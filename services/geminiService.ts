@@ -1,9 +1,17 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Função auxiliar para inicializar a IA apenas quando necessário
+const getAI = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    throw new Error("API_KEY não configurada na Vercel.");
+  }
+  return new GoogleGenAI({ apiKey });
+};
 
 export const generateFlashcards = async (text: string, subjectName: string) => {
+  const ai = getAI();
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `Transforme o seguinte conteúdo sobre "${subjectName}" em uma lista de cartões de estudo (flashcards). 
@@ -25,15 +33,18 @@ export const generateFlashcards = async (text: string, subjectName: string) => {
     }
   });
 
-  // Ensure response.text is not undefined to avoid JSON.parse errors
   return JSON.parse(response.text || '[]');
 };
 
 export const getStudyMotivation = async (subjects: string[]) => {
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: `Estou estudando as seguintes disciplinas: ${subjects.join(', ')}. Me dê uma dica rápida de estudo ou frase motivacional curta.`,
-  });
-  // The .text property is a string | undefined
-  return response.text;
+  try {
+    const ai = getAI();
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Estou estudando as seguintes disciplinas: ${subjects.join(', ')}. Me dê uma dica rápida de estudo ou frase motivacional curta.`,
+    });
+    return response.text;
+  } catch (e) {
+    return "A justiça é a constante e perpétua vontade de dar a cada um o seu.";
+  }
 };
