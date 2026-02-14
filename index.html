@@ -1,0 +1,59 @@
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estuda SanFran</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              sanfran: {
+                rubi: '#9B111E',
+                rubiDark: '#4a080f',
+                rubiBlack: '#1a0505',
+              },
+              usp: {
+                blue: '#1094ab',
+                gold: '#fcb421',
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; transition: background-color 0.3s ease, color 0.3s ease; }
+        .preserve-3d { transform-style: preserve-3d; }
+        .backface-hidden { backface-visibility: hidden; }
+        .rotate-y-180 { transform: rotateY(180deg); }
+        
+        /* Melhoria de contraste para scrollbars */
+        .dark ::-webkit-scrollbar { width: 8px; }
+        .dark ::-webkit-scrollbar-track { background: #1a0505; }
+        .dark ::-webkit-scrollbar-thumb { background: #9B111E; border-radius: 10px; }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "@google/genai": "https://esm.sh/@google/genai@^1.41.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.564.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2"
+  }
+}
+</script>
+</head>
+<body class="bg-[#fcfcfc] dark:bg-sanfran-rubiBlack text-slate-950 dark:text-white">
+    <div id="root"></div>
+</body>
+</html>
