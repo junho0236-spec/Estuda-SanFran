@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Plus, BrainCircuit, Sparkles, RotateCcw, Folder as FolderIcon, ChevronRight as BreadcrumbSeparator, ArrowLeft, Trash2, FolderPlus } from 'lucide-react';
+import { Plus, BrainCircuit, Sparkles, RotateCcw, Folder as FolderIcon, ChevronRight as BreadcrumbSeparator, ArrowLeft, Trash2, FolderPlus, AlertCircle } from 'lucide-react';
 import { Flashcard, Subject, Folder } from '../types';
 import { generateFlashcards } from '../services/geminiService';
 import { supabase } from '../services/supabaseClient';
@@ -26,6 +26,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [manualBack, setManualBack] = useState('');
   const [newFolderName, setNewFolderName] = useState('');
   const [showFolderInput, setShowFolderInput] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const currentFolders = folders.filter(f => f.parentId === currentFolderId);
   const currentCards = flashcards.filter(f => f.folderId === currentFolderId);
@@ -46,6 +47,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const handleGenerate = async () => {
     if (!aiInput.trim()) return;
     setIsGenerating(true);
+    setErrorMessage(null);
     try {
       const subject = subjects.find(s => s.id === selectedSubjectId);
       const newCardsFromAi = await generateFlashcards(aiInput, subject?.name || 'Geral');
@@ -73,7 +75,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setAiInput('');
     } catch (e: any) {
       console.error(e);
-      alert(`Erro no protocolo IA: ${e.message}`);
+      setErrorMessage(e.message || "Erro desconhecido no processamento IA.");
     } finally {
       setIsGenerating(false);
     }
@@ -138,10 +140,10 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               <button onClick={() => { setMode('study'); setCurrentIndex(0); setIsFlipped(false); }} disabled={reviewQueue.length === 0} className="flex items-center gap-2 px-8 py-3.5 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest disabled:opacity-50 hover:bg-sanfran-rubiDark shadow-xl transition-all">
                 <RotateCcw className="w-5 h-5" /> Estudar ({reviewQueue.length})
               </button>
-              <button onClick={() => setMode('create')} className="flex items-center gap-2 px-8 py-3.5 bg-white dark:bg-sanfran-rubiDark text-sanfran-rubi dark:text-white border-2 border-sanfran-rubi rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-50 shadow-xl transition-all">
+              <button onClick={() => {setMode('create'); setErrorMessage(null);}} className="flex items-center gap-2 px-8 py-3.5 bg-white dark:bg-sanfran-rubiDark text-sanfran-rubi dark:text-white border-2 border-sanfran-rubi rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-50 shadow-xl transition-all">
                 <Plus className="w-5 h-5" /> Novo Card
               </button>
-              <button onClick={() => setMode('generate')} className="flex items-center gap-2 px-8 py-3.5 bg-usp-blue text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-[#0d7c8f] shadow-xl transition-all">
+              <button onClick={() => {setMode('generate'); setErrorMessage(null);}} className="flex items-center gap-2 px-8 py-3.5 bg-usp-blue text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-[#0d7c8f] shadow-xl transition-all">
                 <Sparkles className="w-5 h-5" /> Gerar IA
               </button>
               <button onClick={() => setShowFolderInput(true)} className="p-3.5 bg-white dark:bg-sanfran-rubiDark text-sanfran-rubi dark:text-usp-gold border-2 border-slate-200 dark:border-sanfran-rubi/40 rounded-2xl hover:bg-slate-50 shadow-sm transition-all">
@@ -212,11 +214,22 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       )}
 
       {(mode === 'create' || mode === 'generate') && (
-        <div className="bg-white dark:bg-sanfran-rubiDark p-10 rounded-[3rem] border-4 border-slate-300 dark:border-sanfran-rubi/50 shadow-2xl animate-in slide-in-from-bottom-8">
+        <div className="bg-white dark:bg-sanfran-rubiDark p-10 rounded-[3rem] border-4 border-slate-300 dark:border-sanfran-rubi/50 shadow-2xl animate-in slide-in-from-bottom-8 relative overflow-hidden">
           <div className="flex items-center gap-4 mb-8">
             <button onClick={() => setMode('browse')} className="p-3 hover:bg-slate-100 dark:hover:bg-white/10 rounded-2xl text-slate-500 dark:text-white transition-all"><ArrowLeft className="w-8 h-8" /></button>
             <h3 className="text-3xl font-black text-slate-950 dark:text-white uppercase tracking-tight">{mode === 'create' ? 'Protocolo Manual' : 'Processamento IA'}</h3>
           </div>
+
+          {errorMessage && (
+            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-600 rounded-r-xl flex items-center gap-3 animate-in shake duration-300">
+              <AlertCircle className="w-6 h-6 text-red-600 shrink-0" />
+              <div className="flex-1">
+                <p className="text-xs font-black text-red-800 dark:text-red-400 uppercase tracking-tight">Erro no Protocolo IA</p>
+                <p className="text-[10px] font-bold text-red-700/80 dark:text-red-400/80">{errorMessage}</p>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-6">
             <select value={selectedSubjectId} onChange={(e) => setSelectedSubjectId(e.target.value)} className="w-full p-5 bg-slate-50 dark:bg-black/50 border-2 border-slate-300 dark:border-sanfran-rubi/30 rounded-2xl font-black text-slate-950 dark:text-white outline-none">
               {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -227,10 +240,23 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 <textarea value={manualBack} onChange={(e) => setManualBack(e.target.value)} placeholder="Fundamentação / Resposta" className="w-full h-40 p-6 bg-slate-50 dark:bg-black/50 border-2 border-slate-300 rounded-3xl font-bold resize-none outline-none" />
               </div>
             ) : (
-              <textarea value={aiInput} onChange={(e) => setAiInput(e.target.value)} placeholder="Cole o texto jurídico aqui..." className="w-full h-60 p-8 bg-slate-50 dark:bg-black/50 border-2 border-slate-300 rounded-[2.5rem] font-bold resize-none outline-none" />
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-4">Conteúdo Doutrinário / Aula</label>
+                <textarea 
+                  value={aiInput} 
+                  onChange={(e) => setAiInput(e.target.value)} 
+                  placeholder="Cole aqui o texto da aula, doutrina ou jurisprudência para converter em cartões..." 
+                  className="w-full h-60 p-8 bg-slate-50 dark:bg-black/50 border-2 border-slate-300 rounded-[2.5rem] font-bold resize-none outline-none focus:border-usp-blue transition-colors" 
+                />
+              </div>
             )}
-            <button onClick={mode === 'create' ? handleManualCreate : handleGenerate} disabled={isGenerating} className="w-full py-6 bg-sanfran-rubi text-white rounded-[2rem] font-black uppercase text-lg tracking-widest shadow-2xl hover:bg-sanfran-rubiDark disabled:opacity-50">
-              {isGenerating ? "Processando Doutrina..." : mode === 'create' ? "Protocolar Card" : "Gerar Cartões via IA"}
+            <button onClick={mode === 'create' ? handleManualCreate : handleGenerate} disabled={isGenerating} className="w-full py-6 bg-sanfran-rubi text-white rounded-[2rem] font-black uppercase text-lg tracking-widest shadow-2xl hover:bg-sanfran-rubiDark disabled:opacity-50 flex items-center justify-center gap-4 transition-all">
+              {isGenerating ? (
+                <>
+                  <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  <span>Processando Doutrina...</span>
+                </>
+              ) : mode === 'create' ? "Protocolar Card" : "Gerar Cartões via IA"}
             </button>
           </div>
         </div>

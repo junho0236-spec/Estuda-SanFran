@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Timer, BookOpen, CheckSquare, Menu, X, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon } from 'lucide-react';
+import { LayoutDashboard, Timer, BookOpen, CheckSquare, Menu, X, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Key, AlertTriangle } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession } from './types';
 import Dashboard from './components/Dashboard';
 import Anki from './components/Anki';
@@ -11,11 +10,24 @@ import CalendarView from './components/CalendarView';
 import Login from './components/Login';
 import { supabase } from './services/supabaseClient';
 
+declare global {
+  // Fix: Use the expected AIStudio type to avoid conflict with subsequent declarations
+  interface Window {
+    aistudio?: AIStudio;
+  }
+}
+
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>(View.Dashboard);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [session, setSession] = useState<any>(null);
+  
+  // Verifica se a chave existe e não é uma string de erro comum
+  const [hasApiKey, setHasApiKey] = useState(() => {
+    const key = process.env.API_KEY;
+    return !!key && key !== "undefined" && key !== "";
+  });
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem('omnistudy_darkmode');
@@ -40,6 +52,23 @@ const App: React.FC = () => {
     });
 
     return () => subscription.unsubscribe();
+  }, []);
+
+  // Added: Effect to check if an API key has already been selected via the AI Studio dialog on mount
+  useEffect(() => {
+    const checkApiKeySelection = async () => {
+      if (window.aistudio) {
+        try {
+          const hasSelected = await window.aistudio.hasSelectedApiKey();
+          if (hasSelected) {
+            setHasApiKey(true);
+          }
+        } catch (error) {
+          console.error("Erro ao verificar seleção de chave:", error);
+        }
+      }
+    };
+    checkApiKeySelection();
   }, []);
 
   useEffect(() => {
@@ -69,7 +98,7 @@ const App: React.FC = () => {
 
     const { data: tks = [] } = await supabase.from('tasks').select('*').eq('user_id', userId);
     if (tks) setTasks(tks.map(t => ({
-      id: t.id, title: t.title, completed: t.completed, subjectId: t.subject_id, dueDate: t.due_date, completedAt: t.completed_at
+      id: t.id, title: t.title, completed: t.completed, subjectId: t.subject_id, dueDate: t.due_date, completed_at: t.completed_at
     })));
 
     const { data: sessions = [] } = await supabase.from('study_sessions').select('*').eq('user_id', userId);
@@ -81,6 +110,16 @@ const App: React.FC = () => {
     if (isDarkMode) document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
   }, [isDarkMode]);
+
+  const handleOpenKeyDialog = async () => {
+    if (window.aistudio) {
+      await window.aistudio.openSelectKey();
+      // Assume sucesso imediato para evitar race condition conforme diretrizes
+      setHasApiKey(true);
+    } else {
+      alert("Para usar a IA no site publicado, você deve configurar a API_KEY nas variáveis de ambiente da Vercel e fazer o Redeploy.");
+    }
+  };
 
   const navItems = [
     { id: View.Dashboard, icon: LayoutDashboard, label: 'Painel' },
@@ -137,6 +176,14 @@ const App: React.FC = () => {
           ))}
         </nav>
         <div className="p-4 space-y-3">
+          {!hasApiKey && (
+            <button onClick={handleOpenKeyDialog} className="w-full flex flex-col items-center gap-1 px-4 py-3 rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 text-amber-800 dark:text-amber-200 hover:scale-[1.02] transition-all group">
+              <div className="flex items-center gap-2 font-black text-[10px] uppercase tracking-widest">
+                <Key className="w-4 h-4 group-hover:rotate-45 transition-transform" /> Ativar IA (Chave)
+              </div>
+              <span className="text-[8px] opacity-70">Necessário para Flashcards IA</span>
+            </button>
+          )}
           <button onClick={() => setIsDarkMode(!isDarkMode)} className="w-full flex items-center justify-between px-5 py-4 rounded-2xl bg-slate-100 dark:bg-sanfran-rubiDark border border-slate-200 dark:border-sanfran-rubi/30 text-slate-950 dark:text-white hover:scale-[1.02] transition-all">
             <span className="text-xs font-black uppercase tracking-widest">{isDarkMode ? 'Modo Escuro' : 'Modo Claro'}</span>
             {isDarkMode ? <Moon className="w-5 h-5 text-usp-blue" /> : <Sun className="w-5 h-5 text-usp-gold" />}
@@ -149,6 +196,18 @@ const App: React.FC = () => {
         </div>
       </aside>
       <main className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12 transition-colors duration-300">
+        {!hasApiKey && (
+          <div className="mb-8 p-6 bg-red-50 dark:bg-red-900/10 border-l-8 border-red-600 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 animate-pulse">
+            <div className="flex items-center gap-4">
+              <AlertTriangle className="w-8 h-8 text-red-600" />
+              <div>
+                <p className="text-sm font-black text-red-800 dark:text-red-400 uppercase tracking-tight">IA Desconectada</p>
+                <p className="text-xs text-red-600/80 font-bold uppercase">A chave de API não foi detectada no ambiente de produção.</p>
+              </div>
+            </div>
+            <button onClick={handleOpenKeyDialog} className="px-6 py-2 bg-red-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-red-700 transition-colors">Resolver Agora</button>
+          </div>
+        )}
         <div className="max-w-6xl mx-auto">{renderContent()}</div>
       </main>
     </div>
