@@ -3,7 +3,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 
 /**
  * Gera flashcards utilizando o modelo Gemini.
- * De acordo com as diretrizes, a chave de API é obtida exclusivamente de process.env.API_KEY.
+ * Chave de API obtida exclusivamente de process.env.API_KEY.
  */
 export const generateFlashcards = async (text: string, subjectName: string) => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -36,19 +36,19 @@ export const generateFlashcards = async (text: string, subjectName: string) => {
       }
     });
 
-    if (!response.text) throw new Error("O modelo não retornou uma resposta válida.");
+    if (!response.text) throw new Error("A IA não retornou conteúdo.");
     return JSON.parse(response.text.trim());
   } catch (err: any) {
     console.error("Erro Gemini:", err);
-    // Erros de autenticação (como chave ausente ou inválida) serão capturados aqui
-    if (err.message?.includes("API key") || err.status === 401 || err.status === 403) {
-      throw new Error("Erro de Autenticação na IA. Certifique-se de que o sistema está configurado corretamente com a API_KEY.");
-    }
-    throw new Error("Ocorreu um erro ao processar o texto jurídico. Tente novamente em instantes.");
+    throw new Error(err.message || "Erro ao processar IA. Verifique as configurações na Vercel.");
   }
 };
 
 export const getStudyMotivation = async (subjects: string[]) => {
+  if (!process.env.API_KEY || process.env.API_KEY === "undefined") {
+    return "A justiça é a constante e perpétua vontade de dar a cada um o seu. - Ulpiano";
+  }
+
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   try {

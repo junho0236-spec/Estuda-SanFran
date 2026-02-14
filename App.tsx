@@ -98,7 +98,7 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
-        <nav className="p-4 space-y-2 flex-1">
+        <nav className="p-4 space-y-2 flex-1 overflow-y-auto">
           {navItems.map((item) => (
             <button key={item.id} onClick={() => setCurrentView(item.id)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${currentView === item.id ? 'bg-sanfran-rubi text-white font-black' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-sanfran-rubi/10'}`}>
               <item.icon className="w-5 h-5" />
