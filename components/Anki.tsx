@@ -164,7 +164,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       const { error } = await supabase
         .from('flashcards')
         .update({ interval: newInterval, next_review: nextReview })
-        .eq('id', card.id);
+        .eq('id', card.id)
+        .eq('user_id', userId);
       
       if (error) throw error;
 
@@ -188,7 +189,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     e.stopPropagation();
     if (confirm("Deseja realmente excluir este pack? Todos os cards internos serão perdidos.")) {
       try {
-        const { error } = await supabase.from('folders').delete().eq('id', folderId);
+        const { error } = await supabase.from('folders').delete().eq('id', folderId).eq('user_id', userId);
         if (error) throw error;
 
         const idsToDelete = getSubfolderIds(folderId);
@@ -319,7 +320,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                       e.stopPropagation(); 
                       if(confirm('Excluir card?')) {
                         try {
-                          const { error } = await supabase.from('flashcards').delete().eq('id', card.id);
+                          const { error } = await supabase.from('flashcards').delete().eq('id', card.id).eq('user_id', userId);
                           if (error) throw error;
                           setFlashcards(prev => prev.filter(f => f.id !== card.id));
                         } catch (err) { console.error(err); alert("Erro ao excluir."); }

@@ -48,7 +48,7 @@ const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId }) =>
   const removeSubject = async (id: string) => {
     if (!confirm('Deseja realmente remover esta cadeira acadêmica?')) return;
     try {
-      const { error } = await supabase.from('subjects').delete().eq('id', id);
+      const { error } = await supabase.from('subjects').delete().eq('id', id).eq('user_id', userId);
       if (error) throw error;
       setSubjects(prev => prev.filter(s => s.id !== id));
     } catch (err) {

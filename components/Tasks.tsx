@@ -51,7 +51,8 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
       const { error } = await supabase
         .from('tasks')
         .update({ completed: !task.completed })
-        .eq('id', task.id);
+        .eq('id', task.id)
+        .eq('user_id', userId);
       if (error) throw error;
       setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed: !task.completed } : t));
     } catch (err) {
@@ -61,7 +62,7 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
 
   const removeTask = async (id: string) => {
     try {
-      const { error } = await supabase.from('tasks').delete().eq('id', id);
+      const { error } = await supabase.from('tasks').delete().eq('id', id).eq('user_id', userId);
       if (error) throw error;
       setTasks(prev => prev.filter(t => t.id !== id));
     } catch (err) {
