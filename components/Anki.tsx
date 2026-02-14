@@ -45,7 +45,6 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [showFolderInput, setShowFolderInput] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
-  // Estados para Seleção em Massa
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set());
 
@@ -413,19 +412,27 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               <div className="h-full bg-sanfran-rubi transition-all" style={{ width: `${((currentIndex + 1) / reviewQueue.length) * 100}%` }}></div>
             </div>
           </div>
-          <div onClick={() => setIsFlipped(!isFlipped)} className="relative w-full max-w-2xl h-[400px] cursor-pointer transition-transform duration-700 transform-gpu preserve-3d">
-            <div className={`absolute inset-0 w-full h-full duration-700 transition-all ${isFlipped ? 'rotate-y-180' : ''}`} style={{ transformStyle: 'preserve-3d' }}>
-              <div className={`absolute inset-0 w-full h-full bg-white dark:bg-sanfran-rubiDark border-[6px] border-slate-200 dark:border-sanfran-rubi/40 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden ${isFlipped ? 'hidden' : 'flex'}`}>
+          
+          <div className="relative w-full max-w-2xl h-[400px] preserve-3d">
+            <div 
+              onClick={() => setIsFlipped(!isFlipped)} 
+              className={`absolute inset-0 w-full h-full cursor-pointer transition-transform duration-700 preserve-3d ${isFlipped ? 'rotate-y-180' : ''}`}
+            >
+              {/* Face da Frente */}
+              <div className="absolute inset-0 w-full h-full bg-white dark:bg-sanfran-rubiDark border-[6px] border-slate-200 dark:border-sanfran-rubi/40 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden">
                 <span className="text-xs font-black text-sanfran-rubi uppercase tracking-[0.3em] mb-8">Questão Jurídica</span>
                 <p className="text-2xl font-black text-slate-950 dark:text-white leading-tight">{reviewQueue[currentIndex].front}</p>
                 <p className="absolute bottom-12 text-slate-500 text-xs font-black uppercase animate-pulse">Toque para desvelar</p>
               </div>
-              <div className={`absolute inset-0 w-full h-full bg-slate-50 dark:bg-black/60 border-[6px] border-usp-blue/40 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center ${!isFlipped ? 'hidden' : 'flex'}`}>
+              
+              {/* Face de Trás (Pré-rotacionada para não espelhar o texto) */}
+              <div className="absolute inset-0 w-full h-full bg-slate-50 dark:bg-black/80 border-[6px] border-usp-blue/40 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden rotate-y-180">
                 <span className="text-xs font-black text-usp-blue uppercase tracking-[0.3em] mb-8">Doutrina / Resposta</span>
                 <p className="text-2xl font-black text-slate-950 dark:text-white leading-tight">{reviewQueue[currentIndex].back}</p>
               </div>
             </div>
           </div>
+
           {isFlipped && (
             <div className="mt-12 grid grid-cols-3 gap-6 w-full max-w-2xl animate-in fade-in slide-in-from-bottom-6">
               <button onClick={() => handleReview(0)} className="p-6 bg-red-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:scale-105 transition-transform">Difícil</button>
