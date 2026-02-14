@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Timer, BookOpen, CheckSquare, Menu, X, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Key, AlertTriangle, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Timer, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession } from './types';
 import Dashboard from './components/Dashboard';
 import Anki from './components/Anki';
@@ -11,35 +11,11 @@ import CalendarView from './components/CalendarView';
 import Login from './components/Login';
 import { supabase } from './services/supabaseClient';
 
-declare global {
-  interface AIStudio {
-    hasSelectedApiKey: () => Promise<boolean>;
-    openSelectKey: () => Promise<void>;
-  }
-  interface Window {
-    aistudio?: AIStudio;
-  }
-}
-
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>(View.Dashboard);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [session, setSession] = useState<any>(null);
-  const [isAiActive, setIsAiActive] = useState(false);
-
-  // Verifica se a IA já está ativa no carregamento
-  useEffect(() => {
-    const checkAiStatus = async () => {
-      if (window.aistudio) {
-        const active = await window.aistudio.hasSelectedApiKey();
-        setIsAiActive(active);
-      } else if (process.env.API_KEY && process.env.API_KEY !== "undefined") {
-        setIsAiActive(true);
-      }
-    };
-    checkAiStatus();
-  }, []);
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem('omnistudy_darkmode');
@@ -99,15 +75,6 @@ const App: React.FC = () => {
     else document.documentElement.classList.remove('dark');
   }, [isDarkMode]);
 
-  const handleActivateAi = async () => {
-    if (window.aistudio) {
-      await window.aistudio.openSelectKey();
-      setIsAiActive(true);
-    } else {
-      alert("Seletor de IA não disponível neste navegador.");
-    }
-  };
-
   if (!isAuthenticated) return <Login onLogin={() => setIsAuthenticated(true)} />;
 
   const navItems = [
@@ -140,16 +107,6 @@ const App: React.FC = () => {
           ))}
         </nav>
         <div className="p-4 space-y-3">
-          {!isAiActive ? (
-            <button onClick={handleActivateAi} className="w-full flex flex-col items-center gap-1 px-4 py-3 rounded-2xl bg-usp-gold text-slate-900 font-black text-[10px] uppercase tracking-widest hover:scale-[1.02] transition-all shadow-lg animate-bounce">
-              <div className="flex items-center gap-2"><Key className="w-4 h-4" /> Ativar Inteligência IA</div>
-              <span className="text-[8px] opacity-70">Para gerar flashcards</span>
-            </button>
-          ) : (
-            <div className="w-full flex items-center gap-2 px-4 py-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 font-black text-[10px] uppercase tracking-widest justify-center">
-              <Sparkles className="w-4 h-4" /> IA Conectada
-            </div>
-          )}
           <button onClick={() => setIsDarkMode(!isDarkMode)} className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-slate-100 dark:bg-sanfran-rubiDark text-xs font-black uppercase tracking-widest text-slate-900 dark:text-white">
             {isDarkMode ? 'Escuro' : 'Claro'}
             {isDarkMode ? <Moon className="w-4 h-4 text-usp-blue" /> : <Sun className="w-4 h-4 text-usp-gold" />}
@@ -159,18 +116,6 @@ const App: React.FC = () => {
       </aside>
 
       <main className="flex-1 overflow-y-auto p-4 md:p-10">
-        {!isAiActive && currentView === View.Anki && (
-          <div className="mb-8 p-6 bg-usp-gold/10 border-l-8 border-usp-gold rounded-2xl flex items-center justify-between gap-4 shadow-xl">
-            <div className="flex items-center gap-4">
-              <Sparkles className="w-8 h-8 text-usp-gold shrink-0" />
-              <div>
-                <p className="font-black uppercase text-sm text-slate-900 dark:text-white">Potencialize seus estudos com IA</p>
-                <p className="text-xs text-slate-600 dark:text-slate-400">Ative sua chave para converter doutrinas em flashcards automaticamente.</p>
-              </div>
-            </div>
-            <button onClick={handleActivateAi} className="px-6 py-2 bg-usp-gold text-slate-900 rounded-xl font-black text-[10px] uppercase shadow-lg hover:scale-105 transition-transform">Conectar Agora</button>
-          </div>
-        )}
         <div className="max-w-6xl mx-auto">
           {currentView === View.Dashboard && <Dashboard subjects={subjects} flashcards={flashcards} tasks={tasks} studySessions={studySessions} />}
           {currentView === View.Anki && <Anki subjects={subjects} flashcards={flashcards} setFlashcards={setFlashcards} folders={folders} setFolders={setFolders} userId={session.user.id} />}

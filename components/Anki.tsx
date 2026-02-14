@@ -75,7 +75,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setAiInput('');
     } catch (e: any) {
       console.error(e);
-      setErrorMessage(e.message || "Falha técnica na geração. Verifique sua chave de IA.");
+      setErrorMessage(e.message || "Erro inesperado ao gerar cartões. Verifique as configurações de IA.");
     } finally {
       setIsGenerating(false);
     }
@@ -220,7 +220,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
             <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-600 rounded-r-xl flex items-center gap-3 animate-in shake duration-300">
               <AlertCircle className="w-6 h-6 text-red-600 shrink-0" />
               <div className="flex-1">
-                <p className="text-xs font-black text-red-800 dark:text-red-400 uppercase tracking-tight">Falha de Protocolo</p>
+                <p className="text-xs font-black text-red-800 dark:text-red-400 uppercase tracking-tight">Falha Técnica</p>
                 <p className="text-[10px] font-bold text-red-700/80 dark:text-red-400/80">{errorMessage}</p>
               </div>
             </div>

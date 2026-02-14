@@ -3,10 +3,9 @@ import { GoogleGenAI, Type } from "@google/genai";
 
 /**
  * Gera flashcards utilizando o modelo Gemini.
- * A instância do GoogleGenAI é criada dentro da função para garantir o uso da chave mais recente.
+ * De acordo com as diretrizes, a chave de API é obtida exclusivamente de process.env.API_KEY.
  */
 export const generateFlashcards = async (text: string, subjectName: string) => {
-  // Cria a instância no momento da chamada para pegar a chave injetada pelo seletor
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   try {
@@ -37,22 +36,20 @@ export const generateFlashcards = async (text: string, subjectName: string) => {
       }
     });
 
-    if (!response.text) throw new Error("A IA não retornou conteúdo. Verifique sua conexão.");
+    if (!response.text) throw new Error("O modelo não retornou uma resposta válida.");
     return JSON.parse(response.text.trim());
   } catch (err: any) {
-    console.error("Erro no processamento Gemini:", err);
-    if (err.message?.includes("API key") || err.message?.includes("entity was not found")) {
-      throw new Error("Sua chave de IA expirou ou é inválida. Clique em 'Ativar IA' novamente.");
+    console.error("Erro Gemini:", err);
+    // Erros de autenticação (como chave ausente ou inválida) serão capturados aqui
+    if (err.message?.includes("API key") || err.status === 401 || err.status === 403) {
+      throw new Error("Erro de Autenticação na IA. Certifique-se de que o sistema está configurado corretamente com a API_KEY.");
     }
-    throw err;
+    throw new Error("Ocorreu um erro ao processar o texto jurídico. Tente novamente em instantes.");
   }
 };
 
 export const getStudyMotivation = async (subjects: string[]) => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey || apiKey === "undefined") return "A justiça é a constante e perpétua vontade de dar a cada um o seu. - Ulpiano";
-
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   try {
     const response = await ai.models.generateContent({
