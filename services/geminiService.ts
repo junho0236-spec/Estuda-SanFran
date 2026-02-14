@@ -1,47 +1,53 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-// Função auxiliar para inicializar a IA apenas quando necessário
 const getAI = () => {
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
-    throw new Error("API_KEY não configurada na Vercel.");
+    throw new Error("API_KEY não encontrada. Verifique as configurações na Vercel.");
   }
   return new GoogleGenAI({ apiKey });
 };
 
 export const generateFlashcards = async (text: string, subjectName: string) => {
-  const ai = getAI();
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: `Transforme o seguinte conteúdo sobre "${subjectName}" em uma lista de cartões de estudo (flashcards). 
-    Crie cartões concisos e diretos com Pergunta e Resposta.
-    Texto base: ${text}`,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            front: { type: Type.STRING, description: 'A pergunta ou conceito.' },
-            back: { type: Type.STRING, description: 'A resposta ou explicação.' }
-          },
-          required: ["front", "back"]
+  try {
+    const ai = getAI();
+    // Usando gemini-2.0-flash que costuma ser mais estável para JSON schema
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.0-flash', 
+      contents: `Você é um tutor da SanFran (FDUSP). Transforme o conteúdo sobre "${subjectName}" em Flashcards para estudo.
+      O texto é: ${text}
+      Responda apenas com o JSON conforme o esquema solicitado.`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              front: { type: Type.STRING, description: 'Pergunta ou conceito jurídico.' },
+              back: { type: Type.STRING, description: 'Resposta fundamentada ou explicação.' }
+            },
+            required: ["front", "back"]
+          }
         }
       }
-    }
-  });
+    });
 
-  return JSON.parse(response.text || '[]');
+    if (!response.text) throw new Error("IA retornou corpo vazio.");
+    return JSON.parse(response.text.trim());
+  } catch (err: any) {
+    console.error("Erro Gemini Service:", err);
+    throw new Error(err.message || "Erro desconhecido na IA.");
+  }
 };
 
 export const getStudyMotivation = async (subjects: string[]) => {
   try {
     const ai = getAI();
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Estou estudando as seguintes disciplinas: ${subjects.join(', ')}. Me dê uma dica rápida de estudo ou frase motivacional curta.`,
+      model: 'gemini-2.0-flash',
+      contents: `Dê uma frase motivacional jurídica curta para quem estuda: ${subjects.join(', ')}.`,
     });
     return response.text;
   } catch (e) {

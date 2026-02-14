@@ -2,18 +2,34 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, RotateCcw, Coffee, Zap, Scale } from 'lucide-react';
 import { Subject } from '../types';
+import { supabase } from '../services/supabaseClient';
 
 interface PomodoroProps {
   subjects: Subject[];
+  userId: string;
 }
 
-const Pomodoro: React.FC<PomodoroProps> = ({ subjects }) => {
+const Pomodoro: React.FC<PomodoroProps> = ({ subjects, userId }) => {
   const [secondsLeft, setSecondsLeft] = useState(25 * 60);
   const [isActive, setIsActive] = useState(false);
   const [mode, setMode] = useState<'work' | 'break'>('work');
   const [selectedSubject, setSelectedSubject] = useState(subjects[0]?.id || '');
   
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const saveSession = async (duration: number) => {
+    try {
+      await supabase.from('study_sessions').insert({
+        id: Math.random().toString(36).substr(2, 9),
+        user_id: userId,
+        duration: duration,
+        subject_id: selectedSubject,
+        start_time: new Date().toISOString()
+      });
+    } catch (e) {
+      console.error("Erro ao protocolar tempo:", e);
+    }
+  };
 
   useEffect(() => {
     if (isActive && secondsLeft > 0) {
@@ -23,11 +39,14 @@ const Pomodoro: React.FC<PomodoroProps> = ({ subjects }) => {
     } else if (secondsLeft === 0) {
       setIsActive(false);
       if (mode === 'work') {
+        saveSession(25 * 60);
         setMode('break');
         setSecondsLeft(5 * 60);
+        alert("Labuta concluída! Hora do recreio.");
       } else {
         setMode('work');
         setSecondsLeft(25 * 60);
+        alert("Recreio encerrado. De volta aos autos.");
       }
     }
     return () => {
@@ -37,13 +56,15 @@ const Pomodoro: React.FC<PomodoroProps> = ({ subjects }) => {
 
   const toggleTimer = () => setIsActive(!isActive);
   const resetTimer = () => { setIsActive(false); setSecondsLeft(mode === 'work' ? 25 * 60 : 5 * 60); };
+  
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const progress = ((mode === 'work' ? 25 * 60 : 5 * 60) - secondsLeft) / (mode === 'work' ? 25 * 60 : 5 * 60) * 100;
+  const totalTime = mode === 'work' ? 25 * 60 : 5 * 60;
+  const progress = ((totalTime - secondsLeft) / totalTime) * 100;
 
   return (
     <div className="max-w-xl mx-auto space-y-8 animate-in zoom-in duration-300">
@@ -65,8 +86,12 @@ const Pomodoro: React.FC<PomodoroProps> = ({ subjects }) => {
         </div>
 
         <div className="flex gap-4 mb-8">
-          <button onClick={toggleTimer} className={`w-16 h-16 rounded-full flex items-center justify-center transition-all shadow-xl ${isActive ? 'bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300' : 'bg-[#9B111E] text-white'}`}>{isActive ? <Pause /> : <Play fill="currentColor" />}</button>
-          <button onClick={resetTimer} className="w-16 h-16 rounded-full bg-slate-50 dark:bg-white/5 text-slate-300 dark:text-slate-600 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-white/10 transition-all border border-slate-100 dark:border-slate-800"><RotateCcw /></button>
+          <button onClick={toggleTimer} className={`w-16 h-16 rounded-full flex items-center justify-center transition-all shadow-xl ${isActive ? 'bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300' : 'bg-[#9B111E] text-white'}`}>
+            {isActive ? <Pause /> : <Play fill="currentColor" />}
+          </button>
+          <button onClick={resetTimer} className="w-16 h-16 rounded-full bg-slate-50 dark:bg-white/5 text-slate-300 dark:text-slate-600 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-white/10 transition-all border border-slate-100 dark:border-slate-800">
+            <RotateCcw />
+          </button>
         </div>
 
         <div className="w-full space-y-2">
@@ -74,17 +99,6 @@ const Pomodoro: React.FC<PomodoroProps> = ({ subjects }) => {
           <select value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value)} className="w-full p-4 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-slate-800 rounded-2xl font-bold text-center outline-none focus:ring-2 focus:ring-[#9B111E] text-slate-800 dark:text-slate-100 transition-all">
             {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white dark:bg-[#181818] p-5 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-red-50 dark:bg-[#9B111E]/10 rounded-2xl text-[#9B111E]"><Scale className="w-6 h-6" /></div>
-          <div><p className="text-[9px] text-slate-400 dark:text-slate-500 font-black uppercase tracking-widest leading-none mb-1">Duração Labuta</p><p className="text-slate-900 dark:text-slate-100 font-black text-lg">25:00</p></div>
-        </div>
-        <div className="bg-white dark:bg-[#181818] p-5 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-cyan-50 dark:bg-[#1094ab]/10 rounded-2xl text-[#1094ab]"><Coffee className="w-6 h-6" /></div>
-          <div><p className="text-[9px] text-slate-400 dark:text-slate-500 font-black uppercase tracking-widest leading-none mb-1">Pausa para Café</p><p className="text-slate-900 dark:text-slate-100 font-black text-lg">05:00</p></div>
         </div>
       </div>
     </div>

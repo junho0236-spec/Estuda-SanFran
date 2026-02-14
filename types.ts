@@ -4,7 +4,8 @@ export enum View {
   Anki = 'anki',
   Timer = 'timer',
   Subjects = 'subjects',
-  Tasks = 'tasks'
+  Tasks = 'tasks',
+  Calendar = 'calendar'
 }
 
 export interface Folder {
@@ -18,9 +19,9 @@ export interface Flashcard {
   front: string;
   back: string;
   subjectId: string;
-  folderId: string | null; // ID of the pack/folder it belongs to
-  nextReview: number; // timestamp
-  interval: number; // days
+  folderId: string | null;
+  nextReview: number;
+  interval: number;
 }
 
 export interface Subject {
@@ -39,7 +40,7 @@ export interface Task {
 
 export interface StudySession {
   id: string;
-  startTime: number;
-  duration: number; // seconds
-  subjectId: string;
+  start_time: string;
+  duration: number;
+  subject_id: string;
 }
