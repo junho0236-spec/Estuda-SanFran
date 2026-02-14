@@ -1,6 +1,20 @@
 
 import React, { useState } from 'react';
-import { Plus, BrainCircuit, Sparkles, RotateCcw, Folder as FolderIcon, ChevronRight as BreadcrumbSeparator, ArrowLeft, Trash2, FolderPlus, AlertCircle, ShieldAlert, ExternalLink } from 'lucide-react';
+import { 
+  Plus, 
+  BrainCircuit, 
+  Sparkles, 
+  RotateCcw, 
+  Folder as FolderIcon, 
+  ChevronRight, 
+  ArrowLeft, 
+  Trash2, 
+  FolderPlus, 
+  AlertCircle, 
+  ShieldAlert, 
+  ExternalLink, 
+  ShieldCheck
+} from 'lucide-react';
 import { Flashcard, Subject, Folder } from '../types';
 import { generateFlashcards } from '../services/geminiService';
 import { supabase } from '../services/supabaseClient';
@@ -28,21 +42,14 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [showFolderInput, setShowFolderInput] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const currentFolders = folders.filter(f => f.parentId === currentFolderId);
-  const currentCards = flashcards.filter(f => f.folderId === currentFolderId);
-  
   const getSubfolderIds = (folderId: string | null): string[] => {
-    let ids = folderId ? [folderId] : [];
+    let ids: string[] = folderId ? [folderId] : [];
     const children = folders.filter(f => f.parentId === folderId);
-    children.forEach(child => { ids = [...ids, ...getSubfolderIds(child.id)]; });
+    children.forEach(child => {
+      ids = [...ids, ...getSubfolderIds(child.id)];
+    });
     return ids;
   };
-
-  const currentContextIds = getSubfolderIds(currentFolderId);
-  const reviewQueue = flashcards.filter(f => 
-    f.nextReview <= Date.now() && 
-    (currentFolderId === null ? true : currentContextIds.includes(f.folderId as string))
-  );
 
   const handleGenerate = async () => {
     if (!aiInput.trim()) return;
@@ -50,9 +57,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     setErrorMessage(null);
     try {
       const subject = subjects.find(s => s.id === selectedSubjectId);
-      const newCardsFromAi = await generateFlashcards(aiInput, subject?.name || 'Geral');
+      const cards = await generateFlashcards(aiInput, subject?.name || 'Geral');
       
-      const cardsToInsert = newCardsFromAi.map((c: any) => ({
+      const cardsToInsert = cards.map((c: any) => ({
         id: Math.random().toString(36).substr(2, 9),
         front: c.front,
         back: c.back,
@@ -66,18 +73,64 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       const { error } = await supabase.from('flashcards').insert(cardsToInsert);
       if (error) throw error;
 
-      const formattedCards: Flashcard[] = cardsToInsert.map(c => ({
-        id: c.id, front: c.front, back: c.back, subjectId: c.subject_id, folderId: c.folder_id, nextReview: c.next_review, interval: c.interval
+      const formattedCards: Flashcard[] = cardsToInsert.map((c: any) => ({
+        id: c.id, 
+        front: c.front, 
+        back: c.back, 
+        subjectId: c.subject_id, 
+        folderId: c.folder_id, 
+        nextReview: c.next_review, 
+        interval: c.interval
       }));
 
       setFlashcards(prev => [...prev, ...formattedCards]);
       setMode('browse');
       setAiInput('');
-    } catch (e: any) {
-      console.error(e);
-      setErrorMessage(e.message || "Erro inesperado ao gerar cartões.");
+    } catch (err: any) {
+      setErrorMessage(err.message);
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const deleteFlashcard = async (id: string) => {
+    if (!confirm("Deseja realmente eliminar este card do processo de estudos?")) return;
+    
+    try {
+      const { error } = await supabase
+        .from('flashcards')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', userId);
+        
+      if (error) throw error;
+      
+      setFlashcards(prev => prev.filter(card => card.id !== id));
+    } catch (err) {
+      console.error("Erro ao deletar card:", err);
+      alert("Falha ao remover o card do sistema.");
+    }
+  };
+
+  const deleteFolder = async (e: React.MouseEvent, folderId: string) => {
+    e.stopPropagation();
+    if (!confirm("Deseja realmente excluir este pack e todos os sub-diretórios?")) return;
+    
+    try {
+      const idsToDelete = getSubfolderIds(folderId);
+      const { error } = await supabase
+        .from('folders')
+        .delete()
+        .in('id', idsToDelete)
+        .eq('user_id', userId);
+        
+      if (error) throw error;
+      
+      setFolders(prev => prev.filter(f => !idsToDelete.includes(f.id)));
+      setFlashcards(prev => prev.filter(fc => !idsToDelete.includes(fc.folderId as string)));
+      if (currentFolderId === folderId) setCurrentFolderId(null);
+    } catch (err) {
+      console.error("Erro ao deletar pasta:", err);
     }
   };
 
@@ -86,51 +139,89 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     const newId = Math.random().toString(36).substr(2, 9);
     try {
       const { error } = await supabase.from('flashcards').insert({
-        id: newId, user_id: userId, front: manualFront, back: manualBack, subject_id: selectedSubjectId, folder_id: currentFolderId, next_review: Date.now(), interval: 0
+        id: newId, 
+        user_id: userId, 
+        front: manualFront, 
+        back: manualBack, 
+        subject_id: selectedSubjectId, 
+        folder_id: currentFolderId, 
+        next_review: Date.now(), 
+        interval: 0
       });
       if (error) throw error;
-      setFlashcards(prev => [...prev, { id: newId, front: manualFront, back: manualBack, subjectId: selectedSubjectId, folderId: currentFolderId, nextReview: Date.now(), interval: 0 }]);
-      setManualFront(''); setManualBack(''); setMode('browse');
-    } catch (err) { alert("Erro ao protocolar card."); }
+      setFlashcards(prev => [...prev, { 
+        id: newId, 
+        front: manualFront, 
+        back: manualBack, 
+        subjectId: selectedSubjectId, 
+        folderId: currentFolderId, 
+        nextReview: Date.now(), 
+        interval: 0 
+      }]);
+      setManualFront(''); 
+      setManualBack(''); 
+      setMode('browse');
+    } catch (err) { 
+      alert("Erro ao protocolar card."); 
+    }
   };
 
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) return;
     const newId = Math.random().toString(36).substr(2, 9);
     try {
-      const { error } = await supabase.from('folders').insert({ id: newId, user_id: userId, name: newFolderName, parent_id: currentFolderId });
+      const { error } = await supabase.from('folders').insert({ 
+        id: newId, 
+        user_id: userId, 
+        name: newFolderName, 
+        parent_id: currentFolderId 
+      });
       if (error) throw error;
       setFolders(prev => [...prev, { id: newId, name: newFolderName, parentId: currentFolderId }]);
-      setNewFolderName(''); setShowFolderInput(false);
-    } catch (err) { alert("Erro ao criar pasta."); }
+      setNewFolderName(''); 
+      setShowFolderInput(false);
+    } catch (err) { 
+      alert("Erro ao criar pasta."); 
+    }
   };
+
+  const currentFolders = folders.filter(f => f.parentId === currentFolderId);
+  const currentCards = flashcards.filter(f => f.folderId === currentFolderId);
+  const currentContextIds = getSubfolderIds(currentFolderId);
+  const reviewQueue = flashcards.filter(f => 
+    f.nextReview <= Date.now() && 
+    (currentFolderId === null ? true : currentContextIds.includes(f.folderId as string))
+  );
 
   const handleReview = async (quality: number) => {
     const card = reviewQueue[currentIndex];
     const newInterval = quality === 0 ? 0 : (card.interval === 0 ? 1 : card.interval * 2);
     const nextReview = Date.now() + newInterval * 24 * 60 * 60 * 1000;
     try {
-      await supabase.from('flashcards').update({ interval: newInterval, next_review: nextReview }).eq('id', card.id).eq('user_id', userId);
+      await supabase.from('flashcards').update({ 
+        interval: newInterval, 
+        next_review: nextReview 
+      }).eq('id', card.id).eq('user_id', userId);
+      
       setFlashcards(prev => prev.map(f => f.id === card.id ? { ...f, interval: newInterval, nextReview } : f));
-      if (currentIndex < reviewQueue.length - 1) { setCurrentIndex(prev => prev + 1); setIsFlipped(false); }
-      else { setMode('browse'); setCurrentIndex(0); setIsFlipped(false); }
-    } catch (err) { alert("Erro ao atualizar revisão."); }
-  };
-
-  const deleteFolder = async (e: React.MouseEvent, folderId: string) => {
-    e.stopPropagation();
-    if (confirm("Deseja realmente excluir este pack?")) {
-      await supabase.from('folders').delete().eq('id', folderId).eq('user_id', userId);
-      const idsToDelete = getSubfolderIds(folderId);
-      setFolders(prev => prev.filter(f => !idsToDelete.includes(f.id)));
-      setFlashcards(prev => prev.filter(fc => !idsToDelete.includes(fc.folderId as string)));
+      
+      if (currentIndex < reviewQueue.length - 1) { 
+        setCurrentIndex(prev => prev + 1); 
+        setIsFlipped(false); 
+      } else { 
+        setMode('browse'); 
+        setCurrentIndex(0); 
+        setIsFlipped(false); 
+      }
+    } catch (err) { 
+      alert("Erro ao atualizar revisão."); 
     }
   };
 
-  const isAuthError = errorMessage?.includes("CHAVE_AUSENTE") || errorMessage?.includes("CHAVE_INVALIDA") || errorMessage?.includes("API Key");
+  const isAuthError = errorMessage?.includes("DILIGÊNCIA") || errorMessage?.includes("CHAVE_AUSENTE");
 
   return (
-    <div className="space-y-10 max-w-5xl mx-auto pb-20">
+    <div className="space-y-10 max-w-5xl mx-auto pb-20 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h2 className="text-4xl font-black text-slate-950 dark:text-white uppercase tracking-tight">Flashcards</h2>
@@ -139,7 +230,11 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         <div className="flex flex-wrap gap-3">
           {mode === 'browse' && (
             <>
-              <button onClick={() => { setMode('study'); setCurrentIndex(0); setIsFlipped(false); }} disabled={reviewQueue.length === 0} className="flex items-center gap-2 px-8 py-3.5 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest disabled:opacity-50 hover:bg-sanfran-rubiDark shadow-xl transition-all">
+              <button 
+                onClick={() => { setMode('study'); setCurrentIndex(0); setIsFlipped(false); }} 
+                disabled={reviewQueue.length === 0} 
+                className="flex items-center gap-2 px-8 py-3.5 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest disabled:opacity-50 hover:bg-sanfran-rubiDark shadow-xl transition-all"
+              >
                 <RotateCcw className="w-5 h-5" /> Estudar ({reviewQueue.length})
               </button>
               <button onClick={() => {setMode('create'); setErrorMessage(null);}} className="flex items-center gap-2 px-8 py-3.5 bg-white dark:bg-sanfran-rubiDark text-sanfran-rubi dark:text-white border-2 border-sanfran-rubi rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-50 shadow-xl transition-all">
@@ -156,6 +251,16 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         </div>
       </div>
 
+      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 bg-slate-100 dark:bg-white/5 p-2 rounded-lg inline-flex">
+        <button onClick={() => setCurrentFolderId(null)} className="hover:text-sanfran-rubi">Início</button>
+        {currentFolderId && (
+          <>
+            <ChevronRight className="w-3 h-3" />
+            <span className="text-sanfran-rubi">Diretório Atual</span>
+          </>
+        )}
+      </div>
+
       {showFolderInput && (
         <div className="bg-white dark:bg-sanfran-rubiDark p-6 rounded-2xl border-2 border-usp-gold shadow-xl flex gap-3 animate-in slide-in-from-top-4">
           <input type="text" value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="Nome do pack/pasta..." className="flex-1 bg-transparent outline-none font-bold text-slate-950 dark:text-white" />
@@ -164,8 +269,55 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         </div>
       )}
 
+      {mode === 'browse' && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
+          {currentFolders.map(folder => (
+            <div key={folder.id} onClick={() => setCurrentFolderId(folder.id)} className="bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2rem] border-2 border-slate-200 dark:border-sanfran-rubi/40 shadow-xl hover:shadow-2xl hover:border-usp-gold cursor-pointer transition-all group relative border-l-[10px] border-l-usp-gold">
+              <FolderIcon className="text-usp-gold w-8 h-8 mb-4" />
+              <h4 className="font-black text-slate-950 dark:text-white truncate uppercase tracking-tight">{folder.name}</h4>
+              <button onClick={(e) => deleteFolder(e, folder.id)} className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-sanfran-rubi transition-opacity">
+                <Trash2 className="w-5 h-5" />
+              </button>
+            </div>
+          ))}
+          {currentCards.map(card => {
+            const subject = subjects.find(s => s.id === card.subjectId);
+            return (
+              <div key={card.id} className="bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2rem] border-2 border-slate-200 dark:border-sanfran-rubi/40 shadow-xl group flex flex-col justify-between h-[240px] border-l-[10px] relative transition-all hover:scale-[1.02]" style={{ borderLeftColor: subject?.color || '#9B111E' }}>
+                <p className="font-black text-slate-950 dark:text-white line-clamp-4 leading-tight">{card.front}</p>
+                <div className="flex justify-between items-center mt-4">
+                  <div>
+                    <span className="text-[9px] font-black uppercase text-slate-400 block">PRAZO: {new Date(card.nextReview).toLocaleDateString()}</span>
+                    <span className="text-[8px] font-bold text-slate-300 uppercase truncate max-w-[100px] block">{subject?.name}</span>
+                  </div>
+                  <BrainCircuit className="w-5 h-5 text-sanfran-rubi opacity-40" />
+                </div>
+                <button 
+                  onClick={() => deleteFlashcard(card.id)}
+                  className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-red-500 transition-all transform hover:scale-110"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            );
+          })}
+          {currentFolders.length === 0 && currentCards.length === 0 && (
+            <div className="col-span-full py-20 text-center opacity-20">
+              <BrainCircuit className="w-20 h-20 mx-auto mb-4" />
+              <p className="font-black uppercase tracking-widest text-sm">Pauta de estudos vazia nesta pasta.</p>
+            </div>
+          )}
+        </div>
+      )}
+
       {mode === 'study' && reviewQueue.length > 0 && (
         <div className="flex flex-col items-center py-10 animate-in fade-in zoom-in duration-500">
+          <div className="mb-6 flex items-center gap-4 text-slate-400 font-black text-xs uppercase tracking-widest">
+            <span>Card {currentIndex + 1} de {reviewQueue.length}</span>
+            <div className="w-32 h-2 bg-slate-100 dark:bg-white/10 rounded-full overflow-hidden">
+              <div className="h-full bg-sanfran-rubi transition-all" style={{ width: `${((currentIndex + 1) / reviewQueue.length) * 100}%` }}></div>
+            </div>
+          </div>
           <div onClick={() => setIsFlipped(!isFlipped)} className="relative w-full max-w-2xl h-[400px] cursor-pointer transition-transform duration-700 transform-gpu preserve-3d">
             <div className={`absolute inset-0 w-full h-full duration-700 transition-all ${isFlipped ? 'rotate-y-180' : ''}`} style={{ transformStyle: 'preserve-3d' }}>
               <div className={`absolute inset-0 w-full h-full bg-white dark:bg-sanfran-rubiDark border-[6px] border-slate-200 dark:border-sanfran-rubi/40 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden ${isFlipped ? 'hidden' : 'flex'}`}>
@@ -181,39 +333,12 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
           </div>
           {isFlipped && (
             <div className="mt-12 grid grid-cols-3 gap-6 w-full max-w-2xl animate-in fade-in slide-in-from-bottom-6">
-              <button onClick={() => handleReview(0)} className="p-6 bg-red-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Difícil</button>
-              <button onClick={() => handleReview(3)} className="p-6 bg-usp-gold text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Médio</button>
-              <button onClick={() => handleReview(5)} className="p-6 bg-usp-blue text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Fácil</button>
+              <button onClick={() => handleReview(0)} className="p-6 bg-red-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:scale-105 transition-transform">Difícil</button>
+              <button onClick={() => handleReview(3)} className="p-6 bg-usp-gold text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:scale-105 transition-transform">Médio</button>
+              <button onClick={() => handleReview(5)} className="p-6 bg-usp-blue text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:scale-105 transition-transform">Fácil</button>
             </div>
           )}
           <button onClick={() => setMode('browse')} className="mt-12 text-slate-600 dark:text-slate-300 font-black text-xs uppercase underline underline-offset-8">Encerrar Audiência</button>
-        </div>
-      )}
-
-      {mode === 'browse' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
-          {currentFolders.map(folder => (
-            <div key={folder.id} onClick={() => setCurrentFolderId(folder.id)} className="bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2rem] border-2 border-slate-200 dark:border-sanfran-rubi/40 shadow-xl hover:shadow-2xl hover:border-usp-gold cursor-pointer transition-all group relative border-l-[10px] border-l-usp-gold">
-              <FolderIcon className="text-usp-gold w-8 h-8 mb-4" />
-              <h4 className="font-black text-slate-950 dark:text-white truncate uppercase tracking-tight">{folder.name}</h4>
-              <button onClick={(e) => deleteFolder(e, folder.id)} className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-sanfran-rubi"><Trash2 className="w-5 h-5" /></button>
-            </div>
-          ))}
-          {currentCards.map(card => (
-            <div key={card.id} className="bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2rem] border-2 border-slate-200 dark:border-sanfran-rubi/40 shadow-xl group flex flex-col justify-between h-[220px] border-l-[10px]" style={{ borderLeftColor: subjects.find(s => s.id === card.subjectId)?.color || '#9B111E' }}>
-              <p className="font-black text-slate-950 dark:text-white line-clamp-4 leading-tight">{card.front}</p>
-              <div className="flex justify-between items-center mt-4">
-                <span className="text-[9px] font-black uppercase text-slate-400">PRAZO: {new Date(card.nextReview).toLocaleDateString()}</span>
-                <BrainCircuit className="w-5 h-5 text-sanfran-rubi opacity-40" />
-              </div>
-            </div>
-          ))}
-          {currentFolders.length === 0 && currentCards.length === 0 && (
-            <div className="col-span-full py-20 text-center opacity-20">
-              <BrainCircuit className="w-20 h-20 mx-auto mb-4" />
-              <p className="font-black uppercase tracking-widest text-sm">Pauta de estudos vazia nesta pasta.</p>
-            </div>
-          )}
         </div>
       )}
 
@@ -234,9 +359,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   {isAuthError ? 'Despacho de Auditoria: Falta de Credencial' : 'Falha Técnica no Processamento'}
                 </p>
                 <p className={`text-xs font-bold leading-relaxed ${isAuthError ? 'text-amber-700/80 dark:text-amber-400/80' : 'text-red-700/80 dark:text-red-400/80'}`}>
-                  {isAuthError 
-                    ? "A IA não conseguiu encontrar sua chave de acesso. No painel da Vercel, vá em Settings > Environment Variables e adicione a chave 'API_KEY' com o seu token do Gemini." 
-                    : errorMessage}
+                  {errorMessage}
                 </p>
                 {isAuthError && (
                   <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-2 text-[10px] font-black uppercase text-amber-900 dark:text-amber-200 underline decoration-2 underline-offset-4">
@@ -281,7 +404,12 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
                   <span>Extraindo Doutrina...</span>
                 </>
-              ) : mode === 'create' ? "Protocolar Card" : "Gerar Cartões via IA"}
+              ) : (
+                <>
+                  <ShieldCheck className="w-6 h-6" />
+                  <span>{mode === 'create' ? "Protocolar Card" : "Gerar Cartões via IA"}</span>
+                </>
+              )}
             </button>
           </div>
         </div>
