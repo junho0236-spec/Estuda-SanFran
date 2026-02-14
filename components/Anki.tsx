@@ -13,7 +13,10 @@ import {
   AlertCircle, 
   ShieldAlert, 
   ExternalLink, 
-  ShieldCheck
+  ShieldCheck,
+  CheckSquare,
+  Square,
+  X
 } from 'lucide-react';
 import { Flashcard, Subject, Folder } from '../types';
 import { generateFlashcards } from '../services/geminiService';
@@ -41,6 +44,10 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [newFolderName, setNewFolderName] = useState('');
   const [showFolderInput, setShowFolderInput] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  
+  // Estados para Seleção em Massa
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set());
 
   const getSubfolderIds = (folderId: string | null): string[] => {
     let ids: string[] = folderId ? [folderId] : [];
@@ -49,6 +56,50 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       ids = [...ids, ...getSubfolderIds(child.id)];
     });
     return ids;
+  };
+
+  const currentCards = flashcards.filter(f => f.folderId === currentFolderId);
+
+  const toggleCardSelection = (id: string) => {
+    const newSelection = new Set(selectedCardIds);
+    if (newSelection.has(id)) {
+      newSelection.delete(id);
+    } else {
+      newSelection.add(id);
+    }
+    setSelectedCardIds(newSelection);
+  };
+
+  const selectAllInFolder = () => {
+    if (selectedCardIds.size === currentCards.length) {
+      setSelectedCardIds(new Set());
+    } else {
+      setSelectedCardIds(new Set(currentCards.map(c => c.id)));
+    }
+  };
+
+  const deleteSelectedCards = async () => {
+    if (selectedCardIds.size === 0) return;
+    const count = selectedCardIds.size;
+    if (!confirm(`Deseja realmente eliminar estes ${count} cards permanentemente? Esta ação é irreversível.`)) return;
+    
+    try {
+      const idsArray = Array.from(selectedCardIds);
+      const { error } = await supabase
+        .from('flashcards')
+        .delete()
+        .in('id', idsArray)
+        .eq('user_id', userId);
+        
+      if (error) throw error;
+      
+      setFlashcards(prev => prev.filter(card => !selectedCardIds.has(card.id)));
+      setSelectedCardIds(new Set());
+      setIsSelectionMode(false);
+    } catch (err) {
+      console.error("Erro na deleção em massa:", err);
+      alert("Falha ao remover os cards selecionados.");
+    }
   };
 
   const handleGenerate = async () => {
@@ -186,7 +237,6 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   };
 
   const currentFolders = folders.filter(f => f.parentId === currentFolderId);
-  const currentCards = flashcards.filter(f => f.folderId === currentFolderId);
   const currentContextIds = getSubfolderIds(currentFolderId);
   const reviewQueue = flashcards.filter(f => 
     f.nextReview <= Date.now() && 
@@ -230,22 +280,52 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         <div className="flex flex-wrap gap-3">
           {mode === 'browse' && (
             <>
-              <button 
-                onClick={() => { setMode('study'); setCurrentIndex(0); setIsFlipped(false); }} 
-                disabled={reviewQueue.length === 0} 
-                className="flex items-center gap-2 px-8 py-3.5 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest disabled:opacity-50 hover:bg-sanfran-rubiDark shadow-xl transition-all"
-              >
-                <RotateCcw className="w-5 h-5" /> Estudar ({reviewQueue.length})
-              </button>
-              <button onClick={() => {setMode('create'); setErrorMessage(null);}} className="flex items-center gap-2 px-8 py-3.5 bg-white dark:bg-sanfran-rubiDark text-sanfran-rubi dark:text-white border-2 border-sanfran-rubi rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-50 shadow-xl transition-all">
-                <Plus className="w-5 h-5" /> Novo Card
-              </button>
-              <button onClick={() => {setMode('generate'); setErrorMessage(null);}} className="flex items-center gap-2 px-8 py-3.5 bg-usp-blue text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-[#0d7c8f] shadow-xl transition-all">
-                <Sparkles className="w-5 h-5" /> Gerar IA
-              </button>
-              <button onClick={() => setShowFolderInput(true)} className="p-3.5 bg-white dark:bg-sanfran-rubiDark text-sanfran-rubi dark:text-usp-gold border-2 border-slate-200 dark:border-sanfran-rubi/40 rounded-2xl hover:bg-slate-50 shadow-sm transition-all">
-                <FolderPlus className="w-6 h-6" />
-              </button>
+              {isSelectionMode ? (
+                <div className="flex items-center gap-2 bg-slate-100 dark:bg-white/5 p-1 rounded-2xl animate-in slide-in-from-right-4">
+                   <button 
+                    onClick={selectAllInFolder}
+                    className="flex items-center gap-2 px-6 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-sm hover:bg-slate-50 transition-all"
+                  >
+                    {selectedCardIds.size === currentCards.length ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                    Todos
+                  </button>
+                  <button 
+                    onClick={deleteSelectedCards}
+                    disabled={selectedCardIds.size === 0}
+                    className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg hover:bg-red-700 disabled:opacity-30 transition-all"
+                  >
+                    <Trash2 className="w-4 h-4" /> Deletar ({selectedCardIds.size})
+                  </button>
+                  <button 
+                    onClick={() => { setIsSelectionMode(false); setSelectedCardIds(new Set()); }}
+                    className="p-3 text-slate-500 hover:text-red-500 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <button 
+                    onClick={() => { setMode('study'); setCurrentIndex(0); setIsFlipped(false); }} 
+                    disabled={reviewQueue.length === 0} 
+                    className="flex items-center gap-2 px-8 py-3.5 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest disabled:opacity-50 hover:bg-sanfran-rubiDark shadow-xl transition-all"
+                  >
+                    <RotateCcw className="w-5 h-5" /> Estudar ({reviewQueue.length})
+                  </button>
+                  <button onClick={() => setIsSelectionMode(true)} className="flex items-center gap-2 px-6 py-3.5 bg-white dark:bg-sanfran-rubiDark text-slate-600 dark:text-slate-300 border-2 border-slate-200 dark:border-sanfran-rubi/20 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all">
+                    Selecionar
+                  </button>
+                  <button onClick={() => {setMode('create'); setErrorMessage(null);}} className="flex items-center gap-2 px-6 py-3.5 bg-white dark:bg-sanfran-rubiDark text-sanfran-rubi dark:text-white border-2 border-sanfran-rubi rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-50 shadow-xl transition-all">
+                    <Plus className="w-5 h-5" /> Novo
+                  </button>
+                  <button onClick={() => {setMode('generate'); setErrorMessage(null);}} className="flex items-center gap-2 px-6 py-3.5 bg-usp-blue text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-[#0d7c8f] shadow-xl transition-all">
+                    <Sparkles className="w-5 h-5" /> IA
+                  </button>
+                  <button onClick={() => setShowFolderInput(true)} className="p-3.5 bg-white dark:bg-sanfran-rubiDark text-sanfran-rubi dark:text-usp-gold border-2 border-slate-200 dark:border-sanfran-rubi/40 rounded-2xl hover:bg-slate-50 shadow-sm transition-all">
+                    <FolderPlus className="w-6 h-6" />
+                  </button>
+                </>
+              )}
             </>
           )}
         </div>
@@ -272,32 +352,47 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       {mode === 'browse' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
           {currentFolders.map(folder => (
-            <div key={folder.id} onClick={() => setCurrentFolderId(folder.id)} className="bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2rem] border-2 border-slate-200 dark:border-sanfran-rubi/40 shadow-xl hover:shadow-2xl hover:border-usp-gold cursor-pointer transition-all group relative border-l-[10px] border-l-usp-gold">
+            <div key={folder.id} onClick={() => !isSelectionMode && setCurrentFolderId(folder.id)} className={`bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2rem] border-2 shadow-xl transition-all group relative border-l-[10px] border-l-usp-gold ${isSelectionMode ? 'opacity-40 cursor-not-allowed' : 'hover:shadow-2xl hover:border-usp-gold cursor-pointer border-slate-200 dark:border-sanfran-rubi/40'}`}>
               <FolderIcon className="text-usp-gold w-8 h-8 mb-4" />
               <h4 className="font-black text-slate-950 dark:text-white truncate uppercase tracking-tight">{folder.name}</h4>
-              <button onClick={(e) => deleteFolder(e, folder.id)} className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-sanfran-rubi transition-opacity">
-                <Trash2 className="w-5 h-5" />
-              </button>
+              {!isSelectionMode && (
+                <button onClick={(e) => deleteFolder(e, folder.id)} className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-sanfran-rubi transition-opacity">
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              )}
             </div>
           ))}
           {currentCards.map(card => {
             const subject = subjects.find(s => s.id === card.subjectId);
+            const isSelected = selectedCardIds.has(card.id);
             return (
-              <div key={card.id} className="bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2rem] border-2 border-slate-200 dark:border-sanfran-rubi/40 shadow-xl group flex flex-col justify-between h-[240px] border-l-[10px] relative transition-all hover:scale-[1.02]" style={{ borderLeftColor: subject?.color || '#9B111E' }}>
-                <p className="font-black text-slate-950 dark:text-white line-clamp-4 leading-tight">{card.front}</p>
+              <div 
+                key={card.id} 
+                onClick={() => isSelectionMode && toggleCardSelection(card.id)}
+                className={`bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2rem] border-2 shadow-xl group flex flex-col justify-between h-[240px] border-l-[10px] relative transition-all ${isSelectionMode ? 'cursor-pointer hover:scale-[1.03]' : 'hover:scale-[1.02] border-slate-200 dark:border-sanfran-rubi/40'} ${isSelected ? 'border-usp-gold ring-4 ring-usp-gold/20' : 'border-slate-200 dark:border-sanfran-rubi/40'}`} 
+                style={{ borderLeftColor: isSelected ? '#fcb421' : (subject?.color || '#9B111E') }}
+              >
+                {isSelectionMode && (
+                  <div className={`absolute top-4 right-4 w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-usp-gold border-usp-gold text-slate-900' : 'bg-white/10 border-slate-300 dark:border-white/20'}`}>
+                    {isSelected && <ShieldCheck className="w-4 h-4" />}
+                  </div>
+                )}
+                <p className={`font-black text-slate-950 dark:text-white line-clamp-4 leading-tight ${isSelected ? 'text-usp-gold dark:text-usp-gold' : ''}`}>{card.front}</p>
                 <div className="flex justify-between items-center mt-4">
                   <div>
                     <span className="text-[9px] font-black uppercase text-slate-400 block">PRAZO: {new Date(card.nextReview).toLocaleDateString()}</span>
                     <span className="text-[8px] font-bold text-slate-300 uppercase truncate max-w-[100px] block">{subject?.name}</span>
                   </div>
-                  <BrainCircuit className="w-5 h-5 text-sanfran-rubi opacity-40" />
+                  <BrainCircuit className={`w-5 h-5 transition-colors ${isSelected ? 'text-usp-gold opacity-100' : 'text-sanfran-rubi opacity-40'}`} />
                 </div>
-                <button 
-                  onClick={() => deleteFlashcard(card.id)}
-                  className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-red-500 transition-all transform hover:scale-110"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                {!isSelectionMode && (
+                  <button 
+                    onClick={() => deleteFlashcard(card.id)}
+                    className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-red-500 transition-all transform hover:scale-110"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             );
           })}
