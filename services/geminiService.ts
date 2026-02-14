@@ -2,16 +2,26 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 /**
- * Recupera a chave de API de forma segura, tratando casos onde o objeto process 
- * pode não estar definido no ambiente de execução do navegador.
+ * Tenta capturar a chave de API de diversas fontes comuns em builds de frontend (Vite, Webpack, Vercel).
  */
 export const getSafeApiKey = (): string | null => {
   try {
-    // Tenta acessar via process.env (comum em builds Vercel/Vite/Esbuild)
-    const key = typeof process !== 'undefined' && process.env ? process.env.API_KEY : null;
-    if (key && key !== "undefined" && key !== "") return key;
+    // 1. Tenta o padrão exigido (process.env)
+    const processKey = typeof process !== 'undefined' && process.env ? process.env.API_KEY : null;
+    if (processKey && processKey !== "undefined" && processKey !== "") return processKey;
+
+    // 2. Tenta o padrão do Vite (import.meta.env) caso o build esteja mascarando process.env
+    // @ts-ignore
+    const viteKey = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_API_KEY : null;
+    if (viteKey && viteKey !== "undefined" && viteKey !== "") return viteKey;
+
+    // 3. Verifica se a chave foi injetada globalmente no index.html
+    // @ts-ignore
+    const globalKey = window.__API_KEY__;
+    if (globalKey && globalKey !== "") return globalKey;
+
   } catch (e) {
-    // Falha silenciosa se process não estiver definido
+    // Falha silenciosa se os objetos de ambiente não existirem
   }
   return null;
 };
@@ -23,10 +33,9 @@ export const generateFlashcards = async (text: string, subjectName: string) => {
   const apiKey = getSafeApiKey();
   
   if (!apiKey) {
-    throw new Error("DILIGÊNCIA NECESSÁRIA: A 'API_KEY' não foi configurada nas variáveis de ambiente do seu projeto (Vercel/GitHub).");
+    throw new Error("DILIGÊNCIA NECESSÁRIA: A variável 'API_KEY' não está visível para o navegador. Na Vercel, certifique-se de que a variável foi adicionada e o projeto foi reconstruído.");
   }
 
-  // Inicializa apenas com chave válida para evitar o erro interno da biblioteca
   const ai = new GoogleGenAI({ apiKey });
   
   try {
@@ -61,10 +70,7 @@ export const generateFlashcards = async (text: string, subjectName: string) => {
     return JSON.parse(response.text.trim());
   } catch (err: any) {
     console.error("Erro Gemini:", err);
-    if (err.message?.includes("API Key") || err.message?.includes("invalid") || err.status === 400) {
-      throw new Error("ERRO DE PROTOCOLO: A chave de API fornecida parece inválida ou não tem permissão para este modelo.");
-    }
-    throw new Error("Erro no processamento da IA. Verifique sua conexão ou tente novamente.");
+    throw new Error("Erro no processamento da IA. Verifique se sua chave tem permissão para o modelo Gemini 1.5 Flash.");
   }
 };
 

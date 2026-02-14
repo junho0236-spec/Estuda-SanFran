@@ -10,6 +10,12 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script>
+      // Shim para process.env
+      window.process = window.process || { env: {} };
+      
+      // Diagnóstico: Se a Vercel injetar via script tag no futuro ou via DefinePlugin
+      window.__API_KEY__ = ""; 
+
       tailwind.config = {
         darkMode: 'class',
         theme: {
@@ -34,8 +40,6 @@
         .preserve-3d { transform-style: preserve-3d; }
         .backface-hidden { backface-visibility: hidden; }
         .rotate-y-180 { transform: rotateY(180deg); }
-        
-        /* Melhoria de contraste para scrollbars */
         .dark ::-webkit-scrollbar { width: 8px; }
         .dark ::-webkit-scrollbar-track { background: #1a0505; }
         .dark ::-webkit-scrollbar-thumb { background: #9B111E; border-radius: 10px; }
