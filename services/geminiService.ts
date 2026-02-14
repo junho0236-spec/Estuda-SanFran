@@ -1,55 +1,68 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-/**
- * Tenta capturar a chave de API de diversas fontes comuns em builds de frontend (Vite, Webpack, Vercel).
- */
 export const getSafeApiKey = (): string | null => {
   try {
-    // 1. Tenta o padrão exigido (process.env)
     const processKey = typeof process !== 'undefined' && process.env ? process.env.API_KEY : null;
     if (processKey && processKey !== "undefined" && processKey !== "") return processKey;
 
-    // 2. Tenta o padrão do Vite (import.meta.env) caso o build esteja mascarando process.env
     // @ts-ignore
     const viteKey = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_API_KEY : null;
     if (viteKey && viteKey !== "undefined" && viteKey !== "") return viteKey;
 
-    // 3. Verifica se a chave foi injetada globalmente no index.html
     // @ts-ignore
     const globalKey = window.__API_KEY__;
     if (globalKey && globalKey !== "") return globalKey;
 
-  } catch (e) {
-    // Falha silenciosa se os objetos de ambiente não existirem
-  }
+  } catch (e) {}
   return null;
 };
 
-/**
- * Gera flashcards utilizando o modelo Gemini.
- */
-export const generateFlashcards = async (text: string, subjectName: string) => {
+export const generateFlashcards = async (
+  text: string, 
+  subjectName: string, 
+  config?: { count: string, frontLength: string, backLength: string }
+) => {
   const apiKey = getSafeApiKey();
   
   if (!apiKey) {
-    throw new Error("DILIGÊNCIA NECESSÁRIA: A variável 'API_KEY' não está visível para o navegador. Na Vercel, certifique-se de que a variável foi adicionada e o projeto foi reconstruído.");
+    throw new Error("DILIGÊNCIA NECESSÁRIA: A variável 'API_KEY' não está visível.");
   }
 
   const ai = new GoogleGenAI({ apiKey });
   
+  const countInstruction = config?.count === 'auto' 
+    ? "gere uma quantidade proporcional à densidade do texto" 
+    : `gere exatamente ${config?.count} flashcards`;
+
+  const frontInstruction = {
+    curto: "A frente deve ser uma pergunta direta e curta.",
+    medio: "A frente deve ser uma pergunta contextualizada de tamanho médio.",
+    longo: "A frente deve ser um caso clínico ou enunciado longo e detalhado."
+  }[config?.frontLength || 'medio'];
+
+  const backInstruction = {
+    curto: "O verso deve ser uma resposta direta e lacônica.",
+    medio: "O verso deve ser uma resposta fundamentada com citação doutrinária moderada.",
+    longo: "O verso deve ser uma explicação exaustiva, profunda e detalhada sobre o tema."
+  }[config?.backLength || 'medio'];
+
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview', 
-      contents: `Você é um tutor da SanFran (Academia Jurídica FDUSP). Sua tarefa é converter o texto jurídico abaixo em uma lista de Flashcards para Anki.
+      contents: `Você é um tutor da SanFran (Academia Jurídica FDUSP).
       
       DISCIPLINA: ${subjectName}
+      CONFIGURAÇÃO: 
+      - Quantidade: ${countInstruction}
+      - Estilo Frente: ${frontInstruction}
+      - Estilo Verso: ${backInstruction}
+      
       TEXTO PARA PROCESSAR: ${text}
       
       REGRAS:
       - Responda APENAS com o JSON.
-      - Foco em prazos, conceitos latinos e doutrina clássica.
-      - Crie perguntas instigantes na frente (front) e respostas fundamentadas no verso (back).`,
+      - Foco em prazos, conceitos latinos e doutrina clássica.`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -57,8 +70,8 @@ export const generateFlashcards = async (text: string, subjectName: string) => {
           items: {
             type: Type.OBJECT,
             properties: {
-              front: { type: Type.STRING, description: 'Pergunta (Frente).' },
-              back: { type: Type.STRING, description: 'Resposta (Verso).' }
+              front: { type: Type.STRING },
+              back: { type: Type.STRING }
             },
             required: ["front", "back"]
           }
@@ -70,16 +83,14 @@ export const generateFlashcards = async (text: string, subjectName: string) => {
     return JSON.parse(response.text.trim());
   } catch (err: any) {
     console.error("Erro Gemini:", err);
-    throw new Error("Erro no processamento da IA. Verifique se sua chave tem permissão para o modelo Gemini 1.5 Flash.");
+    throw new Error("Erro no processamento da IA.");
   }
 };
 
 export const getStudyMotivation = async (subjects: string[]) => {
   const apiKey = getSafeApiKey();
   if (!apiKey) return "A justiça é a constante e perpétua vontade de dar a cada um o seu. - Ulpiano";
-
   const ai = new GoogleGenAI({ apiKey });
-  
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',

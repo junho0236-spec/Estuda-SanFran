@@ -16,7 +16,11 @@ import {
   ShieldCheck,
   CheckSquare,
   Square,
-  X
+  X,
+  Settings,
+  AlignLeft,
+  AlignCenter,
+  AlignJustify
 } from 'lucide-react';
 import { Flashcard, Subject, Folder } from '../types';
 import { generateFlashcards } from '../services/geminiService';
@@ -45,8 +49,14 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [showFolderInput, setShowFolderInput] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
+  // Estados para Seleção em Massa
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set());
+
+  // Estados para Configuração de IA
+  const [genCount, setGenCount] = useState('auto');
+  const [frontLen, setFrontLen] = useState('medio');
+  const [backLen, setBackLen] = useState('medio');
 
   const getSubfolderIds = (folderId: string | null): string[] => {
     let ids: string[] = folderId ? [folderId] : [];
@@ -107,7 +117,11 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     setErrorMessage(null);
     try {
       const subject = subjects.find(s => s.id === selectedSubjectId);
-      const cards = await generateFlashcards(aiInput, subject?.name || 'Geral');
+      const cards = await generateFlashcards(aiInput, subject?.name || 'Geral', {
+        count: genCount,
+        frontLength: frontLen,
+        backLength: backLen
+      });
       
       const cardsToInsert = cards.map((c: any) => ({
         id: Math.random().toString(36).substr(2, 9),
@@ -472,13 +486,75 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
             </div>
           )}
 
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-4">Disciplina Vinculada</label>
-              <select value={selectedSubjectId} onChange={(e) => setSelectedSubjectId(e.target.value)} className="w-full p-5 bg-slate-50 dark:bg-black/50 border-2 border-slate-300 dark:border-sanfran-rubi/30 rounded-2xl font-black text-slate-950 dark:text-white outline-none">
-                {subjects.length === 0 ? <option value="">Nenhuma disciplina disponível</option> : subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+          <div className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-4">Disciplina Vinculada</label>
+                <select value={selectedSubjectId} onChange={(e) => setSelectedSubjectId(e.target.value)} className="w-full p-4 bg-slate-50 dark:bg-black/50 border-2 border-slate-300 dark:border-sanfran-rubi/30 rounded-2xl font-black text-slate-950 dark:text-white outline-none">
+                  {subjects.length === 0 ? <option value="">Nenhuma disciplina disponível</option> : subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+
+              {mode === 'generate' && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-4">Volume de Cards</label>
+                  <div className="flex gap-2">
+                    {['auto', '5', '10', '15'].map(num => (
+                      <button 
+                        key={num} 
+                        onClick={() => setGenCount(num)} 
+                        className={`flex-1 py-4 rounded-2xl font-black text-xs uppercase tracking-widest border-2 transition-all ${genCount === num ? 'bg-usp-gold border-usp-gold text-white' : 'bg-white dark:bg-black/40 border-slate-200 text-slate-400'}`}
+                      >
+                        {num === 'auto' ? 'Auto' : num}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
+
+            {mode === 'generate' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in slide-in-from-top-2">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-4">Extensão da Frente (Pergunta)</label>
+                  <div className="flex gap-2 bg-slate-50 dark:bg-black/40 p-1.5 rounded-2xl border-2 border-slate-200 dark:border-sanfran-rubi/10">
+                    {[
+                      { id: 'curto', icon: AlignLeft, label: 'Curta' },
+                      { id: 'medio', icon: AlignCenter, label: 'Média' },
+                      { id: 'longo', icon: AlignJustify, label: 'Longa' }
+                    ].map(opt => (
+                      <button 
+                        key={opt.id} 
+                        onClick={() => setFrontLen(opt.id)} 
+                        className={`flex-1 flex flex-col items-center gap-1 py-3 rounded-xl transition-all ${frontLen === opt.id ? 'bg-white dark:bg-sanfran-rubiDark text-sanfran-rubi shadow-sm' : 'text-slate-400 hover:text-slate-500'}`}
+                      >
+                        <opt.icon className="w-4 h-4" />
+                        <span className="text-[8px] font-black uppercase tracking-widest">{opt.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-4">Extensão do Verso (Resposta)</label>
+                  <div className="flex gap-2 bg-slate-50 dark:bg-black/40 p-1.5 rounded-2xl border-2 border-slate-200 dark:border-sanfran-rubi/10">
+                    {[
+                      { id: 'curto', icon: AlignLeft, label: 'Direta' },
+                      { id: 'medio', icon: AlignCenter, label: 'Médio' },
+                      { id: 'longo', icon: AlignJustify, label: 'Doutrinária' }
+                    ].map(opt => (
+                      <button 
+                        key={opt.id} 
+                        onClick={() => setBackLen(opt.id)} 
+                        className={`flex-1 flex flex-col items-center gap-1 py-3 rounded-xl transition-all ${backLen === opt.id ? 'bg-white dark:bg-sanfran-rubiDark text-usp-blue shadow-sm' : 'text-slate-400 hover:text-slate-500'}`}
+                      >
+                        <opt.icon className="w-4 h-4" />
+                        <span className="text-[8px] font-black uppercase tracking-widest">{opt.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
             
             {mode === 'create' ? (
               <div className="space-y-4">
@@ -498,7 +574,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
             )}
             <button 
               onClick={mode === 'create' ? handleManualCreate : handleGenerate} 
-              disabled={isGenerating || (mode === 'generate' && subjects.length === 0)} 
+              disabled={isGenerating || (mode === 'generate' && (subjects.length === 0 || !aiInput.trim()))} 
               className="w-full py-6 bg-sanfran-rubi text-white rounded-[2rem] font-black uppercase text-lg tracking-widest shadow-2xl hover:bg-sanfran-rubiDark disabled:opacity-30 flex items-center justify-center gap-4 transition-all"
             >
               {isGenerating ? (
