@@ -75,7 +75,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setAiInput('');
     } catch (e: any) {
       console.error(e);
-      setErrorMessage(e.message || "Erro desconhecido no processamento IA.");
+      setErrorMessage(e.message || "Falha técnica na geração. Verifique sua chave de IA.");
     } finally {
       setIsGenerating(false);
     }
@@ -154,15 +154,11 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         </div>
       </div>
 
-      {mode === 'browse' && (
-        <div className="flex items-center gap-4 text-[12px] font-black uppercase tracking-widest text-slate-800 dark:text-slate-100 bg-white dark:bg-sanfran-rubiDark/50 p-5 rounded-[1.5rem] border border-slate-300 dark:border-sanfran-rubi/40 shadow-xl">
-          <button onClick={() => setCurrentFolderId(null)} className={`hover:text-sanfran-rubi ${currentFolderId === null ? 'text-sanfran-rubi' : ''}`}>RAIZ</button>
-          {folders.find(f => f.id === currentFolderId) && (
-            <>
-              <BreadcrumbSeparator className="w-5 h-5 text-slate-400" />
-              <span className="text-sanfran-rubi">{folders.find(f => f.id === currentFolderId)?.name}</span>
-            </>
-          )}
+      {showFolderInput && (
+        <div className="bg-white dark:bg-sanfran-rubiDark p-6 rounded-2xl border-2 border-usp-gold shadow-xl flex gap-3 animate-in slide-in-from-top-4">
+          <input type="text" value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="Nome do pack/pasta..." className="flex-1 bg-transparent outline-none font-bold text-slate-950 dark:text-white" />
+          <button onClick={handleCreateFolder} className="px-6 py-2 bg-usp-gold text-slate-900 rounded-xl font-black uppercase text-[10px]">Criar</button>
+          <button onClick={() => setShowFolderInput(false)} className="px-4 py-2 text-slate-400 hover:text-red-500 font-bold uppercase text-[10px]">Cancelar</button>
         </div>
       )}
 
@@ -224,7 +220,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
             <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-600 rounded-r-xl flex items-center gap-3 animate-in shake duration-300">
               <AlertCircle className="w-6 h-6 text-red-600 shrink-0" />
               <div className="flex-1">
-                <p className="text-xs font-black text-red-800 dark:text-red-400 uppercase tracking-tight">Erro no Protocolo IA</p>
+                <p className="text-xs font-black text-red-800 dark:text-red-400 uppercase tracking-tight">Falha de Protocolo</p>
                 <p className="text-[10px] font-bold text-red-700/80 dark:text-red-400/80">{errorMessage}</p>
               </div>
             </div>
@@ -245,7 +241,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 <textarea 
                   value={aiInput} 
                   onChange={(e) => setAiInput(e.target.value)} 
-                  placeholder="Cole aqui o texto da aula, doutrina ou jurisprudência para converter em cartões..." 
+                  placeholder="Cole aqui o texto jurídico..." 
                   className="w-full h-60 p-8 bg-slate-50 dark:bg-black/50 border-2 border-slate-300 rounded-[2.5rem] font-bold resize-none outline-none focus:border-usp-blue transition-colors" 
                 />
               </div>
@@ -254,7 +250,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               {isGenerating ? (
                 <>
                   <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  <span>Processando Doutrina...</span>
+                  <span>Extraindo Doutrina...</span>
                 </>
               ) : mode === 'create' ? "Protocolar Card" : "Gerar Cartões via IA"}
             </button>

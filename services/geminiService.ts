@@ -2,30 +2,25 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 /**
- * Tenta obter a chave de API de múltiplas fontes.
+ * Gera flashcards utilizando o modelo Gemini.
+ * A instância do GoogleGenAI é criada dentro da função para garantir o uso da chave mais recente.
  */
-const getApiKey = () => {
-  return process.env.API_KEY || "";
-};
-
 export const generateFlashcards = async (text: string, subjectName: string) => {
-  const apiKey = getApiKey();
-  
-  if (!apiKey || apiKey === "undefined") {
-    throw new Error("A IA da SanFran precisa de uma chave de API. Se você é o dono do app, configure 'API_KEY' na Vercel. Se é usuário, use o botão 'Ativar IA' na lateral.");
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
+  // Cria a instância no momento da chamada para pegar a chave injetada pelo seletor
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview', 
-      contents: `Você é um tutor da SanFran (Academia Jurídica FDUSP). Converta o texto em flashcards Anki.
+      contents: `Você é um tutor da SanFran (Academia Jurídica FDUSP). Sua tarefa é converter o texto jurídico abaixo em uma lista de Flashcards para Anki.
       
       DISCIPLINA: ${subjectName}
-      TEXTO: ${text}
+      TEXTO PARA PROCESSAR: ${text}
       
-      JSON com campos 'front' e 'back'.`,
+      REGRAS:
+      - Responda APENAS com o JSON.
+      - Foco em prazos, conceitos latinos e doutrina clássica.
+      - Crie perguntas instigantes na frente (front) e respostas fundamentadas no verso (back).`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -33,8 +28,8 @@ export const generateFlashcards = async (text: string, subjectName: string) => {
           items: {
             type: Type.OBJECT,
             properties: {
-              front: { type: Type.STRING },
-              back: { type: Type.STRING }
+              front: { type: Type.STRING, description: 'Pergunta (Frente).' },
+              back: { type: Type.STRING, description: 'Resposta (Verso).' }
             },
             required: ["front", "back"]
           }
@@ -42,25 +37,30 @@ export const generateFlashcards = async (text: string, subjectName: string) => {
       }
     });
 
+    if (!response.text) throw new Error("A IA não retornou conteúdo. Verifique sua conexão.");
     return JSON.parse(response.text.trim());
   } catch (err: any) {
-    console.error("Erro Gemini:", err);
+    console.error("Erro no processamento Gemini:", err);
+    if (err.message?.includes("API key") || err.message?.includes("entity was not found")) {
+      throw new Error("Sua chave de IA expirou ou é inválida. Clique em 'Ativar IA' novamente.");
+    }
     throw err;
   }
 };
 
 export const getStudyMotivation = async (subjects: string[]) => {
-  const apiKey = getApiKey();
-  if (!apiKey || apiKey === "undefined") return "A justiça é a constante e perpétua vontade de dar a cada um o seu.";
+  const apiKey = process.env.API_KEY;
+  if (!apiKey || apiKey === "undefined") return "A justiça é a constante e perpétua vontade de dar a cada um o seu. - Ulpiano";
 
   const ai = new GoogleGenAI({ apiKey });
+  
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Frase curta de motivação jurídica (SanFran) para: ${subjects.join(', ')}.`,
+      contents: `Gere uma frase de motivação curta para um estudante de Direito da SanFran que estuda: ${subjects.join(', ')}. Estilo erudito e clássico.`,
     });
     return response.text;
   } catch (e) {
-    return "Scientia Vinces.";
+    return "A justiça é a constante e perpétua vontade de dar a cada um o seu. - Ulpiano";
   }
 };

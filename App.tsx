@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Timer, BookOpen, CheckSquare, Menu, X, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Key, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, Timer, BookOpen, CheckSquare, Menu, X, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Key, AlertTriangle, Sparkles } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession } from './types';
 import Dashboard from './components/Dashboard';
 import Anki from './components/Anki';
@@ -12,8 +12,10 @@ import Login from './components/Login';
 import { supabase } from './services/supabaseClient';
 
 declare global {
-  // Use the AIStudio type for the aistudio property on the Window interface
-  // to avoid conflicts with existing declarations.
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
   interface Window {
     aistudio?: AIStudio;
   }
@@ -24,26 +26,19 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [session, setSession] = useState<any>(null);
-  
-  // Estado para monitorar se temos uma chave válida disponível
-  const [hasApiKey, setHasApiKey] = useState(false);
+  const [isAiActive, setIsAiActive] = useState(false);
 
+  // Verifica se a IA já está ativa no carregamento
   useEffect(() => {
-    const checkKey = async () => {
-      // 1. Tenta process.env (Vercel/Build time)
-      const envKey = process.env.API_KEY;
-      if (envKey && envKey !== "undefined" && envKey !== "") {
-        setHasApiKey(true);
-        return;
-      }
-
-      // 2. Tenta AI Studio (Runtime)
+    const checkAiStatus = async () => {
       if (window.aistudio) {
-        const selected = await window.aistudio.hasSelectedApiKey();
-        if (selected) setHasApiKey(true);
+        const active = await window.aistudio.hasSelectedApiKey();
+        setIsAiActive(active);
+      } else if (process.env.API_KEY && process.env.API_KEY !== "undefined") {
+        setIsAiActive(true);
       }
     };
-    checkKey();
+    checkAiStatus();
   }, []);
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -104,12 +99,12 @@ const App: React.FC = () => {
     else document.documentElement.classList.remove('dark');
   }, [isDarkMode]);
 
-  const handleOpenKeyDialog = async () => {
+  const handleActivateAi = async () => {
     if (window.aistudio) {
       await window.aistudio.openSelectKey();
-      setHasApiKey(true);
+      setIsAiActive(true);
     } else {
-      alert("Configuração Necessária:\n1. Vá ao painel da Vercel\n2. Settings -> Environment Variables\n3. Adicione API_KEY com sua chave do Google AI Studio\n4. Faça um REDEPLOY na aba Deployments.");
+      alert("Seletor de IA não disponível neste navegador.");
     }
   };
 
@@ -145,30 +140,35 @@ const App: React.FC = () => {
           ))}
         </nav>
         <div className="p-4 space-y-3">
-          {!hasApiKey && (
-            <button onClick={handleOpenKeyDialog} className="w-full flex items-center gap-2 px-4 py-3 rounded-2xl bg-amber-500 text-white font-black text-[10px] uppercase tracking-widest hover:bg-amber-600">
-              <Key className="w-4 h-4" /> Ativar Inteligência IA
+          {!isAiActive ? (
+            <button onClick={handleActivateAi} className="w-full flex flex-col items-center gap-1 px-4 py-3 rounded-2xl bg-usp-gold text-slate-900 font-black text-[10px] uppercase tracking-widest hover:scale-[1.02] transition-all shadow-lg animate-bounce">
+              <div className="flex items-center gap-2"><Key className="w-4 h-4" /> Ativar Inteligência IA</div>
+              <span className="text-[8px] opacity-70">Para gerar flashcards</span>
             </button>
+          ) : (
+            <div className="w-full flex items-center gap-2 px-4 py-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 font-black text-[10px] uppercase tracking-widest justify-center">
+              <Sparkles className="w-4 h-4" /> IA Conectada
+            </div>
           )}
           <button onClick={() => setIsDarkMode(!isDarkMode)} className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-slate-100 dark:bg-sanfran-rubiDark text-xs font-black uppercase tracking-widest text-slate-900 dark:text-white">
             {isDarkMode ? 'Escuro' : 'Claro'}
-            {isDarkMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+            {isDarkMode ? <Moon className="w-4 h-4 text-usp-blue" /> : <Sun className="w-4 h-4 text-usp-gold" />}
           </button>
           <button onClick={() => supabase.auth.signOut()} className="w-full flex items-center gap-2 px-4 py-3 text-slate-400 hover:text-red-500 font-black uppercase text-[10px] tracking-widest"><LogOut className="w-4 h-4" /> Sair</button>
         </div>
       </aside>
 
       <main className="flex-1 overflow-y-auto p-4 md:p-10">
-        {!hasApiKey && (
-          <div className="mb-8 p-5 bg-red-600 text-white rounded-2xl flex items-center justify-between gap-4 shadow-xl animate-pulse">
+        {!isAiActive && currentView === View.Anki && (
+          <div className="mb-8 p-6 bg-usp-gold/10 border-l-8 border-usp-gold rounded-2xl flex items-center justify-between gap-4 shadow-xl">
             <div className="flex items-center gap-4">
-              <AlertTriangle className="w-8 h-8 shrink-0" />
+              <Sparkles className="w-8 h-8 text-usp-gold shrink-0" />
               <div>
-                <p className="font-black uppercase text-sm">Erro de Protocolo IA</p>
-                <p className="text-xs opacity-90">A chave de API não foi detectada. Flashcards automáticos não funcionarão.</p>
+                <p className="font-black uppercase text-sm text-slate-900 dark:text-white">Potencialize seus estudos com IA</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400">Ative sua chave para converter doutrinas em flashcards automaticamente.</p>
               </div>
             </div>
-            <button onClick={handleOpenKeyDialog} className="px-6 py-2 bg-white text-red-600 rounded-xl font-black text-[10px] uppercase shadow-lg">Resolver</button>
+            <button onClick={handleActivateAi} className="px-6 py-2 bg-usp-gold text-slate-900 rounded-xl font-black text-[10px] uppercase shadow-lg hover:scale-105 transition-transform">Conectar Agora</button>
           </div>
         )}
         <div className="max-w-6xl mx-auto">
