@@ -2,24 +2,31 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 /**
- * Verifica se a API_KEY está disponível no ambiente.
+ * Recupera a chave de API de forma segura, tratando casos onde o objeto process 
+ * pode não estar definido no ambiente de execução do navegador.
  */
-const getApiKey = () => {
-  const key = process.env.API_KEY;
-  if (!key || key === "undefined" || key === "") return null;
-  return key;
+export const getSafeApiKey = (): string | null => {
+  try {
+    // Tenta acessar via process.env (comum em builds Vercel/Vite/Esbuild)
+    const key = typeof process !== 'undefined' && process.env ? process.env.API_KEY : null;
+    if (key && key !== "undefined" && key !== "") return key;
+  } catch (e) {
+    // Falha silenciosa se process não estiver definido
+  }
+  return null;
 };
 
 /**
  * Gera flashcards utilizando o modelo Gemini.
  */
 export const generateFlashcards = async (text: string, subjectName: string) => {
-  const apiKey = getApiKey();
+  const apiKey = getSafeApiKey();
   
   if (!apiKey) {
-    throw new Error("CHAVE_AUSENTE: A API_KEY não foi detectada no ambiente. Verifique o painel da Vercel.");
+    throw new Error("DILIGÊNCIA NECESSÁRIA: A 'API_KEY' não foi configurada nas variáveis de ambiente do seu projeto (Vercel/GitHub).");
   }
 
+  // Inicializa apenas com chave válida para evitar o erro interno da biblioteca
   const ai = new GoogleGenAI({ apiKey });
   
   try {
@@ -54,15 +61,15 @@ export const generateFlashcards = async (text: string, subjectName: string) => {
     return JSON.parse(response.text.trim());
   } catch (err: any) {
     console.error("Erro Gemini:", err);
-    if (err.message?.includes("API Key") || err.message?.includes("API_KEY")) {
-      throw new Error("CHAVE_INVALIDA: A chave fornecida é inválida ou expirou.");
+    if (err.message?.includes("API Key") || err.message?.includes("invalid") || err.status === 400) {
+      throw new Error("ERRO DE PROTOCOLO: A chave de API fornecida parece inválida ou não tem permissão para este modelo.");
     }
-    throw new Error("Erro no processamento da IA. Tente novamente em instantes.");
+    throw new Error("Erro no processamento da IA. Verifique sua conexão ou tente novamente.");
   }
 };
 
 export const getStudyMotivation = async (subjects: string[]) => {
-  const apiKey = getApiKey();
+  const apiKey = getSafeApiKey();
   if (!apiKey) return "A justiça é a constante e perpétua vontade de dar a cada um o seu. - Ulpiano";
 
   const ai = new GoogleGenAI({ apiKey });

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Brain, CheckCircle2, Clock, Zap, TrendingUp, ShieldCheck, AlertTriangle, Sparkles } from 'lucide-react';
 import { Subject, Flashcard, Task, StudySession } from '../types';
-import { getStudyMotivation } from '../services/geminiService';
+import { getStudyMotivation, getSafeApiKey } from '../services/geminiService';
 
 interface DashboardProps {
   subjects: Subject[];
@@ -13,13 +13,14 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, studySessions }) => {
   const [motivation, setMotivation] = useState("Carregando inspiração jurídica...");
-  const [hasAiKey, setHasAiKey] = useState(true);
+  const [hasAiKey, setHasAiKey] = useState(false);
 
   useEffect(() => {
+    const apiKey = getSafeApiKey();
+    setHasAiKey(!!apiKey);
+
     const fetchMotivation = async () => {
-      const apiKey = process.env.API_KEY;
-      if (!apiKey || apiKey === "undefined" || apiKey === "") {
-        setHasAiKey(false);
+      if (!apiKey) {
         setMotivation("A justiça é a constante e perpétua vontade de dar a cada um o seu. - Ulpiano");
         return;
       }
@@ -49,9 +50,9 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
           <p className="text-slate-700 dark:text-slate-300 mt-2 font-bold text-lg">Pronto para dominar as leis hoje?</p>
         </div>
         
-        <div className={`px-4 py-2 rounded-xl flex items-center gap-3 border text-[10px] font-black uppercase tracking-widest ${hasAiKey ? 'bg-emerald-50 border-emerald-200 text-emerald-600 dark:bg-emerald-900/20 dark:border-emerald-500/30 dark:text-emerald-400' : 'bg-amber-50 border-amber-200 text-amber-600 dark:bg-amber-900/20 dark:border-amber-500/30 dark:text-amber-400'}`}>
+        <div className={`px-4 py-2 rounded-xl flex items-center gap-3 border text-[10px] font-black uppercase tracking-widest transition-all ${hasAiKey ? 'bg-emerald-50 border-emerald-200 text-emerald-600 dark:bg-emerald-900/20 dark:border-emerald-500/30 dark:text-emerald-400' : 'bg-amber-50 border-amber-200 text-amber-600 dark:bg-amber-900/20 dark:border-amber-500/30 dark:text-amber-400'}`}>
           {hasAiKey ? <Sparkles className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
-          {hasAiKey ? "IA: Conectada" : "IA: Pendente de Configuração"}
+          {hasAiKey ? "IA: Conectada" : "IA: Configuração Pendente"}
         </div>
       </header>
 
@@ -94,7 +95,7 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
               Doutrina AI
             </h3>
           </div>
-          <div className="bg-slate-50 dark:bg-black/40 rounded-[2rem] p-8 border border-slate-200 dark:border-sanfran-rubi/20 italic text-slate-900 dark:text-slate-100 text-xl leading-relaxed relative overflow-hidden shadow-inner">
+          <div className="bg-slate-50 dark:bg-black/40 rounded-[2rem] p-8 border border-slate-200 dark:border-sanfran-rubi/20 italic text-slate-900 dark:text-slate-100 text-xl leading-relaxed relative overflow-hidden shadow-inner min-h-[140px] flex items-center">
             <div className="absolute top-0 right-0 w-48 h-48 bg-sanfran-rubi opacity-[0.05] -mr-24 -mt-24 rounded-full" />
             <span className="relative z-10 font-bold leading-relaxed">"{motivation}"</span>
           </div>
