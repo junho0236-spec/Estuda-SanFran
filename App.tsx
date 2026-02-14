@@ -141,7 +141,7 @@ const App: React.FC = () => {
             <span className="text-xs font-black uppercase tracking-widest">{isDarkMode ? 'Modo Escuro' : 'Modo Claro'}</span>
             {isDarkMode ? <Moon className="w-5 h-5 text-usp-blue" /> : <Sun className="w-5 h-5 text-usp-gold" />}
           </button>
-          <button handleLogout={handleLogout} className="w-full flex items-center gap-3 px-5 py-3 rounded-2xl text-slate-500 hover:text-red-600 dark:hover:text-red-400 transition-all font-black uppercase text-[10px] tracking-widest"><LogOut className="w-4 h-4" /> Sair do Sistema</button>
+          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-5 py-3 rounded-2xl text-slate-500 hover:text-red-600 dark:hover:text-red-400 transition-all font-black uppercase text-[10px] tracking-widest"><LogOut className="w-4 h-4" /> Sair do Sistema</button>
           <div className="bg-sanfran-rubi dark:bg-sanfran-rubiDark rounded-2xl p-4 text-white shadow-xl border border-white/10">
             <p className="text-[9px] text-white/70 mb-1 font-black uppercase tracking-widest">Academia SanFran</p>
             <p className="text-sm font-black italic">"Scientia Vinces"</p>
