@@ -2,11 +2,25 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 /**
+ * Verifica se a API_KEY está disponível no ambiente.
+ */
+const getApiKey = () => {
+  const key = process.env.API_KEY;
+  if (!key || key === "undefined" || key === "") return null;
+  return key;
+};
+
+/**
  * Gera flashcards utilizando o modelo Gemini.
- * Chave de API obtida exclusivamente de process.env.API_KEY.
  */
 export const generateFlashcards = async (text: string, subjectName: string) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = getApiKey();
+  
+  if (!apiKey) {
+    throw new Error("CHAVE_AUSENTE: A API_KEY não foi detectada no ambiente. Verifique o painel da Vercel.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   
   try {
     const response = await ai.models.generateContent({
@@ -40,16 +54,18 @@ export const generateFlashcards = async (text: string, subjectName: string) => {
     return JSON.parse(response.text.trim());
   } catch (err: any) {
     console.error("Erro Gemini:", err);
-    throw new Error(err.message || "Erro ao processar IA. Verifique as configurações na Vercel.");
+    if (err.message?.includes("API Key") || err.message?.includes("API_KEY")) {
+      throw new Error("CHAVE_INVALIDA: A chave fornecida é inválida ou expirou.");
+    }
+    throw new Error("Erro no processamento da IA. Tente novamente em instantes.");
   }
 };
 
 export const getStudyMotivation = async (subjects: string[]) => {
-  if (!process.env.API_KEY || process.env.API_KEY === "undefined") {
-    return "A justiça é a constante e perpétua vontade de dar a cada um o seu. - Ulpiano";
-  }
+  const apiKey = getApiKey();
+  if (!apiKey) return "A justiça é a constante e perpétua vontade de dar a cada um o seu. - Ulpiano";
 
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
   
   try {
     const response = await ai.models.generateContent({

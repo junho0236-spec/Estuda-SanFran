@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Brain, CheckCircle2, Clock, Zap, TrendingUp, ShieldCheck } from 'lucide-react';
+import { Brain, CheckCircle2, Clock, Zap, TrendingUp, ShieldCheck, AlertTriangle, Sparkles } from 'lucide-react';
 import { Subject, Flashcard, Task, StudySession } from '../types';
 import { getStudyMotivation } from '../services/geminiService';
 
@@ -13,9 +13,17 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, studySessions }) => {
   const [motivation, setMotivation] = useState("Carregando inspiração jurídica...");
+  const [hasAiKey, setHasAiKey] = useState(true);
 
   useEffect(() => {
     const fetchMotivation = async () => {
+      const apiKey = process.env.API_KEY;
+      if (!apiKey || apiKey === "undefined" || apiKey === "") {
+        setHasAiKey(false);
+        setMotivation("A justiça é a constante e perpétua vontade de dar a cada um o seu. - Ulpiano");
+        return;
+      }
+      
       try {
         const text = await getStudyMotivation(subjects.map(s => s.name));
         setMotivation(text || "A justiça é a constante e perpétua vontade de dar a cada um o seu.");
@@ -29,16 +37,22 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
   const cardsToReview = flashcards.filter(f => f.nextReview <= Date.now()).length;
   const pendingTasks = tasks.filter(t => !t.completed).length;
   
-  // Cálculo de horas acumuladas
   const totalSeconds = studySessions.reduce((acc, s) => acc + (s.duration || 0), 0);
   const totalHours = (totalSeconds / 3600).toFixed(1);
   const sessionsToday = studySessions.filter(s => s.start_time.startsWith(new Date().toISOString().split('T')[0])).length;
 
   return (
     <div className="space-y-12 animate-in fade-in duration-500">
-      <header>
-        <h2 className="text-4xl md:text-5xl font-black text-slate-950 dark:text-white tracking-tight">Salve, Doutor(a)! 🏛️</h2>
-        <p className="text-slate-700 dark:text-slate-300 mt-2 font-bold text-lg">Pronto para dominar as leis hoje?</p>
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h2 className="text-4xl md:text-5xl font-black text-slate-950 dark:text-white tracking-tight">Salve, Doutor(a)! 🏛️</h2>
+          <p className="text-slate-700 dark:text-slate-300 mt-2 font-bold text-lg">Pronto para dominar as leis hoje?</p>
+        </div>
+        
+        <div className={`px-4 py-2 rounded-xl flex items-center gap-3 border text-[10px] font-black uppercase tracking-widest ${hasAiKey ? 'bg-emerald-50 border-emerald-200 text-emerald-600 dark:bg-emerald-900/20 dark:border-emerald-500/30 dark:text-emerald-400' : 'bg-amber-50 border-amber-200 text-amber-600 dark:bg-amber-900/20 dark:border-amber-500/30 dark:text-amber-400'}`}>
+          {hasAiKey ? <Sparkles className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+          {hasAiKey ? "IA: Conectada" : "IA: Pendente de Configuração"}
+        </div>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -89,17 +103,21 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
         <div className="bg-white dark:bg-sanfran-rubiDark/30 rounded-[2.5rem] p-8 md:p-10 border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl border-t-[12px] border-t-usp-blue">
           <h3 className="text-2xl md:text-3xl font-black mb-10 text-slate-950 dark:text-white uppercase tracking-tight">Cadeiras</h3>
           <div className="space-y-6">
-            {subjects.map(s => (
-              <div key={s.id} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 hover:scale-[1.02] transition-transform">
-                <div className="flex items-center gap-4">
-                  <div className="w-5 h-5 rounded-full shadow-lg" style={{ backgroundColor: s.color }} />
-                  <span className="font-black text-slate-900 dark:text-white uppercase text-sm tracking-wide">{s.name}</span>
+            {subjects.length === 0 ? (
+              <p className="text-center text-xs text-slate-400 font-bold uppercase italic py-10">Nenhuma cadeira matriculada.</p>
+            ) : (
+              subjects.map(s => (
+                <div key={s.id} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 hover:scale-[1.02] transition-transform">
+                  <div className="flex items-center gap-4">
+                    <div className="w-5 h-5 rounded-full shadow-lg" style={{ backgroundColor: s.color }} />
+                    <span className="font-black text-slate-900 dark:text-white uppercase text-sm tracking-wide">{s.name}</span>
+                  </div>
+                  <span className="text-[11px] font-black text-white bg-slate-950 dark:bg-sanfran-rubi px-4 py-1.5 rounded-full shadow-md">
+                    {flashcards.filter(f => f.subjectId === s.id).length}
+                  </span>
                 </div>
-                <span className="text-[11px] font-black text-white bg-slate-950 dark:bg-sanfran-rubi px-4 py-1.5 rounded-full shadow-md">
-                  {flashcards.filter(f => f.subjectId === s.id).length}
-                </span>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>

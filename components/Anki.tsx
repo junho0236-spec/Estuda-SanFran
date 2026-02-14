@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Plus, BrainCircuit, Sparkles, RotateCcw, Folder as FolderIcon, ChevronRight as BreadcrumbSeparator, ArrowLeft, Trash2, FolderPlus, AlertCircle } from 'lucide-react';
+import { Plus, BrainCircuit, Sparkles, RotateCcw, Folder as FolderIcon, ChevronRight as BreadcrumbSeparator, ArrowLeft, Trash2, FolderPlus, AlertCircle, ShieldAlert, ExternalLink } from 'lucide-react';
 import { Flashcard, Subject, Folder } from '../types';
 import { generateFlashcards } from '../services/geminiService';
 import { supabase } from '../services/supabaseClient';
@@ -75,7 +75,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setAiInput('');
     } catch (e: any) {
       console.error(e);
-      setErrorMessage(e.message || "Erro inesperado ao gerar cartões. Verifique as configurações de IA.");
+      setErrorMessage(e.message || "Erro inesperado ao gerar cartões.");
     } finally {
       setIsGenerating(false);
     }
@@ -126,6 +126,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setFlashcards(prev => prev.filter(fc => !idsToDelete.includes(fc.folderId as string)));
     }
   };
+
+  const isAuthError = errorMessage?.includes("CHAVE_AUSENTE") || errorMessage?.includes("CHAVE_INVALIDA") || errorMessage?.includes("API Key");
 
   return (
     <div className="space-y-10 max-w-5xl mx-auto pb-20">
@@ -206,6 +208,12 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               </div>
             </div>
           ))}
+          {currentFolders.length === 0 && currentCards.length === 0 && (
+            <div className="col-span-full py-20 text-center opacity-20">
+              <BrainCircuit className="w-20 h-20 mx-auto mb-4" />
+              <p className="font-black uppercase tracking-widest text-sm">Pauta de estudos vazia nesta pasta.</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -217,19 +225,36 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
           </div>
 
           {errorMessage && (
-            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-600 rounded-r-xl flex items-center gap-3 animate-in shake duration-300">
-              <AlertCircle className="w-6 h-6 text-red-600 shrink-0" />
+            <div className={`mb-8 p-6 rounded-3xl border-2 flex gap-4 animate-in shake duration-300 ${isAuthError ? 'bg-amber-50 border-amber-300 dark:bg-amber-900/10 dark:border-amber-500/30' : 'bg-red-50 border-red-300 dark:bg-red-900/10 dark:border-red-500/30'}`}>
+              <div className={`p-3 rounded-2xl shrink-0 ${isAuthError ? 'bg-amber-500 text-white' : 'bg-red-500 text-white'}`}>
+                {isAuthError ? <ShieldAlert className="w-6 h-6" /> : <AlertCircle className="w-6 h-6" />}
+              </div>
               <div className="flex-1">
-                <p className="text-xs font-black text-red-800 dark:text-red-400 uppercase tracking-tight">Falha Técnica</p>
-                <p className="text-[10px] font-bold text-red-700/80 dark:text-red-400/80">{errorMessage}</p>
+                <p className={`text-sm font-black uppercase tracking-tight mb-1 ${isAuthError ? 'text-amber-800 dark:text-amber-400' : 'text-red-800 dark:text-red-400'}`}>
+                  {isAuthError ? 'Despacho de Auditoria: Falta de Credencial' : 'Falha Técnica no Processamento'}
+                </p>
+                <p className={`text-xs font-bold leading-relaxed ${isAuthError ? 'text-amber-700/80 dark:text-amber-400/80' : 'text-red-700/80 dark:text-red-400/80'}`}>
+                  {isAuthError 
+                    ? "A IA não conseguiu encontrar sua chave de acesso. No painel da Vercel, vá em Settings > Environment Variables e adicione a chave 'API_KEY' com o seu token do Gemini." 
+                    : errorMessage}
+                </p>
+                {isAuthError && (
+                  <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-2 text-[10px] font-black uppercase text-amber-900 dark:text-amber-200 underline decoration-2 underline-offset-4">
+                    Obter Chave no Google AI Studio <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
               </div>
             </div>
           )}
 
           <div className="space-y-6">
-            <select value={selectedSubjectId} onChange={(e) => setSelectedSubjectId(e.target.value)} className="w-full p-5 bg-slate-50 dark:bg-black/50 border-2 border-slate-300 dark:border-sanfran-rubi/30 rounded-2xl font-black text-slate-950 dark:text-white outline-none">
-              {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-4">Disciplina Vinculada</label>
+              <select value={selectedSubjectId} onChange={(e) => setSelectedSubjectId(e.target.value)} className="w-full p-5 bg-slate-50 dark:bg-black/50 border-2 border-slate-300 dark:border-sanfran-rubi/30 rounded-2xl font-black text-slate-950 dark:text-white outline-none">
+                {subjects.length === 0 ? <option value="">Nenhuma disciplina disponível</option> : subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+            
             {mode === 'create' ? (
               <div className="space-y-4">
                 <input value={manualFront} onChange={(e) => setManualFront(e.target.value)} placeholder="Enunciado / Pergunta" className="w-full p-5 bg-slate-50 dark:bg-black/50 border-2 border-slate-300 rounded-2xl font-bold outline-none" />
@@ -241,12 +266,16 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 <textarea 
                   value={aiInput} 
                   onChange={(e) => setAiInput(e.target.value)} 
-                  placeholder="Cole aqui o texto jurídico..." 
-                  className="w-full h-60 p-8 bg-slate-50 dark:bg-black/50 border-2 border-slate-300 rounded-[2.5rem] font-bold resize-none outline-none focus:border-usp-blue transition-colors" 
+                  placeholder="Cole aqui o texto jurídico para ser processado pela IA..." 
+                  className="w-full h-60 p-8 bg-slate-50 dark:bg-black/50 border-2 border-slate-300 rounded-[2.5rem] font-bold resize-none outline-none focus:border-usp-blue transition-colors shadow-inner" 
                 />
               </div>
             )}
-            <button onClick={mode === 'create' ? handleManualCreate : handleGenerate} disabled={isGenerating} className="w-full py-6 bg-sanfran-rubi text-white rounded-[2rem] font-black uppercase text-lg tracking-widest shadow-2xl hover:bg-sanfran-rubiDark disabled:opacity-50 flex items-center justify-center gap-4 transition-all">
+            <button 
+              onClick={mode === 'create' ? handleManualCreate : handleGenerate} 
+              disabled={isGenerating || (mode === 'generate' && subjects.length === 0)} 
+              className="w-full py-6 bg-sanfran-rubi text-white rounded-[2rem] font-black uppercase text-lg tracking-widest shadow-2xl hover:bg-sanfran-rubiDark disabled:opacity-30 flex items-center justify-center gap-4 transition-all"
+            >
               {isGenerating ? (
                 <>
                   <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
