@@ -52,9 +52,9 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks }) =>
         />
         <StatCard 
           icon={<Clock className="text-usp-gold dark:text-white" />} 
-          label="Foco" 
+          label="Cronômetro" 
           value={4} 
-          subtext="Pomodoros hoje"
+          subtext="Sessões hoje"
           bgColor="bg-yellow-50 dark:bg-usp-gold"
         />
         <StatCard 

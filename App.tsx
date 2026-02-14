@@ -61,12 +61,12 @@ const App: React.FC = () => {
     const { data: flds } = await supabase.from('folders').select('*').eq('user_id', userId);
     if (flds) setFolders(flds.map(f => ({ id: f.id, name: f.name, parentId: f.parent_id })));
 
-    const { data: cards } = await supabase.from('flashcards').select('*').eq('user_id', userId);
+    const { data: cards = [] } = await supabase.from('flashcards').select('*').eq('user_id', userId);
     if (cards) setFlashcards(cards.map(c => ({
       id: c.id, front: c.front, back: c.back, subjectId: c.subject_id, folderId: c.folder_id, nextReview: c.next_review, interval: c.interval
     })));
 
-    const { data: tks } = await supabase.from('tasks').select('*').eq('user_id', userId);
+    const { data: tks = [] } = await supabase.from('tasks').select('*').eq('user_id', userId);
     if (tks) setTasks(tks.map(t => ({
       id: t.id, title: t.title, completed: t.completed, subjectId: t.subject_id, dueDate: t.due_date
     })));
@@ -81,7 +81,7 @@ const App: React.FC = () => {
   const navItems = [
     { id: View.Dashboard, icon: LayoutDashboard, label: 'Painel' },
     { id: View.Anki, icon: BrainCircuit, label: 'Flashcards (Anki)' },
-    { id: View.Timer, icon: Timer, label: 'Pomodoro' },
+    { id: View.Timer, icon: Timer, label: 'Cronômetro' },
     { id: View.Calendar, icon: CalendarIcon, label: 'Calendário' },
     { id: View.Subjects, icon: BookOpen, label: 'Disciplinas' },
     { id: View.Tasks, icon: CheckSquare, label: 'Tarefas' },
