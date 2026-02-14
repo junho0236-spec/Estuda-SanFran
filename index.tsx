@@ -12,13 +12,13 @@ if (!rootElement) {
 // Captura erros globais para evitar a "tela branca" sem explicação
 window.onerror = (message) => {
   rootElement.innerHTML = `
-    <div style="padding: 20px; color: #9B111E; font-family: sans-serif; text-align: center;">
-      <h1 style="font-weight: 900;">Ops! Algo deu errado no carregamento.</h1>
-      <p style="color: #666;">Isso geralmente acontece por falta de configuração na Vercel ou no Supabase.</p>
-      <div style="background: #f8f8f8; padding: 15px; border-radius: 10px; margin-top: 20px; font-size: 12px; text-align: left; display: inline-block;">
+    <div style="padding: 40px; color: #9B111E; font-family: sans-serif; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh;">
+      <h1 style="font-weight: 900; font-size: 2rem; margin-bottom: 10px;">Ops! Algo deu errado.</h1>
+      <p style="color: #666; max-width: 500px;">O sistema encontrou um erro inesperado durante o processamento da sua sessão acadêmica.</p>
+      <div style="background: #f8f8f8; padding: 20px; border-radius: 15px; margin-top: 30px; font-size: 13px; text-align: left; border: 1px solid #eee; font-family: monospace; color: #444;">
         <code>${message}</code>
       </div>
-      <p style="margin-top: 20px; font-size: 14px;">Verifique se a <b>API_KEY</b> foi adicionada corretamente nas configurações da Vercel.</p>
+      <button onclick="window.location.reload()" style="margin-top: 30px; padding: 12px 24px; background: #9B111E; color: white; border: none; border-radius: 10px; font-weight: 900; cursor: pointer; text-transform: uppercase; letter-spacing: 1px;">Recarregar Sistema</button>
     </div>
   `;
 };

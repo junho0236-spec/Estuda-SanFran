@@ -36,6 +36,7 @@ export interface Task {
   completed: boolean;
   subjectId?: string;
   dueDate?: string;
+  completedAt?: string;
 }
 
 export interface StudySession {

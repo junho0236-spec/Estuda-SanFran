@@ -47,14 +47,26 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
   };
 
   const toggleTask = async (task: Task) => {
+    const isNowCompleted = !task.completed;
+    const completionTimestamp = isNowCompleted ? new Date().toISOString() : null;
+
     try {
       const { error } = await supabase
         .from('tasks')
-        .update({ completed: !task.completed })
+        .update({ 
+          completed: isNowCompleted,
+          completed_at: completionTimestamp 
+        })
         .eq('id', task.id)
         .eq('user_id', userId);
+      
       if (error) throw error;
-      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed: !task.completed } : t));
+      
+      setTasks(prev => prev.map(t => t.id === task.id ? { 
+        ...t, 
+        completed: isNowCompleted, 
+        completedAt: completionTimestamp || undefined 
+      } : t));
     } catch (err) {
       console.error(err);
     }
@@ -101,7 +113,7 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
                     {subject && (
                       <span className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md" style={{ backgroundColor: `${subject.color}15`, color: subject.color }}>{subject.name}</span>
                     )}
-                    <span className="flex items-center gap-1 text-[9px] font-bold text-slate-300 dark:text-slate-500 uppercase tracking-widest"><Calendar className="w-3 h-3" /> Hoje</span>
+                    <span className="flex items-center gap-1 text-[9px] font-bold text-slate-300 dark:text-slate-500 uppercase tracking-widest"><Calendar className="w-3 h-3" /> {task.dueDate || 'Hoje'}</span>
                   </div>
                 </div>
               </div>

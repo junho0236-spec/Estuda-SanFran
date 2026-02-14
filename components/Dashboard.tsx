@@ -1,16 +1,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { Brain, CheckCircle2, Clock, Zap, TrendingUp, ShieldCheck } from 'lucide-react';
-import { Subject, Flashcard, Task } from '../types';
+import { Subject, Flashcard, Task, StudySession } from '../types';
 import { getStudyMotivation } from '../services/geminiService';
 
 interface DashboardProps {
   subjects: Subject[];
   flashcards: Flashcard[];
   tasks: Task[];
+  studySessions: StudySession[];
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks }) => {
+const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, studySessions }) => {
   const [motivation, setMotivation] = useState("Carregando inspiração jurídica...");
 
   useEffect(() => {
@@ -27,6 +28,11 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks }) =>
 
   const cardsToReview = flashcards.filter(f => f.nextReview <= Date.now()).length;
   const pendingTasks = tasks.filter(t => !t.completed).length;
+  
+  // Cálculo de horas acumuladas
+  const totalSeconds = studySessions.reduce((acc, s) => acc + (s.duration || 0), 0);
+  const totalHours = (totalSeconds / 3600).toFixed(1);
+  const sessionsToday = studySessions.filter(s => s.start_time.startsWith(new Date().toISOString().split('T')[0])).length;
 
   return (
     <div className="space-y-12 animate-in fade-in duration-500">
@@ -52,9 +58,9 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks }) =>
         />
         <StatCard 
           icon={<Clock className="text-usp-gold dark:text-white" />} 
-          label="Cronômetro" 
-          value={4} 
-          subtext="Sessões hoje"
+          label="Horas Totais" 
+          value={`${totalHours}h`} 
+          subtext={`${sessionsToday} sessões hoje`}
           bgColor="bg-yellow-50 dark:bg-usp-gold"
         />
         <StatCard 

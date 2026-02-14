@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, Timer, BookOpen, CheckSquare, Menu, X, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon } from 'lucide-react';
-import { View, Subject, Flashcard, Task, Folder } from './types';
+import { View, Subject, Flashcard, Task, Folder, StudySession } from './types';
 import Dashboard from './components/Dashboard';
 import Anki from './components/Anki';
 import Pomodoro from './components/Pomodoro';
@@ -26,6 +26,7 @@ const App: React.FC = () => {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [studySessions, setStudySessions] = useState<StudySession[]>([]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -68,8 +69,11 @@ const App: React.FC = () => {
 
     const { data: tks = [] } = await supabase.from('tasks').select('*').eq('user_id', userId);
     if (tks) setTasks(tks.map(t => ({
-      id: t.id, title: t.title, completed: t.completed, subjectId: t.subject_id, dueDate: t.due_date
+      id: t.id, title: t.title, completed: t.completed, subjectId: t.subject_id, dueDate: t.due_date, completedAt: t.completed_at
     })));
+
+    const { data: sessions = [] } = await supabase.from('study_sessions').select('*').eq('user_id', userId);
+    if (sessions) setStudySessions(sessions);
   };
 
   useEffect(() => {
@@ -96,13 +100,13 @@ const App: React.FC = () => {
     const userId = session.user.id;
 
     switch (currentView) {
-      case View.Dashboard: return <Dashboard subjects={subjects} flashcards={flashcards} tasks={tasks} />;
+      case View.Dashboard: return <Dashboard subjects={subjects} flashcards={flashcards} tasks={tasks} studySessions={studySessions} />;
       case View.Anki: return <Anki subjects={subjects} flashcards={flashcards} setFlashcards={setFlashcards} folders={folders} setFolders={setFolders} userId={userId} />;
       case View.Timer: return <Pomodoro subjects={subjects} userId={userId} />;
-      case View.Calendar: return <CalendarView subjects={subjects} userId={userId} />;
+      case View.Calendar: return <CalendarView subjects={subjects} tasks={tasks} userId={userId} />;
       case View.Subjects: return <Subjects subjects={subjects} setSubjects={setSubjects} userId={userId} />;
       case View.Tasks: return <Tasks subjects={subjects} tasks={tasks} setTasks={setTasks} userId={userId} />;
-      default: return <Dashboard subjects={subjects} flashcards={flashcards} tasks={tasks} />;
+      default: return <Dashboard subjects={subjects} flashcards={flashcards} tasks={tasks} studySessions={studySessions} />;
     }
   };
 
@@ -137,7 +141,7 @@ const App: React.FC = () => {
             <span className="text-xs font-black uppercase tracking-widest">{isDarkMode ? 'Modo Escuro' : 'Modo Claro'}</span>
             {isDarkMode ? <Moon className="w-5 h-5 text-usp-blue" /> : <Sun className="w-5 h-5 text-usp-gold" />}
           </button>
-          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-5 py-3 rounded-2xl text-slate-500 hover:text-red-600 dark:hover:text-red-400 transition-all font-black uppercase text-[10px] tracking-widest"><LogOut className="w-4 h-4" /> Sair do Sistema</button>
+          <button handleLogout={handleLogout} className="w-full flex items-center gap-3 px-5 py-3 rounded-2xl text-slate-500 hover:text-red-600 dark:hover:text-red-400 transition-all font-black uppercase text-[10px] tracking-widest"><LogOut className="w-4 h-4" /> Sair do Sistema</button>
           <div className="bg-sanfran-rubi dark:bg-sanfran-rubiDark rounded-2xl p-4 text-white shadow-xl border border-white/10">
             <p className="text-[9px] text-white/70 mb-1 font-black uppercase tracking-widest">Academia SanFran</p>
             <p className="text-sm font-black italic">"Scientia Vinces"</p>
