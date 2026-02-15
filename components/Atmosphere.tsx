@@ -9,12 +9,12 @@ interface SoundTrack {
   icon: React.ElementType;
 }
 
-// Links atualizados para uma seleção diversificada e testada do SoundHelix
+// URLs estáveis da Wikimedia Commons e SoundHelix para garantir funcionamento e imersão
 const tracks: SoundTrack[] = [
-  { id: 'bells', name: 'Sinos do XI', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3', icon: Bell },
-  { id: 'arcadas', name: 'Burburinho das Arcadas', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3', icon: Users },
-  { id: 'rain', name: 'Chuva no Largo', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3', icon: CloudRain },
-  { id: 'library', name: 'Biblioteca SanFran', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-13.mp3', icon: Library },
+  { id: 'bells', name: 'Sinos do XI', url: 'https://upload.wikimedia.org/wikipedia/commons/8/87/Church_Bells_in_the_Distance.mp3', icon: Bell },
+  { id: 'arcadas', name: 'Burburinho das Arcadas', url: 'https://upload.wikimedia.org/wikipedia/commons/e/e0/Crowd_at_an_airport.mp3', icon: Users },
+  { id: 'rain', name: 'Chuva no Largo', url: 'https://upload.wikimedia.org/wikipedia/commons/5/52/Rain_On_The_Roof.mp3', icon: CloudRain },
+  { id: 'library', name: 'Biblioteca SanFran', url: 'https://upload.wikimedia.org/wikipedia/commons/b/b0/Writing_with_pencil.mp3', icon: Library },
   { id: 'lofi', name: 'Lofi do Bacharel', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3', icon: Music },
   { id: 'cafe', name: 'Café da Faculdade', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', icon: Coffee },
 ];
@@ -31,14 +31,14 @@ const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus }) => {
   const [isLoading, setIsLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Efeito para controlar o Volume
+  // Controle de Volume
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = volume;
     }
   }, [volume]);
 
-  // Efeito para gerenciar a troca de faixas e Play/Pause
+  // Gerenciamento de Play/Pause e troca de faixa
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -56,7 +56,7 @@ const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus }) => {
           await audio.play();
           setIsLoading(false);
         } catch (error) {
-          console.error("Falha na reprodução:", error);
+          console.error("Erro na reprodução de áudio:", error);
           setIsPlaying(false);
           setIsLoading(false);
         }
@@ -99,7 +99,7 @@ const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus }) => {
           )}
           {!isExtremeFocus && (
             <span className="text-[10px] font-black uppercase tracking-widest">
-              {isLoading ? 'Carregando...' : isPlaying ? 'Atmosfera Ativa' : 'Atmosfera'}
+              {isLoading ? 'Conectando...' : isPlaying ? 'Atmosfera Ativa' : 'Atmosfera'}
             </span>
           )}
         </button>
@@ -108,7 +108,7 @@ const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus }) => {
           <div className="absolute bottom-20 left-0 w-72 bg-white dark:bg-[#0d0303] rounded-[2.5rem] border-2 border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl p-6 animate-in slide-in-from-bottom-4 duration-300">
             <div className="flex items-center justify-between mb-6">
                <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Sons das Arcadas</h4>
-               <button onClick={() => setIsOpen(false)} className="text-slate-300 hover:text-sanfran-rubi"><Volume2 size={16} /></button>
+               <button onClick={() => setIsOpen(false)} className="text-slate-300 hover:text-sanfran-rubi transition-colors"><Volume2 size={16} /></button>
             </div>
 
             <div className="space-y-3 mb-6">
@@ -135,7 +135,7 @@ const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus }) => {
 
             <div className="space-y-3">
                <div className="flex justify-between items-center px-1">
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Volume</span>
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Volume Imersivo</span>
                   <span className="text-[10px] font-bold tabular-nums text-slate-600">{Math.round(volume * 100)}%</span>
                </div>
                <input 
