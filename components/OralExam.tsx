@@ -18,28 +18,41 @@ interface OralExamProps {
   userId: string;
 }
 
+// Funções de decodificação de áudio PCM exigidas pela Live API
 function decode(base64: string) {
   const binaryString = atob(base64);
   const len = binaryString.length;
   const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
   return bytes;
 }
 
 function encode(bytes: Uint8Array) {
   let binary = '';
   const len = bytes.byteLength;
-  for (let i = 0; i < len; i++) binary += String.fromCharCode(bytes[i]);
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
   return btoa(binary);
 }
 
-async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number): Promise<AudioBuffer> {
+async function decodeAudioData(
+  data: Uint8Array,
+  ctx: AudioContext,
+  sampleRate: number,
+  numChannels: number,
+): Promise<AudioBuffer> {
   const dataInt16 = new Int16Array(data.buffer);
   const frameCount = dataInt16.length / numChannels;
   const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+
   for (let channel = 0; channel < numChannels; channel++) {
     const channelData = buffer.getChannelData(channel);
-    for (let i = 0; i < frameCount; i++) channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    for (let i = 0; i < frameCount; i++) {
+      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    }
   }
   return buffer;
 }
@@ -77,18 +90,20 @@ const OralExam: React.FC<OralExamProps> = ({ subjects, userId }) => {
         feedback: feedback
       });
       if (!error) fetchHistory();
-      return "Resultado protocolado.";
-    } catch (err) { return "Erro ao salvar."; }
+      return "Resultado protocolado com sucesso.";
+    } catch (err) {
+      return "Erro ao salvar no banco.";
+    }
   };
 
   const saveResultTool: FunctionDeclaration = {
     name: 'save_exam_result',
     parameters: {
       type: Type.OBJECT,
-      description: 'Salva nota e feedback.',
+      description: 'Salva a nota e feedback do exame oral no banco de dados.',
       properties: {
-        grade: { type: Type.STRING },
-        feedback: { type: Type.STRING },
+        grade: { type: Type.STRING, description: 'Nota de 0 a 10.' },
+        feedback: { type: Type.STRING, description: 'Parecer técnico.' },
       },
       required: ['grade', 'feedback'],
     },
@@ -100,12 +115,18 @@ const OralExam: React.FC<OralExamProps> = ({ subjects, userId }) => {
     setErrorMessage(null);
     
     try {
+      // 1. Solicita microfone primeiro para evitar erros de permissão tardios
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
       
       const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       const outputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       audioContextRef.current = outputCtx;
+
+      // Garantir que os contextos de áudio estão ativos (requisito do navegador)
+      if (inputCtx.state === 'suspended') await inputCtx.resume();
+      if (outputCtx.state === 'suspended') await outputCtx.resume();
 
       const sessionPromise = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-12-2025',
@@ -113,37 +134,53 @@ const OralExam: React.FC<OralExamProps> = ({ subjects, userId }) => {
           responseModalities: [Modality.AUDIO],
           tools: [{ functionDeclarations: [saveResultTool] }],
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Charon' } } },
-          systemInstruction: `Você é um Professor da USP. Conduza um exame oral rigoroso sobre ${selectedSubject}. Use "Doutor". No final, use a função save_exam_result para dar a nota.`,
+          systemInstruction: `Você é um Professor Catedrático da Faculdade de Direito da USP. Conduza um exame oral rigoroso sobre ${selectedSubject}. Ao final, utilize obrigatoriamente a função 'save_exam_result' para registrar a nota e o feedback do aluno.`,
         },
         callbacks: {
           onopen: () => {
             setStatus('active');
             setIsActive(true);
+            
             const source = inputCtx.createMediaStreamSource(stream);
             const processor = inputCtx.createScriptProcessor(4096, 1, 1);
+            
             processor.onaudioprocess = (e) => {
               const inputData = e.inputBuffer.getChannelData(0);
-              const int16 = new Int16Array(inputData.length);
-              for (let i = 0; i < inputData.length; i++) int16[i] = inputData[i] * 32768;
-              const pcmBlob = { data: encode(new Uint8Array(int16.buffer)), mimeType: 'audio/pcm;rate=16000' };
-              sessionPromise.then(s => s.sendRealtimeInput({ media: pcmBlob }));
+              const l = inputData.length;
+              const int16 = new Int16Array(l);
+              for (let i = 0; i < l; i++) {
+                int16[i] = inputData[i] * 32768;
+              }
+              const pcmBlob = {
+                data: encode(new Uint8Array(int16.buffer)),
+                mimeType: 'audio/pcm;rate=16000',
+              };
+              // Envia áudio apenas após a promessa ser resolvida
+              sessionPromise.then(session => {
+                session.sendRealtimeInput({ media: pcmBlob });
+              });
             };
+            
             source.connect(processor);
             processor.connect(inputCtx.destination);
           },
           onmessage: async (msg) => {
+            // Lógica de Function Calling
             if (msg.toolCall) {
               for (const fc of msg.toolCall.functionCalls) {
                 if (fc.name === 'save_exam_result') {
                   const res = await saveExamResult(fc.args.grade as string, fc.args.feedback as string);
-                  sessionPromise.then(s => s.sendToolResponse({ functionResponses: { id: fc.id, name: fc.name, response: { result: res } } }));
+                  sessionPromise.then(s => s.sendToolResponse({
+                    functionResponses: { id: fc.id, name: fc.name, response: { result: res } }
+                  }));
                 }
               }
             }
+
+            // Lógica de Reprodução de Áudio
             const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
             if (audioData && audioContextRef.current) {
               const ctx = audioContextRef.current;
-              if (ctx.state === 'suspended') await ctx.resume();
               nextStartTimeRef.current = Math.max(nextStartTimeRef.current, ctx.currentTime);
               const buffer = await decodeAudioData(decode(audioData), ctx, 24000, 1);
               const source = ctx.createBufferSource();
@@ -155,12 +192,22 @@ const OralExam: React.FC<OralExamProps> = ({ subjects, userId }) => {
             }
           },
           onclose: () => { setStatus('idle'); setIsActive(false); },
-          onerror: (e) => { setErrorMessage("Conexão interrompida."); setStatus('idle'); }
+          onerror: (e) => { 
+            console.error("Live API Error:", e);
+            setErrorMessage("Erro crítico na conexão com a banca."); 
+            setStatus('idle'); 
+          }
         }
       });
+
       sessionRef.current = await sessionPromise;
     } catch (err: any) {
-      setErrorMessage(err.name === 'NotAllowedError' ? "Microfone bloqueado." : "Erro ao iniciar bancada.");
+      console.error("Start Session Error:", err);
+      if (err.name === 'NotAllowedError') {
+        setErrorMessage("Microfone bloqueado pelo navegador.");
+      } else {
+        setErrorMessage("Falha ao invocar banca examinadora.");
+      }
       setStatus('idle');
     }
   };
@@ -178,7 +225,7 @@ const OralExam: React.FC<OralExamProps> = ({ subjects, userId }) => {
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <h2 className="text-4xl font-black text-slate-950 dark:text-white uppercase tracking-tight">Exame Oral AI</h2>
-          <p className="text-slate-500 dark:text-slate-400 font-bold italic text-lg mt-1">Sua voz, sua tese, seu futuro.</p>
+          <p className="text-slate-500 dark:text-slate-400 font-bold italic text-lg mt-1">Defesa de tese em tempo real.</p>
         </div>
         <div className="bg-usp-gold/10 px-6 py-3 rounded-2xl border border-usp-gold/30 flex items-center gap-3">
           <GraduationCap className="text-usp-gold" />
