@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Play, Pause, RotateCcw, Clock, Settings2, ShieldCheck, Coffee, History, Trash2, ArrowLeft, Calendar, Gavel, Trash } from 'lucide-react';
 import { Subject, StudySession } from '../types';
 import { supabase } from '../services/supabaseClient';
@@ -9,59 +9,52 @@ interface PomodoroProps {
   userId: string;
   studySessions: StudySession[];
   setStudySessions: React.Dispatch<React.SetStateAction<StudySession[]>>;
+  // Props injetadas pelo App.tsx para persistência global
+  isActive: boolean;
+  setIsActive: (active: boolean) => void;
+  secondsLeft: number;
+  setSecondsLeft: (seconds: number) => void;
+  mode: 'work' | 'break';
+  setMode: (mode: 'work' | 'break') => void;
+  selectedSubjectId: string | null;
+  setSelectedSubjectId: (id: string | null) => void;
+  setTotalInitial: (seconds: number) => void;
 }
 
-const Pomodoro: React.FC<PomodoroProps> = ({ subjects, userId, studySessions, setStudySessions }) => {
+const Pomodoro: React.FC<PomodoroProps> = ({ 
+  subjects, 
+  userId, 
+  studySessions, 
+  setStudySessions,
+  isActive,
+  setIsActive,
+  secondsLeft,
+  setSecondsLeft,
+  mode,
+  setMode,
+  selectedSubjectId,
+  setSelectedSubjectId,
+  setTotalInitial
+}) => {
   const [workMinutes, setWorkMinutes] = useState(25);
   const [breakMinutes, setBreakMinutes] = useState(5);
-  const [secondsLeft, setSecondsLeft] = useState(25 * 60);
-  const [isActive, setIsActive] = useState(false);
-  const [mode, setMode] = useState<'work' | 'break'>('work');
-  const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Sincroniza configuração inicial quando não está ativo
+  useEffect(() => {
+    if (!isActive) {
+      const initial = mode === 'work' ? workMinutes * 60 : breakMinutes * 60;
+      setSecondsLeft(initial);
+      setTotalInitial(initial);
+    }
+  }, [workMinutes, breakMinutes, mode, isActive]);
 
   useEffect(() => {
-    if (!selectedSubject && subjects.length > 0) {
-      setSelectedSubject(subjects[0].id);
+    if (!selectedSubjectId && subjects.length > 0) {
+      setSelectedSubjectId(subjects[0].id);
     }
-  }, [subjects, selectedSubject]);
-
-  const saveSession = async (duration: number) => {
-    const now = new Date();
-    const brDate = new Intl.DateTimeFormat('sv-SE', { 
-      timeZone: 'America/Sao_Paulo',
-      year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', second: '2-digit'
-    }).format(now).replace(' ', 'T');
-
-    const newSession: StudySession = {
-      id: Math.random().toString(36).substr(2, 9),
-      user_id: userId,
-      duration: duration,
-      subject_id: selectedSubject || '',
-      start_time: brDate
-    };
-
-    try {
-      const dbPayload = {
-        id: newSession.id,
-        user_id: userId,
-        duration: Number(duration),
-        subject_id: selectedSubject || null,
-        start_time: brDate
-      };
-      const { error } = await supabase.from('study_sessions').insert(dbPayload);
-      if (error) throw error;
-      setStudySessions(prev => [newSession, ...prev]);
-    } catch (e) {
-      console.error("Erro ao protocolar tempo no banco de dados:", e);
-      // Fallback local se o banco falhar momentaneamente
-      setStudySessions(prev => [newSession, ...prev]);
-    }
-  };
+  }, [subjects, selectedSubjectId]);
 
   const deleteSession = async (id: string) => {
     if (!confirm("Deseja expurgar este registro do seu histórico acadêmico?")) return;
@@ -85,39 +78,13 @@ const Pomodoro: React.FC<PomodoroProps> = ({ subjects, userId, studySessions, se
     }
   };
 
-  useEffect(() => {
-    if (!isActive) {
-      setSecondsLeft(mode === 'work' ? workMinutes * 60 : breakMinutes * 60);
-    }
-  }, [workMinutes, breakMinutes, mode, isActive]);
-
-  useEffect(() => {
-    if (isActive && secondsLeft > 0) {
-      timerRef.current = setInterval(() => {
-        setSecondsLeft(prev => prev - 1);
-      }, 1000);
-    } else if (secondsLeft === 0) {
-      setIsActive(false);
-      if (mode === 'work') {
-        saveSession(workMinutes * 60);
-        setMode('break');
-        setSecondsLeft(breakMinutes * 60);
-        alert("Ciclo concluído! Hora do descanso.");
-      } else {
-        setMode('work');
-        setSecondsLeft(workMinutes * 60);
-        alert("Descanso encerrado. De volta aos estudos.");
-      }
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [isActive, secondsLeft, mode, workMinutes, breakMinutes]);
-
   const toggleTimer = () => setIsActive(!isActive);
+  
   const resetTimer = () => { 
     setIsActive(false); 
-    setSecondsLeft(mode === 'work' ? workMinutes * 60 : breakMinutes * 60); 
+    const initial = mode === 'work' ? workMinutes * 60 : breakMinutes * 60;
+    setSecondsLeft(initial); 
+    setTotalInitial(initial);
   };
   
   const formatTime = (seconds: number) => {
@@ -220,7 +187,7 @@ const Pomodoro: React.FC<PomodoroProps> = ({ subjects, userId, studySessions, se
           </button>
           <button 
             onClick={() => setShowSettings(!showSettings)}
-            className={`p-3 md:p-4 rounded-2xl border-2 transition-all ${showSettings ? 'bg-sanfran-rubi text-white border-sanfran-rubi shadow-xl' : 'bg-white dark:bg-sanfran-rubiDark/20 text-slate-500 border-slate-200 dark:border-sanfran-rubi/30'}`}
+            className={`p-3 md:p-4 rounded-2xl border-2 transition-all ${showSettings ? 'bg-sanfran-rubi text-white border-sanfran-rubi shadow-xl' : 'bg-white dark:bg-sanfran-rubiDark/20 text-slate-500 border-2 border-slate-200 dark:border-sanfran-rubi/30'}`}
           >
             <Settings2 className="w-6 h-6" />
           </button>
@@ -259,7 +226,7 @@ const Pomodoro: React.FC<PomodoroProps> = ({ subjects, userId, studySessions, se
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className="text-5xl sm:text-7xl md:text-8xl font-black tabular-nums text-slate-950 dark:text-white tracking-tighter drop-shadow-sm">{formatTime(secondsLeft)}</span>
             <div className={`mt-3 md:mt-4 px-4 py-1.5 rounded-full font-black uppercase text-[8px] md:text-[10px] tracking-widest shadow-lg flex items-center gap-2 ${mode === 'work' ? 'bg-sanfran-rubi text-white' : 'bg-usp-blue text-white'}`}>
-              {mode === 'work' ? <ShieldCheck className="w-3.5 h-3.5" /> : <Coffee className="w-3.5 h-3.5" />}
+              {mode === 'work' ? <Gavel className="w-3.5 h-3.5" /> : <Coffee className="w-3.5 h-3.5" />}
               {mode === 'work' ? 'Estudo' : 'Descanso'}
             </div>
           </div>
@@ -283,8 +250,8 @@ const Pomodoro: React.FC<PomodoroProps> = ({ subjects, userId, studySessions, se
         <div className="w-full space-y-3 max-w-sm">
           <label className="text-[9px] md:text-[10px] text-center block font-black text-slate-400 uppercase tracking-widest">Protocolar em</label>
           <select 
-            value={selectedSubject || ''} 
-            onChange={(e) => setSelectedSubject(e.target.value || null)} 
+            value={selectedSubjectId || ''} 
+            onChange={(e) => setSelectedSubjectId(e.target.value || null)} 
             className="w-full p-4 md:p-5 bg-slate-50 dark:bg-black/60 border-2 border-slate-200 dark:border-sanfran-rubi/30 rounded-2xl md:rounded-3xl font-black text-center outline-none focus:border-sanfran-rubi text-sm md:text-base text-slate-900 dark:text-white transition-all shadow-inner"
           >
             <option value="">Sem Matéria</option>

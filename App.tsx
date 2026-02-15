@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Timer, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession } from './types';
 import Dashboard from './components/Dashboard';
 import Anki from './components/Anki';
@@ -75,6 +75,74 @@ const App: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [studySessions, setStudySessions] = useState<StudySession[]>([]);
 
+  // --- Timer Global State ---
+  const [timerIsActive, setTimerIsActive] = useState(false);
+  const [timerSecondsLeft, setTimerSecondsLeft] = useState(25 * 60);
+  const [timerMode, setTimerMode] = useState<'work' | 'break'>('work');
+  const [timerSelectedSubjectId, setTimerSelectedSubjectId] = useState<string | null>(null);
+  const [timerTotalInitial, setTimerTotalInitial] = useState(25 * 60);
+  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (timerIsActive && timerSecondsLeft > 0) {
+      timerIntervalRef.current = setInterval(() => {
+        setTimerSecondsLeft(prev => prev - 1);
+      }, 1000);
+    } else if (timerSecondsLeft === 0 && timerIsActive) {
+      handleTimerComplete();
+    }
+    return () => {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    };
+  }, [timerIsActive, timerSecondsLeft]);
+
+  const handleTimerComplete = async () => {
+    setTimerIsActive(false);
+    if (timerMode === 'work') {
+      await saveStudySession(timerTotalInitial);
+      setTimerMode('break');
+      // Default break time logic (can be overriden in Pomodoro component)
+      alert("Ciclo concluído! Hora do descanso.");
+    } else {
+      setTimerMode('work');
+      alert("Descanso encerrado. De volta aos estudos.");
+    }
+  };
+
+  const saveStudySession = async (duration: number) => {
+    if (!session?.user) return;
+    const brDate = getBrasiliaISOString();
+    const newSession: StudySession = {
+      id: Math.random().toString(36).substr(2, 9),
+      user_id: session.user.id,
+      duration: duration,
+      subject_id: timerSelectedSubjectId || '',
+      start_time: brDate
+    };
+
+    try {
+      const { error } = await supabase.from('study_sessions').insert({
+        id: newSession.id,
+        user_id: session.user.id,
+        duration: Number(duration),
+        subject_id: timerSelectedSubjectId || null,
+        start_time: brDate
+      });
+      if (error) throw error;
+      setStudySessions(prev => [newSession, ...prev]);
+    } catch (e) {
+      console.error("Erro ao salvar sessão:", e);
+      setStudySessions(prev => [newSession, ...prev]);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  // --- Auth & Data Loading ---
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -133,7 +201,7 @@ const App: React.FC = () => {
   const navItems = [
     { id: View.Dashboard, icon: LayoutDashboard, label: 'Painel' },
     { id: View.Anki, icon: BrainCircuit, label: 'Flashcards' },
-    { id: View.Timer, icon: Timer, label: 'Timer' },
+    { id: View.Timer, icon: TimerIcon, label: 'Timer' },
     { id: View.Calendar, icon: CalendarIcon, label: 'Agenda' },
     { id: View.Subjects, icon: BookOpen, label: 'Cadeiras' },
     { id: View.Tasks, icon: CheckSquare, label: 'Pauta' },
@@ -187,7 +255,7 @@ const App: React.FC = () => {
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 relative">
         {/* Mobile Header */}
         <header className="lg:hidden bg-white dark:bg-[#0d0303] border-b border-slate-200 dark:border-sanfran-rubi/30 p-4 flex items-center justify-between sticky top-0 z-20">
           <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-slate-100 dark:bg-sanfran-rubi/10 rounded-xl text-slate-600 dark:text-white">
@@ -197,20 +265,65 @@ const App: React.FC = () => {
             <div className="bg-sanfran-rubi p-1.5 rounded-lg text-white"><BookOpen className="w-4 h-4" /></div>
             <span className="text-sm font-black dark:text-white uppercase tracking-tighter">SanFran</span>
           </div>
-          <div className="w-10"></div> {/* Spacer for symmetry */}
+          <div className="w-10"></div>
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 md:p-10 relative">
           <div className="max-w-6xl mx-auto">
             {currentView === View.Dashboard && <Dashboard subjects={subjects} flashcards={flashcards} tasks={tasks} studySessions={studySessions} />}
             {currentView === View.Anki && <Anki subjects={subjects} flashcards={flashcards} setFlashcards={setFlashcards} folders={folders} setFolders={setFolders} userId={session.user.id} />}
-            {/* Fix: Pass missing studySessions prop to Pomodoro component to satisfy mandatory PomodoroProps interface */}
-            {currentView === View.Timer && <Pomodoro subjects={subjects} userId={session.user.id} studySessions={studySessions} setStudySessions={setStudySessions} />}
+            
+            {currentView === View.Timer && (
+              <Pomodoro 
+                subjects={subjects} 
+                userId={session.user.id} 
+                studySessions={studySessions} 
+                setStudySessions={setStudySessions}
+                // Props globais do timer
+                isActive={timerIsActive}
+                setIsActive={setTimerIsActive}
+                secondsLeft={timerSecondsLeft}
+                setSecondsLeft={setTimerSecondsLeft}
+                mode={timerMode}
+                setMode={setTimerMode}
+                selectedSubjectId={timerSelectedSubjectId}
+                setSelectedSubjectId={setTimerSelectedSubjectId}
+                setTotalInitial={setTimerTotalInitial}
+              />
+            )}
+
             {currentView === View.Calendar && <CalendarView subjects={subjects} tasks={tasks} userId={session.user.id} studySessions={studySessions} />}
             {currentView === View.Subjects && <Subjects subjects={subjects} setSubjects={setSubjects} userId={session.user.id} />}
             {currentView === View.Tasks && <Tasks subjects={subjects} tasks={tasks} setTasks={setTasks} userId={session.user.id} />}
           </div>
         </main>
+
+        {/* --- Global Mini-Timer Widget --- */}
+        {timerIsActive && currentView !== View.Timer && (
+          <div 
+            onClick={() => setCurrentView(View.Timer)}
+            className="fixed bottom-6 right-6 md:bottom-10 md:right-10 z-50 animate-in slide-in-from-bottom-10 duration-500 cursor-pointer group"
+          >
+            <div className={`flex items-center gap-3 p-3 md:p-4 rounded-[2rem] border-2 shadow-2xl backdrop-blur-xl transition-all hover:scale-105 active:scale-95 ${timerMode === 'work' ? 'bg-white/90 dark:bg-sanfran-rubi/20 border-sanfran-rubi shadow-red-900/20' : 'bg-white/90 dark:bg-usp-blue/20 border-usp-blue shadow-cyan-900/20'}`}>
+              <div className="relative w-10 h-10 md:w-12 md:h-12 flex items-center justify-center">
+                 <svg className="absolute inset-0 w-full h-full transform -rotate-90">
+                    <circle cx="50%" cy="50%" r="45%" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-slate-100 dark:text-white/5" />
+                    <circle cx="50%" cy="50%" r="45%" stroke="currentColor" strokeWidth="4" fill="transparent" strokeDasharray="100" strokeDashoffset={100 - ( (timerSecondsLeft / timerTotalInitial) * 100 )} className={`transition-all duration-1000 ${timerMode === 'work' ? 'text-sanfran-rubi' : 'text-usp-blue'}`} pathLength="100" strokeLinecap="round" />
+                 </svg>
+                 {timerMode === 'work' ? <Gavel className="w-4 h-4 md:w-5 md:h-5 text-sanfran-rubi" /> : <Coffee className="w-4 h-4 md:w-5 md:h-5 text-usp-blue" />}
+              </div>
+              <div className="pr-2">
+                <p className="text-[8px] font-black uppercase text-slate-500 tracking-widest">{timerMode === 'work' ? 'Em Pauta' : 'Recesso'}</p>
+                <h4 className="text-sm md:text-lg font-black tabular-nums dark:text-white">{formatTime(timerSecondsLeft)}</h4>
+              </div>
+              <div className="pl-2 border-l border-slate-200 dark:border-white/10">
+                 <div className="bg-slate-100 dark:bg-white/10 p-2 rounded-full group-hover:bg-sanfran-rubi group-hover:text-white transition-colors">
+                    <Play className="w-3 h-3 fill-current" />
+                 </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
