@@ -9,12 +9,12 @@ interface SoundTrack {
   icon: React.ElementType;
 }
 
-// Links atualizados para servidores de áudio estáveis e de acesso direto
+// Links atualizados para uma seleção diversificada e testada do SoundHelix
 const tracks: SoundTrack[] = [
-  { id: 'bells', name: 'Sinos do XI', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3', icon: Bell },
-  { id: 'arcadas', name: 'Burburinho das Arcadas', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3', icon: Users },
-  { id: 'rain', name: 'Chuva no Largo', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3', icon: CloudRain },
-  { id: 'library', name: 'Biblioteca SanFran', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3', icon: Library },
+  { id: 'bells', name: 'Sinos do XI', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3', icon: Bell },
+  { id: 'arcadas', name: 'Burburinho das Arcadas', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3', icon: Users },
+  { id: 'rain', name: 'Chuva no Largo', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3', icon: CloudRain },
+  { id: 'library', name: 'Biblioteca SanFran', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-13.mp3', icon: Library },
   { id: 'lofi', name: 'Lofi do Bacharel', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3', icon: Music },
   { id: 'cafe', name: 'Café da Faculdade', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', icon: Coffee },
 ];
@@ -28,48 +28,80 @@ const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(0.5);
   const [isOpen, setIsOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Efeito para controlar o Volume
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = volume;
     }
   }, [volume]);
 
-  const toggleTrack = (trackId: string) => {
-    const track = tracks.find(t => t.id === trackId);
-    if (!track) return;
+  // Efeito para gerenciar a troca de faixas e Play/Pause
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
 
-    if (currentTrackId === trackId) {
-      if (isPlaying) {
-        setIsPlaying(false);
-        audioRef.current?.pause();
+    const handlePlay = async () => {
+      if (isPlaying && currentTrackId) {
+        const track = tracks.find(t => t.id === currentTrackId);
+        if (track && audio.src !== track.url) {
+          setIsLoading(true);
+          audio.src = track.url;
+          audio.load();
+        }
+        
+        try {
+          await audio.play();
+          setIsLoading(false);
+        } catch (error) {
+          console.error("Falha na reprodução:", error);
+          setIsPlaying(false);
+          setIsLoading(false);
+        }
       } else {
-        setIsPlaying(true);
-        audioRef.current?.play().catch(e => console.error("Erro ao dar play:", e));
+        audio.pause();
       }
+    };
+
+    handlePlay();
+  }, [isPlaying, currentTrackId]);
+
+  const toggleTrack = (trackId: string) => {
+    if (currentTrackId === trackId) {
+      setIsPlaying(!isPlaying);
     } else {
       setCurrentTrackId(trackId);
       setIsPlaying(true);
-      if (audioRef.current) {
-        audioRef.current.src = track.url;
-        audioRef.current.load(); // Garante que o novo áudio seja carregado
-        audioRef.current.play().catch(e => console.error("Erro ao carregar som:", e));
-      }
     }
   };
 
   return (
     <div className={`fixed z-[60] transition-all duration-700 ${isExtremeFocus ? 'bottom-8 left-8' : 'bottom-6 left-6 lg:bottom-10 lg:left-72'}`}>
-      <audio ref={audioRef} loop preload="auto" />
+      <audio 
+        ref={audioRef} 
+        loop 
+        preload="auto" 
+        onWaiting={() => setIsLoading(true)}
+        onCanPlay={() => setIsLoading(false)}
+      />
       
       <div className="flex items-center gap-3">
         <button 
           onClick={() => setIsOpen(!isOpen)}
           className={`p-4 rounded-[1.5rem] border-2 shadow-2xl backdrop-blur-xl transition-all hover:scale-105 active:scale-95 flex items-center gap-3 ${isPlaying ? 'bg-sanfran-rubi text-white border-sanfran-rubi' : 'bg-white dark:bg-sanfran-rubiDark/40 text-slate-400 border-slate-200 dark:border-sanfran-rubi/30'}`}
         >
-          {isPlaying ? <Waves className="w-5 h-5 animate-pulse" /> : <VolumeX className="w-5 h-5" />}
-          {!isExtremeFocus && <span className="text-[10px] font-black uppercase tracking-widest">{isPlaying ? 'Atmosfera Ativa' : 'Atmosfera'}</span>}
+          {isPlaying ? (
+            <Waves className={`w-5 h-5 ${isLoading ? 'animate-spin opacity-50' : 'animate-pulse'}`} />
+          ) : (
+            <VolumeX className="w-5 h-5" />
+          )}
+          {!isExtremeFocus && (
+            <span className="text-[10px] font-black uppercase tracking-widest">
+              {isLoading ? 'Carregando...' : isPlaying ? 'Atmosfera Ativa' : 'Atmosfera'}
+            </span>
+          )}
         </button>
 
         {isOpen && (
@@ -89,10 +121,13 @@ const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus }) => {
                     className={`w-full flex items-center justify-between p-3 rounded-2xl transition-all border-2 ${isActive ? 'bg-sanfran-rubi/10 border-sanfran-rubi text-sanfran-rubi shadow-inner' : 'bg-slate-50 dark:bg-white/5 border-transparent text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10'}`}
                   >
                     <div className="flex items-center gap-3">
-                      <track.icon size={16} className={isActive && isPlaying ? 'animate-bounce text-sanfran-rubi' : ''} />
+                      <track.icon size={16} className={isActive && isPlaying && !isLoading ? 'animate-bounce text-sanfran-rubi' : ''} />
                       <span className="text-[10px] font-bold uppercase tracking-wide">{track.name}</span>
                     </div>
-                    {isActive && isPlaying ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
+                    <div className="flex items-center gap-2">
+                       {isActive && isLoading && <div className="w-3 h-3 border-2 border-sanfran-rubi border-t-transparent rounded-full animate-spin" />}
+                       {isActive && isPlaying && !isLoading ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
+                    </div>
                   </button>
                 );
               })}
