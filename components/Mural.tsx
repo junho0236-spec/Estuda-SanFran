@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Pin, Trash2, MessageSquare, Quote, AlertCircle, RefreshCw } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
@@ -70,7 +71,13 @@ const Mural: React.FC<MuralProps> = ({ userId, userName }) => {
       setNewMessage('');
     } catch (err: any) {
       console.error(err);
-      alert(`Erro ao fixar recado: ${err.message || 'Verifique sua conexão ou permissões.'}`);
+      
+      // Tratamento específico para erro de coluna faltando
+      if (err.message && (err.message.includes("Could not find the 'color' column") || err.message.includes("column \"color\" of relation \"mural_messages\" does not exist"))) {
+        alert("⚠️ Erro de Banco de Dados: A tabela existe mas está desatualizada. Execute o SQL de migração no Supabase para adicionar a coluna 'color'.");
+      } else {
+        alert(`Erro ao fixar recado: ${err.message || 'Verifique sua conexão ou permissões.'}`);
+      }
     }
   };
 
