@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Brain, CheckCircle2, Clock, Zap, TrendingUp, ShieldCheck, AlertTriangle, Sparkles } from 'lucide-react';
 import { Subject, Flashcard, Task, StudySession } from '../types';
 import { getStudyMotivation, getSafeApiKey } from '../services/geminiService';
@@ -36,16 +36,58 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
     fetchMotivation();
   }, [subjects]);
 
+  // Cálculos de Status
   const cardsToReview = flashcards.filter(f => f.nextReview <= Date.now()).length;
   const pendingTasks = tasks.filter(t => !t.completed).length;
-  
-  // Cálculo de horas totais somando cada duração
   const totalSeconds = studySessions.reduce((acc, s) => acc + (Number(s.duration) || 0), 0);
   const totalHours = (totalSeconds / 3600).toFixed(1);
-
-  // Filtro de sessões hoje respeitando o fuso de Brasília
   const todayStr = getBrasiliaDate();
   const sessionsToday = studySessions.filter(s => s.start_time.startsWith(todayStr)).length;
+
+  // Lógica de Cálculo da Ofensiva (Streak)
+  const streak = useMemo(() => {
+    const activityDates = new Set<string>();
+    
+    // Adiciona datas de sessões de estudo
+    studySessions.forEach(s => {
+      if (s.start_time) activityDates.add(s.start_time.split('T')[0]);
+    });
+    
+    // Adiciona datas de tarefas concluídas
+    tasks.forEach(t => {
+      if (t.completed && t.completedAt) activityDates.add(t.completedAt.split('T')[0]);
+    });
+
+    if (activityDates.size === 0) return 0;
+
+    const sortedDates = Array.from(activityDates).sort((a, b) => b.localeCompare(a));
+    const today = getBrasiliaDate();
+    
+    // Calcula ontem
+    const yesterdayDate = new Date();
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterday = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(yesterdayDate);
+
+    let currentStreak = 0;
+    let checkDateStr = activityDates.has(today) ? today : (activityDates.has(yesterday) ? yesterday : null);
+
+    if (!checkDateStr) return 0;
+
+    // Função para subtrair 1 dia de uma string YYYY-MM-DD
+    const subtractOneDay = (dateStr: string) => {
+      const d = new Date(dateStr + 'T12:00:00'); // T12:00:00 evita bugs de fuso ao subtrair
+      d.setDate(d.getDate() - 1);
+      return d.toISOString().split('T')[0];
+    };
+
+    let tempDate = checkDateStr;
+    while (activityDates.has(tempDate)) {
+      currentStreak++;
+      tempDate = subtractOneDay(tempDate);
+    }
+
+    return currentStreak;
+  }, [studySessions, tasks]);
 
   return (
     <div className="space-y-12 animate-in fade-in duration-500">
@@ -86,8 +128,8 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
         <StatCard 
           icon={<ShieldCheck className="text-slate-700 dark:text-white" />} 
           label="Ofensiva" 
-          value="7" 
-          subtext="Dias de labuta"
+          value={streak} 
+          subtext={streak === 1 ? "Dia de labuta" : "Dias de labuta"}
           bgColor="bg-slate-100 dark:bg-slate-600"
         />
       </div>
