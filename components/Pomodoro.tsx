@@ -1,16 +1,17 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, RotateCcw, Clock, Settings2, ShieldCheck, Coffee } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Play, Pause, RotateCcw, Clock, Settings2, ShieldCheck, Coffee, History, Trash2, ArrowLeft, Calendar, Gavel, Trash } from 'lucide-react';
 import { Subject, StudySession } from '../types';
 import { supabase } from '../services/supabaseClient';
 
 interface PomodoroProps {
   subjects: Subject[];
   userId: string;
+  studySessions: StudySession[];
   setStudySessions: React.Dispatch<React.SetStateAction<StudySession[]>>;
 }
 
-const Pomodoro: React.FC<PomodoroProps> = ({ subjects, userId, setStudySessions }) => {
+const Pomodoro: React.FC<PomodoroProps> = ({ subjects, userId, studySessions, setStudySessions }) => {
   const [workMinutes, setWorkMinutes] = useState(25);
   const [breakMinutes, setBreakMinutes] = useState(5);
   const [secondsLeft, setSecondsLeft] = useState(25 * 60);
@@ -18,6 +19,7 @@ const Pomodoro: React.FC<PomodoroProps> = ({ subjects, userId, setStudySessions 
   const [mode, setMode] = useState<'work' | 'break'>('work');
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -56,7 +58,30 @@ const Pomodoro: React.FC<PomodoroProps> = ({ subjects, userId, setStudySessions 
       setStudySessions(prev => [newSession, ...prev]);
     } catch (e) {
       console.error("Erro ao protocolar tempo no banco de dados:", e);
+      // Fallback local se o banco falhar momentaneamente
       setStudySessions(prev => [newSession, ...prev]);
+    }
+  };
+
+  const deleteSession = async (id: string) => {
+    if (!confirm("Deseja expurgar este registro do seu histórico acadêmico?")) return;
+    try {
+      const { error } = await supabase.from('study_sessions').delete().eq('id', id).eq('user_id', userId);
+      if (error) throw error;
+      setStudySessions(prev => prev.filter(s => s.id !== id));
+    } catch (e) {
+      console.error("Erro ao deletar sessão:", e);
+    }
+  };
+
+  const clearHistory = async () => {
+    if (!confirm("ALERTA: Deseja limpar TODO o seu dossiê de sessões? Esta ação é irreversível.")) return;
+    try {
+      const { error } = await supabase.from('study_sessions').delete().eq('user_id', userId);
+      if (error) throw error;
+      setStudySessions([]);
+    } catch (e) {
+      console.error("Erro ao limpar histórico:", e);
     }
   };
 
@@ -104,6 +129,81 @@ const Pomodoro: React.FC<PomodoroProps> = ({ subjects, userId, setStudySessions 
   const totalTime = mode === 'work' ? workMinutes * 60 : breakMinutes * 60;
   const progress = ((totalTime - secondsLeft) / totalTime) * 100;
 
+  if (showHistory) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6 md:space-y-10 animate-in slide-in-from-right-8 duration-500 pb-20 px-2">
+        <header className="flex items-center justify-between">
+          <button 
+            onClick={() => setShowHistory(false)}
+            className="flex items-center gap-2 p-3 text-slate-500 hover:text-sanfran-rubi font-black uppercase text-[10px] tracking-widest transition-all"
+          >
+            <ArrowLeft className="w-4 h-4" /> Voltar ao Relógio
+          </button>
+          <button 
+            onClick={clearHistory}
+            disabled={studySessions.length === 0}
+            className="flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-xl font-black uppercase text-[9px] tracking-widest disabled:opacity-30"
+          >
+            <Trash2 className="w-3.5 h-3.5" /> Limpar Dossiê
+          </button>
+        </header>
+
+        <div className="bg-white dark:bg-sanfran-rubiDark/30 rounded-[2.5rem] p-6 md:p-10 border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl">
+          <div className="flex items-center gap-4 mb-8">
+             <div className="bg-usp-blue p-3 rounded-2xl text-white shadow-lg"><History className="w-6 h-6" /></div>
+             <div>
+                <h3 className="text-2xl font-black text-slate-950 dark:text-white uppercase tracking-tight">Dossiê Temporal</h3>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Histórico de sessões protocoladas</p>
+             </div>
+          </div>
+
+          <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+            {studySessions.length === 0 ? (
+              <div className="py-20 text-center space-y-4">
+                <Clock className="w-12 h-12 text-slate-100 dark:text-white/5 mx-auto" />
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nenhuma sessão registrada nesta instância.</p>
+              </div>
+            ) : (
+              studySessions.map((session) => {
+                const subject = subjects.find(s => s.id === session.subject_id);
+                const date = new Date(session.start_time);
+                const durationMins = Math.floor(session.duration / 60);
+                
+                return (
+                  <div key={session.id} className="group p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/10 flex items-center justify-between hover:bg-white dark:hover:bg-white/10 transition-all">
+                    <div className="flex items-center gap-4">
+                      <div className="w-2 h-10 rounded-full" style={{ backgroundColor: subject?.color || '#9B111E' }} />
+                      <div>
+                        <p className="font-black text-slate-900 dark:text-white text-sm uppercase tracking-tight truncate max-w-[150px]">{subject?.name || 'Geral'}</p>
+                        <div className="flex items-center gap-3 mt-0.5">
+                           <span className="flex items-center gap-1 text-[9px] font-bold text-slate-400 uppercase">
+                              <Calendar className="w-3 h-3" /> {date.toLocaleDateString()}
+                           </span>
+                           <span className="flex items-center gap-1 text-[9px] font-bold text-slate-400 uppercase">
+                              <Clock className="w-3 h-3" /> {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                           </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span className="text-sm font-black text-sanfran-rubi">{durationMins}m</span>
+                      <button 
+                        onClick={() => deleteSession(session.id)}
+                        className="p-2 text-slate-200 hover:text-red-500 transition-colors"
+                      >
+                        <Trash className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-2xl mx-auto space-y-6 md:space-y-10 animate-in zoom-in duration-300 pb-20 px-2">
       <header className="flex items-center justify-between">
@@ -111,12 +211,20 @@ const Pomodoro: React.FC<PomodoroProps> = ({ subjects, userId, setStudySessions 
           <h2 className="text-3xl md:text-4xl font-black text-slate-950 dark:text-white uppercase tracking-tight">Timer</h2>
           <p className="text-slate-500 dark:text-slate-400 font-bold italic text-sm md:text-base">Produtividade em foco.</p>
         </div>
-        <button 
-          onClick={() => setShowSettings(!showSettings)}
-          className={`p-3 md:p-4 rounded-2xl border-2 transition-all ${showSettings ? 'bg-sanfran-rubi text-white border-sanfran-rubi shadow-xl' : 'bg-white dark:bg-sanfran-rubiDark/20 text-slate-500 border-slate-200 dark:border-sanfran-rubi/30'}`}
-        >
-          <Settings2 className="w-6 h-6" />
-        </button>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => setShowHistory(true)}
+            className="p-3 md:p-4 rounded-2xl bg-white dark:bg-sanfran-rubiDark/20 text-slate-500 border-2 border-slate-200 dark:border-sanfran-rubi/30 shadow-xl"
+          >
+            <History className="w-6 h-6" />
+          </button>
+          <button 
+            onClick={() => setShowSettings(!showSettings)}
+            className={`p-3 md:p-4 rounded-2xl border-2 transition-all ${showSettings ? 'bg-sanfran-rubi text-white border-sanfran-rubi shadow-xl' : 'bg-white dark:bg-sanfran-rubiDark/20 text-slate-500 border-slate-200 dark:border-sanfran-rubi/30'}`}
+          >
+            <Settings2 className="w-6 h-6" />
+          </button>
+        </div>
       </header>
 
       {showSettings && (
@@ -145,8 +253,8 @@ const Pomodoro: React.FC<PomodoroProps> = ({ subjects, userId, setStudySessions 
       <div className="bg-white dark:bg-[#0d0303] rounded-[3rem] md:rounded-[4rem] p-8 md:p-16 border-b-[12px] md:border-b-[16px] border-b-sanfran-rubi border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl flex flex-col items-center relative overflow-hidden">
         <div className="relative w-60 h-60 sm:w-72 sm:h-72 md:w-80 md:h-80 mb-8 md:mb-12">
           <svg className="w-full h-full transform -rotate-90 filter drop-shadow-xl">
-            <circle cx="50%" cy="50%" r="48%" stroke="currentColor" className="text-slate-100 dark:text-white/5" strokeWidth="6 md:strokeWidth-8" fill="transparent" />
-            <circle cx="50%" cy="50%" r="48%" stroke="currentColor" strokeWidth="8 md:strokeWidth-10" fill="transparent" strokeDasharray="100" strokeDashoffset={100 - progress} className={`transition-all duration-1000 ${mode === 'work' ? 'text-sanfran-rubi' : 'text-usp-blue'}`} pathLength="100" strokeLinecap="round" />
+            <circle cx="50%" cy="50%" r="48%" stroke="currentColor" className="text-slate-100 dark:text-white/5" strokeWidth="8" fill="transparent" />
+            <circle cx="50%" cy="50%" r="48%" stroke="currentColor" strokeWidth="10" fill="transparent" strokeDasharray="100" strokeDashoffset={100 - progress} className={`transition-all duration-1000 ${mode === 'work' ? 'text-sanfran-rubi' : 'text-usp-blue'}`} pathLength="100" strokeLinecap="round" />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className="text-5xl sm:text-7xl md:text-8xl font-black tabular-nums text-slate-950 dark:text-white tracking-tighter drop-shadow-sm">{formatTime(secondsLeft)}</span>

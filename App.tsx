@@ -204,7 +204,8 @@ const App: React.FC = () => {
           <div className="max-w-6xl mx-auto">
             {currentView === View.Dashboard && <Dashboard subjects={subjects} flashcards={flashcards} tasks={tasks} studySessions={studySessions} />}
             {currentView === View.Anki && <Anki subjects={subjects} flashcards={flashcards} setFlashcards={setFlashcards} folders={folders} setFolders={setFolders} userId={session.user.id} />}
-            {currentView === View.Timer && <Pomodoro subjects={subjects} userId={session.user.id} setStudySessions={setStudySessions} />}
+            {/* Fix: Pass missing studySessions prop to Pomodoro component to satisfy mandatory PomodoroProps interface */}
+            {currentView === View.Timer && <Pomodoro subjects={subjects} userId={session.user.id} studySessions={studySessions} setStudySessions={setStudySessions} />}
             {currentView === View.Calendar && <CalendarView subjects={subjects} tasks={tasks} userId={session.user.id} studySessions={studySessions} />}
             {currentView === View.Subjects && <Subjects subjects={subjects} setSubjects={setSubjects} userId={session.user.id} />}
             {currentView === View.Tasks && <Tasks subjects={subjects} tasks={tasks} setTasks={setTasks} userId={session.user.id} />}

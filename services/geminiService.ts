@@ -18,7 +18,8 @@ export const generateFlashcards = async (text: string, subjectName: string) => {
     throw new Error("DILIGÊNCIA NECESSÁRIA: API_KEY não configurada.");
   }
 
-  const ai = new GoogleGenAI({ apiKey });
+  // Fix: Strictly follow SDK guidelines by initializing GoogleGenAI with { apiKey: process.env.API_KEY } directly
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   try {
     const response = await ai.models.generateContent({
@@ -56,7 +57,8 @@ export const getStudyMotivation = async (subjects: string[]) => {
   const apiKey = getSafeApiKey();
   if (!apiKey) return "A justiça é a constante e perpétua vontade de dar a cada um o seu. - Ulpiano";
 
-  const ai = new GoogleGenAI({ apiKey });
+  // Fix: Strictly follow SDK guidelines by initializing GoogleGenAI with { apiKey: process.env.API_KEY } directly
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   try {
     const response = await ai.models.generateContent({
