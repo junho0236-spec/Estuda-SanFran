@@ -18,13 +18,8 @@ export const getSafeApiKey = (): string | null => {
   return null;
 };
 
-/**
- * Limpa a string de resposta da IA removendo blocos de código markdown
- * e espaços desnecessários que podem quebrar o JSON.parse
- */
 const cleanJsonResponse = (rawText: string): string => {
   let cleaned = rawText.trim();
-  // Remove blocos de código markdown se existirem
   cleaned = cleaned.replace(/^```json\n?/, "");
   cleaned = cleaned.replace(/```$/, "");
   return cleaned.trim();
@@ -38,48 +33,40 @@ export const generateFlashcards = async (
   const apiKey = getSafeApiKey();
   
   if (!apiKey) {
-    throw new Error("DILIGÊNCIA NECESSÁRIA: A variável 'API_KEY' não está configurada corretamente no ambiente.");
+    throw new Error("DILIGÊNCIA NECESSÁRIA: A variável 'API_KEY' não está configurada corretamente.");
   }
 
+  // Sempre cria uma nova instância para garantir que usa a chave mais atual do seletor
   const ai = new GoogleGenAI({ apiKey });
   
   const countInstruction = config?.count === 'auto' 
-    ? "gere uma quantidade proporcional à densidade e relevância jurídica do texto" 
+    ? "gere uma quantidade proporcional à densidade do texto" 
     : `gere exatamente ${config?.count} flashcards`;
 
   const frontInstruction = {
     curto: "A frente deve ser uma pergunta direta, curta e objetiva.",
     medio: "A frente deve ser uma pergunta contextualizada de tamanho médio.",
-    longo: "A frente deve ser um enunciado longo, como um caso prático ou item de edital detalhado."
+    longo: "A frente deve ser um enunciado longo e detalhado."
   }[config?.frontLength || 'medio'];
 
   const backInstruction = {
-    curto: "O verso deve ser uma resposta direta, lacônica e sem rodeios.",
-    medio: "O verso deve ser uma resposta fundamentada com base legal ou doutrinária moderada.",
-    longo: "O verso deve ser uma explicação exaustiva, profunda, citando dispositivos legais e correntes doutrinárias."
+    curto: "O verso deve ser uma resposta direta e lacônica.",
+    medio: "O verso deve ser uma resposta fundamentada com base legal moderada.",
+    longo: "O verso deve ser uma explicação exaustiva e profunda."
   }[config?.backLength || 'medio'];
 
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview', 
-      contents: `Você é um tutor de elite da SanFran (Academia Jurídica FDUSP).
-      
-      OBJETIVO: Transformar o texto jurídico fornecido em Flashcards de alta qualidade.
+      contents: `Você é um tutor de elite da SanFran.
       
       DISCIPLINA: ${subjectName}
-      CONFIGURAÇÃO TÉCNICA: 
-      - Quantidade: ${countInstruction}
-      - Estilo Frente: ${frontInstruction}
-      - Estilo Verso: ${backInstruction}
+      QUANTIDADE: ${countInstruction}
+      ESTILO: Frente ${frontInstruction}, Verso ${backInstruction}
       
-      TEXTO PARA ANÁLISE: 
-      "${text}"
+      TEXTO: "${text}"
       
-      REGRAS CRÍTICAS:
-      1. Responda ESTRITAMENTE com um array JSON.
-      2. NÃO inclua saudações, explicações ou blocos de código markdown.
-      3. Foco absoluto em prazos processuais, conceitos em latim, súmulas e doutrina clássica.
-      4. Se o texto for insuficiente, tente extrair os conceitos fundamentais do tema ${subjectName}.`,
+      REGRAS: Responda APENAS com um array JSON. Sem markdown.`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -100,18 +87,16 @@ export const generateFlashcards = async (
     if (!rawText) throw new Error("O servidor da IA retornou um veredito vazio.");
     
     const jsonStr = cleanJsonResponse(rawText);
-    
     try {
       return JSON.parse(jsonStr);
     } catch (parseError) {
-      console.error("Falha ao analisar JSON da IA:", jsonStr);
-      throw new Error("A IA enviou dados em formato inválido para o sistema.");
+      throw new Error("A IA enviou dados em formato inválido.");
     }
   } catch (err: any) {
-    console.error("Erro Gemini Detalhado:", err);
-    // Repassa o erro de forma amigável mas informativa
-    const errorMsg = err.message || "Erro desconhecido na comunicação com a IA.";
-    throw new Error(`Despacho de Erro: ${errorMsg}`);
+    console.error("Erro Gemini:", err);
+    // Extrai mensagem técnica se disponível
+    const msg = err.message || JSON.stringify(err);
+    throw new Error(msg);
   }
 };
 
@@ -122,7 +107,7 @@ export const getStudyMotivation = async (subjects: string[]) => {
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Gere uma frase de motivação curta para um estudante de Direito da SanFran que estuda: ${subjects.join(', ')}. Estilo erudito e clássico. Use máximas latinas se apropriado.`,
+      contents: `Gere uma frase de motivação curta para um estudante de Direito da SanFran que estuda: ${subjects.join(', ')}. Estilo erudito.`,
     });
     return response.text;
   } catch (e) {
