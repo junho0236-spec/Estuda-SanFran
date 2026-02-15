@@ -51,30 +51,37 @@ const App: React.FC = () => {
   const loadUserData = async () => {
     const userId = session.user.id;
     
-    // Busca todas as informações necessárias simultaneamente
-    const [
-      { data: subs },
-      { data: flds },
-      { data: cards },
-      { data: tks },
-      { data: sessions }
-    ] = await Promise.all([
-      supabase.from('subjects').select('*').eq('user_id', userId),
-      supabase.from('folders').select('*').eq('user_id', userId),
-      supabase.from('flashcards').select('*').eq('user_id', userId),
-      supabase.from('tasks').select('*').eq('user_id', userId),
-      supabase.from('study_sessions').select('*').eq('user_id', userId).order('start_time', { ascending: false })
-    ]);
+    try {
+      // Busca todas as informações necessárias simultaneamente
+      const [
+        resSubs,
+        resFlds,
+        resCards,
+        resTks,
+        resSessions
+      ] = await Promise.all([
+        supabase.from('subjects').select('*').eq('user_id', userId),
+        supabase.from('folders').select('*').eq('user_id', userId),
+        supabase.from('flashcards').select('*').eq('user_id', userId),
+        supabase.from('tasks').select('*').eq('user_id', userId),
+        supabase.from('study_sessions').select('*').eq('user_id', userId).order('start_time', { ascending: false })
+      ]);
 
-    setSubjects(subs || []);
-    setFolders(flds?.map(f => ({ id: f.id, name: f.name, parentId: f.parent_id })) || []);
-    setFlashcards(cards?.map(c => ({
-      id: c.id, front: c.front, back: c.back, subjectId: c.subject_id, folderId: c.folder_id, nextReview: c.next_review, interval: c.interval
-    })) || []);
-    setTasks(tks?.map(t => ({
-      id: t.id, title: t.title, completed: t.completed, subjectId: t.subject_id, dueDate: t.due_date, completedAt: t.completed_at
-    })) || []);
-    setStudySessions(sessions || []);
+      if (resSubs.data) setSubjects(resSubs.data);
+      if (resFlds.data) setFolders(resFlds.data.map(f => ({ id: f.id, name: f.name, parentId: f.parent_id })));
+      if (resCards.data) setFlashcards(resCards.data.map(c => ({
+        id: c.id, front: c.front, back: c.back, subjectId: c.subject_id, folderId: c.folder_id, nextReview: c.next_review, interval: c.interval
+      })));
+      if (resTks.data) setTasks(resTks.data.map(t => ({
+        id: t.id, title: t.title, completed: t.completed, subjectId: t.subject_id, dueDate: t.due_date, completedAt: t.completed_at
+      })));
+      if (resSessions.data) setStudySessions(resSessions.data);
+
+      // Logs de diagnóstico silenciosos
+      if (resSessions.error) console.warn("Aviso: Tabela de sessões ainda não acessível ou vazia.");
+    } catch (err) {
+      console.error("Erro crítico no carregamento do protocolo acadêmico:", err);
+    }
   };
 
   useEffect(() => {
