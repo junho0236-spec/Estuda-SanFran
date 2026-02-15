@@ -15,7 +15,8 @@ import {
   Hash,
   ArrowUpCircle,
   Clock,
-  ChevronDown
+  ChevronDown,
+  Sparkles
 } from 'lucide-react';
 import { Task, Subject, TaskPriority, TaskCategory } from '../types';
 import { supabase } from '../services/supabaseClient';
@@ -72,7 +73,7 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
       setIsAdding(false);
     } catch (err) {
       console.error(err);
-      alert("Erro ao protocolar tarefa no dossiê.");
+      alert("Erro ao protocolar tarefa no dossiê. Verifique se as colunas 'priority' e 'category' foram criadas no Supabase.");
     }
   };
 
@@ -80,7 +81,7 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
     const isNowCompleted = !task.completed;
     const completionTimestamp = isNowCompleted ? new Date().toISOString() : null;
 
-    // Atualização Otimista (UX rápida)
+    // Atualização Otimista para resposta instantânea
     setTasks(prev => prev.map(t => t.id === task.id ? { 
       ...t, 
       completed: isNowCompleted, 
@@ -100,7 +101,7 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
       if (error) throw error;
     } catch (err) {
       console.error("Erro na sincronização da tarefa:", err);
-      // Reverter se der erro
+      // Reverter estado local em caso de falha crítica
       setTasks(prev => prev.map(t => t.id === task.id ? task : t));
     }
   };
@@ -124,9 +125,9 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
 
   const getPriorityColor = (p?: TaskPriority) => {
     switch (p) {
-      case 'urgente': return 'text-red-600 bg-red-100 dark:bg-red-900/30';
-      case 'alta': return 'text-orange-600 bg-orange-100 dark:bg-orange-900/30';
-      default: return 'text-slate-600 bg-slate-100 dark:bg-slate-800';
+      case 'urgente': return 'text-red-600 bg-red-100 dark:bg-red-900/40 border-red-200 dark:border-red-800';
+      case 'alta': return 'text-orange-600 bg-orange-100 dark:bg-orange-900/40 border-orange-200 dark:border-orange-800';
+      default: return 'text-slate-600 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700';
     }
   };
 
@@ -147,20 +148,21 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
     <div className="max-w-4xl mx-auto space-y-10 animate-in slide-in-from-bottom-8 duration-700 pb-20">
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-2">
-          <div className="flex items-center gap-3">
-             {/* Fix: Added missing CheckSquare to lucide-react imports */}
-             <div className="bg-sanfran-rubi p-3 rounded-2xl text-white shadow-xl shadow-red-900/20"><CheckSquare className="w-8 h-8" /></div>
-             <h2 className="text-4xl font-black text-slate-950 dark:text-white uppercase tracking-tighter">Dossiê de Prazos</h2>
+          <div className="flex items-center gap-4">
+             <div className="bg-sanfran-rubi p-4 rounded-3xl text-white shadow-2xl shadow-red-900/30 scale-110"><CheckSquare className="w-8 h-8" /></div>
+             <div>
+                <h2 className="text-4xl font-black text-slate-950 dark:text-white uppercase tracking-tighter leading-none">Dossiê de Prazos</h2>
+                <p className="text-slate-500 dark:text-slate-400 font-bold text-lg mt-1 italic">Gestão de pauta e excelência processual.</p>
+             </div>
           </div>
-          <p className="text-slate-500 dark:text-slate-400 font-bold text-lg ml-1">Gestão de pauta com rigor acadêmico.</p>
         </div>
         
-        <div className="flex bg-white dark:bg-sanfran-rubiDark/20 p-1.5 rounded-2xl border border-slate-200 dark:border-sanfran-rubi/30 shadow-lg">
+        <div className="flex bg-white dark:bg-sanfran-rubiDark/20 p-2 rounded-[2rem] border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl backdrop-blur-md">
           {(['pendentes', 'concluidos', 'todos'] as const).map(f => (
             <button 
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filter === f ? 'bg-sanfran-rubi text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 dark:hover:text-white'}`}
+              className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${filter === f ? 'bg-sanfran-rubi text-white shadow-xl scale-105' : 'text-slate-400 hover:text-slate-600 dark:hover:text-white'}`}
             >
               {f}
             </button>
@@ -169,79 +171,89 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
       </header>
 
       {/* Barra de Progresso da Pauta */}
-      <div className="bg-white dark:bg-sanfran-rubiDark/30 p-8 rounded-[2.5rem] border border-slate-200 dark:border-sanfran-rubi/30 shadow-xl overflow-hidden relative group">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-[11px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-            <ArrowUpCircle className="w-4 h-4 text-sanfran-rubi" /> Cumprimento de Pauta
-          </h3>
-          <span className="text-lg font-black text-sanfran-rubi tabular-nums">{Math.round(progressPercent)}%</span>
+      <div className="bg-white dark:bg-sanfran-rubiDark/30 p-10 rounded-[3rem] border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl overflow-hidden relative group">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-sanfran-rubi/5 rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform" />
+        <div className="flex items-center justify-between mb-6">
+          <div className="space-y-1">
+            <h3 className="text-[11px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+              <ArrowUpCircle className="w-4 h-4 text-sanfran-rubi" /> Desempenho da Bancada
+            </h3>
+            <p className="text-xs text-slate-400 font-bold uppercase italic">Taxa de cumprimento de obrigações</p>
+          </div>
+          <span className="text-4xl font-black text-sanfran-rubi tabular-nums drop-shadow-sm">{Math.round(progressPercent)}%</span>
         </div>
-        <div className="w-full h-4 bg-slate-100 dark:bg-black/40 rounded-full overflow-hidden shadow-inner">
+        <div className="w-full h-5 bg-slate-100 dark:bg-black/40 rounded-full overflow-hidden shadow-inner p-1">
           <div 
-            className="h-full bg-sanfran-rubi transition-all duration-1000 ease-out shadow-[0_0_15px_rgba(155,17,30,0.5)]"
+            className="h-full bg-sanfran-rubi transition-all duration-1000 ease-out shadow-[0_0_20px_rgba(155,17,30,0.6)] rounded-full"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
-        <div className="mt-4 flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
-           <span>{tasks.length - completedCount} Processos em Aberto</span>
-           <span>{completedCount} Prazos Cumpridos</span>
+        <div className="mt-6 flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">
+           <span className="flex items-center gap-2"><div className="w-2 h-2 bg-slate-300 rounded-full"/> {tasks.length - completedCount} Pendências</span>
+           <span className="flex items-center gap-2"><div className="w-2 h-2 bg-sanfran-rubi rounded-full"/> {completedCount} Julgados</span>
         </div>
       </div>
 
       {/* Protocolo de Nova Tarefa */}
-      <div className="bg-white dark:bg-sanfran-rubiDark/30 p-2 rounded-[2.5rem] border-2 border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl focus-within:border-sanfran-rubi transition-all">
-        <div className="flex flex-col md:flex-row gap-2">
-          <div className="flex-1 flex items-center px-6">
-            <Gavel className="w-6 h-6 text-slate-300 mr-4" />
+      <div className="bg-white dark:bg-sanfran-rubiDark/30 p-3 rounded-[3rem] border-2 border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl focus-within:border-sanfran-rubi transition-all group">
+        <div className="flex flex-col md:flex-row gap-3">
+          <div className="flex-1 flex items-center px-8 py-4">
+            <Gavel className="w-7 h-7 text-slate-300 group-focus-within:text-sanfran-rubi mr-5 transition-colors" />
             <input 
               type="text" 
               value={newTaskTitle} 
               onChange={(e) => setNewTaskTitle(e.target.value)} 
-              placeholder="Digite o novo processo ou prazo..." 
+              placeholder="Descreva o novo prazo ou ato processual..." 
               onFocus={() => setIsAdding(true)}
               onKeyDown={(e) => e.key === 'Enter' && addTask()} 
-              className="flex-1 py-6 bg-transparent outline-none text-xl font-bold placeholder:text-slate-300 dark:placeholder:text-slate-700 text-slate-900 dark:text-white" 
+              className="flex-1 bg-transparent outline-none text-2xl font-black placeholder:text-slate-200 dark:placeholder:text-slate-800 text-slate-950 dark:text-white" 
             />
           </div>
           <button 
             onClick={addTask}
-            className="md:w-24 bg-sanfran-rubi text-white rounded-[2rem] flex items-center justify-center hover:bg-sanfran-rubiDark transition-all m-2 shadow-xl shadow-red-900/30"
+            className="md:w-32 bg-sanfran-rubi text-white rounded-[2.5rem] flex items-center justify-center hover:bg-sanfran-rubiDark transition-all m-2 shadow-2xl shadow-red-900/40 group-hover:scale-105 active:scale-95"
           >
-            <Plus className="w-8 h-8" />
+            <Plus className="w-10 h-10" />
           </button>
         </div>
 
         {isAdding && (
-          <div className="p-6 pt-2 border-t border-slate-100 dark:border-sanfran-rubi/10 grid grid-cols-1 md:grid-cols-3 gap-4 animate-in slide-in-from-top-4 duration-300">
-             <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Cadeira</label>
+          <div className="p-8 pt-4 border-t border-slate-100 dark:border-sanfran-rubi/10 grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-top-6 duration-400">
+             <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2 ml-2">
+                  <BookOpen className="w-3 h-3" /> Cadeira
+                </label>
                 <select 
                   value={selectedSubjectId} 
                   onChange={(e) => setSelectedSubjectId(e.target.value)} 
-                  className="w-full p-4 bg-slate-50 dark:bg-black/40 rounded-2xl text-xs font-bold border-none outline-none appearance-none"
+                  className="w-full p-5 bg-slate-50 dark:bg-black/60 rounded-2xl text-xs font-black border-2 border-transparent focus:border-sanfran-rubi outline-none appearance-none transition-all shadow-inner"
                 >
                   <option value="">Geral / Administrativo</option>
                   {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
              </div>
-             <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Prioridade</label>
+             <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2 ml-2">
+                  <AlertTriangle className="w-3 h-3" /> Prioridade
+                </label>
                 <select 
                   value={selectedPriority} 
                   onChange={(e) => setSelectedPriority(e.target.value as TaskPriority)} 
-                  className="w-full p-4 bg-slate-50 dark:bg-black/40 rounded-2xl text-xs font-bold border-none outline-none"
+                  className="w-full p-5 bg-slate-50 dark:bg-black/60 rounded-2xl text-xs font-black border-2 border-transparent focus:border-sanfran-rubi outline-none transition-all shadow-inner"
                 >
                   <option value="normal">⚖️ Normal</option>
                   <option value="alta">⚠️ Alta</option>
                   <option value="urgente">🚨 Urgente</option>
                 </select>
              </div>
-             <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Natureza</label>
+             <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2 ml-2">
+                  <Sparkles className="w-3 h-3" /> Natureza
+                </label>
                 <select 
                   value={selectedCategory} 
                   onChange={(e) => setSelectedCategory(e.target.value as TaskCategory)} 
-                  className="w-full p-4 bg-slate-50 dark:bg-black/40 rounded-2xl text-xs font-bold border-none outline-none"
+                  className="w-full p-5 bg-slate-50 dark:bg-black/60 rounded-2xl text-xs font-black border-2 border-transparent focus:border-sanfran-rubi outline-none transition-all shadow-inner"
                 >
                   <option value="geral">Geral</option>
                   <option value="peticao">Petição / Escrita</option>
@@ -255,52 +267,55 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
       </div>
 
       {/* Lista de Processos */}
-      <div className="space-y-4">
+      <div className="space-y-6">
         {filteredTasks.map(task => {
           const subject = subjects.find(s => s.id === task.subjectId);
           return (
             <div 
               key={task.id} 
-              className={`group flex items-center gap-6 p-6 rounded-[2.5rem] border-2 transition-all relative overflow-hidden ${task.completed ? 'bg-slate-50 dark:bg-sanfran-rubiDark/10 border-slate-100 dark:border-sanfran-rubi/10 opacity-60 scale-[0.98]' : 'bg-white dark:bg-sanfran-rubiDark/40 border-slate-200 dark:border-sanfran-rubi/20 shadow-xl hover:shadow-2xl hover:border-sanfran-rubi/40'}`}
+              className={`group flex items-center gap-8 p-8 rounded-[3rem] border-2 transition-all relative overflow-hidden ${task.completed ? 'bg-slate-50 dark:bg-sanfran-rubiDark/10 border-slate-100 dark:border-sanfran-rubi/10 opacity-60 scale-[0.97]' : 'bg-white dark:bg-sanfran-rubiDark/40 border-slate-200 dark:border-sanfran-rubi/20 shadow-xl hover:shadow-2xl hover:-translate-y-1'}`}
             >
               {/* Barra Lateral de Cadeira */}
-              <div className="absolute left-0 top-0 bottom-0 w-2" style={{ backgroundColor: subject?.color || '#ccc' }} />
+              <div className="absolute left-0 top-0 bottom-0 w-3 shadow-sm" style={{ backgroundColor: subject?.color || '#333' }} />
 
               <button 
                 onClick={() => toggleTask(task)} 
-                className={`flex-shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${task.completed ? 'bg-emerald-500 text-white shadow-lg' : 'bg-slate-100 dark:bg-black/40 text-slate-300 hover:text-sanfran-rubi hover:bg-sanfran-rubi/10'}`}
+                className={`flex-shrink-0 w-14 h-14 rounded-[1.5rem] flex items-center justify-center transition-all ${task.completed ? 'bg-emerald-500 text-white shadow-xl rotate-[360deg]' : 'bg-slate-50 dark:bg-black/60 text-slate-200 dark:text-slate-800 border-2 border-slate-100 dark:border-white/5 hover:border-sanfran-rubi hover:text-sanfran-rubi'}`}
               >
-                {task.completed ? <CheckCircle2 className="w-6 h-6" /> : <Circle className="w-6 h-6" />}
+                {task.completed ? <CheckCircle2 className="w-8 h-8" /> : <Circle className="w-8 h-8" />}
               </button>
 
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 mb-1">
-                   <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm flex items-center gap-1.5 ${getPriorityColor(task.priority)}`}>
-                     {task.priority === 'urgente' && <AlertTriangle className="w-3 h-3" />}
+                <div className="flex items-center gap-3 mb-2">
+                   <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm flex items-center gap-2 border ${getPriorityColor(task.priority)}`}>
+                     {task.priority === 'urgente' && <div className="w-2 h-2 bg-red-600 rounded-full animate-pulse" />}
                      {task.priority}
                    </span>
-                   <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                   <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 bg-slate-50 dark:bg-black/20 px-4 py-1.5 rounded-full">
                      {getCategoryIcon(task.category)}
                      {task.category}
                    </span>
                 </div>
-                <h4 className={`text-xl font-black truncate leading-tight transition-all ${task.completed ? 'line-through text-slate-400' : 'text-slate-900 dark:text-white'}`}>
+                <h4 className={`text-2xl font-black truncate leading-tight transition-all tracking-tight ${task.completed ? 'line-through text-slate-400' : 'text-slate-950 dark:text-white'}`}>
                   {task.title}
                 </h4>
-                <div className="flex items-center gap-4 mt-2">
+                <div className="flex flex-wrap items-center gap-6 mt-3">
                    {subject && (
-                     <span className="text-[10px] font-bold uppercase tracking-tight" style={{ color: subject.color }}>{subject.name}</span>
+                     <span className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: subject.color }} />
+                        {subject.name}
+                     </span>
                    )}
-                   <span className="flex items-center gap-1.5 text-[10px] font-black text-slate-300 dark:text-slate-500 uppercase">
-                     <Calendar className="w-3.5 h-3.5" /> 
-                     {task.completed ? `Concluído em ${new Date(task.completedAt!).toLocaleDateString()}` : `Prazo: ${task.dueDate || 'Imediato'}`}
+                   <span className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                     <Calendar className="w-4 h-4 text-slate-300" /> 
+                     {task.completed ? `Concluído em ${new Date(task.completedAt!).toLocaleDateString()}` : `Protocolado: ${task.dueDate || 'Imediato'}`}
                    </span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={() => removeTask(task.id)} className="p-4 text-slate-300 hover:text-red-500 transition-colors bg-slate-50 dark:bg-black/40 rounded-2xl border border-slate-100 dark:border-white/5">
-                  <Trash2 className="w-5 h-5" />
+              <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
+                <button onClick={() => removeTask(task.id)} className="p-5 text-slate-300 hover:text-red-500 transition-all bg-slate-50 dark:bg-black/60 rounded-3xl border border-slate-100 dark:border-white/5 shadow-lg active:scale-90">
+                  <Trash2 className="w-6 h-6" />
                 </button>
               </div>
             </div>
@@ -308,13 +323,14 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
         })}
 
         {filteredTasks.length === 0 && (
-          <div className="py-24 text-center bg-white dark:bg-sanfran-rubiDark/20 rounded-[4rem] border-4 border-dashed border-slate-100 dark:border-sanfran-rubi/10 flex flex-col items-center gap-6">
-            <div className="bg-slate-50 dark:bg-sanfran-rubiDark p-8 rounded-full">
-              <Gavel className="w-20 h-20 text-slate-200 dark:text-sanfran-rubi/20" />
+          <div className="py-32 text-center bg-white dark:bg-sanfran-rubiDark/20 rounded-[4rem] border-4 border-dashed border-slate-100 dark:border-sanfran-rubi/10 flex flex-col items-center gap-8 animate-in fade-in zoom-in duration-1000">
+            <div className="bg-slate-50 dark:bg-sanfran-rubiDark p-10 rounded-full relative">
+              <Gavel className="w-24 h-24 text-slate-100 dark:text-sanfran-rubi/10" />
+              <div className="absolute inset-0 border-4 border-sanfran-rubi/10 rounded-full animate-ping" />
             </div>
-            <div>
-              <p className="text-2xl font-black text-slate-300 dark:text-slate-700 uppercase tracking-tighter italic">Pauta Vazia</p>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">Nenhum processo aguardando decisão.</p>
+            <div className="space-y-2">
+              <p className="text-3xl font-black text-slate-300 dark:text-slate-700 uppercase tracking-tighter italic">Tribunal em Recesso</p>
+              <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Nenhuma demanda pendente para esta pauta.</p>
             </div>
           </div>
         )}
