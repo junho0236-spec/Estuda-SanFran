@@ -10,15 +10,14 @@ interface SoundTrack {
 }
 
 /**
- * Seleção de áudios ambientais otimizada para estabilidade e imersão.
- * Utilizamos SoundHelix para trilhas musicais (Lofi/Café) 
- * e Raw GitHub para sons ambientes reais (Chuva/Biblioteca).
+ * Links de áudio selecionados por compatibilidade universal e realismo ambiental.
+ * Fontes: Wikimedia Commons (Sons Reais) e SoundHelix (Música).
  */
 const tracks: SoundTrack[] = [
-  { id: 'bells', name: 'Sinos do XI', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3', icon: Bell },
-  { id: 'arcadas', name: 'Burburinho das Arcadas', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3', icon: Users },
-  { id: 'rain', name: 'Chuva no Largo', url: 'https://raw.githubusercontent.com/IgorKowalczyk/lofly/main/public/sounds/rain.mp3', icon: CloudRain },
-  { id: 'library', name: 'Biblioteca SanFran', url: 'https://raw.githubusercontent.com/rafael-lua/pomodoro-timer/master/public/sounds/forest.mp3', icon: Library },
+  { id: 'bells', name: 'Sinos do XI', url: 'https://upload.wikimedia.org/wikipedia/commons/8/87/Church_Bells_in_the_Distance.mp3', icon: Bell },
+  { id: 'arcadas', name: 'Burburinho das Arcadas', url: 'https://upload.wikimedia.org/wikipedia/commons/e/e0/Crowd_at_an_airport.mp3', icon: Users },
+  { id: 'rain', name: 'Chuva no Largo', url: 'https://upload.wikimedia.org/wikipedia/commons/5/52/Rain_On_The_Roof.mp3', icon: CloudRain },
+  { id: 'library', name: 'Biblioteca SanFran', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3', icon: Library },
   { id: 'lofi', name: 'Lofi do Bacharel', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3', icon: Music },
   { id: 'cafe', name: 'Café da Faculdade', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', icon: Coffee },
 ];
@@ -35,14 +34,14 @@ const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus }) => {
   const [isLoading, setIsLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Efeito para sincronizar o volume
+  // Sincroniza o volume
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = volume;
     }
   }, [volume]);
 
-  // Efeito para gerenciar a fonte do áudio e reprodução
+  // Gerencia a troca de fontes e execução
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -51,10 +50,8 @@ const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus }) => {
       if (isPlaying && currentTrackId) {
         const track = tracks.find(t => t.id === currentTrackId);
         if (track) {
-          // Se trocou de faixa, reinicia o carregamento
           if (audio.src !== track.url) {
             setIsLoading(true);
-            audio.pause();
             audio.src = track.url;
             audio.load();
           }
@@ -63,9 +60,8 @@ const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus }) => {
             await audio.play();
             setIsLoading(false);
           } catch (error) {
-            console.error("Erro na reprodução de atmosfera:", error);
+            console.error("Erro ao reproduzir atmosfera:", error);
             setIsLoading(false);
-            // Pode ser um erro de rede ou política de autoplay do navegador
           }
         }
       } else {
@@ -87,11 +83,11 @@ const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus }) => {
 
   return (
     <div className={`fixed z-[60] transition-all duration-700 ${isExtremeFocus ? 'bottom-8 left-8' : 'bottom-6 left-6 lg:bottom-10 lg:left-72'}`}>
+      {/* Removido o crossOrigin para evitar bloqueios de segurança em links diretos */}
       <audio 
         ref={audioRef} 
         loop 
         preload="auto" 
-        crossOrigin="anonymous"
         onWaiting={() => setIsLoading(true)}
         onCanPlay={() => setIsLoading(false)}
       />
@@ -144,7 +140,7 @@ const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus }) => {
 
             <div className="space-y-3">
                <div className="flex justify-between items-center px-1">
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Ajuste de Volume</span>
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Volume Atmosfera</span>
                   <span className="text-[10px] font-bold tabular-nums text-slate-600">{Math.round(volume * 100)}%</span>
                </div>
                <input 
