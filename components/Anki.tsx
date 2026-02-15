@@ -109,6 +109,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       const subject = subjects.find(s => s.id === selectedSubjectId);
       const cards = await generateFlashcards(aiInput, subject?.name || 'Geral');
       
+      if (!Array.isArray(cards)) throw new Error("Resposta da IA inválida.");
+
       const cardsToInsert = cards.map((c: any) => ({
         id: Math.random().toString(36).substr(2, 9),
         front: c.front,
@@ -137,7 +139,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setMode('browse');
       setAiInput('');
     } catch (err: any) {
-      setErrorMessage(err.message);
+      setErrorMessage(err.message || "Falha na comunicação com o tribunal digital.");
     } finally {
       setIsGenerating(false);
     }
@@ -267,7 +269,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     }
   };
 
-  const isAuthError = errorMessage?.includes("DILIGÊNCIA") || errorMessage?.includes("CHAVE_AUSENTE");
+  const isAuthError = errorMessage?.includes("DILIGÊNCIA") || errorMessage?.includes("API_KEY");
 
   return (
     <div className="space-y-10 max-w-5xl mx-auto pb-20 animate-in fade-in duration-500">
@@ -312,7 +314,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                     <RotateCcw className="w-5 h-5" /> Estudar ({reviewQueue.length})
                   </button>
                   <button onClick={() => setIsSelectionMode(true)} className="flex items-center gap-2 px-6 py-3.5 bg-white dark:bg-sanfran-rubiDark text-slate-600 dark:text-slate-300 border-2 border-slate-200 dark:border-sanfran-rubi/20 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all">
-                    Selecionar
+                    Gerenciar
                   </button>
                   <button onClick={() => {setMode('create'); setErrorMessage(null);}} className="flex items-center gap-2 px-6 py-3.5 bg-white dark:bg-sanfran-rubiDark text-sanfran-rubi dark:text-white border-2 border-sanfran-rubi rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-50 shadow-xl transition-all">
                     <Plus className="w-5 h-5" /> Novo
@@ -425,7 +427,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 <p className="absolute bottom-12 text-slate-500 text-xs font-black uppercase animate-pulse">Toque para desvelar</p>
               </div>
               
-              {/* Face de Trás (Pré-rotacionada para não espelhar o texto) */}
+              {/* Face de Trás */}
               <div className="absolute inset-0 w-full h-full bg-slate-50 dark:bg-black/80 border-[6px] border-usp-blue/40 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden rotate-y-180">
                 <span className="text-xs font-black text-usp-blue uppercase tracking-[0.3em] mb-8">Doutrina / Resposta</span>
                 <p className="text-2xl font-black text-slate-950 dark:text-white leading-tight">{reviewQueue[currentIndex].back}</p>
@@ -458,7 +460,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               </div>
               <div className="flex-1">
                 <p className={`text-sm font-black uppercase tracking-tight mb-1 ${isAuthError ? 'text-amber-800 dark:text-amber-400' : 'text-red-800 dark:text-red-400'}`}>
-                  {isAuthError ? 'Despacho de Auditoria: Falta de Credencial' : 'Falha Técnica no Processamento'}
+                  {isAuthError ? 'Despacho de Auditoria: Falta de Credencial' : 'Falha no Processamento'}
                 </p>
                 <p className={`text-xs font-bold leading-relaxed ${isAuthError ? 'text-amber-700/80 dark:text-amber-400/80' : 'text-red-700/80 dark:text-red-400/80'}`}>
                   {errorMessage}
