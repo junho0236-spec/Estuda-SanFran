@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Volume2, VolumeX, CloudRain, Coffee, Music, Library, Play, Pause, Sliders, Waves, Bell } from 'lucide-react';
+import { Volume2, VolumeX, CloudRain, Coffee, Music, Library, Play, Pause, Waves, Bell, Users } from 'lucide-react';
 
 interface SoundTrack {
   id: string;
@@ -11,10 +11,11 @@ interface SoundTrack {
 
 const tracks: SoundTrack[] = [
   { id: 'bells', name: 'Sinos do XI', url: 'https://cdn.pixabay.com/audio/2022/03/15/audio_73147f7d9a.mp3', icon: Bell },
-  { id: 'rain', name: 'Chuva nas Arcadas', url: 'https://cdn.pixabay.com/audio/2022/07/04/audio_3d1f062d05.mp3', icon: CloudRain },
-  { id: 'library', name: 'Biblioteca XI', url: 'https://cdn.pixabay.com/audio/2021/11/25/audio_1e370e5b1f.mp3', icon: Library },
-  { id: 'lofi', name: 'Lofi Jurídico', url: 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808737487.mp3', icon: Music },
-  { id: 'cafe', name: 'Café da SanFran', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', icon: Coffee },
+  { id: 'arcadas', name: 'Burburinho das Arcadas', url: 'https://cdn.pixabay.com/audio/2022/01/18/audio_8230983a65.mp3', icon: Users },
+  { id: 'rain', name: 'Chuva no Largo', url: 'https://cdn.pixabay.com/audio/2022/07/04/audio_3d1f062d05.mp3', icon: CloudRain },
+  { id: 'library', name: 'Biblioteca SanFran', url: 'https://cdn.pixabay.com/audio/2021/11/25/audio_1e370e5b1f.mp3', icon: Library },
+  { id: 'lofi', name: 'Lofi do Bacharel', url: 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808737487.mp3', icon: Music },
+  { id: 'cafe', name: 'Café da Faculdade', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', icon: Coffee },
 ];
 
 interface AtmosphereProps {
@@ -56,24 +57,10 @@ const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus }) => {
     }
   };
 
-  const togglePlay = () => {
-    if (!currentTrackId) {
-      toggleTrack(tracks[0].id);
-      return;
-    }
-    if (isPlaying) {
-      audioRef.current?.pause();
-    } else {
-      audioRef.current?.play();
-    }
-    setIsPlaying(!isPlaying);
-  };
-
   return (
     <div className={`fixed z-[60] transition-all duration-700 ${isExtremeFocus ? 'bottom-8 left-8' : 'bottom-6 left-6 lg:bottom-10 lg:left-72'}`}>
       <audio ref={audioRef} loop />
       
-      {/* Botão Principal */}
       <div className="flex items-center gap-3">
         <button 
           onClick={() => setIsOpen(!isOpen)}
@@ -86,7 +73,7 @@ const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus }) => {
         {isOpen && (
           <div className="absolute bottom-20 left-0 w-72 bg-white dark:bg-[#0d0303] rounded-[2.5rem] border-2 border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl p-6 animate-in slide-in-from-bottom-4 duration-300">
             <div className="flex items-center justify-between mb-6">
-               <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Atmosfera de Estudo</h4>
+               <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Sons das Arcadas</h4>
                <button onClick={() => setIsOpen(false)} className="text-slate-300 hover:text-sanfran-rubi"><Volume2 size={16} /></button>
             </div>
 
