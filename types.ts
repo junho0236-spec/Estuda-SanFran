@@ -7,11 +7,7 @@ export enum View {
   Tasks = 'tasks',
   Calendar = 'calendar',
   Ranking = 'ranking',
-  Library = 'library',
-  Lounge = 'lounge',
-  GradeCalc = 'grade-calc',
-  Mural = 'mural',
-  OralDefense = 'oral-defense'
+  Library = 'library'
 }
 
 export interface Folder {
@@ -86,7 +82,7 @@ export interface Badge {
   id: string;
   name: string;
   description: string;
-  icon: string;
+  icon: string; // Lucide icon name
   rarity: 'common' | 'rare' | 'epic' | 'legendary';
   isUnlocked: boolean;
 }
