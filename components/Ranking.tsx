@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Trophy, Medal, Gavel, Award, Scale, Briefcase, GraduationCap, Crown, User, TrendingUp, Clock } from 'lucide-react';
+import { Trophy, Medal, Gavel, Award, Scale, Briefcase, GraduationCap, Crown, User, TrendingUp, Clock, Info } from 'lucide-react';
 import { RankingEntry } from '../types';
 import { supabase } from '../services/supabaseClient';
 
@@ -43,7 +43,7 @@ const Ranking: React.FC<RankingProps> = ({ userId, session }) => {
           const { data: profileData } = await supabase.from('profiles').select('id, full_name');
           profileData?.forEach(p => { profileMap[p.id] = p.full_name; });
         } catch (e) {
-          console.warn("Tabela 'profiles' inacessível.");
+          console.warn("Tabela 'profiles' inacessível ou vazia.");
         }
 
         // 3. Agrupamento por usuário
@@ -53,7 +53,7 @@ const Ranking: React.FC<RankingProps> = ({ userId, session }) => {
         });
 
         // 4. Montagem do array de ranking
-        const myNameFromSession = session?.user?.user_metadata?.full_name;
+        const myNameFromSession = session?.user?.user_metadata?.full_name || 'Doutor(a)';
         
         const sorted = Object.entries(userTotals)
           .map(([id, total]) => {
@@ -106,6 +106,16 @@ const Ranking: React.FC<RankingProps> = ({ userId, session }) => {
         <h2 className="text-4xl md:text-6xl font-black text-slate-950 dark:text-white uppercase tracking-tighter">Ranking SanFran</h2>
         <p className="text-slate-500 font-bold italic">"Scientia Vinces" - Pela ciência, vencerás.</p>
       </header>
+
+      {/* Alerta de Pioneirismo */}
+      {ranking.length === 1 && (
+        <div className="max-w-xl mx-auto bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-6 rounded-3xl flex items-center gap-4 animate-pulse">
+           <Info className="text-usp-blue w-6 h-6 flex-shrink-0" />
+           <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 leading-relaxed">
+             Você é o pioneiro acadêmico nesta instância. Convide outros doutores para disputar a pauta do ranking!
+           </p>
+        </div>
+      )}
 
       {/* Pódio visual */}
       <div className="flex flex-col md:flex-row items-end justify-center gap-6 md:gap-10 pt-10">

@@ -177,13 +177,16 @@ const App: React.FC = () => {
     if (!name) return;
     
     try {
-      await supabase.from('profiles').upsert({
+      const { error } = await supabase.from('profiles').upsert({
         id: user.id,
         full_name: name,
         updated_at: new Date().toISOString()
       }, { onConflict: 'id' });
+      
+      if (error) throw error;
+      console.log("Perfil sincronizado com sucesso.");
     } catch (e) {
-      console.warn("Sincronização de perfil falhou. Verifique se a tabela 'profiles' existe no Supabase.");
+      console.warn("Sincronização de perfil falhou. Certifique-se de executar o SQL corrigido no Supabase.", e);
     }
   };
 
