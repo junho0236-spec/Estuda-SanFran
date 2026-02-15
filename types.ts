@@ -6,7 +6,8 @@ export enum View {
   Subjects = 'subjects',
   Tasks = 'tasks',
   Calendar = 'calendar',
-  Ranking = 'ranking'
+  Ranking = 'ranking',
+  Library = 'library'
 }
 
 export interface Folder {
@@ -51,6 +52,19 @@ export interface StudySession {
   start_time: string;
   duration: number;
   subject_id: string;
+  reading_id?: string;
+}
+
+export interface Reading {
+  id: string;
+  user_id: string;
+  title: string;
+  author: string;
+  total_pages: number;
+  current_page: number;
+  subject_id?: string;
+  status: 'lendo' | 'concluido' | 'pausado';
+  created_at?: string;
 }
 
 export interface RankingEntry {

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy } from 'lucide-react';
-import { View, Subject, Flashcard, Task, Folder, StudySession } from './types';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon } from 'lucide-react';
+import { View, Subject, Flashcard, Task, Folder, StudySession, Reading } from './types';
 import Dashboard from './components/Dashboard';
 import Anki from './components/Anki';
 import Pomodoro from './components/Pomodoro';
@@ -9,6 +9,7 @@ import Subjects from './components/Subjects';
 import Tasks from './components/Tasks';
 import CalendarView from './components/CalendarView';
 import Ranking from './components/Ranking';
+import Library from './components/Library';
 import Login from './components/Login';
 import { supabase } from './services/supabaseClient';
 
@@ -74,6 +75,7 @@ const App: React.FC = () => {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [readings, setReadings] = useState<Reading[]>([]);
   const [studySessions, setStudySessions] = useState<StudySession[]>([]);
 
   // --- Timer Global State ---
@@ -81,8 +83,11 @@ const App: React.FC = () => {
   const [timerSecondsLeft, setTimerSecondsLeft] = useState(25 * 60);
   const [timerMode, setTimerMode] = useState<'work' | 'break'>('work');
   const [timerSelectedSubjectId, setTimerSelectedSubjectId] = useState<string | null>(null);
+  const [timerSelectedReadingId, setTimerSelectedReadingId] = useState<string | null>(null);
   const [timerTotalInitial, setTimerTotalInitial] = useState(25 * 60);
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const isExtremeFocus = timerIsActive && currentView === View.Timer && timerMode === 'work';
 
   useEffect(() => {
     if (timerIsActive && timerSecondsLeft > 0) {
@@ -125,11 +130,14 @@ const App: React.FC = () => {
   const saveStudySession = async (duration: number) => {
     if (!session?.user) return;
     const brDate = getBrasiliaISOString();
+    const newSessionId = Math.random().toString(36).substr(2, 9);
+    
     const newSession: StudySession = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: newSessionId,
       user_id: session.user.id,
       duration: duration,
       subject_id: timerSelectedSubjectId || '',
+      reading_id: timerSelectedReadingId || undefined,
       start_time: brDate
     };
 
@@ -139,6 +147,7 @@ const App: React.FC = () => {
         user_id: session.user.id,
         duration: Number(duration),
         subject_id: timerSelectedSubjectId || null,
+        reading_id: timerSelectedReadingId || null,
         start_time: brDate
       });
       if (error) throw error;
@@ -184,9 +193,8 @@ const App: React.FC = () => {
       }, { onConflict: 'id' });
       
       if (error) throw error;
-      console.log("Perfil sincronizado com sucesso.");
     } catch (e) {
-      console.warn("Sincronização de perfil falhou. Certifique-se de executar o SQL corrigido no Supabase.", e);
+      console.warn("Sincronização de perfil falhou.", e);
     }
   };
 
@@ -199,12 +207,13 @@ const App: React.FC = () => {
   const loadUserData = async () => {
     const userId = session.user.id;
     try {
-      const [resSubs, resFlds, resCards, resTks, resSessions] = await Promise.all([
+      const [resSubs, resFlds, resCards, resTks, resSessions, resReadings] = await Promise.all([
         supabase.from('subjects').select('*').eq('user_id', userId),
         supabase.from('folders').select('*').eq('user_id', userId),
         supabase.from('flashcards').select('*').eq('user_id', userId),
         supabase.from('tasks').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-        supabase.from('study_sessions').select('*').eq('user_id', userId).order('start_time', { ascending: false })
+        supabase.from('study_sessions').select('*').eq('user_id', userId).order('start_time', { ascending: false }),
+        supabase.from('readings').select('*').eq('user_id', userId).order('created_at', { ascending: false })
       ]);
       if (resSubs.data) setSubjects(resSubs.data);
       if (resFlds.data) setFolders(resFlds.data.map(f => ({ id: f.id, name: f.name, parentId: f.parent_id })));
@@ -216,6 +225,7 @@ const App: React.FC = () => {
         priority: t.priority || 'normal', category: t.category || 'geral'
       })));
       if (resSessions.data) setStudySessions(resSessions.data);
+      if (resReadings.data) setReadings(resReadings.data);
     } catch (err) {
       console.error("Erro crítico no carregamento do protocolo acadêmico:", err);
     }
@@ -234,6 +244,7 @@ const App: React.FC = () => {
   const navItems = [
     { id: View.Dashboard, icon: LayoutDashboard, label: 'Painel' },
     { id: View.Anki, icon: BrainCircuit, label: 'Flashcards' },
+    { id: View.Library, icon: LibraryIcon, label: 'Biblioteca' },
     { id: View.Timer, icon: TimerIcon, label: 'Timer' },
     { id: View.Calendar, icon: CalendarIcon, label: 'Agenda' },
     { id: View.Ranking, icon: Trophy, label: 'Ranking' },
@@ -242,9 +253,9 @@ const App: React.FC = () => {
   ];
 
   return (
-    <div className={`flex h-screen overflow-hidden transition-colors duration-300 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#fcfcfc]'}`}>
+    <div className={`flex h-screen overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#fcfcfc]'}`}>
       {/* Mobile Overlay */}
-      {isSidebarOpen && (
+      {isSidebarOpen && !isExtremeFocus && (
         <div 
           className="fixed inset-0 bg-black/50 z-30 lg:hidden backdrop-blur-sm"
           onClick={closeSidebar}
@@ -252,7 +263,7 @@ const App: React.FC = () => {
       )}
 
       {/* Sidebar */}
-      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 left-0 z-40 w-64 bg-white dark:bg-[#0d0303] border-r border-slate-200 dark:border-sanfran-rubi/30 transition-transform duration-300 lg:relative lg:translate-x-0 flex flex-col`}>
+      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${isExtremeFocus ? '-translate-x-full lg:-translate-x-full lg:w-0' : 'lg:relative lg:translate-x-0 lg:w-64'} fixed inset-y-0 left-0 z-40 bg-white dark:bg-[#0d0303] border-r border-slate-200 dark:border-sanfran-rubi/30 transition-all duration-700 flex flex-col`}>
         <div className="p-6 border-b border-slate-100 dark:border-sanfran-rubi/20 flex flex-col">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
@@ -290,7 +301,7 @@ const App: React.FC = () => {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0 relative">
-        <header className="lg:hidden bg-white dark:bg-[#0d0303] border-b border-slate-200 dark:border-sanfran-rubi/30 p-4 flex items-center justify-between sticky top-0 z-20">
+        <header className={`${isExtremeFocus ? 'hidden' : 'lg:hidden'} bg-white dark:bg-[#0d0303] border-b border-slate-200 dark:border-sanfran-rubi/30 p-4 flex items-center justify-between sticky top-0 z-20`}>
           <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-slate-100 dark:bg-sanfran-rubi/10 rounded-xl text-slate-600 dark:text-white">
             <Menu className="w-6 h-6" />
           </button>
@@ -301,14 +312,16 @@ const App: React.FC = () => {
           <div className="w-10"></div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-10 relative">
-          <div className="max-w-6xl mx-auto">
+        <main className={`flex-1 overflow-y-auto ${isExtremeFocus ? 'p-0' : 'p-4 md:p-10'} relative transition-all duration-700`}>
+          <div className={`${isExtremeFocus ? 'max-w-none h-full flex items-center justify-center' : 'max-w-6xl mx-auto'}`}>
             {currentView === View.Dashboard && <Dashboard subjects={subjects} flashcards={flashcards} tasks={tasks} studySessions={studySessions} />}
             {currentView === View.Anki && <Anki subjects={subjects} flashcards={flashcards} setFlashcards={setFlashcards} folders={folders} setFolders={setFolders} userId={session.user.id} />}
+            {currentView === View.Library && <Library readings={readings} setReadings={setReadings} subjects={subjects} userId={session.user.id} />}
             
             {currentView === View.Timer && (
               <Pomodoro 
                 subjects={subjects} 
+                readings={readings}
                 userId={session.user.id} 
                 studySessions={studySessions} 
                 setStudySessions={setStudySessions}
@@ -320,8 +333,11 @@ const App: React.FC = () => {
                 setMode={setTimerMode}
                 selectedSubjectId={timerSelectedSubjectId}
                 setSelectedSubjectId={setTimerSelectedSubjectId}
+                selectedReadingId={timerSelectedReadingId}
+                setSelectedReadingId={setTimerSelectedReadingId}
                 setTotalInitial={setTimerTotalInitial}
                 onManualFinalize={manualFinalize}
+                isExtremeFocus={isExtremeFocus}
               />
             )}
 

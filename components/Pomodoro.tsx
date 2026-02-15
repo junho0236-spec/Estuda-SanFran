@@ -1,11 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
-import { Play, Pause, RotateCcw, Clock, Settings2, ShieldCheck, Coffee, History, Trash2, ArrowLeft, Calendar, Gavel, Trash, Check } from 'lucide-react';
-import { Subject, StudySession } from '../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Play, Pause, RotateCcw, Clock, Settings2, ShieldCheck, Coffee, History, Trash2, ArrowLeft, Calendar, Gavel, Trash, Check, Book, Quote, Zap } from 'lucide-react';
+import { Subject, StudySession, Reading } from '../types';
 import { supabase } from '../services/supabaseClient';
 
 interface PomodoroProps {
   subjects: Subject[];
+  readings: Reading[];
   userId: string;
   studySessions: StudySession[];
   setStudySessions: React.Dispatch<React.SetStateAction<StudySession[]>>;
@@ -17,12 +18,16 @@ interface PomodoroProps {
   setMode: (mode: 'work' | 'break') => void;
   selectedSubjectId: string | null;
   setSelectedSubjectId: (id: string | null) => void;
+  selectedReadingId: string | null;
+  setSelectedReadingId: (id: string | null) => void;
   setTotalInitial: (seconds: number) => void;
   onManualFinalize?: () => void;
+  isExtremeFocus?: boolean;
 }
 
 const Pomodoro: React.FC<PomodoroProps> = ({ 
   subjects, 
+  readings,
   userId, 
   studySessions, 
   setStudySessions,
@@ -34,13 +39,30 @@ const Pomodoro: React.FC<PomodoroProps> = ({
   setMode,
   selectedSubjectId,
   setSelectedSubjectId,
+  selectedReadingId,
+  setSelectedReadingId,
   setTotalInitial,
-  onManualFinalize
+  onManualFinalize,
+  isExtremeFocus = false
 }) => {
   const [workMinutes, setWorkMinutes] = useState(25);
   const [breakMinutes, setBreakMinutes] = useState(5);
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+
+  const focusQuotes = [
+    "A jurisprudência é o conhecimento das coisas divinas e humanas. - Justiniano",
+    "Quem se descuida da pauta, descuida do Direito. - Adágio Forense",
+    "O silêncio é o solo onde germina a justiça. - Sêneca",
+    "Pacta Sunt Servanda: Os acordos devem ser cumpridos. - Princípio de Direito",
+    "A leitura faz o homem completo; a conversa, o homem ágil; e o escrever, o homem preciso. - Francis Bacon",
+    "Non scholae, sed vitae discimus. - Aprendemos para a vida, não para a escola.",
+    "A perseverança é a alma do acadêmico. - XI de Agosto"
+  ];
+
+  const activeQuote = useMemo(() => {
+    return focusQuotes[Math.floor(Math.random() * focusQuotes.length)];
+  }, [isActive, mode]);
 
   useEffect(() => {
     if (!isActive) {
@@ -96,7 +118,7 @@ const Pomodoro: React.FC<PomodoroProps> = ({
   const totalTime = mode === 'work' ? workMinutes * 60 : breakMinutes * 60;
   const progress = ((totalTime - secondsLeft) / totalTime) * 100;
 
-  if (showHistory) {
+  if (showHistory && !isExtremeFocus) {
     return (
       <div className="max-w-2xl mx-auto space-y-6 md:space-y-10 animate-in slide-in-from-right-8 duration-500 pb-20 px-2">
         <header className="flex items-center justify-between">
@@ -132,7 +154,8 @@ const Pomodoro: React.FC<PomodoroProps> = ({
               </div>
             ) : (
               studySessions.map((session) => {
-                const subject = subjects.find(s => s.id === session.subject_id);
+                const subject = subjects.find(sub => sub.id === session.subject_id);
+                const reading = readings.find(r => r.id === session.reading_id);
                 const date = new Date(session.start_time);
                 const durationMins = Math.floor(session.duration / 60);
                 const durationSecs = session.duration % 60;
@@ -143,6 +166,11 @@ const Pomodoro: React.FC<PomodoroProps> = ({
                       <div className="w-2 h-10 rounded-full" style={{ backgroundColor: subject?.color || '#9B111E' }} />
                       <div>
                         <p className="font-black text-slate-900 dark:text-white text-sm uppercase tracking-tight truncate max-w-[150px]">{subject?.name || 'Geral'}</p>
+                        {reading && (
+                          <p className="text-[9px] font-bold text-sanfran-rubi uppercase flex items-center gap-1">
+                            <Book size={8} /> {reading.title}
+                          </p>
+                        )}
                         <div className="flex items-center gap-3 mt-0.5">
                            <span className="flex items-center gap-1 text-[9px] font-bold text-slate-400 uppercase">
                               <Calendar className="w-3 h-3" /> {date.toLocaleDateString()}
@@ -173,29 +201,32 @@ const Pomodoro: React.FC<PomodoroProps> = ({
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 md:space-y-10 animate-in zoom-in duration-300 pb-20 px-2">
-      <header className="flex items-center justify-between">
-        <div className="text-left">
-          <h2 className="text-3xl md:text-4xl font-black text-slate-950 dark:text-white uppercase tracking-tight">Timer</h2>
-          <p className="text-slate-500 dark:text-slate-400 font-bold italic text-sm md:text-base">Produtividade em foco.</p>
-        </div>
-        <div className="flex gap-2">
-          <button 
-            onClick={() => setShowHistory(true)}
-            className="p-3 md:p-4 rounded-2xl bg-white dark:bg-sanfran-rubiDark/20 text-slate-500 border-2 border-slate-200 dark:border-sanfran-rubi/30 shadow-xl"
-          >
-            <History className="w-6 h-6" />
-          </button>
-          <button 
-            onClick={() => setShowSettings(!showSettings)}
-            className={`p-3 md:p-4 rounded-2xl border-2 transition-all ${showSettings ? 'bg-sanfran-rubi text-white border-sanfran-rubi shadow-xl' : 'bg-white dark:bg-sanfran-rubiDark/20 text-slate-500 border-2 border-slate-200 dark:border-sanfran-rubi/30'}`}
-          >
-            <Settings2 className="w-6 h-6" />
-          </button>
-        </div>
-      </header>
+    <div className={`w-full max-w-4xl mx-auto transition-all duration-1000 ${isExtremeFocus ? 'flex flex-col items-center justify-center min-h-[80vh]' : 'space-y-6 md:space-y-10 pb-20 px-2'}`}>
+      
+      {!isExtremeFocus && (
+        <header className="flex items-center justify-between">
+          <div className="text-left">
+            <h2 className="text-3xl md:text-4xl font-black text-slate-950 dark:text-white uppercase tracking-tight">Timer</h2>
+            <p className="text-slate-500 dark:text-slate-400 font-bold italic text-sm md:text-base">Produtividade em foco.</p>
+          </div>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setShowHistory(true)}
+              className="p-3 md:p-4 rounded-2xl bg-white dark:bg-sanfran-rubiDark/20 text-slate-500 border-2 border-slate-200 dark:border-sanfran-rubi/30 shadow-xl"
+            >
+              <History className="w-6 h-6" />
+            </button>
+            <button 
+              onClick={() => setShowSettings(!showSettings)}
+              className={`p-3 md:p-4 rounded-2xl border-2 transition-all ${showSettings ? 'bg-sanfran-rubi text-white border-sanfran-rubi shadow-xl' : 'bg-white dark:bg-sanfran-rubiDark/20 text-slate-500 border-2 border-slate-200 dark:border-sanfran-rubi/30'}`}
+            >
+              <Settings2 className="w-6 h-6" />
+            </button>
+          </div>
+        </header>
+      )}
 
-      {showSettings && (
+      {!isExtremeFocus && showSettings && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in slide-in-from-top-4 duration-300">
           <div className="bg-white dark:bg-sanfran-rubiDark/40 p-5 md:p-6 rounded-[2rem] border border-slate-200 dark:border-sanfran-rubi/30 shadow-xl">
             <label className="flex items-center gap-2 text-[9px] font-black uppercase text-slate-400 tracking-widest mb-4">
@@ -218,14 +249,26 @@ const Pomodoro: React.FC<PomodoroProps> = ({
         </div>
       )}
 
-      <div className="bg-white dark:bg-[#0d0303] rounded-[3rem] md:rounded-[4rem] p-8 md:p-16 border-b-[12px] md:border-b-[16px] border-b-sanfran-rubi border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl flex flex-col items-center relative overflow-hidden">
-        <div className="relative w-60 h-60 sm:w-72 sm:h-72 md:w-80 md:h-80 mb-8 md:mb-12">
+      {/* Timer Container */}
+      <div className={`${isExtremeFocus ? 'bg-transparent border-none shadow-none' : 'bg-white dark:bg-[#0d0303] rounded-[3rem] md:rounded-[4rem] border-b-[12px] md:border-b-[16px] border-b-sanfran-rubi border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl p-8 md:p-12'} flex flex-col items-center relative overflow-hidden transition-all duration-1000`}>
+        
+        {isExtremeFocus && (
+          <div className="mb-12 text-center animate-in fade-in duration-1000">
+             <div className="flex items-center justify-center gap-3 text-sanfran-rubi mb-2">
+                <Zap size={16} className="animate-pulse" />
+                <span className="text-[10px] font-black uppercase tracking-[0.4em]">Foco Extremo em Pauta</span>
+             </div>
+             <p className="text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase tracking-widest">A academia aguarda seus resultados.</p>
+          </div>
+        )}
+
+        <div className={`relative ${isExtremeFocus ? 'w-80 h-80 md:w-[28rem] md:h-[28rem]' : 'w-60 h-60 sm:w-72 sm:h-72 md:w-80 md:h-80'} mb-8 transition-all duration-700`}>
           <svg className="w-full h-full transform -rotate-90 filter drop-shadow-xl">
-            <circle cx="50%" cy="50%" r="48%" stroke="currentColor" className="text-slate-100 dark:text-white/5" strokeWidth="8" fill="transparent" />
-            <circle cx="50%" cy="50%" r="48%" stroke="currentColor" strokeWidth="10" fill="transparent" strokeDasharray="100" strokeDashoffset={100 - progress} className={`transition-all duration-1000 ${mode === 'work' ? 'text-sanfran-rubi' : 'text-usp-blue'}`} pathLength="100" strokeLinecap="round" />
+            <circle cx="50%" cy="50%" r="48%" stroke="currentColor" className="text-slate-100 dark:text-white/5" strokeWidth={isExtremeFocus ? "4" : "8"} fill="transparent" />
+            <circle cx="50%" cy="50%" r="48%" stroke="currentColor" strokeWidth={isExtremeFocus ? "6" : "10"} fill="transparent" strokeDasharray="100" strokeDashoffset={100 - progress} className={`transition-all duration-1000 ${mode === 'work' ? 'text-sanfran-rubi' : 'text-usp-blue'}`} pathLength="100" strokeLinecap="round" />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-5xl sm:text-7xl md:text-8xl font-black tabular-nums text-slate-950 dark:text-white tracking-tighter drop-shadow-sm">{formatTime(secondsLeft)}</span>
+            <span className={`${isExtremeFocus ? 'text-8xl md:text-[10rem]' : 'text-5xl sm:text-7xl md:text-8xl'} font-black tabular-nums text-slate-950 dark:text-white tracking-tighter drop-shadow-sm transition-all duration-700`}>{formatTime(secondsLeft)}</span>
             <div className={`mt-3 md:mt-4 px-4 py-1.5 rounded-full font-black uppercase text-[8px] md:text-[10px] tracking-widest shadow-lg flex items-center gap-2 ${mode === 'work' ? 'bg-sanfran-rubi text-white' : 'bg-usp-blue text-white'}`}>
               {mode === 'work' ? <Gavel className="w-3.5 h-3.5" /> : <Coffee className="w-3.5 h-3.5" />}
               {mode === 'work' ? 'Estudo' : 'Descanso'}
@@ -233,24 +276,35 @@ const Pomodoro: React.FC<PomodoroProps> = ({
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-4 md:gap-6 mb-8 md:mb-12 w-full max-w-sm">
+        {isExtremeFocus && (
+          <div className="max-w-xl text-center mt-12 mb-16 px-6 animate-in slide-in-from-bottom-8 duration-1000 delay-500">
+             <Quote className="w-8 h-8 text-sanfran-rubi/20 mx-auto mb-6" />
+             <p className="text-xl md:text-3xl font-serif italic text-slate-800 dark:text-slate-200 leading-snug tracking-tight">
+               "{activeQuote}"
+             </p>
+          </div>
+        )}
+
+        <div className={`flex flex-col md:flex-row gap-4 md:gap-6 w-full ${isExtremeFocus ? 'max-w-xs' : 'max-w-sm'} transition-all`}>
           <div className="flex gap-4 flex-1">
             <button 
               onClick={toggleTimer} 
-              className={`flex-1 py-5 md:py-6 rounded-3xl md:rounded-[2rem] flex items-center justify-center transition-all shadow-xl hover:scale-[1.03] active:scale-95 border-b-4 ${isActive ? 'bg-slate-100 dark:bg-white/10 text-slate-500 border-slate-300 dark:border-white/10' : 'bg-sanfran-rubi text-white border-sanfran-rubiDark'}`}
+              className={`flex-1 ${isExtremeFocus ? 'py-4 rounded-2xl bg-white/5 text-slate-400 border border-white/10 hover:bg-sanfran-rubi hover:text-white' : 'py-5 md:py-6 rounded-3xl md:rounded-[2rem] shadow-xl hover:scale-[1.03] active:scale-95 border-b-4'} flex items-center justify-center transition-all ${!isExtremeFocus && (isActive ? 'bg-slate-100 dark:bg-white/10 text-slate-500 border-slate-300 dark:border-white/10' : 'bg-sanfran-rubi text-white border-sanfran-rubiDark')}`}
             >
-              {isActive ? <Pause className="w-6 h-6 md:w-8 md:h-8" /> : <Play className="w-6 h-6 md:w-8 md:h-8 fill-current" />}
+              {isActive ? <Pause className={isExtremeFocus ? "w-5 h-5" : "w-6 h-6 md:w-8 md:h-8"} /> : <Play className={`${isExtremeFocus ? "w-5 h-5" : "w-6 h-6 md:w-8 md:h-8"} fill-current`} />}
+              {isExtremeFocus && <span className="ml-2 text-[10px] font-black uppercase tracking-widest">{isActive ? 'Interromper' : 'Prosseguir'}</span>}
             </button>
-            <button 
-              onClick={resetTimer} 
-              className="w-16 md:w-24 bg-white dark:bg-white/5 border-2 border-slate-200 dark:border-sanfran-rubi/30 text-slate-400 hover:text-sanfran-rubi hover:border-sanfran-rubi rounded-3xl md:rounded-[2rem] flex items-center justify-center transition-all shadow-lg active:scale-90"
-            >
-              <RotateCcw className="w-6 h-6 md:w-7 md:h-7" />
-            </button>
+            {!isExtremeFocus && (
+              <button 
+                onClick={resetTimer} 
+                className="w-16 md:w-24 bg-white dark:bg-white/5 border-2 border-slate-200 dark:border-sanfran-rubi/30 text-slate-400 hover:text-sanfran-rubi hover:border-sanfran-rubi rounded-3xl md:rounded-[2rem] flex items-center justify-center transition-all shadow-lg active:scale-90"
+              >
+                <RotateCcw className="w-6 h-6 md:w-7 md:h-7" />
+              </button>
+            )}
           </div>
           
-          {/* Botão de Finalização Manual (Protocolar Agora) */}
-          {(isActive || secondsLeft < totalTime) && mode === 'work' && (
+          {(isActive || secondsLeft < totalTime) && mode === 'work' && !isExtremeFocus && (
             <button 
               onClick={onManualFinalize}
               className="w-full md:w-auto px-8 py-5 md:py-6 bg-emerald-500 hover:bg-emerald-600 text-white rounded-3xl md:rounded-[2rem] flex items-center justify-center gap-3 font-black uppercase text-[10px] tracking-widest shadow-xl shadow-emerald-900/20 transition-all hover:scale-[1.03] active:scale-95 border-b-4 border-emerald-700 animate-in fade-in zoom-in duration-300"
@@ -260,17 +314,34 @@ const Pomodoro: React.FC<PomodoroProps> = ({
           )}
         </div>
 
-        <div className="w-full space-y-3 max-w-sm">
-          <label className="text-[9px] md:text-[10px] text-center block font-black text-slate-400 uppercase tracking-widest">Protocolar em</label>
-          <select 
-            value={selectedSubjectId || ''} 
-            onChange={(e) => setSelectedSubjectId(e.target.value || null)} 
-            className="w-full p-4 md:p-5 bg-slate-50 dark:bg-black/60 border-2 border-slate-200 dark:border-sanfran-rubi/30 rounded-2xl md:rounded-3xl font-black text-center outline-none focus:border-sanfran-rubi text-sm md:text-base text-slate-900 dark:text-white transition-all shadow-inner"
-          >
-            <option value="">Sem Matéria</option>
-            {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-        </div>
+        {!isExtremeFocus && (
+          <div className="w-full mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
+            <div className="space-y-2">
+              <label className="text-[9px] md:text-[10px] text-center block font-black text-slate-400 uppercase tracking-widest">Cadeira</label>
+              <select 
+                value={selectedSubjectId || ''} 
+                onChange={(e) => setSelectedSubjectId(e.target.value || null)} 
+                className="w-full p-4 bg-slate-50 dark:bg-black/60 border-2 border-slate-200 dark:border-sanfran-rubi/30 rounded-2xl font-black outline-none focus:border-sanfran-rubi text-xs text-slate-900 dark:text-white transition-all shadow-inner"
+              >
+                <option value="">Geral</option>
+                {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[9px] md:text-[10px] text-center block font-black text-slate-400 uppercase tracking-widest">Doutrina / Obra</label>
+              <select 
+                value={selectedReadingId || ''} 
+                onChange={(e) => setSelectedReadingId(e.target.value || null)} 
+                className="w-full p-4 bg-slate-50 dark:bg-black/60 border-2 border-slate-200 dark:border-sanfran-rubi/30 rounded-2xl font-black outline-none focus:border-sanfran-rubi text-xs text-slate-900 dark:text-white transition-all shadow-inner"
+              >
+                <option value="">Nenhuma Obra</option>
+                {readings.filter(r => r.status !== 'concluido').map(r => (
+                  <option key={r.id} value={r.id}>{r.title}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
