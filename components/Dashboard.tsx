@@ -1,17 +1,19 @@
 
+import { Brain, CheckCircle2, Clock, Zap, TrendingUp, Medal, Gavel, Award, Scale, Briefcase, GraduationCap, Quote, Sun, Book, Shield, Zap as ZapIcon, Trophy } from 'lucide-react';
 import React, { useMemo } from 'react';
-import { Brain, CheckCircle2, Clock, Zap, TrendingUp, Medal, Gavel, Award, Scale, Briefcase, GraduationCap, Quote } from 'lucide-react';
-import { Subject, Flashcard, Task, StudySession } from '../types';
+import { Subject, Flashcard, Task, StudySession, Reading } from '../types';
 import { getBrasiliaDate } from '../App';
+import BadgeGallery, { BadgeData } from './BadgeGallery';
 
 interface DashboardProps {
   subjects: Subject[];
   flashcards: Flashcard[];
   tasks: Task[];
   studySessions: StudySession[];
+  readings: Reading[];
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, studySessions }) => {
+const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, studySessions, readings }) => {
   const legalQuotes = [
     "A justiça é a constante e perpétua vontade de dar a cada um o seu. - Ulpiano",
     "A lei é a razão livre da paixão. - Aristóteles",
@@ -92,8 +94,77 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
     return currentStreak;
   }, [studySessions, tasks]);
 
+  // --- Lógica de Badges ---
+  const badges: BadgeData[] = useMemo(() => {
+    return [
+      {
+        id: 'early_bird',
+        name: 'Madrugador XI de Agosto',
+        description: 'Sessão iniciada antes das 7h',
+        icon: Sun,
+        isUnlocked: studySessions.some(s => {
+          const time = new Date(s.start_time).getHours();
+          return time < 7;
+        }),
+        color: 'text-amber-500'
+      },
+      {
+        id: 'iron_bacharel',
+        name: 'Bacharel de Ferro',
+        description: 'Estudar 4h+ em um único dia',
+        icon: ZapIcon,
+        isUnlocked: (() => {
+          const days: Record<string, number> = {};
+          studySessions.forEach(s => {
+            const day = s.start_time.split('T')[0];
+            days[day] = (days[day] || 0) + s.duration;
+          });
+          return Object.values(days).some(d => d >= 4 * 3600);
+        })(),
+        color: 'text-sanfran-rubi'
+      },
+      {
+        id: 'constitutionalist',
+        name: 'Constitucionalista',
+        description: 'Revisar 100+ cards de Const.',
+        icon: Shield,
+        isUnlocked: (() => {
+          const constSubject = subjects.find(s => s.name.toLowerCase().includes('const'));
+          if (!constSubject) return false;
+          // Contamos flashcards desta disciplina. Num sistema ideal, contaríamos revisões históricas.
+          return flashcards.filter(f => f.subjectId === constSubject.id).length >= 50; 
+        })(),
+        color: 'text-usp-blue'
+      },
+      {
+        id: 'doctrinator',
+        name: 'Doutrinador',
+        description: 'Possuir 5+ obras na Biblioteca',
+        icon: Book,
+        isUnlocked: readings.length >= 5,
+        color: 'text-emerald-500'
+      },
+      {
+        id: 'impartial',
+        name: 'Imparcial',
+        description: 'Concluir 50 tarefas da Pauta',
+        icon: Gavel,
+        isUnlocked: tasks.filter(t => t.completed).length >= 50,
+        color: 'text-purple-500'
+      },
+      {
+        id: 'partner',
+        name: 'Sócio do XI',
+        description: 'Alcançar patente Sócio-Diretor',
+        icon: Trophy,
+        isUnlocked: totalHours >= 700,
+        color: 'text-usp-gold'
+      }
+    ];
+  }, [studySessions, flashcards, tasks, readings, subjects, totalHours]);
+
   return (
-    <div className="space-y-8 md:space-y-12 animate-in fade-in duration-500">
+    <div className="space-y-8 md:space-y-12 animate-in fade-in duration-500 pb-20">
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="text-center md:text-left">
           <h2 className="text-3xl md:text-5xl font-black text-slate-950 dark:text-white tracking-tight">Salve, Doutor(a)! 🏛️</h2>
@@ -183,6 +254,9 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
           highlight={streak > 0}
         />
       </div>
+
+      {/* --- Galeria de Conquistas (Badges) --- */}
+      <BadgeGallery badges={badges} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-10">
         <div className="lg:col-span-2 bg-white dark:bg-sanfran-rubiDark/30 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl border-t-[10px] md:border-t-[12px] border-t-sanfran-rubi">

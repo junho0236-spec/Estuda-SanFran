@@ -73,3 +73,16 @@ export interface RankingEntry {
   total_seconds: number;
   rank_name: string;
 }
+
+export interface Note {
+  content: string;
+}
+
+export interface Badge {
+  id: string;
+  name: string;
+  description: string;
+  icon: string; // Lucide icon name
+  rarity: 'common' | 'rare' | 'epic' | 'legendary';
+  isUnlocked: boolean;
+}
