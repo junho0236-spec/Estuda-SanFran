@@ -1,7 +1,7 @@
 
-import { Brain, CheckCircle2, Clock, Zap, TrendingUp, Medal, Gavel, Award, Scale, Briefcase, GraduationCap, Quote, Sun, Book, Shield, Zap as ZapIcon, Trophy, BookOpen, Layout, MousePointerClick } from 'lucide-react';
+import { Brain, CheckCircle2, Clock, Zap, TrendingUp, Medal, Gavel, Award, Scale, Briefcase, GraduationCap, Quote, Sun, Book, Shield, Zap as ZapIcon, Trophy } from 'lucide-react';
 import React, { useMemo } from 'react';
-import { View, Subject, Flashcard, Task, StudySession, Reading } from '../types';
+import { Subject, Flashcard, Task, StudySession, Reading } from '../types';
 import { getBrasiliaDate } from '../App';
 import BadgeGallery, { BadgeData } from './BadgeGallery';
 
@@ -11,10 +11,9 @@ interface DashboardProps {
   tasks: Task[];
   studySessions: StudySession[];
   readings: Reading[];
-  onNavigate: (view: View) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, studySessions, readings, onNavigate }) => {
+const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, studySessions, readings }) => {
   const legalQuotes = [
     "A justiça é a constante e perpétua vontade de dar a cada um o seu. - Ulpiano",
     "A lei é a razão livre da paixão. - Aristóteles",
@@ -223,41 +222,6 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
         </div>
       </div>
 
-      {/* --- Acesso Rápido aos Ramos --- */}
-      <div>
-        <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4 ml-2">Ferramentas Jurídicas</h3>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <QuickAction 
-            icon={<Gavel className="w-6 h-6 text-white" />} 
-            label="Pauta do Dia" 
-            sub="Gerir Tarefas" 
-            color="bg-slate-900 dark:bg-slate-800"
-            onClick={() => onNavigate(View.Tasks)}
-          />
-          <QuickAction 
-            icon={<Zap className="w-6 h-6 text-white" />} 
-            label="Sessão Foco" 
-            sub="Abrir Timer" 
-            color="bg-sanfran-rubi"
-            onClick={() => onNavigate(View.Timer)}
-          />
-           <QuickAction 
-            icon={<Brain className="w-6 h-6 text-white" />} 
-            label="Flashcards" 
-            sub="Revisar Matéria" 
-            color="bg-usp-blue"
-            onClick={() => onNavigate(View.Anki)}
-          />
-          <QuickAction 
-            icon={<BookOpen className="w-6 h-6 text-white" />} 
-            label="Cadeiras" 
-            sub="Ver Disciplinas" 
-            color="bg-usp-gold"
-            onClick={() => onNavigate(View.Subjects)}
-          />
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         <StatCard 
           icon={<Brain className="text-sanfran-rubi dark:text-white" />} 
@@ -335,21 +299,6 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
     </div>
   );
 };
-
-const QuickAction: React.FC<{ icon: React.ReactNode, label: string, sub: string, color: string, onClick: () => void }> = ({ icon, label, sub, color, onClick }) => (
-  <button 
-    onClick={onClick}
-    className="flex flex-col items-center justify-center p-6 rounded-[2rem] bg-white dark:bg-sanfran-rubiDark/40 border border-slate-200 dark:border-sanfran-rubi/30 shadow-xl hover:scale-105 active:scale-95 transition-all group"
-  >
-    <div className={`w-12 h-12 rounded-2xl ${color} flex items-center justify-center shadow-lg mb-3 group-hover:rotate-6 transition-transform`}>
-      {icon}
-    </div>
-    <div className="text-center">
-      <span className="block text-xs font-black text-slate-900 dark:text-white uppercase">{label}</span>
-      <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest">{sub}</span>
-    </div>
-  </button>
-);
 
 const StatCard: React.FC<{ icon: React.ReactNode, label: string, value: string | number, unit?: string, subtext: string, bgColor: string, highlight?: boolean }> = ({ icon, label, value, unit, subtext, bgColor, highlight }) => (
   <div className={`bg-white dark:bg-sanfran-rubiDark/40 p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border-2 shadow-xl hover:shadow-2xl md:hover:-translate-y-2 transition-all group overflow-hidden relative ${highlight ? 'border-orange-200 dark:border-orange-500/30 shadow-orange-900/10' : 'border-slate-200 dark:border-sanfran-rubi/30'}`}>

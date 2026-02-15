@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Pin, Trash2, MessageSquare, Quote, Info } from 'lucide-react';
+import { Send, Pin, Trash2, MessageSquare, Quote, AlertCircle, RefreshCw } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { MuralMessage } from '../types';
 
@@ -14,6 +13,7 @@ const Mural: React.FC<MuralProps> = ({ userId, userName }) => {
   const [newMessage, setNewMessage] = useState('');
   const [selectedColor, setSelectedColor] = useState<'yellow' | 'blue' | 'red' | 'green'>('yellow');
   const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -37,14 +37,19 @@ const Mural: React.FC<MuralProps> = ({ userId, userName }) => {
 
   const fetchMessages = async () => {
     setIsLoading(true);
+    setFetchError(null);
     const { data, error } = await supabase
       .from('mural_messages')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(50);
 
-    if (error) console.error('Erro ao buscar mural:', error);
-    else setMessages(data || []);
+    if (error) {
+      console.error('Erro ao buscar mural:', error);
+      setFetchError(error.message);
+    } else {
+      setMessages(data || []);
+    }
     setIsLoading(false);
   };
 
@@ -63,16 +68,21 @@ const Mural: React.FC<MuralProps> = ({ userId, userName }) => {
       const { error } = await supabase.from('mural_messages').insert(msgPayload);
       if (error) throw error;
       setNewMessage('');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Erro ao fixar recado no mural.');
+      alert(`Erro ao fixar recado: ${err.message || 'Verifique sua conexão ou permissões.'}`);
     }
   };
 
   const deleteMessage = async (id: string) => {
     if(!confirm("Deseja rasgar este recado do mural?")) return;
-    const { error } = await supabase.from('mural_messages').delete().eq('id', id).eq('user_id', userId);
-    if (error) alert('Erro ao deletar mensagem');
+    try {
+      const { error } = await supabase.from('mural_messages').delete().eq('id', id).eq('user_id', userId);
+      if (error) throw error;
+      setMessages(prev => prev.filter(m => m.id !== id));
+    } catch (err: any) {
+      alert(`Erro ao deletar: ${err.message}`);
+    }
   };
 
   const getColorStyles = (color: string) => {
@@ -95,6 +105,13 @@ const Mural: React.FC<MuralProps> = ({ userId, userName }) => {
           <h2 className="text-4xl md:text-6xl font-black text-slate-950 dark:text-white uppercase tracking-tighter leading-none">Mural das Arcadas</h2>
           <p className="text-slate-500 font-bold italic text-lg mt-2">Deixe seu recado para a posteridade (ou até a próxima aula).</p>
         </div>
+        <button 
+          onClick={fetchMessages}
+          className="p-3 rounded-full bg-slate-100 dark:bg-white/10 text-slate-500 hover:text-sanfran-rubi transition-colors"
+          title="Atualizar Mural"
+        >
+          <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
+        </button>
       </header>
 
       {/* Área de Input */}
@@ -121,7 +138,8 @@ const Mural: React.FC<MuralProps> = ({ userId, userName }) => {
             />
             <button
               type="submit"
-              className="bg-sanfran-rubi text-white px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-sanfran-rubiDark transition-all shadow-lg flex items-center justify-center gap-2"
+              disabled={isLoading}
+              className="bg-sanfran-rubi text-white px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-sanfran-rubiDark transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <Send className="w-4 h-4" /> Fixar
             </button>
@@ -129,12 +147,19 @@ const Mural: React.FC<MuralProps> = ({ userId, userName }) => {
         </form>
       </div>
 
-      {/* Grid de Mensagens - Estilo Masonry/Grid */}
+      {/* Grid de Mensagens */}
       <div className="flex-1 overflow-y-auto pr-2 pb-20 custom-scrollbar">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center h-64 opacity-50">
              <div className="w-12 h-12 border-4 border-sanfran-rubi border-t-transparent rounded-full animate-spin"></div>
              <p className="mt-4 text-[10px] font-black uppercase tracking-widest">Carregando recados...</p>
+          </div>
+        ) : fetchError ? (
+          <div className="flex flex-col items-center justify-center h-64 border-4 border-dashed border-red-200 dark:border-red-900/20 rounded-[3rem] text-red-400 bg-red-50 dark:bg-red-900/10 p-6 text-center">
+            <AlertCircle size={48} className="mb-4 text-red-500" />
+            <p className="text-xl font-black uppercase">Erro de Conexão</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest mt-2">{fetchError}</p>
+            <p className="text-[10px] mt-4 max-w-xs opacity-75">Verifique se as tabelas e políticas de segurança (RLS) foram criadas corretamente no Supabase.</p>
           </div>
         ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 border-4 border-dashed border-slate-200 dark:border-white/5 rounded-[3rem] text-slate-400">
@@ -149,7 +174,6 @@ const Mural: React.FC<MuralProps> = ({ userId, userName }) => {
                 key={msg.id}
                 className={`p-6 rounded-2xl shadow-lg border-2 relative group transition-all hover:scale-[1.02] hover:z-10 flex flex-col justify-between min-h-[180px] ${getColorStyles(msg.color)}`}
               >
-                {/* Pin Visual */}
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-slate-400 shadow-sm border border-slate-500 z-20"></div>
 
                 <div className="mb-4">
