@@ -11,6 +11,7 @@ import CalendarView from './components/CalendarView';
 import Ranking from './components/Ranking';
 import Library from './components/Library';
 import Login from './components/Login';
+import Atmosphere from './components/Atmosphere';
 import { supabase } from './services/supabaseClient';
 
 export const getBrasiliaDate = () => {
@@ -232,8 +233,8 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    if (isDarkMode) document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
+    if (isDarkMode) document.documentElement.classList.add('class');
+    else document.documentElement.classList.remove('class');
     localStorage.setItem('omnistudy_darkmode', JSON.stringify(isDarkMode));
   }, [isDarkMode]);
 
@@ -254,6 +255,9 @@ const App: React.FC = () => {
 
   return (
     <div className={`flex h-screen overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#fcfcfc]'}`}>
+      {/* Atmosphere Audio Control */}
+      <Atmosphere isExtremeFocus={isExtremeFocus} />
+
       {/* Mobile Overlay */}
       {isSidebarOpen && !isExtremeFocus && (
         <div 
