@@ -9,7 +9,8 @@ export enum View {
   Ranking = 'ranking',
   Library = 'library',
   Largo = 'largo',
-  Mural = 'mural'
+  Mural = 'mural',
+  Calculator = 'calculator'
 }
 
 export interface Folder {
