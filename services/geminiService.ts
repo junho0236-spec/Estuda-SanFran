@@ -2,38 +2,20 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 /**
- * Tenta capturar a chave de API de diversas fontes comuns em builds de frontend (Vite, Webpack, Vercel).
+ * Obtém a chave de API exclusivamente do ambiente.
  */
 export const getSafeApiKey = (): string | null => {
-  try {
-    // 1. Tenta o padrão exigido (process.env)
-    const processKey = typeof process !== 'undefined' && process.env ? process.env.API_KEY : null;
-    if (processKey && processKey !== "undefined" && processKey !== "") return processKey;
-
-    // 2. Tenta o padrão do Vite (import.meta.env) caso o build esteja mascarando process.env
-    // @ts-ignore
-    const viteKey = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_API_KEY : null;
-    if (viteKey && viteKey !== "undefined" && viteKey !== "") return viteKey;
-
-    // 3. Verifica se a chave foi injetada globalmente no index.html
-    // @ts-ignore
-    const globalKey = window.__API_KEY__;
-    if (globalKey && globalKey !== "") return globalKey;
-
-  } catch (e) {
-    // Falha silenciosa se os objetos de ambiente não existirem
-  }
-  return null;
+  return process.env.API_KEY || null;
 };
 
 /**
- * Gera flashcards utilizando o modelo Gemini.
+ * Gera flashcards utilizando o modelo Gemini 3.
  */
 export const generateFlashcards = async (text: string, subjectName: string) => {
   const apiKey = getSafeApiKey();
   
   if (!apiKey) {
-    throw new Error("DILIGÊNCIA NECESSÁRIA: A variável 'API_KEY' não está visível para o navegador. Na Vercel, certifique-se de que a variável foi adicionada e o projeto foi reconstruído.");
+    throw new Error("DILIGÊNCIA NECESSÁRIA: API_KEY não configurada.");
   }
 
   const ai = new GoogleGenAI({ apiKey });
@@ -41,15 +23,10 @@ export const generateFlashcards = async (text: string, subjectName: string) => {
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview', 
-      contents: `Você é um tutor da SanFran (Academia Jurídica FDUSP). Sua tarefa é converter o texto jurídico abaixo em uma lista de Flashcards para Anki.
-      
+      contents: `Converta o texto jurídico abaixo em JSON para Flashcards Anki.
       DISCIPLINA: ${subjectName}
-      TEXTO PARA PROCESSAR: ${text}
-      
-      REGRAS:
-      - Responda APENAS com o JSON.
-      - Foco em prazos, conceitos latinos e doutrina clássica.
-      - Crie perguntas instigantes na frente (front) e respostas fundamentadas no verso (back).`,
+      TEXTO: ${text}
+      REGRAS: Retorne APENAS um array de objetos com "front" (pergunta) e "back" (resposta).`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -57,8 +34,8 @@ export const generateFlashcards = async (text: string, subjectName: string) => {
           items: {
             type: Type.OBJECT,
             properties: {
-              front: { type: Type.STRING, description: 'Pergunta (Frente).' },
-              back: { type: Type.STRING, description: 'Resposta (Verso).' }
+              front: { type: Type.STRING },
+              back: { type: Type.STRING }
             },
             required: ["front", "back"]
           }
@@ -66,11 +43,12 @@ export const generateFlashcards = async (text: string, subjectName: string) => {
       }
     });
 
-    if (!response.text) throw new Error("A IA não retornou conteúdo.");
-    return JSON.parse(response.text.trim());
+    const jsonStr = response.text;
+    if (!jsonStr) throw new Error("A IA retornou uma resposta vazia.");
+    return JSON.parse(jsonStr.trim());
   } catch (err: any) {
     console.error("Erro Gemini:", err);
-    throw new Error("Erro no processamento da IA. Verifique se sua chave tem permissão para o modelo Gemini 1.5 Flash.");
+    throw new Error("Falha na extração via IA. Tente o modo de Importação em Lote.");
   }
 };
 
@@ -83,10 +61,10 @@ export const getStudyMotivation = async (subjects: string[]) => {
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Gere uma frase de motivação curta para um estudante de Direito da SanFran que estuda: ${subjects.join(', ')}. Estilo erudito e clássico.`,
+      contents: `Gere uma frase de motivação curta para um estudante de Direito (USP SanFran) que estuda: ${subjects.join(', ')}.`,
     });
-    return response.text;
+    return response.text || "Scientia Vinces.";
   } catch (e) {
-    return "A justiça é a constante e perpétua vontade de dar a cada um o seu. - Ulpiano";
+    return "A justiça é a constante e perpétua vontade de dar a cada um o seu.";
   }
 };

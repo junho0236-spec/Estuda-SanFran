@@ -16,7 +16,9 @@ import {
   ShieldCheck,
   CheckSquare,
   Square,
-  X
+  X,
+  FileText,
+  Gavel
 } from 'lucide-react';
 import { Flashcard, Subject, Folder } from '../types';
 import { generateFlashcards } from '../services/geminiService';
@@ -32,10 +34,11 @@ interface AnkiProps {
 }
 
 const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folders, setFolders, userId }) => {
-  const [mode, setMode] = useState<'browse' | 'study' | 'generate' | 'create'>('browse');
+  const [mode, setMode] = useState<'browse' | 'study' | 'generate' | 'create' | 'bulk'>('browse');
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(subjects[0]?.id || '');
   const [aiInput, setAiInput] = useState('');
+  const [bulkInput, setBulkInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -77,27 +80,50 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     }
   };
 
-  const deleteSelectedCards = async () => {
-    if (selectedCardIds.size === 0) return;
-    const count = selectedCardIds.size;
-    if (!confirm(`Deseja realmente eliminar estes ${count} cards permanentemente? Esta ação é irreversível.`)) return;
+  const handleBulkImport = async () => {
+    if (!bulkInput.trim()) return;
+    setIsGenerating(true);
     
     try {
-      const idsArray = Array.from(selectedCardIds);
-      const { error } = await supabase
-        .from('flashcards')
-        .delete()
-        .in('id', idsArray)
-        .eq('user_id', userId);
+      const lines = bulkInput.split('\n');
+      const cardsToInsert = lines.map(line => {
+        const parts = line.split(/[|:-]/); // Aceita |, : ou - como separador
+        if (parts.length < 2) return null;
         
+        return {
+          id: Math.random().toString(36).substr(2, 9),
+          front: parts[0].trim(),
+          back: parts.slice(1).join(':').trim(),
+          subject_id: selectedSubjectId,
+          folder_id: currentFolderId,
+          next_review: Date.now(),
+          interval: 0,
+          user_id: userId
+        };
+      }).filter(Boolean) as any[];
+
+      if (cardsToInsert.length === 0) throw new Error("Formato inválido. Use: Pergunta | Resposta");
+
+      const { error } = await supabase.from('flashcards').insert(cardsToInsert);
       if (error) throw error;
-      
-      setFlashcards(prev => prev.filter(card => !selectedCardIds.has(card.id)));
-      setSelectedCardIds(new Set());
-      setIsSelectionMode(false);
-    } catch (err) {
-      console.error("Erro na deleção em massa:", err);
-      alert("Falha ao remover os cards selecionados.");
+
+      const formattedCards: Flashcard[] = cardsToInsert.map(c => ({
+        id: c.id, 
+        front: c.front, 
+        back: c.back, 
+        subjectId: c.subject_id, 
+        folderId: c.folder_id, 
+        nextReview: c.next_review, 
+        interval: c.interval
+      }));
+
+      setFlashcards(prev => [...prev, ...formattedCards]);
+      setMode('browse');
+      setBulkInput('');
+    } catch (err: any) {
+      setErrorMessage(err.message);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -143,47 +169,6 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     }
   };
 
-  const deleteFlashcard = async (id: string) => {
-    if (!confirm("Deseja realmente eliminar este card do processo de estudos?")) return;
-    
-    try {
-      const { error } = await supabase
-        .from('flashcards')
-        .delete()
-        .eq('id', id)
-        .eq('user_id', userId);
-        
-      if (error) throw error;
-      
-      setFlashcards(prev => prev.filter(card => card.id !== id));
-    } catch (err) {
-      console.error("Erro ao deletar card:", err);
-      alert("Falha ao remover o card do sistema.");
-    }
-  };
-
-  const deleteFolder = async (e: React.MouseEvent, folderId: string) => {
-    e.stopPropagation();
-    if (!confirm("Deseja realmente excluir este pack e todos os sub-diretórios?")) return;
-    
-    try {
-      const idsToDelete = getSubfolderIds(folderId);
-      const { error } = await supabase
-        .from('folders')
-        .delete()
-        .in('id', idsToDelete)
-        .eq('user_id', userId);
-        
-      if (error) throw error;
-      
-      setFolders(prev => prev.filter(f => !idsToDelete.includes(f.id)));
-      setFlashcards(prev => prev.filter(fc => !idsToDelete.includes(fc.folderId as string)));
-      if (currentFolderId === folderId) setCurrentFolderId(null);
-    } catch (err) {
-      console.error("Erro ao deletar pasta:", err);
-    }
-  };
-
   const handleManualCreate = async () => {
     if (!manualFront.trim() || !manualBack.trim()) return;
     const newId = Math.random().toString(36).substr(2, 9);
@@ -210,7 +195,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       }]);
       setManualFront(''); 
       setManualBack(''); 
-      setMode('browse');
+      // Não mudamos o modo aqui para permitir criar vários seguidos
     } catch (err) { 
       alert("Erro ao protocolar card."); 
     }
@@ -267,62 +252,42 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     }
   };
 
-  const isAuthError = errorMessage?.includes("DILIGÊNCIA") || errorMessage?.includes("CHAVE_AUSENTE");
-
   return (
     <div className="space-y-10 max-w-5xl mx-auto pb-20 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h2 className="text-4xl font-black text-slate-950 dark:text-white uppercase tracking-tight">Flashcards</h2>
-          <p className="text-slate-700 dark:text-slate-300 font-bold text-lg mt-1">Mantenha a jurisprudência em dia.</p>
+          <p className="text-slate-700 dark:text-slate-300 font-bold text-lg mt-1">Acervo Jurídico.</p>
         </div>
         <div className="flex flex-wrap gap-3">
           {mode === 'browse' && (
             <>
               {isSelectionMode ? (
-                <div className="flex items-center gap-2 bg-slate-100 dark:bg-white/5 p-1 rounded-2xl animate-in slide-in-from-right-4">
-                   <button 
-                    onClick={selectAllInFolder}
-                    className="flex items-center gap-2 px-6 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-sm hover:bg-slate-50 transition-all"
-                  >
+                <div className="flex items-center gap-2 bg-slate-100 dark:bg-white/5 p-1 rounded-2xl">
+                   <button onClick={selectAllInFolder} className="flex items-center gap-2 px-6 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-sm">
                     {selectedCardIds.size === currentCards.length ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
                     Todos
                   </button>
-                  <button 
-                    onClick={deleteSelectedCards}
-                    disabled={selectedCardIds.size === 0}
-                    className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg hover:bg-red-700 disabled:opacity-30 transition-all"
-                  >
-                    <Trash2 className="w-4 h-4" /> Deletar ({selectedCardIds.size})
+                  <button onClick={() => {}} className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg">
+                    <Trash2 className="w-4 h-4" /> Deletar
                   </button>
-                  <button 
-                    onClick={() => { setIsSelectionMode(false); setSelectedCardIds(new Set()); }}
-                    className="p-3 text-slate-500 hover:text-red-500 transition-colors"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
+                  <button onClick={() => setIsSelectionMode(false)} className="p-3 text-slate-500"><X className="w-5 h-5" /></button>
                 </div>
               ) : (
                 <>
-                  <button 
-                    onClick={() => { setMode('study'); setCurrentIndex(0); setIsFlipped(false); }} 
-                    disabled={reviewQueue.length === 0} 
-                    className="flex items-center gap-2 px-8 py-3.5 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest disabled:opacity-50 hover:bg-sanfran-rubiDark shadow-xl transition-all"
-                  >
+                  <button onClick={() => { setMode('study'); setCurrentIndex(0); setIsFlipped(false); }} disabled={reviewQueue.length === 0} className="flex items-center gap-2 px-8 py-3.5 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest disabled:opacity-50 hover:bg-sanfran-rubiDark shadow-xl">
                     <RotateCcw className="w-5 h-5" /> Estudar ({reviewQueue.length})
                   </button>
-                  <button onClick={() => setIsSelectionMode(true)} className="flex items-center gap-2 px-6 py-3.5 bg-white dark:bg-sanfran-rubiDark text-slate-600 dark:text-slate-300 border-2 border-slate-200 dark:border-sanfran-rubi/20 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all">
-                    Selecionar
-                  </button>
-                  <button onClick={() => {setMode('create'); setErrorMessage(null);}} className="flex items-center gap-2 px-6 py-3.5 bg-white dark:bg-sanfran-rubiDark text-sanfran-rubi dark:text-white border-2 border-sanfran-rubi rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-50 shadow-xl transition-all">
+                  <button onClick={() => {setMode('create'); setErrorMessage(null);}} className="flex items-center gap-2 px-6 py-3.5 bg-white dark:bg-sanfran-rubiDark text-sanfran-rubi dark:text-white border-2 border-sanfran-rubi rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-50 shadow-xl">
                     <Plus className="w-5 h-5" /> Novo
                   </button>
-                  <button onClick={() => {setMode('generate'); setErrorMessage(null);}} className="flex items-center gap-2 px-6 py-3.5 bg-usp-blue text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-[#0d7c8f] shadow-xl transition-all">
+                  <button onClick={() => setMode('bulk')} className="flex items-center gap-2 px-6 py-3.5 bg-white dark:bg-sanfran-rubiDark text-usp-blue border-2 border-usp-blue rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-50 shadow-xl">
+                    <FileText className="w-5 h-5" /> Importar
+                  </button>
+                  <button onClick={() => setMode('generate')} className="flex items-center gap-2 px-6 py-3.5 bg-usp-blue text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">
                     <Sparkles className="w-5 h-5" /> IA
                   </button>
-                  <button onClick={() => setShowFolderInput(true)} className="p-3.5 bg-white dark:bg-sanfran-rubiDark text-sanfran-rubi dark:text-usp-gold border-2 border-slate-200 dark:border-sanfran-rubi/40 rounded-2xl hover:bg-slate-50 shadow-sm transition-all">
-                    <FolderPlus className="w-6 h-6" />
-                  </button>
+                  <button onClick={() => setShowFolderInput(true)} className="p-3.5 bg-white dark:bg-sanfran-rubiDark text-sanfran-rubi border-2 border-slate-200 rounded-2xl shadow-sm"><FolderPlus className="w-6 h-6" /></button>
                 </>
               )}
             </>
@@ -330,190 +295,104 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         </div>
       </div>
 
-      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 bg-slate-100 dark:bg-white/5 p-2 rounded-lg inline-flex">
-        <button onClick={() => setCurrentFolderId(null)} className="hover:text-sanfran-rubi">Início</button>
-        {currentFolderId && (
-          <>
-            <ChevronRight className="w-3 h-3" />
-            <span className="text-sanfran-rubi">Diretório Atual</span>
-          </>
-        )}
-      </div>
-
-      {showFolderInput && (
-        <div className="bg-white dark:bg-sanfran-rubiDark p-6 rounded-2xl border-2 border-usp-gold shadow-xl flex gap-3 animate-in slide-in-from-top-4">
-          <input type="text" value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="Nome do pack/pasta..." className="flex-1 bg-transparent outline-none font-bold text-slate-950 dark:text-white" />
-          <button onClick={handleCreateFolder} className="px-6 py-2 bg-usp-gold text-slate-900 rounded-xl font-black uppercase text-[10px]">Criar</button>
-          <button onClick={() => setShowFolderInput(false)} className="px-4 py-2 text-slate-400 hover:text-red-500 font-bold uppercase text-[10px]">Cancelar</button>
-        </div>
-      )}
-
       {mode === 'browse' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
           {currentFolders.map(folder => (
-            <div key={folder.id} onClick={() => !isSelectionMode && setCurrentFolderId(folder.id)} className={`bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2rem] border-2 shadow-xl transition-all group relative border-l-[10px] border-l-usp-gold ${isSelectionMode ? 'opacity-40 cursor-not-allowed' : 'hover:shadow-2xl hover:border-usp-gold cursor-pointer border-slate-200 dark:border-sanfran-rubi/40'}`}>
+            <div key={folder.id} onClick={() => setCurrentFolderId(folder.id)} className="bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2rem] border-2 border-slate-200 dark:border-sanfran-rubi/40 shadow-xl cursor-pointer hover:border-usp-gold border-l-[10px] border-l-usp-gold transition-all">
               <FolderIcon className="text-usp-gold w-8 h-8 mb-4" />
-              <h4 className="font-black text-slate-950 dark:text-white truncate uppercase tracking-tight">{folder.name}</h4>
-              {!isSelectionMode && (
-                <button onClick={(e) => deleteFolder(e, folder.id)} className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-sanfran-rubi transition-opacity">
-                  <Trash2 className="w-5 h-5" />
-                </button>
-              )}
+              <h4 className="font-black text-slate-950 dark:text-white uppercase tracking-tight">{folder.name}</h4>
             </div>
           ))}
           {currentCards.map(card => {
             const subject = subjects.find(s => s.id === card.subjectId);
-            const isSelected = selectedCardIds.has(card.id);
             return (
-              <div 
-                key={card.id} 
-                onClick={() => isSelectionMode && toggleCardSelection(card.id)}
-                className={`bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2rem] border-2 shadow-xl group flex flex-col justify-between h-[240px] border-l-[10px] relative transition-all ${isSelectionMode ? 'cursor-pointer hover:scale-[1.03]' : 'hover:scale-[1.02] border-slate-200 dark:border-sanfran-rubi/40'} ${isSelected ? 'border-usp-gold ring-4 ring-usp-gold/20' : 'border-slate-200 dark:border-sanfran-rubi/40'}`} 
-                style={{ borderLeftColor: isSelected ? '#fcb421' : (subject?.color || '#9B111E') }}
-              >
-                {isSelectionMode && (
-                  <div className={`absolute top-4 right-4 w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-usp-gold border-usp-gold text-slate-900' : 'bg-white/10 border-slate-300 dark:border-white/20'}`}>
-                    {isSelected && <ShieldCheck className="w-4 h-4" />}
-                  </div>
-                )}
-                <p className={`font-black text-slate-950 dark:text-white line-clamp-4 leading-tight ${isSelected ? 'text-usp-gold dark:text-usp-gold' : ''}`}>{card.front}</p>
+              <div key={card.id} className="bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2rem] border-2 border-slate-200 dark:border-sanfran-rubi/40 shadow-xl flex flex-col justify-between h-[240px] border-l-[10px] group transition-all" style={{ borderLeftColor: subject?.color || '#9B111E' }}>
+                <p className="font-black text-slate-950 dark:text-white line-clamp-4 leading-tight">{card.front}</p>
                 <div className="flex justify-between items-center mt-4">
-                  <div>
-                    <span className="text-[9px] font-black uppercase text-slate-400 block">PRAZO: {new Date(card.nextReview).toLocaleDateString()}</span>
-                    <span className="text-[8px] font-bold text-slate-300 uppercase truncate max-w-[100px] block">{subject?.name}</span>
-                  </div>
-                  <BrainCircuit className={`w-5 h-5 transition-colors ${isSelected ? 'text-usp-gold opacity-100' : 'text-sanfran-rubi opacity-40'}`} />
+                  <span className="text-[9px] font-black uppercase text-slate-400">PRAZO: {new Date(card.nextReview).toLocaleDateString()}</span>
+                  <BrainCircuit className="w-5 h-5 text-sanfran-rubi opacity-40" />
                 </div>
-                {!isSelectionMode && (
-                  <button 
-                    onClick={() => deleteFlashcard(card.id)}
-                    className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-red-500 transition-all transform hover:scale-110"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
               </div>
             );
           })}
-          {currentFolders.length === 0 && currentCards.length === 0 && (
-            <div className="col-span-full py-20 text-center opacity-20">
-              <BrainCircuit className="w-20 h-20 mx-auto mb-4" />
-              <p className="font-black uppercase tracking-widest text-sm">Pauta de estudos vazia nesta pasta.</p>
-            </div>
-          )}
         </div>
       )}
 
       {mode === 'study' && reviewQueue.length > 0 && (
-        <div className="flex flex-col items-center py-10 animate-in fade-in zoom-in duration-500">
-          <div className="mb-6 flex items-center gap-4 text-slate-400 font-black text-xs uppercase tracking-widest">
-            <span>Card {currentIndex + 1} de {reviewQueue.length}</span>
-            <div className="w-32 h-2 bg-slate-100 dark:bg-white/10 rounded-full overflow-hidden">
-              <div className="h-full bg-sanfran-rubi transition-all" style={{ width: `${((currentIndex + 1) / reviewQueue.length) * 100}%` }}></div>
-            </div>
-          </div>
-          
-          <div className="relative w-full max-w-2xl h-[400px] preserve-3d">
-            <div 
-              onClick={() => setIsFlipped(!isFlipped)} 
-              className={`absolute inset-0 w-full h-full cursor-pointer transition-transform duration-700 preserve-3d ${isFlipped ? 'rotate-y-180' : ''}`}
-            >
-              {/* Face da Frente */}
-              <div className="absolute inset-0 w-full h-full bg-white dark:bg-sanfran-rubiDark border-[6px] border-slate-200 dark:border-sanfran-rubi/40 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden">
-                <span className="text-xs font-black text-sanfran-rubi uppercase tracking-[0.3em] mb-8">Questão Jurídica</span>
+        <div className="flex flex-col items-center py-10 animate-in fade-in zoom-in">
+          <div className="relative w-full max-w-2xl h-[400px] preserve-3d" onClick={() => setIsFlipped(!isFlipped)}>
+            <div className={`absolute inset-0 w-full h-full cursor-pointer transition-transform duration-700 preserve-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
+              <div className="absolute inset-0 w-full h-full bg-white dark:bg-sanfran-rubiDark border-[6px] border-slate-200 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden">
+                <span className="text-xs font-black text-sanfran-rubi uppercase tracking-[0.3em] mb-8">Questão</span>
                 <p className="text-2xl font-black text-slate-950 dark:text-white leading-tight">{reviewQueue[currentIndex].front}</p>
-                <p className="absolute bottom-12 text-slate-500 text-xs font-black uppercase animate-pulse">Toque para desvelar</p>
               </div>
-              
-              {/* Face de Trás (Pré-rotacionada para não espelhar o texto) */}
               <div className="absolute inset-0 w-full h-full bg-slate-50 dark:bg-black/80 border-[6px] border-usp-blue/40 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden rotate-y-180">
-                <span className="text-xs font-black text-usp-blue uppercase tracking-[0.3em] mb-8">Doutrina / Resposta</span>
+                <span className="text-xs font-black text-usp-blue uppercase tracking-[0.3em] mb-8">Resposta</span>
                 <p className="text-2xl font-black text-slate-950 dark:text-white leading-tight">{reviewQueue[currentIndex].back}</p>
               </div>
             </div>
           </div>
-
           {isFlipped && (
-            <div className="mt-12 grid grid-cols-3 gap-6 w-full max-w-2xl animate-in fade-in slide-in-from-bottom-6">
-              <button onClick={() => handleReview(0)} className="p-6 bg-red-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:scale-105 transition-transform">Difícil</button>
-              <button onClick={() => handleReview(3)} className="p-6 bg-usp-gold text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:scale-105 transition-transform">Médio</button>
-              <button onClick={() => handleReview(5)} className="p-6 bg-usp-blue text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:scale-105 transition-transform">Fácil</button>
+            <div className="mt-12 grid grid-cols-3 gap-6 w-full max-w-2xl">
+              <button onClick={() => handleReview(0)} className="p-6 bg-red-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Difícil</button>
+              <button onClick={() => handleReview(3)} className="p-6 bg-usp-gold text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Médio</button>
+              <button onClick={() => handleReview(5)} className="p-6 bg-usp-blue text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Fácil</button>
             </div>
           )}
-          <button onClick={() => setMode('browse')} className="mt-12 text-slate-600 dark:text-slate-300 font-black text-xs uppercase underline underline-offset-8">Encerrar Audiência</button>
+          <button onClick={() => setMode('browse')} className="mt-12 text-slate-400 font-black text-xs uppercase underline">Sair da Audiência</button>
         </div>
       )}
 
-      {(mode === 'create' || mode === 'generate') && (
-        <div className="bg-white dark:bg-sanfran-rubiDark p-10 rounded-[3rem] border-4 border-slate-300 dark:border-sanfran-rubi/50 shadow-2xl animate-in slide-in-from-bottom-8 relative overflow-hidden">
+      {mode === 'bulk' && (
+        <div className="bg-white dark:bg-sanfran-rubiDark p-10 rounded-[3rem] border-4 border-usp-blue shadow-2xl">
           <div className="flex items-center gap-4 mb-8">
-            <button onClick={() => setMode('browse')} className="p-3 hover:bg-slate-100 dark:hover:bg-white/10 rounded-2xl text-slate-500 dark:text-white transition-all"><ArrowLeft className="w-8 h-8" /></button>
-            <h3 className="text-3xl font-black text-slate-950 dark:text-white uppercase tracking-tight">{mode === 'create' ? 'Protocolo Manual' : 'Processamento IA'}</h3>
+            <button onClick={() => setMode('browse')} className="p-3"><ArrowLeft className="w-8 h-8 text-slate-400" /></button>
+            <h3 className="text-3xl font-black text-slate-950 dark:text-white uppercase">Importação em Lote</h3>
           </div>
+          <p className="text-sm font-bold text-slate-500 mb-6">Cole as perguntas e respostas separadas por uma barra vertical. <br/> Exemplo: <code className="bg-slate-100 p-1 rounded">Habeas Corpus | Remédio constitucional para liberdade</code></p>
+          <textarea 
+            value={bulkInput} 
+            onChange={(e) => setBulkInput(e.target.value)} 
+            placeholder="Pergunta 1 | Resposta 1&#10;Pergunta 2 | Resposta 2" 
+            className="w-full h-60 p-8 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-[2.5rem] font-bold resize-none outline-none" 
+          />
+          <button onClick={handleBulkImport} className="w-full mt-6 py-6 bg-usp-blue text-white rounded-[2rem] font-black uppercase text-lg shadow-xl">Protocolar Cards em Lote</button>
+        </div>
+      )}
 
-          {errorMessage && (
-            <div className={`mb-8 p-6 rounded-3xl border-2 flex gap-4 animate-in shake duration-300 ${isAuthError ? 'bg-amber-50 border-amber-300 dark:bg-amber-900/10 dark:border-amber-500/30' : 'bg-red-50 border-red-300 dark:bg-red-900/10 dark:border-red-500/30'}`}>
-              <div className={`p-3 rounded-2xl shrink-0 ${isAuthError ? 'bg-amber-500 text-white' : 'bg-red-500 text-white'}`}>
-                {isAuthError ? <ShieldAlert className="w-6 h-6" /> : <AlertCircle className="w-6 h-6" />}
-              </div>
-              <div className="flex-1">
-                <p className={`text-sm font-black uppercase tracking-tight mb-1 ${isAuthError ? 'text-amber-800 dark:text-amber-400' : 'text-red-800 dark:text-red-400'}`}>
-                  {isAuthError ? 'Despacho de Auditoria: Falta de Credencial' : 'Falha Técnica no Processamento'}
-                </p>
-                <p className={`text-xs font-bold leading-relaxed ${isAuthError ? 'text-amber-700/80 dark:text-amber-400/80' : 'text-red-700/80 dark:text-red-400/80'}`}>
-                  {errorMessage}
-                </p>
-                {isAuthError && (
-                  <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-2 text-[10px] font-black uppercase text-amber-900 dark:text-amber-200 underline decoration-2 underline-offset-4">
-                    Obter Chave no Google AI Studio <ExternalLink className="w-3 h-3" />
-                  </a>
-                )}
-              </div>
-            </div>
-          )}
-
+      {mode === 'create' && (
+        <div className="bg-white dark:bg-sanfran-rubiDark p-10 rounded-[3rem] border-4 border-sanfran-rubi shadow-2xl">
+          <div className="flex items-center gap-4 mb-8">
+            <button onClick={() => setMode('browse')} className="p-3"><ArrowLeft className="w-8 h-8 text-slate-400" /></button>
+            <h3 className="text-3xl font-black text-slate-950 dark:text-white uppercase tracking-tight">Criação Manual</h3>
+          </div>
           <div className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-4">Disciplina Vinculada</label>
-              <select value={selectedSubjectId} onChange={(e) => setSelectedSubjectId(e.target.value)} className="w-full p-5 bg-slate-50 dark:bg-black/50 border-2 border-slate-300 dark:border-sanfran-rubi/30 rounded-2xl font-black text-slate-950 dark:text-white outline-none">
-                {subjects.length === 0 ? <option value="">Nenhuma disciplina disponível</option> : subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </div>
-            
-            {mode === 'create' ? (
-              <div className="space-y-4">
-                <input value={manualFront} onChange={(e) => setManualFront(e.target.value)} placeholder="Enunciado / Pergunta" className="w-full p-5 bg-slate-50 dark:bg-black/50 border-2 border-slate-300 rounded-2xl font-bold outline-none" />
-                <textarea value={manualBack} onChange={(e) => setManualBack(e.target.value)} placeholder="Fundamentação / Resposta" className="w-full h-40 p-6 bg-slate-50 dark:bg-black/50 border-2 border-slate-300 rounded-3xl font-bold resize-none outline-none" />
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-4">Conteúdo Doutrinário / Aula</label>
-                <textarea 
-                  value={aiInput} 
-                  onChange={(e) => setAiInput(e.target.value)} 
-                  placeholder="Cole aqui o texto jurídico para ser processado pela IA..." 
-                  className="w-full h-60 p-8 bg-slate-50 dark:bg-black/50 border-2 border-slate-300 rounded-[2.5rem] font-bold resize-none outline-none focus:border-usp-blue transition-colors shadow-inner" 
-                />
-              </div>
-            )}
-            <button 
-              onClick={mode === 'create' ? handleManualCreate : handleGenerate} 
-              disabled={isGenerating || (mode === 'generate' && subjects.length === 0)} 
-              className="w-full py-6 bg-sanfran-rubi text-white rounded-[2rem] font-black uppercase text-lg tracking-widest shadow-2xl hover:bg-sanfran-rubiDark disabled:opacity-30 flex items-center justify-center gap-4 transition-all"
-            >
-              {isGenerating ? (
-                <>
-                  <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  <span>Extraindo Doutrina...</span>
-                </>
-              ) : (
-                <>
-                  <ShieldCheck className="w-6 h-6" />
-                  <span>{mode === 'create' ? "Protocolar Card" : "Gerar Cartões via IA"}</span>
-                </>
-              )}
+            <input value={manualFront} onChange={(e) => setManualFront(e.target.value)} placeholder="Enunciado / Pergunta" className="w-full p-6 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-2xl font-bold outline-none" />
+            <textarea value={manualBack} onChange={(e) => setManualBack(e.target.value)} placeholder="Doutrina / Resposta" className="w-full h-40 p-6 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-3xl font-bold resize-none outline-none" />
+            <button onClick={handleManualCreate} className="w-full py-6 bg-sanfran-rubi text-white rounded-[2rem] font-black uppercase text-lg shadow-xl flex items-center justify-center gap-3">
+              <Gavel className="w-6 h-6" /> Protocolar Card
             </button>
+            <p className="text-center text-[10px] font-black uppercase text-slate-400">Você pode criar vários cards seguidos. Clique no botão acima para salvar e continuar.</p>
           </div>
+        </div>
+      )}
+
+      {mode === 'generate' && (
+        <div className="bg-white dark:bg-sanfran-rubiDark p-10 rounded-[3rem] border-4 border-usp-blue shadow-2xl">
+          <div className="flex items-center gap-4 mb-8">
+            <button onClick={() => setMode('browse')} className="p-3"><ArrowLeft className="w-8 h-8 text-slate-400" /></button>
+            <h3 className="text-3xl font-black text-slate-950 dark:text-white uppercase tracking-tight">Processamento IA</h3>
+          </div>
+          <textarea 
+            value={aiInput} 
+            onChange={(e) => setAiInput(e.target.value)} 
+            placeholder="Cole o texto jurídico aqui para converter em cards..." 
+            className="w-full h-60 p-8 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-[2.5rem] font-bold resize-none outline-none" 
+          />
+          <button onClick={handleGenerate} disabled={isGenerating} className="w-full mt-6 py-6 bg-usp-blue text-white rounded-[2rem] font-black uppercase text-lg shadow-xl flex items-center justify-center gap-4">
+            {isGenerating ? "Processando..." : "Gerar via IA"}
+          </button>
+          {errorMessage && <p className="mt-4 text-red-600 font-bold text-center uppercase text-xs">{errorMessage}</p>}
         </div>
       )}
     </div>
