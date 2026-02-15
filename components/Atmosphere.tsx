@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Volume2, VolumeX, CloudRain, Coffee, Music, Library, Play, Pause, Sliders, Waves } from 'lucide-react';
+import { Volume2, VolumeX, CloudRain, Coffee, Music, Library, Play, Pause, Sliders, Waves, Bell } from 'lucide-react';
 
 interface SoundTrack {
   id: string;
@@ -10,10 +10,11 @@ interface SoundTrack {
 }
 
 const tracks: SoundTrack[] = [
+  { id: 'sinos', name: 'Sinos do XI', url: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3', icon: Bell },
   { id: 'rain', name: 'Chuva nas Arcadas', url: 'https://cdn.pixabay.com/audio/2022/07/04/audio_3d1f062d05.mp3', icon: CloudRain },
   { id: 'library', name: 'Biblioteca XI', url: 'https://cdn.pixabay.com/audio/2021/11/25/audio_1e370e5b1f.mp3', icon: Library },
   { id: 'lofi', name: 'Lofi Jurídico', url: 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808737487.mp3', icon: Music },
-  { id: 'cafe', name: 'Café da SanFran', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', icon: Coffee }, // Placeholder para ambiência
+  { id: 'cafe', name: 'Café da SanFran', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', icon: Coffee },
 ];
 
 interface AtmosphereProps {
@@ -72,7 +73,6 @@ const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus }) => {
     <div className={`fixed z-[60] transition-all duration-700 ${isExtremeFocus ? 'bottom-8 left-8' : 'bottom-6 left-6 lg:bottom-10 lg:left-72'}`}>
       <audio ref={audioRef} loop />
       
-      {/* Botão Principal */}
       <div className="flex items-center gap-3">
         <button 
           onClick={() => setIsOpen(!isOpen)}
