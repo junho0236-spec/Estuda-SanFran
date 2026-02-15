@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Mic, Newspaper } from 'lucide-react';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading } from './types';
 import Dashboard from './components/Dashboard';
 import Anki from './components/Anki';
@@ -13,8 +13,6 @@ import Library from './components/Library';
 import Login from './components/Login';
 import Atmosphere from './components/Atmosphere';
 import Scratchpad from './components/Scratchpad';
-import OralExam from './components/OralExam';
-import LegalNews from './components/LegalNews';
 import { supabase } from './services/supabaseClient';
 
 export const getBrasiliaDate = () => {
@@ -236,6 +234,7 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
+    // Corrigido para adicionar a classe 'dark' para Tailwind
     if (isDarkMode) document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
     localStorage.setItem('omnistudy_darkmode', JSON.stringify(isDarkMode));
@@ -247,8 +246,6 @@ const App: React.FC = () => {
 
   const navItems = [
     { id: View.Dashboard, icon: LayoutDashboard, label: 'Painel' },
-    { id: View.OralExam, icon: Mic, label: 'Exame Oral' },
-    { id: View.LegalNews, icon: Newspaper, label: 'Jurisprudência' },
     { id: View.Anki, icon: BrainCircuit, label: 'Flashcards' },
     { id: View.Library, icon: LibraryIcon, label: 'Biblioteca' },
     { id: View.Timer, icon: TimerIcon, label: 'Timer' },
@@ -260,10 +257,13 @@ const App: React.FC = () => {
 
   return (
     <div className={`flex h-screen overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#fcfcfc]'}`}>
+      {/* Atmosphere Audio Control */}
       <Atmosphere isExtremeFocus={isExtremeFocus} />
 
+      {/* Scratchpad Control */}
       {session?.user && <Scratchpad userId={session.user.id} isExtremeFocus={isExtremeFocus} />}
 
+      {/* Mobile Overlay */}
       {isSidebarOpen && !isExtremeFocus && (
         <div 
           className="fixed inset-0 bg-black/50 z-30 lg:hidden backdrop-blur-sm"
@@ -271,6 +271,7 @@ const App: React.FC = () => {
         />
       )}
 
+      {/* Sidebar */}
       <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${isExtremeFocus ? '-translate-x-full lg:-translate-x-full lg:w-0' : 'lg:relative lg:translate-x-0 lg:w-64'} fixed inset-y-0 left-0 z-40 bg-white dark:bg-[#0d0303] border-r border-slate-200 dark:border-sanfran-rubi/30 transition-all duration-700 flex flex-col`}>
         <div className="p-6 border-b border-slate-100 dark:border-sanfran-rubi/20 flex flex-col">
           <div className="flex items-center justify-between mb-2">
@@ -322,9 +323,7 @@ const App: React.FC = () => {
 
         <main className={`flex-1 overflow-y-auto ${isExtremeFocus ? 'p-0' : 'p-4 md:p-10'} relative transition-all duration-700`}>
           <div className={`${isExtremeFocus ? 'max-w-none h-full flex items-center justify-center' : 'max-w-6xl mx-auto'}`}>
-            {currentView === View.Dashboard && <Dashboard subjects={subjects} flashcards={flashcards} tasks={tasks} studySessions={studySessions} readings={readings} userId={session.user.id} />}
-            {currentView === View.OralExam && <OralExam subjects={subjects} userId={session.user.id} />}
-            {currentView === View.LegalNews && <LegalNews />}
+            {currentView === View.Dashboard && <Dashboard subjects={subjects} flashcards={flashcards} tasks={tasks} studySessions={studySessions} readings={readings} />}
             {currentView === View.Anki && <Anki subjects={subjects} flashcards={flashcards} setFlashcards={setFlashcards} folders={folders} setFolders={setFolders} userId={session.user.id} />}
             {currentView === View.Library && <Library readings={readings} setReadings={setReadings} subjects={subjects} userId={session.user.id} />}
             

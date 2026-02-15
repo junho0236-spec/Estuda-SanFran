@@ -7,9 +7,7 @@ export enum View {
   Tasks = 'tasks',
   Calendar = 'calendar',
   Ranking = 'ranking',
-  Library = 'library',
-  OralExam = 'oral-exam',
-  LegalNews = 'legal-news'
+  Library = 'library'
 }
 
 export interface Folder {

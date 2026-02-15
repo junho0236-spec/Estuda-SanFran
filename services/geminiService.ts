@@ -12,13 +12,13 @@ export const getSafeApiKey = (): string | null => {
 };
 
 /**
- * Gera flashcards a partir de um texto jurídico ou acadêmico utilizando Gemini 3 Flash.
- * Alterado de Pro para Flash para maximizar a cota gratuita e velocidade.
+ * Gera flashcards a partir de um texto jurídico ou acadêmico utilizando Gemini 3 Pro.
+ * Ideal para tarefas complexas de estruturação de conhecimento.
  */
 export const generateFlashcards = async (text: string, subjectName: string) => {
   const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: `Com base no seguinte texto acadêmico da disciplina de "${subjectName}", gere uma lista de flashcards (pergunta e resposta curta). Foque em conceitos-chave e prazos. Texto: "${text}"`,
+    model: 'gemini-3-pro-preview',
+    contents: `Com base no seguinte texto acadêmico da disciplina de "${subjectName}", gere uma lista de flashcards (pergunta e resposta curta). Texto: "${text}"`,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
@@ -53,7 +53,8 @@ export const generateFlashcards = async (text: string, subjectName: string) => {
 };
 
 /**
- * Retorna uma frase de motivação em latim com tradução.
+ * Retorna uma frase de motivação em latim com tradução, baseada no contexto das disciplinas estudadas.
+ * Utiliza Gemini 3 Flash para baixa latência.
  */
 export const getStudyMotivation = async (subjects: string[]) => {
   const list = subjects.length > 0 ? subjects.join(", ") : "Direito";
