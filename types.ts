@@ -7,7 +7,8 @@ export enum View {
   Tasks = 'tasks',
   Calendar = 'calendar',
   Ranking = 'ranking',
-  Library = 'library'
+  Library = 'library',
+  Largo = 'largo'
 }
 
 export interface Folder {
@@ -85,4 +86,13 @@ export interface Badge {
   icon: string; // Lucide icon name
   rarity: 'common' | 'rare' | 'epic' | 'legendary';
   isUnlocked: boolean;
+}
+
+export interface PresenceUser {
+  user_id: string;
+  name: string;
+  view: string;
+  subject_name?: string;
+  is_timer_active: boolean;
+  last_seen: string;
 }

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon } from 'lucide-react';
-import { View, Subject, Flashcard, Task, Folder, StudySession, Reading } from './types';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users } from 'lucide-react';
+import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser } from './types';
 import Dashboard from './components/Dashboard';
 import Anki from './components/Anki';
 import Pomodoro from './components/Pomodoro';
@@ -10,6 +10,7 @@ import Tasks from './components/Tasks';
 import CalendarView from './components/CalendarView';
 import Ranking from './components/Ranking';
 import Library from './components/Library';
+import Largo from './components/Largo';
 import Login from './components/Login';
 import Atmosphere from './components/Atmosphere';
 import Scratchpad from './components/Scratchpad';
@@ -67,6 +68,7 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [session, setSession] = useState<any>(null);
+  const [presenceUsers, setPresenceUsers] = useState<PresenceUser[]>([]);
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem('omnistudy_darkmode');
@@ -90,6 +92,50 @@ const App: React.FC = () => {
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isExtremeFocus = timerIsActive && currentView === View.Timer && timerMode === 'work';
+
+  // --- Realtime Presence Logic ---
+  useEffect(() => {
+    if (!isAuthenticated || !session?.user) return;
+
+    const channel = supabase.channel('largo_presenca', {
+      config: { presence: { key: session.user.id } },
+    });
+
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState();
+        const users: PresenceUser[] = [];
+        Object.keys(state).forEach((key) => {
+          const userState = state[key][0] as any;
+          users.push({
+            user_id: userState.user_id,
+            name: userState.name,
+            view: userState.view,
+            subject_name: userState.subject_name,
+            is_timer_active: userState.is_timer_active,
+            last_seen: userState.last_seen,
+          });
+        });
+        setPresenceUsers(users);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          const selectedSubject = subjects.find(s => s.id === timerSelectedSubjectId);
+          await channel.track({
+            user_id: session.user.id,
+            name: session.user.user_metadata?.full_name || 'Doutor(a)',
+            view: currentView,
+            subject_name: timerIsActive ? (selectedSubject?.name || 'Geral') : undefined,
+            is_timer_active: timerIsActive,
+            last_seen: new Date().toISOString(),
+          });
+        }
+      });
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [isAuthenticated, session, currentView, timerIsActive, timerSelectedSubjectId, subjects]);
 
   useEffect(() => {
     if (timerIsActive && timerSecondsLeft > 0) {
@@ -234,7 +280,6 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    // Corrigido para adicionar a classe 'dark' para Tailwind
     if (isDarkMode) document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
     localStorage.setItem('omnistudy_darkmode', JSON.stringify(isDarkMode));
@@ -249,6 +294,7 @@ const App: React.FC = () => {
     { id: View.Anki, icon: BrainCircuit, label: 'Flashcards' },
     { id: View.Library, icon: LibraryIcon, label: 'Biblioteca' },
     { id: View.Timer, icon: TimerIcon, label: 'Timer' },
+    { id: View.Largo, icon: Users, label: 'O Largo' },
     { id: View.Calendar, icon: CalendarIcon, label: 'Agenda' },
     { id: View.Ranking, icon: Trophy, label: 'Ranking' },
     { id: View.Subjects, icon: BookOpen, label: 'Cadeiras' },
@@ -257,13 +303,9 @@ const App: React.FC = () => {
 
   return (
     <div className={`flex h-screen overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#fcfcfc]'}`}>
-      {/* Atmosphere Audio Control */}
       <Atmosphere isExtremeFocus={isExtremeFocus} />
-
-      {/* Scratchpad Control */}
       {session?.user && <Scratchpad userId={session.user.id} isExtremeFocus={isExtremeFocus} />}
 
-      {/* Mobile Overlay */}
       {isSidebarOpen && !isExtremeFocus && (
         <div 
           className="fixed inset-0 bg-black/50 z-30 lg:hidden backdrop-blur-sm"
@@ -271,7 +313,6 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* Sidebar */}
       <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${isExtremeFocus ? '-translate-x-full lg:-translate-x-full lg:w-0' : 'lg:relative lg:translate-x-0 lg:w-64'} fixed inset-y-0 left-0 z-40 bg-white dark:bg-[#0d0303] border-r border-slate-200 dark:border-sanfran-rubi/30 transition-all duration-700 flex flex-col`}>
         <div className="p-6 border-b border-slate-100 dark:border-sanfran-rubi/20 flex flex-col">
           <div className="flex items-center justify-between mb-2">
@@ -297,6 +338,11 @@ const App: React.FC = () => {
             >
               <item.icon className="w-5 h-5" />
               <span className="text-[10px] uppercase font-bold tracking-wider">{item.label}</span>
+              {item.id === View.Largo && presenceUsers.length > 0 && (
+                <span className="ml-auto w-5 h-5 bg-usp-blue text-[9px] font-black rounded-full flex items-center justify-center text-white">
+                  {presenceUsers.length}
+                </span>
+              )}
             </button>
           ))}
         </nav>
@@ -326,6 +372,7 @@ const App: React.FC = () => {
             {currentView === View.Dashboard && <Dashboard subjects={subjects} flashcards={flashcards} tasks={tasks} studySessions={studySessions} readings={readings} />}
             {currentView === View.Anki && <Anki subjects={subjects} flashcards={flashcards} setFlashcards={setFlashcards} folders={folders} setFolders={setFolders} userId={session.user.id} />}
             {currentView === View.Library && <Library readings={readings} setReadings={setReadings} subjects={subjects} userId={session.user.id} />}
+            {currentView === View.Largo && <Largo presenceUsers={presenceUsers} currentUserId={session.user.id} />}
             
             {currentView === View.Timer && (
               <Pomodoro 
@@ -373,11 +420,6 @@ const App: React.FC = () => {
               <div className="pr-2">
                 <p className="text-[8px] font-black uppercase text-slate-500 tracking-widest">{timerMode === 'work' ? 'Em Pauta' : 'Recesso'}</p>
                 <h4 className="text-sm md:text-lg font-black tabular-nums dark:text-white">{formatTime(timerSecondsLeft)}</h4>
-              </div>
-              <div className="pl-2 border-l border-slate-200 dark:border-white/10">
-                 <div className="bg-slate-100 dark:bg-white/10 p-2 rounded-full group-hover:bg-sanfran-rubi group-hover:text-white transition-colors">
-                    <Play className="w-3 h-3 fill-current" />
-                 </div>
               </div>
             </div>
           </div>
