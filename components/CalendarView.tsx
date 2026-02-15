@@ -11,7 +11,6 @@ interface CalendarViewProps {
 }
 
 const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId, studySessions }) => {
-  // Helper para obter o "Agora" em Brasília como um objeto de data limpo
   const getBrasiliaNow = () => {
     const formatter = new Intl.DateTimeFormat('sv-SE', { 
       timeZone: 'America/Sao_Paulo',
@@ -33,7 +32,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId, st
   const totalDays = getDaysInMonth(currentDate.getFullYear(), currentDate.getMonth());
   
   const totalSeconds = studySessions.reduce((acc, s) => acc + (Number(s.duration) || 0), 0);
-  const totalHours = (totalSeconds / 3600).toFixed(1);
+  
+  const displayTotal = useMemo(() => {
+    if (totalSeconds < 3600) {
+      return { value: Math.floor(totalSeconds / 60), unit: 'Minutos' };
+    }
+    return { value: (totalSeconds / 3600).toFixed(1), unit: 'Horas' };
+  }, [totalSeconds]);
 
   const days = Array.from({ length: totalDays }, (_, i) => i + 1);
   const blanks = Array.from({ length: firstDayOfMonth }, (_, i) => i);
@@ -41,7 +46,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId, st
   const prevMonth = () => {
     const newDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
     setCurrentDate(newDate);
-    setSelectedDay(1); // Reseta o dia ao mudar o mês
+    setSelectedDay(1);
   };
 
   const nextMonth = () => {
@@ -61,8 +66,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId, st
 
   const selectedFullDate = getSelectedDateStr();
   const dailySessions = studySessions.filter(s => s.start_time.startsWith(selectedFullDate));
-  
-  // Filtro de tarefas agora usa a string de data que condiz com o fuso de Brasília
   const dailyTasks = tasks.filter(t => t.completed && t.completedAt?.startsWith(selectedFullDate));
 
   return (
@@ -77,7 +80,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId, st
           <div className="p-3 bg-usp-gold text-white rounded-2xl shadow-lg"><Trophy className="w-6 h-6" /></div>
           <div>
             <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Total Acumulado</p>
-            <p className="text-2xl font-black text-slate-950 dark:text-white">{totalHours} <span className="text-sm font-normal">Horas</span></p>
+            <p className="text-2xl font-black text-slate-950 dark:text-white">{displayTotal.value} <span className="text-sm font-normal">{displayTotal.unit}</span></p>
           </div>
         </div>
       </header>
@@ -102,10 +105,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId, st
               const m = (currentDate.getMonth() + 1).toString().padStart(2, '0');
               const d = day.toString().padStart(2, '0');
               const dateStr = `${y}-${m}-${d}`;
-              
-              const sessionsOnDay = studySessions.filter(s => s.start_time.startsWith(dateStr));
-              const tasksOnDay = tasks.filter(t => t.completedAt?.startsWith(dateStr));
-              const hasActivity = sessionsOnDay.length > 0 || tasksOnDay.length > 0;
+              const hasActivity = studySessions.some(s => s.start_time.startsWith(dateStr)) || tasks.some(t => t.completedAt?.startsWith(dateStr));
               const isSelected = selectedDay === day;
               const isToday = day === brNow.getDate() && currentDate.getMonth() === brNow.getMonth() && currentDate.getFullYear() === brNow.getFullYear();
 
@@ -113,18 +113,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId, st
                 <button 
                   key={day} 
                   onClick={() => setSelectedDay(day)}
-                  className={`
-                    aspect-square rounded-2xl border-2 flex flex-col items-center justify-center relative transition-all group
-                    ${isSelected ? 'bg-sanfran-rubi border-sanfran-rubi text-white shadow-xl scale-105 z-10' : 
-                      hasActivity ? 'bg-sanfran-rubi/5 border-sanfran-rubi/30 text-sanfran-rubi hover:bg-sanfran-rubi/10' : 
-                      'bg-slate-50 dark:bg-white/5 border-transparent text-slate-400 hover:border-slate-300'}
-                    ${isToday && !isSelected ? 'ring-2 ring-usp-gold ring-offset-2 dark:ring-offset-sanfran-rubiBlack' : ''}
-                  `}
+                  className={`aspect-square rounded-2xl border-2 flex flex-col items-center justify-center relative transition-all group ${isSelected ? 'bg-sanfran-rubi border-sanfran-rubi text-white shadow-xl scale-105 z-10' : hasActivity ? 'bg-sanfran-rubi/5 border-sanfran-rubi/30 text-sanfran-rubi hover:bg-sanfran-rubi/10' : 'bg-slate-50 dark:bg-white/5 border-transparent text-slate-400 hover:border-slate-300'} ${isToday && !isSelected ? 'ring-2 ring-usp-gold ring-offset-2 dark:ring-offset-sanfran-rubiBlack' : ''}`}
                 >
                   <span className="font-black text-lg">{day}</span>
-                  {hasActivity && !isSelected && (
-                    <div className="absolute top-2 right-2 w-2 h-2 bg-sanfran-rubi rounded-full shadow-md"></div>
-                  )}
+                  {hasActivity && !isSelected && <div className="absolute top-2 right-2 w-2 h-2 bg-sanfran-rubi rounded-full shadow-md"></div>}
                 </button>
               );
             })}
@@ -134,43 +126,30 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId, st
         <div className="lg:col-span-2 space-y-6 animate-in slide-in-from-right-6 duration-500" key={selectedDay}>
           <div className="bg-white dark:bg-sanfran-rubiDark/30 rounded-[2.5rem] p-8 border-t-[12px] border-t-sanfran-rubi border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl relative overflow-hidden">
             <Scale className="absolute -bottom-4 -right-4 w-32 h-32 text-slate-100 dark:text-white/5 pointer-events-none" />
-            
-            <h3 className="text-xl font-black mb-1 text-slate-900 dark:text-white uppercase flex items-center gap-2">
-              <History className="text-sanfran-rubi w-5 h-5" /> 
-              Resumo do Dia
-            </h3>
-            <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-8 border-b border-slate-100 dark:border-white/10 pb-4">
-              Protocolo de {selectedDay} de {monthNames[currentDate.getMonth()]}
-            </p>
-
+            <h3 className="text-xl font-black mb-1 text-slate-900 dark:text-white uppercase flex items-center gap-2"><History className="text-sanfran-rubi w-5 h-5" /> Resumo do Dia</h3>
+            <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-8 border-b border-slate-100 dark:border-white/10 pb-4">Protocolo de {selectedDay} de {monthNames[currentDate.getMonth()]}</p>
             <div className="space-y-8 relative z-10">
-              {/* Seção de Estudos */}
               <div>
-                <h4 className="text-[11px] font-black uppercase text-slate-500 tracking-tighter mb-4 flex items-center gap-2">
-                  <Clock className="w-4 h-4" /> Sessões de Estudo
-                </h4>
+                <h4 className="text-[11px] font-black uppercase text-slate-500 tracking-tighter mb-4 flex items-center gap-2"><Clock className="w-4 h-4" /> Sessões de Estudo</h4>
                 <div className="space-y-3">
                   {dailySessions.map(s => {
                     const subject = subjects.find(sub => sub.id === s.subject_id);
+                    const durationMins = Math.max(1, Math.round(Number(s.duration) / 60));
                     return (
                       <div key={s.id} className="p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/10 flex items-center justify-between group hover:bg-white dark:hover:bg-white/10 transition-colors">
                         <div className="flex items-center gap-3">
                           <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: subject?.color || '#9B111E' }}></div>
                           <span className="font-bold text-slate-900 dark:text-white text-sm">{subject?.name || 'Geral'}</span>
                         </div>
-                        <span className="text-xs font-black text-sanfran-rubi">{(Number(s.duration) / 60).toFixed(0)} min</span>
+                        <span className="text-xs font-black text-sanfran-rubi">{durationMins} min</span>
                       </div>
                     );
                   })}
                   {dailySessions.length === 0 && <p className="text-[10px] italic text-slate-400 font-bold uppercase tracking-widest text-center py-4 border-2 border-dashed border-slate-100 dark:border-white/5 rounded-2xl">Sem atividades registradas</p>}
                 </div>
               </div>
-
-              {/* Seção de Tarefas */}
               <div>
-                <h4 className="text-[11px] font-black uppercase text-slate-500 tracking-tighter mb-4 flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-usp-blue" /> Tarefas Concluídas
-                </h4>
+                <h4 className="text-[11px] font-black uppercase text-slate-500 tracking-tighter mb-4 flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-usp-blue" /> Tarefas Concluídas</h4>
                 <div className="space-y-3">
                   {dailyTasks.map(t => (
                     <div key={t.id} className="p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/10 flex items-center gap-3">

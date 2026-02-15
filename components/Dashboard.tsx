@@ -40,30 +40,29 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
   const cardsToReview = flashcards.filter(f => f.nextReview <= Date.now()).length;
   const pendingTasks = tasks.filter(t => !t.completed).length;
   const totalSeconds = studySessions.reduce((acc, s) => acc + (Number(s.duration) || 0), 0);
-  const totalHours = (totalSeconds / 3600).toFixed(1);
+  
+  // Lógica de exibição inteligente de tempo
+  const displayTime = useMemo(() => {
+    if (totalSeconds < 3600) {
+      const mins = Math.floor(totalSeconds / 60);
+      return { value: mins, unit: 'min', sub: 'Tempo de estudo' };
+    }
+    const hours = (totalSeconds / 3600).toFixed(1);
+    return { value: hours, unit: 'h', sub: 'Horas acumuladas' };
+  }, [totalSeconds]);
+
   const todayStr = getBrasiliaDate();
   const sessionsToday = studySessions.filter(s => s.start_time.startsWith(todayStr)).length;
 
   // Lógica de Cálculo da Ofensiva (Streak)
   const streak = useMemo(() => {
     const activityDates = new Set<string>();
-    
-    // Adiciona datas de sessões de estudo
-    studySessions.forEach(s => {
-      if (s.start_time) activityDates.add(s.start_time.split('T')[0]);
-    });
-    
-    // Adiciona datas de tarefas concluídas
-    tasks.forEach(t => {
-      if (t.completed && t.completedAt) activityDates.add(t.completedAt.split('T')[0]);
-    });
+    studySessions.forEach(s => { if (s.start_time) activityDates.add(s.start_time.split('T')[0]); });
+    tasks.forEach(t => { if (t.completed && t.completedAt) activityDates.add(t.completedAt.split('T')[0]); });
 
     if (activityDates.size === 0) return 0;
 
-    const sortedDates = Array.from(activityDates).sort((a, b) => b.localeCompare(a));
     const today = getBrasiliaDate();
-    
-    // Calcula ontem
     const yesterdayDate = new Date();
     yesterdayDate.setDate(yesterdayDate.getDate() - 1);
     const yesterday = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(yesterdayDate);
@@ -73,11 +72,10 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
 
     if (!checkDateStr) return 0;
 
-    // Função para subtrair 1 dia de uma string YYYY-MM-DD
     const subtractOneDay = (dateStr: string) => {
-      const d = new Date(dateStr + 'T12:00:00'); // T12:00:00 evita bugs de fuso ao subtrair
+      const d = new Date(dateStr + 'T12:00:00'); 
       d.setDate(d.getDate() - 1);
-      return d.toISOString().split('T')[0];
+      return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(d);
     };
 
     let tempDate = checkDateStr;
@@ -85,7 +83,6 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
       currentStreak++;
       tempDate = subtractOneDay(tempDate);
     }
-
     return currentStreak;
   }, [studySessions, tasks]);
 
@@ -120,17 +117,19 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
         />
         <StatCard 
           icon={<Clock className="text-usp-gold dark:text-white" />} 
-          label="Horas Totais" 
-          value={`${totalHours}h`} 
+          label="Tempo Total" 
+          value={displayTime.value} 
+          unit={displayTime.unit}
           subtext={`${sessionsToday} sessões hoje`}
           bgColor="bg-yellow-50 dark:bg-usp-gold"
         />
         <StatCard 
-          icon={<ShieldCheck className="text-slate-700 dark:text-white" />} 
+          icon={<Zap className={streak > 0 ? "text-orange-500 dark:text-white" : "text-slate-400"} />} 
           label="Ofensiva" 
           value={streak} 
-          subtext={streak === 1 ? "Dia de labuta" : "Dias de labuta"}
-          bgColor="bg-slate-100 dark:bg-slate-600"
+          subtext={streak === 1 ? "Dia de labuta" : "Dias seguidos"}
+          bgColor={streak > 0 ? "bg-orange-50 dark:bg-orange-600" : "bg-slate-100 dark:bg-slate-600"}
+          highlight={streak > 0}
         />
       </div>
 
@@ -173,14 +172,18 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
   );
 };
 
-const StatCard: React.FC<{ icon: React.ReactNode, label: string, value: string | number, subtext: string, bgColor: string }> = ({ icon, label, value, subtext, bgColor }) => (
-  <div className="bg-white dark:bg-sanfran-rubiDark/40 p-8 rounded-[2.5rem] border border-slate-200 dark:border-sanfran-rubi/30 shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all group overflow-hidden relative">
+const StatCard: React.FC<{ icon: React.ReactNode, label: string, value: string | number, unit?: string, subtext: string, bgColor: string, highlight?: boolean }> = ({ icon, label, value, unit, subtext, bgColor, highlight }) => (
+  <div className={`bg-white dark:bg-sanfran-rubiDark/40 p-8 rounded-[2.5rem] border-2 shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all group overflow-hidden relative ${highlight ? 'border-orange-200 dark:border-orange-500/30 shadow-orange-900/10' : 'border-slate-200 dark:border-sanfran-rubi/30'}`}>
+    {highlight && <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 rounded-full -mr-12 -mt-12 animate-pulse" />}
     <div className={`w-16 h-16 rounded-2xl ${bgColor} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg`}>
       {React.cloneElement(icon as React.ReactElement<any>, { size: 32 })}
     </div>
     <div className="space-y-1">
       <p className="text-xs font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest">{label}</p>
-      <h4 className="text-4xl font-black text-slate-950 dark:text-white tabular-nums">{value}</h4>
+      <div className="flex items-baseline gap-1">
+        <h4 className="text-4xl font-black text-slate-950 dark:text-white tabular-nums">{value}</h4>
+        {unit && <span className="text-sm font-black text-slate-400 uppercase">{unit}</span>}
+      </div>
       <p className="text-[11px] text-slate-700 dark:text-slate-300 font-black uppercase tracking-wide opacity-80">{subtext}</p>
     </div>
   </div>
