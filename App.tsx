@@ -292,17 +292,17 @@ const App: React.FC = () => {
   if (!isAuthenticated) return <Login onLogin={() => setIsAuthenticated(true)} />;
 
   const navItems = [
-    { id: View.Dashboard, icon: LayoutDashboard, label: 'Painel' },
-    { id: View.Calculator, icon: CalculatorIcon, label: 'Médias USP' }, // Novo Item
-    { id: View.Anki, icon: BrainCircuit, label: 'Flashcards' },
-    { id: View.Library, icon: LibraryIcon, label: 'Biblioteca' },
-    { id: View.Timer, icon: TimerIcon, label: 'Timer' },
-    { id: View.Largo, icon: Users, label: 'O Largo' },
-    { id: View.Mural, icon: MessageSquare, label: 'Mural' },
-    { id: View.Calendar, icon: CalendarIcon, label: 'Agenda' },
-    { id: View.Ranking, icon: Trophy, label: 'Ranking' },
-    { id: View.Subjects, icon: BookOpen, label: 'Cadeiras' },
-    { id: View.Tasks, icon: CheckSquare, label: 'Pauta' },
+    { id: View.Dashboard, icon: LayoutDashboard, label: 'Painel', color: 'text-slate-600', bg: 'bg-slate-100' },
+    { id: View.Calculator, icon: CalculatorIcon, label: 'Médias USP', color: 'text-emerald-600', bg: 'bg-emerald-100' },
+    { id: View.Anki, icon: BrainCircuit, label: 'Flashcards', color: 'text-usp-blue', bg: 'bg-cyan-100' },
+    { id: View.Library, icon: LibraryIcon, label: 'Biblioteca', color: 'text-indigo-600', bg: 'bg-indigo-100' },
+    { id: View.Timer, icon: TimerIcon, label: 'Timer', color: 'text-sanfran-rubi', bg: 'bg-red-100' },
+    { id: View.Largo, icon: Users, label: 'O Largo', color: 'text-cyan-600', bg: 'bg-cyan-100' },
+    { id: View.Mural, icon: MessageSquare, label: 'Mural', color: 'text-orange-600', bg: 'bg-orange-100' },
+    { id: View.Calendar, icon: CalendarIcon, label: 'Agenda', color: 'text-violet-600', bg: 'bg-violet-100' },
+    { id: View.Ranking, icon: Trophy, label: 'Ranking', color: 'text-usp-gold', bg: 'bg-yellow-100' },
+    { id: View.Subjects, icon: BookOpen, label: 'Cadeiras', color: 'text-pink-600', bg: 'bg-pink-100' },
+    { id: View.Tasks, icon: CheckSquare, label: 'Pauta', color: 'text-slate-800', bg: 'bg-slate-200' },
   ];
 
   return (
@@ -317,45 +317,69 @@ const App: React.FC = () => {
         />
       )}
 
-      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${isExtremeFocus ? '-translate-x-full lg:-translate-x-full lg:w-0' : 'lg:relative lg:translate-x-0 lg:w-64'} fixed inset-y-0 left-0 z-40 bg-white dark:bg-[#0d0303] border-r border-slate-200 dark:border-sanfran-rubi/30 transition-all duration-700 flex flex-col`}>
+      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${isExtremeFocus ? '-translate-x-full lg:-translate-x-full lg:w-0' : 'lg:relative lg:translate-x-0 lg:w-72'} fixed inset-y-0 left-0 z-40 bg-white dark:bg-[#0d0303] border-r border-slate-200 dark:border-sanfran-rubi/30 transition-all duration-700 flex flex-col shadow-2xl lg:shadow-none`}>
         <div className="p-6 border-b border-slate-100 dark:border-sanfran-rubi/20 flex flex-col">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="bg-sanfran-rubi p-2 rounded-xl text-white shadow-lg"><BookOpen className="w-6 h-6" /></div>
+              <div className="bg-sanfran-rubi p-2.5 rounded-2xl text-white shadow-lg shadow-red-900/20"><BookOpen className="w-6 h-6" /></div>
               <div>
-                <h1 className="text-lg font-black dark:text-white leading-none">SanFran</h1>
-                <span className="text-[9px] font-black text-sanfran-rubi uppercase">Academia Jurídica</span>
+                <h1 className="text-xl font-black dark:text-white leading-none tracking-tight">SanFran</h1>
+                <span className="text-[9px] font-black text-sanfran-rubi uppercase tracking-[0.2em]">Academia</span>
               </div>
             </div>
-            <button onClick={closeSidebar} className="lg:hidden p-2 text-slate-400">
-              <X className="w-5 h-5" />
+            <button onClick={closeSidebar} className="lg:hidden p-2 text-slate-400 hover:text-sanfran-rubi transition-colors">
+              <X className="w-6 h-6" />
             </button>
           </div>
           <BrasiliaClock />
         </div>
+        
         <nav className="p-4 space-y-1 flex-1 overflow-y-auto custom-scrollbar">
           {navItems.map((item) => (
             <button 
               key={item.id} 
               onClick={() => { setCurrentView(item.id); closeSidebar(); }} 
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${currentView === item.id ? 'bg-sanfran-rubi text-white font-black shadow-lg shadow-red-900/20' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-sanfran-rubi/10'}`}
+              className={`group w-full flex items-center gap-4 p-3 rounded-2xl transition-all duration-300 border ${
+                currentView === item.id 
+                  ? 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 shadow-xl scale-[1.02] z-10' 
+                  : 'border-transparent hover:bg-slate-50 dark:hover:bg-white/5 opacity-70 hover:opacity-100'
+              }`}
             >
-              <item.icon className="w-5 h-5" />
-              <span className="text-[10px] uppercase font-bold tracking-wider">{item.label}</span>
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm transition-all duration-300 ${
+                currentView === item.id 
+                  ? `${item.bg} dark:bg-white/10` 
+                  : 'bg-slate-100 dark:bg-white/5 group-hover:bg-white dark:group-hover:bg-white/10'
+              }`}>
+                <item.icon className={`w-5 h-5 transition-colors ${
+                  currentView === item.id 
+                    ? item.color + ' dark:text-white'
+                    : 'text-slate-400 dark:text-slate-500 group-hover:text-sanfran-rubi dark:group-hover:text-white'
+                }`} />
+              </div>
+              
+              <div className="flex-1 text-left">
+                 <span className={`block text-[10px] font-black uppercase tracking-widest transition-colors ${
+                   currentView === item.id ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-300'
+                 }`}>
+                   {item.label}
+                 </span>
+              </div>
+
               {item.id === View.Largo && presenceUsers.length > 0 && (
-                <span className="ml-auto w-5 h-5 bg-usp-blue text-[9px] font-black rounded-full flex items-center justify-center text-white">
+                <span className="w-5 h-5 bg-usp-blue text-[9px] font-black rounded-full flex items-center justify-center text-white shadow-md animate-pulse">
                   {presenceUsers.length}
                 </span>
               )}
             </button>
           ))}
         </nav>
-        <div className="p-4 space-y-2">
-          <button onClick={() => setIsDarkMode(!isDarkMode)} className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-slate-100 dark:bg-sanfran-rubiDark text-[9px] font-black uppercase tracking-widest text-slate-900 dark:text-white">
+
+        <div className="p-4 space-y-3 bg-slate-50 dark:bg-black/20 border-t border-slate-100 dark:border-sanfran-rubi/10">
+          <button onClick={() => setIsDarkMode(!isDarkMode)} className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-white dark:bg-sanfran-rubiDark border border-slate-200 dark:border-sanfran-rubi/30 text-[9px] font-black uppercase tracking-widest text-slate-900 dark:text-white shadow-sm hover:shadow-md transition-all">
             {isDarkMode ? 'Modo Escuro' : 'Modo Claro'}
             {isDarkMode ? <Moon className="w-4 h-4 text-usp-blue" /> : <Sun className="w-4 h-4 text-usp-gold" />}
           </button>
-          <button onClick={() => supabase.auth.signOut()} className="w-full flex items-center gap-2 px-4 py-3 text-slate-400 hover:text-red-500 font-black uppercase text-[10px] tracking-widest transition-colors"><LogOut className="w-4 h-4" /> Sair</button>
+          <button onClick={() => supabase.auth.signOut()} className="w-full flex items-center justify-center gap-2 px-4 py-3 text-slate-400 hover:text-red-500 font-black uppercase text-[10px] tracking-widest transition-colors hover:bg-red-50 dark:hover:bg-red-900/10 rounded-2xl"><LogOut className="w-4 h-4" /> Encerrar Sessão</button>
         </div>
       </aside>
 
