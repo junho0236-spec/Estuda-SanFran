@@ -9,12 +9,13 @@ interface SoundTrack {
   icon: React.ElementType;
 }
 
+// Links atualizados para servidores de áudio estáveis e de acesso direto
 const tracks: SoundTrack[] = [
-  { id: 'bells', name: 'Sinos do XI', url: 'https://cdn.pixabay.com/audio/2022/03/15/audio_73147f7d9a.mp3', icon: Bell },
-  { id: 'arcadas', name: 'Burburinho das Arcadas', url: 'https://cdn.pixabay.com/audio/2022/01/18/audio_8230983a65.mp3', icon: Users },
-  { id: 'rain', name: 'Chuva no Largo', url: 'https://cdn.pixabay.com/audio/2022/07/04/audio_3d1f062d05.mp3', icon: CloudRain },
-  { id: 'library', name: 'Biblioteca SanFran', url: 'https://cdn.pixabay.com/audio/2021/11/25/audio_1e370e5b1f.mp3', icon: Library },
-  { id: 'lofi', name: 'Lofi do Bacharel', url: 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808737487.mp3', icon: Music },
+  { id: 'bells', name: 'Sinos do XI', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3', icon: Bell },
+  { id: 'arcadas', name: 'Burburinho das Arcadas', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3', icon: Users },
+  { id: 'rain', name: 'Chuva no Largo', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3', icon: CloudRain },
+  { id: 'library', name: 'Biblioteca SanFran', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3', icon: Library },
+  { id: 'lofi', name: 'Lofi do Bacharel', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3', icon: Music },
   { id: 'cafe', name: 'Café da Faculdade', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', icon: Coffee },
 ];
 
@@ -36,30 +37,31 @@ const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus }) => {
   }, [volume]);
 
   const toggleTrack = (trackId: string) => {
+    const track = tracks.find(t => t.id === trackId);
+    if (!track) return;
+
     if (currentTrackId === trackId) {
       if (isPlaying) {
         setIsPlaying(false);
         audioRef.current?.pause();
       } else {
         setIsPlaying(true);
-        audioRef.current?.play();
+        audioRef.current?.play().catch(e => console.error("Erro ao dar play:", e));
       }
     } else {
-      const track = tracks.find(t => t.id === trackId);
-      if (track) {
-        setCurrentTrackId(trackId);
-        setIsPlaying(true);
-        if (audioRef.current) {
-          audioRef.current.src = track.url;
-          audioRef.current.play();
-        }
+      setCurrentTrackId(trackId);
+      setIsPlaying(true);
+      if (audioRef.current) {
+        audioRef.current.src = track.url;
+        audioRef.current.load(); // Garante que o novo áudio seja carregado
+        audioRef.current.play().catch(e => console.error("Erro ao carregar som:", e));
       }
     }
   };
 
   return (
     <div className={`fixed z-[60] transition-all duration-700 ${isExtremeFocus ? 'bottom-8 left-8' : 'bottom-6 left-6 lg:bottom-10 lg:left-72'}`}>
-      <audio ref={audioRef} loop />
+      <audio ref={audioRef} loop preload="auto" />
       
       <div className="flex items-center gap-3">
         <button 
@@ -84,10 +86,10 @@ const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus }) => {
                   <button 
                     key={track.id}
                     onClick={() => toggleTrack(track.id)}
-                    className={`w-full flex items-center justify-between p-3 rounded-2xl transition-all border-2 ${isActive ? 'bg-sanfran-rubi/10 border-sanfran-rubi text-sanfran-rubi' : 'bg-slate-50 dark:bg-white/5 border-transparent text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10'}`}
+                    className={`w-full flex items-center justify-between p-3 rounded-2xl transition-all border-2 ${isActive ? 'bg-sanfran-rubi/10 border-sanfran-rubi text-sanfran-rubi shadow-inner' : 'bg-slate-50 dark:bg-white/5 border-transparent text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10'}`}
                   >
                     <div className="flex items-center gap-3">
-                      <track.icon size={16} className={isActive ? 'animate-bounce' : ''} />
+                      <track.icon size={16} className={isActive && isPlaying ? 'animate-bounce text-sanfran-rubi' : ''} />
                       <span className="text-[10px] font-bold uppercase tracking-wide">{track.name}</span>
                     </div>
                     {isActive && isPlaying ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
