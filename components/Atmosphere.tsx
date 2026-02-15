@@ -9,12 +9,16 @@ interface SoundTrack {
   icon: React.ElementType;
 }
 
-// Links atualizados para uma seleção diversificada e testada do SoundHelix
+/**
+ * Seleção de áudios ambientais otimizada para estabilidade e imersão.
+ * Utilizamos SoundHelix para trilhas musicais (Lofi/Café) 
+ * e Raw GitHub para sons ambientes reais (Chuva/Biblioteca).
+ */
 const tracks: SoundTrack[] = [
-  { id: 'bells', name: 'Sinos do XI', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3', icon: Bell },
-  { id: 'arcadas', name: 'Burburinho das Arcadas', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3', icon: Users },
-  { id: 'rain', name: 'Chuva no Largo', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3', icon: CloudRain },
-  { id: 'library', name: 'Biblioteca SanFran', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-13.mp3', icon: Library },
+  { id: 'bells', name: 'Sinos do XI', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3', icon: Bell },
+  { id: 'arcadas', name: 'Burburinho das Arcadas', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3', icon: Users },
+  { id: 'rain', name: 'Chuva no Largo', url: 'https://raw.githubusercontent.com/IgorKowalczyk/lofly/main/public/sounds/rain.mp3', icon: CloudRain },
+  { id: 'library', name: 'Biblioteca SanFran', url: 'https://raw.githubusercontent.com/rafael-lua/pomodoro-timer/master/public/sounds/forest.mp3', icon: Library },
   { id: 'lofi', name: 'Lofi do Bacharel', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3', icon: Music },
   { id: 'cafe', name: 'Café da Faculdade', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', icon: Coffee },
 ];
@@ -31,14 +35,14 @@ const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus }) => {
   const [isLoading, setIsLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Efeito para controlar o Volume
+  // Efeito para sincronizar o volume
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = volume;
     }
   }, [volume]);
 
-  // Efeito para gerenciar a troca de faixas e Play/Pause
+  // Efeito para gerenciar a fonte do áudio e reprodução
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -46,19 +50,23 @@ const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus }) => {
     const handlePlay = async () => {
       if (isPlaying && currentTrackId) {
         const track = tracks.find(t => t.id === currentTrackId);
-        if (track && audio.src !== track.url) {
-          setIsLoading(true);
-          audio.src = track.url;
-          audio.load();
-        }
-        
-        try {
-          await audio.play();
-          setIsLoading(false);
-        } catch (error) {
-          console.error("Falha na reprodução:", error);
-          setIsPlaying(false);
-          setIsLoading(false);
+        if (track) {
+          // Se trocou de faixa, reinicia o carregamento
+          if (audio.src !== track.url) {
+            setIsLoading(true);
+            audio.pause();
+            audio.src = track.url;
+            audio.load();
+          }
+          
+          try {
+            await audio.play();
+            setIsLoading(false);
+          } catch (error) {
+            console.error("Erro na reprodução de atmosfera:", error);
+            setIsLoading(false);
+            // Pode ser um erro de rede ou política de autoplay do navegador
+          }
         }
       } else {
         audio.pause();
@@ -83,6 +91,7 @@ const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus }) => {
         ref={audioRef} 
         loop 
         preload="auto" 
+        crossOrigin="anonymous"
         onWaiting={() => setIsLoading(true)}
         onCanPlay={() => setIsLoading(false)}
       />
@@ -99,7 +108,7 @@ const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus }) => {
           )}
           {!isExtremeFocus && (
             <span className="text-[10px] font-black uppercase tracking-widest">
-              {isLoading ? 'Carregando...' : isPlaying ? 'Atmosfera Ativa' : 'Atmosfera'}
+              {isLoading ? 'Conectando...' : isPlaying ? 'Atmosfera Ativa' : 'Atmosfera'}
             </span>
           )}
         </button>
@@ -108,7 +117,7 @@ const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus }) => {
           <div className="absolute bottom-20 left-0 w-72 bg-white dark:bg-[#0d0303] rounded-[2.5rem] border-2 border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl p-6 animate-in slide-in-from-bottom-4 duration-300">
             <div className="flex items-center justify-between mb-6">
                <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Sons das Arcadas</h4>
-               <button onClick={() => setIsOpen(false)} className="text-slate-300 hover:text-sanfran-rubi"><Volume2 size={16} /></button>
+               <button onClick={() => setIsOpen(false)} className="text-slate-300 hover:text-sanfran-rubi transition-colors"><Volume2 size={16} /></button>
             </div>
 
             <div className="space-y-3 mb-6">
@@ -135,7 +144,7 @@ const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus }) => {
 
             <div className="space-y-3">
                <div className="flex justify-between items-center px-1">
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Volume</span>
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Ajuste de Volume</span>
                   <span className="text-[10px] font-bold tabular-nums text-slate-600">{Math.round(volume * 100)}%</span>
                </div>
                <input 
