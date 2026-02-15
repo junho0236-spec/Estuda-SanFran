@@ -41,6 +41,8 @@ export interface Task {
 
 export interface StudySession {
   id: string;
+  // Adicionando user_id para compatibilidade com o retorno do Supabase e criação de objetos locais
+  user_id: string;
   start_time: string;
   duration: number;
   subject_id: string;

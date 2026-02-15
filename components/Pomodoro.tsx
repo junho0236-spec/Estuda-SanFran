@@ -1,36 +1,59 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, RotateCcw, Clock, Settings2, ShieldCheck, Coffee } from 'lucide-react';
-import { Subject } from '../types';
+import { Subject, StudySession } from '../types';
 import { supabase } from '../services/supabaseClient';
 
 interface PomodoroProps {
   subjects: Subject[];
   userId: string;
+  setStudySessions: React.Dispatch<React.SetStateAction<StudySession[]>>;
 }
 
-const Pomodoro: React.FC<PomodoroProps> = ({ subjects, userId }) => {
+const Pomodoro: React.FC<PomodoroProps> = ({ subjects, userId, setStudySessions }) => {
   const [workMinutes, setWorkMinutes] = useState(25);
   const [breakMinutes, setBreakMinutes] = useState(5);
   const [secondsLeft, setSecondsLeft] = useState(25 * 60);
   const [isActive, setIsActive] = useState(false);
   const [mode, setMode] = useState<'work' | 'break'>('work');
-  const [selectedSubject, setSelectedSubject] = useState(subjects[0]?.id || '');
+  const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Sincroniza a matéria selecionada caso a lista de matérias mude e nada esteja selecionado
+  useEffect(() => {
+    if (!selectedSubject && subjects.length > 0) {
+      setSelectedSubject(subjects[0].id);
+    }
+  }, [subjects, selectedSubject]);
+
   const saveSession = async (duration: number) => {
+    const newSession: StudySession = {
+      id: Math.random().toString(36).substr(2, 9),
+      user_id: userId,
+      duration: duration,
+      subject_id: selectedSubject || '', // O Supabase deve lidar com a conversão ou o app deve garantir null
+      start_time: new Date().toISOString()
+    };
+
     try {
-      await supabase.from('study_sessions').insert({
-        id: Math.random().toString(36).substr(2, 9),
-        user_id: userId,
-        duration: duration,
-        subject_id: selectedSubject,
-        start_time: new Date().toISOString()
-      });
+      // Prepara o payload para o banco (usa null se não houver matéria)
+      const dbPayload = {
+        ...newSession,
+        subject_id: selectedSubject || null
+      };
+
+      const { error } = await supabase.from('study_sessions').insert(dbPayload);
+      
+      if (error) throw error;
+
+      // Atualiza o estado global imediatamente
+      setStudySessions(prev => [newSession, ...prev]);
     } catch (e) {
-      console.error("Erro ao protocolar tempo:", e);
+      console.error("Erro ao protocolar tempo no banco de dados:", e);
+      // Fallback local caso a rede falhe
+      setStudySessions(prev => [newSession, ...prev]);
     }
   };
 
@@ -51,11 +74,11 @@ const Pomodoro: React.FC<PomodoroProps> = ({ subjects, userId }) => {
         saveSession(workMinutes * 60);
         setMode('break');
         setSecondsLeft(breakMinutes * 60);
-        alert("Labuta concluída! Hora do recreio.");
+        alert("Ciclo concluído! Hora do descanso.");
       } else {
         setMode('work');
         setSecondsLeft(workMinutes * 60);
-        alert("Recreio encerrado. De volta aos autos.");
+        alert("Descanso encerrado. De volta aos estudos.");
       }
     }
     return () => {
@@ -83,7 +106,7 @@ const Pomodoro: React.FC<PomodoroProps> = ({ subjects, userId }) => {
       <header className="flex items-center justify-between">
         <div className="text-left">
           <h2 className="text-4xl font-black text-slate-950 dark:text-white uppercase tracking-tight">Cronômetro</h2>
-          <p className="text-slate-500 dark:text-slate-400 font-bold italic mt-1">"Pacta Sunt Servanda"</p>
+          <p className="text-slate-500 dark:text-slate-400 font-bold italic mt-1">Sua produtividade em foco.</p>
         </div>
         <button 
           onClick={() => setShowSettings(!showSettings)}
@@ -97,7 +120,7 @@ const Pomodoro: React.FC<PomodoroProps> = ({ subjects, userId }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in slide-in-from-top-4 duration-300">
           <div className="bg-white dark:bg-sanfran-rubiDark/40 p-6 rounded-[2rem] border border-slate-200 dark:border-sanfran-rubi/30 shadow-xl">
             <label className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4">
-              <Clock className="w-4 h-4 text-sanfran-rubi" /> Tempo de Labuta (Min)
+              <Clock className="w-4 h-4 text-sanfran-rubi" /> Tempo de Foco (Min)
             </label>
             <div className="flex items-center gap-4">
               <input 
@@ -111,7 +134,7 @@ const Pomodoro: React.FC<PomodoroProps> = ({ subjects, userId }) => {
           </div>
           <div className="bg-white dark:bg-sanfran-rubiDark/40 p-6 rounded-[2rem] border border-slate-200 dark:border-sanfran-rubi/30 shadow-xl">
             <label className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4">
-              <Coffee className="w-4 h-4 text-usp-blue" /> Tempo de Recreio (Min)
+              <Coffee className="w-4 h-4 text-usp-blue" /> Tempo de Pausa (Min)
             </label>
             <div className="flex items-center gap-4">
               <input 
@@ -139,7 +162,7 @@ const Pomodoro: React.FC<PomodoroProps> = ({ subjects, userId }) => {
             <span className="text-7xl md:text-8xl font-black tabular-nums text-slate-950 dark:text-white tracking-tighter drop-shadow-sm">{formatTime(secondsLeft)}</span>
             <div className={`mt-4 px-5 py-2 rounded-full font-black uppercase text-[10px] tracking-[0.2em] shadow-lg flex items-center gap-2 ${mode === 'work' ? 'bg-sanfran-rubi text-white' : 'bg-usp-blue text-white'}`}>
               {mode === 'work' ? <ShieldCheck className="w-4 h-4" /> : <Coffee className="w-4 h-4" />}
-              {mode === 'work' ? 'Em Labuta' : 'Em Recreio'}
+              {mode === 'work' ? 'Estudando' : 'Descansando'}
             </div>
           </div>
         </div>
@@ -160,12 +183,13 @@ const Pomodoro: React.FC<PomodoroProps> = ({ subjects, userId }) => {
         </div>
 
         <div className="w-full space-y-3 max-w-sm">
-          <label className="text-[10px] text-center block font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Matéria da Diligência</label>
+          <label className="text-[10px] text-center block font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Matéria Vinculada</label>
           <select 
-            value={selectedSubject} 
-            onChange={(e) => setSelectedSubject(e.target.value)} 
+            value={selectedSubject || ''} 
+            onChange={(e) => setSelectedSubject(e.target.value || null)} 
             className="w-full p-5 bg-slate-50 dark:bg-black/60 border-2 border-slate-200 dark:border-sanfran-rubi/30 rounded-3xl font-black text-center outline-none focus:border-sanfran-rubi text-slate-900 dark:text-white transition-all shadow-inner"
           >
+            <option value="">Geral / Sem Matéria</option>
             {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>

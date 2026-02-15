@@ -20,12 +20,14 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
     const newId = Math.random().toString(36).substr(2, 9);
     
     try {
+      const subjectToSave = selectedSubjectId || null;
+
       const { error } = await supabase.from('tasks').insert({
         id: newId,
         user_id: userId,
         title: newTaskTitle,
         completed: false,
-        subject_id: selectedSubjectId || null,
+        subject_id: subjectToSave,
         due_date: new Date().toISOString().split('T')[0]
       });
 

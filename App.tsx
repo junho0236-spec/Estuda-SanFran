@@ -50,29 +50,37 @@ const App: React.FC = () => {
 
   const loadUserData = async () => {
     const userId = session.user.id;
-    const { data: subs } = await supabase.from('subjects').select('*').eq('user_id', userId);
+    
+    // Busca todas as informações necessárias simultaneamente
+    const [
+      { data: subs },
+      { data: flds },
+      { data: cards },
+      { data: tks },
+      { data: sessions }
+    ] = await Promise.all([
+      supabase.from('subjects').select('*').eq('user_id', userId),
+      supabase.from('folders').select('*').eq('user_id', userId),
+      supabase.from('flashcards').select('*').eq('user_id', userId),
+      supabase.from('tasks').select('*').eq('user_id', userId),
+      supabase.from('study_sessions').select('*').eq('user_id', userId).order('start_time', { ascending: false })
+    ]);
+
     setSubjects(subs || []);
-
-    const { data: flds } = await supabase.from('folders').select('*').eq('user_id', userId);
     setFolders(flds?.map(f => ({ id: f.id, name: f.name, parentId: f.parent_id })) || []);
-
-    const { data: cards = [] } = await supabase.from('flashcards').select('*').eq('user_id', userId);
     setFlashcards(cards?.map(c => ({
       id: c.id, front: c.front, back: c.back, subjectId: c.subject_id, folderId: c.folder_id, nextReview: c.next_review, interval: c.interval
     })) || []);
-
-    const { data: tks = [] } = await supabase.from('tasks').select('*').eq('user_id', userId);
     setTasks(tks?.map(t => ({
       id: t.id, title: t.title, completed: t.completed, subjectId: t.subject_id, dueDate: t.due_date, completedAt: t.completed_at
     })) || []);
-
-    const { data: sessions = [] } = await supabase.from('study_sessions').select('*').eq('user_id', userId);
     setStudySessions(sessions || []);
   };
 
   useEffect(() => {
     if (isDarkMode) document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
+    localStorage.setItem('omnistudy_darkmode', JSON.stringify(isDarkMode));
   }, [isDarkMode]);
 
   if (!isAuthenticated) return <Login onLogin={() => setIsAuthenticated(true)} />;
@@ -119,8 +127,8 @@ const App: React.FC = () => {
         <div className="max-w-6xl mx-auto">
           {currentView === View.Dashboard && <Dashboard subjects={subjects} flashcards={flashcards} tasks={tasks} studySessions={studySessions} />}
           {currentView === View.Anki && <Anki subjects={subjects} flashcards={flashcards} setFlashcards={setFlashcards} folders={folders} setFolders={setFolders} userId={session.user.id} />}
-          {currentView === View.Timer && <Pomodoro subjects={subjects} userId={session.user.id} />}
-          {currentView === View.Calendar && <CalendarView subjects={subjects} tasks={tasks} userId={session.user.id} />}
+          {currentView === View.Timer && <Pomodoro subjects={subjects} userId={session.user.id} setStudySessions={setStudySessions} />}
+          {currentView === View.Calendar && <CalendarView subjects={subjects} tasks={tasks} userId={session.user.id} studySessions={studySessions} />}
           {currentView === View.Subjects && <Subjects subjects={subjects} setSubjects={setSubjects} userId={session.user.id} />}
           {currentView === View.Tasks && <Tasks subjects={subjects} tasks={tasks} setTasks={setTasks} userId={session.user.id} />}
         </div>

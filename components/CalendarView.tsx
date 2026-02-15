@@ -1,35 +1,18 @@
 
-import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Clock, History, Trophy, Gavel, Scale, BookOpen, CheckCircle2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { ChevronLeft, ChevronRight, Clock, History, Trophy, Gavel, Scale, CheckCircle2 } from 'lucide-react';
 import { Subject, StudySession, Task } from '../types';
-import { supabase } from '../services/supabaseClient';
 
 interface CalendarViewProps {
   subjects: Subject[];
   tasks: Task[];
   userId: string;
+  studySessions: StudySession[];
 }
 
-const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId }) => {
+const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId, studySessions }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<number>(new Date().getDate());
-  const [sessions, setSessions] = useState<StudySession[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchSessions();
-  }, [currentDate, userId]);
-
-  const fetchSessions = async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from('study_sessions')
-      .select('*')
-      .eq('user_id', userId);
-
-    if (data) setSessions(data);
-    setLoading(false);
-  };
 
   const getDaysInMonth = (year: number, month: number) => {
     return new Date(year, month + 1, 0).getDate();
@@ -38,7 +21,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId }) 
   const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
   const totalDays = getDaysInMonth(currentDate.getFullYear(), currentDate.getMonth());
   
-  const totalSeconds = sessions.reduce((acc, s) => acc + s.duration, 0);
+  const totalSeconds = studySessions.reduce((acc, s) => acc + (s.duration || 0), 0);
   const totalHours = (totalSeconds / 3600).toFixed(1);
 
   const days = Array.from({ length: totalDays }, (_, i) => i + 1);
@@ -52,7 +35,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId }) 
   // Filtros para o dia selecionado
   const selectedFullDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), selectedDay).toISOString().split('T')[0];
   
-  const dailySessions = sessions.filter(s => s.start_time.startsWith(selectedFullDate));
+  const dailySessions = studySessions.filter(s => s.start_time.startsWith(selectedFullDate));
   const dailyTasks = tasks.filter(t => t.completed && t.completedAt?.startsWith(selectedFullDate));
 
   return (
@@ -89,7 +72,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId }) 
             {blanks.map(b => <div key={`b-${b}`} />)}
             {days.map(day => {
               const dateStr = new Date(currentDate.getFullYear(), currentDate.getMonth(), day).toISOString().split('T')[0];
-              const sessionsOnDay = sessions.filter(s => s.start_time.startsWith(dateStr));
+              const sessionsOnDay = studySessions.filter(s => s.start_time.startsWith(dateStr));
               const hasActivity = sessionsOnDay.length > 0;
               const isSelected = selectedDay === day;
 
@@ -120,7 +103,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId }) 
             
             <h3 className="text-xl font-black mb-1 text-slate-900 dark:text-white uppercase flex items-center gap-2">
               <History className="text-sanfran-rubi w-5 h-5" /> 
-              Resumo da Audiência
+              Resumo do Dia
             </h3>
             <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-8 border-b border-slate-100 dark:border-white/10 pb-4">
               Protocolo de {selectedDay} de {monthNames[currentDate.getMonth()]}
@@ -130,7 +113,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId }) 
               {/* Seção de Estudos */}
               <div>
                 <h4 className="text-[11px] font-black uppercase text-slate-500 tracking-tighter mb-4 flex items-center gap-2">
-                  <Clock className="w-4 h-4" /> Labutas Concluídas
+                  <Clock className="w-4 h-4" /> Sessões de Estudo
                 </h4>
                 <div className="space-y-3">
                   {dailySessions.map(s => {
@@ -145,14 +128,14 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId }) 
                       </div>
                     );
                   })}
-                  {dailySessions.length === 0 && <p className="text-[10px] italic text-slate-400 font-bold uppercase tracking-widest text-center py-4 border-2 border-dashed border-slate-100 dark:border-white/5 rounded-2xl">Sem labutas registradas</p>}
+                  {dailySessions.length === 0 && <p className="text-[10px] italic text-slate-400 font-bold uppercase tracking-widest text-center py-4 border-2 border-dashed border-slate-100 dark:border-white/5 rounded-2xl">Sem atividades registradas</p>}
                 </div>
               </div>
 
               {/* Seção de Tarefas */}
               <div>
                 <h4 className="text-[11px] font-black uppercase text-slate-500 tracking-tighter mb-4 flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-usp-blue" /> Diligências Resolvidas
+                  <CheckCircle2 className="w-4 h-4 text-usp-blue" /> Tarefas Concluídas
                 </h4>
                 <div className="space-y-3">
                   {dailyTasks.map(t => (
@@ -161,7 +144,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId }) 
                       <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{t.title}</span>
                     </div>
                   ))}
-                  {dailyTasks.length === 0 && <p className="text-[10px] italic text-slate-400 font-bold uppercase tracking-widest text-center py-4 border-2 border-dashed border-slate-100 dark:border-white/5 rounded-2xl">Nenhuma diligência concluída</p>}
+                  {dailyTasks.length === 0 && <p className="text-[10px] italic text-slate-400 font-bold uppercase tracking-widest text-center py-4 border-2 border-dashed border-slate-100 dark:border-white/5 rounded-2xl">Nenhuma tarefa finalizada</p>}
                 </div>
               </div>
             </div>
