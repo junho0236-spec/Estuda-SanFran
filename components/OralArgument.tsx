@@ -177,7 +177,7 @@ const OralArgument: React.FC = () => {
            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-white/5 flex items-center gap-2 opacity-50">
               <CheckCircle2 size={12} className="text-slate-400" />
               <p className="text-[8px] font-bold uppercase text-slate-400">
-                Dica: Estruture sua fala em: Vocativo > Resumo > Tese > Pedido.
+                Dica: Estruture sua fala em: Vocativo &gt; Resumo &gt; Tese &gt; Pedido.
               </p>
            </div>
         </div>
