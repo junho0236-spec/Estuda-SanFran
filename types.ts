@@ -8,7 +8,8 @@ export enum View {
   Calendar = 'calendar',
   Ranking = 'ranking',
   Library = 'library',
-  Largo = 'largo'
+  Largo = 'largo',
+  Mural = 'mural'
 }
 
 export interface Folder {
@@ -95,4 +96,13 @@ export interface PresenceUser {
   subject_name?: string;
   is_timer_active: boolean;
   last_seen: string;
+}
+
+export interface MuralMessage {
+  id: string;
+  user_id: string;
+  user_name: string;
+  content: string;
+  color: 'yellow' | 'blue' | 'red' | 'green';
+  created_at: string;
 }
