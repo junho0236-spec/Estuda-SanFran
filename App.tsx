@@ -160,15 +160,32 @@ const App: React.FC = () => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setIsAuthenticated(!!session);
+      if (session?.user) syncProfile(session.user);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setIsAuthenticated(!!session);
+      if (session?.user) syncProfile(session.user);
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const syncProfile = async (user: any) => {
+    const name = user.user_metadata?.full_name;
+    if (!name) return;
+    
+    try {
+      await supabase.from('profiles').upsert({
+        id: user.id,
+        full_name: name,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'id' });
+    } catch (e) {
+      console.warn("Sincronização de perfil falhou. Verifique se a tabela 'profiles' existe no Supabase.");
+    }
+  };
 
   useEffect(() => {
     if (isAuthenticated && session?.user) {
@@ -306,7 +323,7 @@ const App: React.FC = () => {
             )}
 
             {currentView === View.Calendar && <CalendarView subjects={subjects} tasks={tasks} userId={session.user.id} studySessions={studySessions} />}
-            {currentView === View.Ranking && <Ranking userId={session.user.id} />}
+            {currentView === View.Ranking && <Ranking userId={session.user.id} session={session} />}
             {currentView === View.Subjects && <Subjects subjects={subjects} setSubjects={setSubjects} userId={session.user.id} />}
             {currentView === View.Tasks && <Tasks subjects={subjects} tasks={tasks} setTasks={setTasks} userId={session.user.id} />}
           </div>
