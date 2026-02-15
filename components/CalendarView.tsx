@@ -11,8 +11,15 @@ interface CalendarViewProps {
 }
 
 const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId, studySessions }) => {
+  // Inicializa com a data local de Brasília para o calendário
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDay, setSelectedDay] = useState<number>(new Date().getDate());
+  
+  // Obter o dia atual em Brasília para seleção padrão
+  const getBrDay = () => {
+    return parseInt(new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit' }).format(new Date()));
+  };
+  
+  const [selectedDay, setSelectedDay] = useState<number>(getBrDay());
 
   const getDaysInMonth = (year: number, month: number) => {
     return new Date(year, month + 1, 0).getDate();
@@ -21,7 +28,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId, st
   const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
   const totalDays = getDaysInMonth(currentDate.getFullYear(), currentDate.getMonth());
   
-  const totalSeconds = studySessions.reduce((acc, s) => acc + (s.duration || 0), 0);
+  const totalSeconds = studySessions.reduce((acc, s) => acc + (Number(s.duration) || 0), 0);
   const totalHours = (totalSeconds / 3600).toFixed(1);
 
   const days = Array.from({ length: totalDays }, (_, i) => i + 1);
@@ -32,9 +39,15 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId, st
 
   const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
-  // Filtros para o dia selecionado
-  const selectedFullDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), selectedDay).toISOString().split('T')[0];
-  
+  // Helper para formatar a data selecionada para busca (YYYY-MM-DD)
+  const getSelectedDateStr = () => {
+    const y = currentDate.getFullYear();
+    const m = (currentDate.getMonth() + 1).toString().padStart(2, '0');
+    const d = selectedDay.toString().padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
+  const selectedFullDate = getSelectedDateStr();
   const dailySessions = studySessions.filter(s => s.start_time.startsWith(selectedFullDate));
   const dailyTasks = tasks.filter(t => t.completed && t.completedAt?.startsWith(selectedFullDate));
 
@@ -71,7 +84,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId, st
             ))}
             {blanks.map(b => <div key={`b-${b}`} />)}
             {days.map(day => {
-              const dateStr = new Date(currentDate.getFullYear(), currentDate.getMonth(), day).toISOString().split('T')[0];
+              const y = currentDate.getFullYear();
+              const m = (currentDate.getMonth() + 1).toString().padStart(2, '0');
+              const d = day.toString().padStart(2, '0');
+              const dateStr = `${y}-${m}-${d}`;
+              
               const sessionsOnDay = studySessions.filter(s => s.start_time.startsWith(dateStr));
               const hasActivity = sessionsOnDay.length > 0;
               const isSelected = selectedDay === day;
@@ -124,7 +141,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId, st
                           <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: subject?.color || '#9B111E' }}></div>
                           <span className="font-bold text-slate-900 dark:text-white text-sm">{subject?.name || 'Geral'}</span>
                         </div>
-                        <span className="text-xs font-black text-sanfran-rubi">{(s.duration / 60).toFixed(0)} min</span>
+                        <span className="text-xs font-black text-sanfran-rubi">{(Number(s.duration) / 60).toFixed(0)} min</span>
                       </div>
                     );
                   })}

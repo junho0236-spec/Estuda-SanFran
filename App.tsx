@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Timer, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon } from 'lucide-react';
+import { LayoutDashboard, Timer, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession } from './types';
 import Dashboard from './components/Dashboard';
 import Anki from './components/Anki';
@@ -10,6 +10,44 @@ import Tasks from './components/Tasks';
 import CalendarView from './components/CalendarView';
 import Login from './components/Login';
 import { supabase } from './services/supabaseClient';
+
+// Helper para obter a data atual no formato YYYY-MM-DD (Brasília)
+export const getBrasiliaDate = () => {
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+};
+
+const BrasiliaClock: React.FC = () => {
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatter = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+
+  const parts = formatter.formatToParts(time);
+  const dateStr = `${parts.find(p => p.type === 'day')?.value}/${parts.find(p => p.type === 'month')?.value}/${parts.find(p => p.type === 'year')?.value}`;
+  const timeStr = `${parts.find(p => p.type === 'hour')?.value}:${parts.find(p => p.type === 'minute')?.value}:${parts.find(p => p.type === 'second')?.value}`;
+
+  return (
+    <div className="mt-4 px-4 py-3 bg-slate-50 dark:bg-sanfran-rubi/10 rounded-2xl border border-slate-100 dark:border-sanfran-rubi/20">
+      <div className="flex items-center gap-2 text-[10px] font-black uppercase text-sanfran-rubi tracking-widest mb-1">
+        <ClockIcon className="w-3 h-3" /> Brasília
+      </div>
+      <div className="text-sm font-black text-slate-900 dark:text-white leading-none">{timeStr}</div>
+      <div className="text-[9px] font-bold text-slate-400 uppercase mt-1">{dateStr}</div>
+    </div>
+  );
+};
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>(View.Dashboard);
@@ -52,7 +90,6 @@ const App: React.FC = () => {
     const userId = session.user.id;
     
     try {
-      // Busca todas as informações necessárias simultaneamente
       const [
         resSubs,
         resFlds,
@@ -77,8 +114,6 @@ const App: React.FC = () => {
       })));
       if (resSessions.data) setStudySessions(resSessions.data);
 
-      // Logs de diagnóstico silenciosos
-      if (resSessions.error) console.warn("Aviso: Tabela de sessões ainda não acessível ou vazia.");
     } catch (err) {
       console.error("Erro crítico no carregamento do protocolo acadêmico:", err);
     }
@@ -104,14 +139,17 @@ const App: React.FC = () => {
   return (
     <div className={`flex h-screen overflow-hidden transition-colors duration-300 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#fcfcfc]'}`}>
       <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 left-0 z-40 w-64 bg-white dark:bg-[#0d0303] border-r border-slate-200 dark:border-sanfran-rubi/30 transition-all lg:relative lg:translate-x-0 flex flex-col`}>
-        <div className="p-6 border-b border-slate-100 dark:border-sanfran-rubi/20 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-sanfran-rubi p-2 rounded-xl text-white shadow-lg"><BookOpen className="w-6 h-6" /></div>
-            <div>
-              <h1 className="text-lg font-black dark:text-white leading-none">SanFran</h1>
-              <span className="text-[9px] font-black text-sanfran-rubi uppercase">Academia Jurídica</span>
+        <div className="p-6 border-b border-slate-100 dark:border-sanfran-rubi/20 flex flex-col">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <div className="bg-sanfran-rubi p-2 rounded-xl text-white shadow-lg"><BookOpen className="w-6 h-6" /></div>
+              <div>
+                <h1 className="text-lg font-black dark:text-white leading-none">SanFran</h1>
+                <span className="text-[9px] font-black text-sanfran-rubi uppercase">Academia Jurídica</span>
+              </div>
             </div>
           </div>
+          <BrasiliaClock />
         </div>
         <nav className="p-4 space-y-2 flex-1 overflow-y-auto">
           {navItems.map((item) => (

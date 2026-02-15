@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Brain, CheckCircle2, Clock, Zap, TrendingUp, ShieldCheck, AlertTriangle, Sparkles } from 'lucide-react';
 import { Subject, Flashcard, Task, StudySession } from '../types';
 import { getStudyMotivation, getSafeApiKey } from '../services/geminiService';
+import { getBrasiliaDate } from '../App';
 
 interface DashboardProps {
   subjects: Subject[];
@@ -38,9 +39,13 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
   const cardsToReview = flashcards.filter(f => f.nextReview <= Date.now()).length;
   const pendingTasks = tasks.filter(t => !t.completed).length;
   
-  const totalSeconds = studySessions.reduce((acc, s) => acc + (s.duration || 0), 0);
+  // Cálculo de horas totais somando cada duração
+  const totalSeconds = studySessions.reduce((acc, s) => acc + (Number(s.duration) || 0), 0);
   const totalHours = (totalSeconds / 3600).toFixed(1);
-  const sessionsToday = studySessions.filter(s => s.start_time.startsWith(new Date().toISOString().split('T')[0])).length;
+
+  // Filtro de sessões hoje respeitando o fuso de Brasília
+  const todayStr = getBrasiliaDate();
+  const sessionsToday = studySessions.filter(s => s.start_time.startsWith(todayStr)).length;
 
   return (
     <div className="space-y-12 animate-in fade-in duration-500">

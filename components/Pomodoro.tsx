@@ -21,7 +21,6 @@ const Pomodoro: React.FC<PomodoroProps> = ({ subjects, userId, setStudySessions 
   
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Sincroniza a matéria selecionada caso a lista de matérias mude e nada esteja selecionado
   useEffect(() => {
     if (!selectedSubject && subjects.length > 0) {
       setSelectedSubject(subjects[0].id);
@@ -29,30 +28,38 @@ const Pomodoro: React.FC<PomodoroProps> = ({ subjects, userId, setStudySessions 
   }, [subjects, selectedSubject]);
 
   const saveSession = async (duration: number) => {
+    // Gerar carimbo de tempo ISO-like ajustado para Brasília
+    const now = new Date();
+    const brDate = new Intl.DateTimeFormat('sv-SE', { 
+      timeZone: 'America/Sao_Paulo',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    }).format(now).replace(' ', 'T');
+
     const newSession: StudySession = {
       id: Math.random().toString(36).substr(2, 9),
       user_id: userId,
       duration: duration,
-      subject_id: selectedSubject || '', // O Supabase deve lidar com a conversão ou o app deve garantir null
-      start_time: new Date().toISOString()
+      subject_id: selectedSubject || '',
+      start_time: brDate
     };
 
     try {
-      // Prepara o payload para o banco (usa null se não houver matéria)
       const dbPayload = {
-        ...newSession,
-        subject_id: selectedSubject || null
+        id: newSession.id,
+        user_id: userId,
+        duration: Number(duration),
+        subject_id: selectedSubject || null,
+        start_time: brDate
       };
 
       const { error } = await supabase.from('study_sessions').insert(dbPayload);
       
       if (error) throw error;
 
-      // Atualiza o estado global imediatamente
       setStudySessions(prev => [newSession, ...prev]);
     } catch (e) {
       console.error("Erro ao protocolar tempo no banco de dados:", e);
-      // Fallback local caso a rede falhe
       setStudySessions(prev => [newSession, ...prev]);
     }
   };
