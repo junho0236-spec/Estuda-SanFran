@@ -21,12 +21,12 @@ const LegalNews: React.FC = () => {
     setMapResults([]);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
       
       if (activeTab === 'news') {
         const response = await ai.models.generateContent({
           model: 'gemini-3-flash-preview',
-          contents: `Busque jurisprudência e notícias jurídicas recentes sobre o tema: ${query}. Forneça um resumo técnico e inclua fontes para verificação.`,
+          contents: `Busque jurisprudência e notícias jurídicas recentes sobre o tema: ${query}. Forneça um resumo técnico e inclua fontes reais.`,
           config: { tools: [{ googleSearch: {} }] }
         });
         setResults({ 
@@ -34,9 +34,8 @@ const LegalNews: React.FC = () => {
           chunks: response.candidates?.[0]?.groundingMetadata?.groundingChunks || [] 
         });
       } else {
-        // Timeout para geolocalização para evitar travamento infinito
         const locationPromise = new Promise((resolve) => {
-          const timeout = setTimeout(() => resolve(null), 3500);
+          const timeout = setTimeout(() => resolve(null), 3000);
           if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
               (pos) => { clearTimeout(timeout); resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }); },
@@ -48,8 +47,8 @@ const LegalNews: React.FC = () => {
         const latLng = await locationPromise;
 
         const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: `Localize tribunais, fóruns e órgãos judiciários em: ${query}. Forneça uma lista e links de localização se possível.`,
+          model: 'gemini-2.5-flash-native-audio-preview-12-2025',
+          contents: `Localize tribunais e órgãos judiciários em: ${query}. Forneça links do Google Maps.`,
           config: { 
             tools: [{ googleMaps: {} }],
             toolConfig: latLng ? { retrievalConfig: { latLng: latLng as any } } : undefined
@@ -57,13 +56,12 @@ const LegalNews: React.FC = () => {
         });
         
         const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-        const mapsData = chunks.filter((c: any) => c.maps);
-        setMapResults(mapsData);
+        setMapResults(chunks.filter((c: any) => c.maps));
         setResults({ text: response.text, chunks: [] });
       }
     } catch (err: any) {
-      console.error("Search Error:", err);
-      setError("Falha na consulta à base de dados. Verifique sua conexão ou tente outro termo.");
+      console.error(err);
+      setError("Falha na consulta. Verifique sua conexão ou tente outro termo.");
     } finally {
       setIsLoading(false);
     }
@@ -74,7 +72,6 @@ const LegalNews: React.FC = () => {
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <h2 className="text-4xl font-black text-slate-950 dark:text-white uppercase tracking-tight">Consultoria IA</h2>
-          <p className="text-slate-500 dark:text-slate-400 font-bold italic text-lg mt-1">Sua central de pautas e tribunais.</p>
         </div>
         <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-2xl border border-slate-200 dark:border-white/10">
            <button onClick={() => { setActiveTab('news'); setResults(null); }} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'news' ? 'bg-usp-blue text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>Jurisprudência</button>
@@ -97,8 +94,8 @@ const LegalNews: React.FC = () => {
               type="text" 
               value={query} 
               onChange={(e) => setQuery(e.target.value)} 
-              placeholder={activeTab === 'news' ? "Digite o tema jurídico..." : "Cidade ou Bairro..."} 
-              className="flex-1 bg-transparent outline-none text-xl md:text-2xl font-black text-slate-950 dark:text-white" 
+              placeholder={activeTab === 'news' ? "Tema jurídico..." : "Sua Cidade..."} 
+              className="flex-1 bg-transparent outline-none text-2xl font-black text-slate-950 dark:text-white" 
             />
           </div>
           <button type="submit" disabled={isLoading} className={`w-full md:w-40 py-5 text-white rounded-[2.5rem] font-black uppercase text-xs tracking-widest shadow-xl transition-all flex items-center justify-center gap-2 ${activeTab === 'news' ? 'bg-usp-blue' : 'bg-emerald-500'}`}>
@@ -110,39 +107,26 @@ const LegalNews: React.FC = () => {
       {results && !isLoading && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className={`lg:col-span-2 bg-white dark:bg-sanfran-rubiDark/30 rounded-[3rem] p-10 border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl border-t-[12px] ${activeTab === 'news' ? 'border-t-usp-blue' : 'border-t-emerald-500'}`}>
-            <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase mb-6 flex items-center gap-3">
-              <Scale size={24} className={activeTab === 'news' ? 'text-usp-blue' : 'text-emerald-500'} /> Parecer IA
-            </h3>
             <div className="prose dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 font-serif text-lg leading-relaxed whitespace-pre-wrap">
               {results.text}
             </div>
           </div>
           <div className="lg:col-span-1 space-y-4">
-             <div className="bg-white dark:bg-sanfran-rubiDark/30 rounded-[2.5rem] p-8 border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl">
-              <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-6 flex items-center gap-2">
-                <Bookmark size={14} className={activeTab === 'news' ? 'text-usp-blue' : 'text-emerald-500'} /> Referências
-              </h3>
-              <div className="space-y-4">
-                {activeTab === 'news' ? (
-                  results.chunks?.map((chunk: any, i: number) => chunk.web && (
-                    <a key={i} href={chunk.web.uri} target="_blank" rel="noopener noreferrer" className="block p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/10 hover:border-usp-blue transition-all">
-                      <p className="text-[10px] font-black text-slate-900 dark:text-white uppercase line-clamp-2 leading-tight mb-2">{chunk.web.title}</p>
-                      <span className="text-[8px] font-bold text-usp-blue uppercase">Ver fonte oficial</span>
-                    </a>
-                  ))
-                ) : (
-                  mapResults.map((chunk, i) => (
-                    <a key={i} href={chunk.maps.uri} target="_blank" rel="noopener noreferrer" className="block p-4 bg-emerald-500/5 rounded-2xl border-2 border-emerald-500/20 hover:border-emerald-500 transition-all">
-                      <p className="text-[10px] font-black text-slate-900 dark:text-white uppercase mb-1">{chunk.maps.title || "Órgão Judiciário"}</p>
-                      <span className="text-[8px] font-bold text-emerald-500 uppercase flex items-center gap-1"><Navigation size={10} /> Ver no Mapa</span>
-                    </a>
-                  ))
-                )}
-                {((activeTab === 'news' && !results.chunks?.some((c:any) => c.web)) || (activeTab === 'courts' && mapResults.length === 0)) && (
-                   <p className="text-[9px] text-slate-400 uppercase font-black text-center py-4">Nenhuma referência adicional encontrada.</p>
-                )}
-              </div>
-            </div>
+            {activeTab === 'news' ? (
+              results.chunks?.map((chunk: any, i: number) => chunk.web && (
+                <a key={i} href={chunk.web.uri} target="_blank" rel="noopener noreferrer" className="block p-4 bg-white dark:bg-white/5 rounded-2xl border border-slate-200 hover:border-usp-blue transition-all">
+                  <p className="text-[10px] font-black uppercase mb-1">{chunk.web.title}</p>
+                  <span className="text-[8px] font-bold text-usp-blue uppercase">Ver fonte</span>
+                </a>
+              ))
+            ) : (
+              mapResults.map((chunk, i) => (
+                <a key={i} href={chunk.maps.uri} target="_blank" rel="noopener noreferrer" className="block p-4 bg-white dark:bg-white/5 rounded-2xl border-2 border-emerald-500/20 hover:border-emerald-500 transition-all">
+                  <p className="text-[10px] font-black uppercase mb-1">{chunk.maps.title}</p>
+                  <span className="text-[8px] font-bold text-emerald-500 uppercase">Ver no Mapa</span>
+                </a>
+              ))
+            )}
           </div>
         </div>
       )}

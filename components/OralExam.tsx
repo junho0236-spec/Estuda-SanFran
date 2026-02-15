@@ -18,7 +18,6 @@ interface OralExamProps {
   userId: string;
 }
 
-// Funções de decodificação de áudio PCM exigidas pela Live API
 function decode(base64: string) {
   const binaryString = atob(base64);
   const len = binaryString.length;
@@ -90,9 +89,9 @@ const OralExam: React.FC<OralExamProps> = ({ subjects, userId }) => {
         feedback: feedback
       });
       if (!error) fetchHistory();
-      return "Resultado protocolado com sucesso.";
+      return "Resultado protocolado.";
     } catch (err) {
-      return "Erro ao salvar no banco.";
+      return "Erro ao salvar.";
     }
   };
 
@@ -100,10 +99,10 @@ const OralExam: React.FC<OralExamProps> = ({ subjects, userId }) => {
     name: 'save_exam_result',
     parameters: {
       type: Type.OBJECT,
-      description: 'Salva a nota e feedback do exame oral no banco de dados.',
+      description: 'Salva a nota e feedback do aluno.',
       properties: {
-        grade: { type: Type.STRING, description: 'Nota de 0 a 10.' },
-        feedback: { type: Type.STRING, description: 'Parecer técnico.' },
+        grade: { type: Type.STRING },
+        feedback: { type: Type.STRING },
       },
       required: ['grade', 'feedback'],
     },
@@ -115,18 +114,12 @@ const OralExam: React.FC<OralExamProps> = ({ subjects, userId }) => {
     setErrorMessage(null);
     
     try {
-      // 1. Solicita microfone primeiro para evitar erros de permissão tardios
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
       
       const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       const outputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       audioContextRef.current = outputCtx;
-
-      // Garantir que os contextos de áudio estão ativos (requisito do navegador)
-      if (inputCtx.state === 'suspended') await inputCtx.resume();
-      if (outputCtx.state === 'suspended') await outputCtx.resume();
 
       const sessionPromise = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-12-2025',
@@ -134,38 +127,28 @@ const OralExam: React.FC<OralExamProps> = ({ subjects, userId }) => {
           responseModalities: [Modality.AUDIO],
           tools: [{ functionDeclarations: [saveResultTool] }],
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Charon' } } },
-          systemInstruction: `Você é um Professor Catedrático da Faculdade de Direito da USP. Conduza um exame oral rigoroso sobre ${selectedSubject}. Ao final, utilize obrigatoriamente a função 'save_exam_result' para registrar a nota e o feedback do aluno.`,
+          systemInstruction: `Você é um Professor Catedrático da Faculdade de Direito da USP. Conduza um exame oral rigoroso sobre ${selectedSubject}. Use "Doutor". Ao final, utilize a função 'save_exam_result' para registrar a nota.`,
         },
         callbacks: {
           onopen: () => {
             setStatus('active');
             setIsActive(true);
-            
             const source = inputCtx.createMediaStreamSource(stream);
             const processor = inputCtx.createScriptProcessor(4096, 1, 1);
-            
             processor.onaudioprocess = (e) => {
               const inputData = e.inputBuffer.getChannelData(0);
-              const l = inputData.length;
-              const int16 = new Int16Array(l);
-              for (let i = 0; i < l; i++) {
-                int16[i] = inputData[i] * 32768;
-              }
+              const int16 = new Int16Array(inputData.length);
+              for (let i = 0; i < inputData.length; i++) int16[i] = inputData[i] * 32768;
               const pcmBlob = {
                 data: encode(new Uint8Array(int16.buffer)),
                 mimeType: 'audio/pcm;rate=16000',
               };
-              // Envia áudio apenas após a promessa ser resolvida
-              sessionPromise.then(session => {
-                session.sendRealtimeInput({ media: pcmBlob });
-              });
+              sessionPromise.then(session => session.sendRealtimeInput({ media: pcmBlob }));
             };
-            
             source.connect(processor);
             processor.connect(inputCtx.destination);
           },
           onmessage: async (msg) => {
-            // Lógica de Function Calling
             if (msg.toolCall) {
               for (const fc of msg.toolCall.functionCalls) {
                 if (fc.name === 'save_exam_result') {
@@ -176,11 +159,10 @@ const OralExam: React.FC<OralExamProps> = ({ subjects, userId }) => {
                 }
               }
             }
-
-            // Lógica de Reprodução de Áudio
             const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
             if (audioData && audioContextRef.current) {
               const ctx = audioContextRef.current;
+              if (ctx.state === 'suspended') await ctx.resume();
               nextStartTimeRef.current = Math.max(nextStartTimeRef.current, ctx.currentTime);
               const buffer = await decodeAudioData(decode(audioData), ctx, 24000, 1);
               const source = ctx.createBufferSource();
@@ -193,21 +175,15 @@ const OralExam: React.FC<OralExamProps> = ({ subjects, userId }) => {
           },
           onclose: () => { setStatus('idle'); setIsActive(false); },
           onerror: (e) => { 
-            console.error("Live API Error:", e);
-            setErrorMessage("Erro crítico na conexão com a banca."); 
+            console.error(e);
+            setErrorMessage("Conexão interrompida."); 
             setStatus('idle'); 
           }
         }
       });
-
       sessionRef.current = await sessionPromise;
     } catch (err: any) {
-      console.error("Start Session Error:", err);
-      if (err.name === 'NotAllowedError') {
-        setErrorMessage("Microfone bloqueado pelo navegador.");
-      } else {
-        setErrorMessage("Falha ao invocar banca examinadora.");
-      }
+      setErrorMessage(err.name === 'NotAllowedError' ? "Microfone bloqueado." : "Erro ao iniciar bancada examinadora.");
       setStatus('idle');
     }
   };
