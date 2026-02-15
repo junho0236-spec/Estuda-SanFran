@@ -1,9 +1,10 @@
 
-import { Brain, CheckCircle2, Clock, Zap, TrendingUp, Medal, Gavel, Award, Scale, Briefcase, GraduationCap, Quote, Sun, Book, Shield, Zap as ZapIcon, Trophy } from 'lucide-react';
-import React, { useMemo } from 'react';
+import { Brain, CheckCircle2, Clock, Zap, TrendingUp, Medal, Gavel, Award, Scale, Briefcase, GraduationCap, Quote, Sun, Book, Shield, Zap as ZapIcon, Trophy, Sparkles, Star } from 'lucide-react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Subject, Flashcard, Task, StudySession, Reading } from '../types';
 import { getBrasiliaDate } from '../App';
 import BadgeGallery, { BadgeData } from './BadgeGallery';
+import { supabase } from '../services/supabaseClient';
 
 interface DashboardProps {
   subjects: Subject[];
@@ -11,9 +12,25 @@ interface DashboardProps {
   tasks: Task[];
   studySessions: StudySession[];
   readings: Reading[];
+  userId: string;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, studySessions, readings }) => {
+const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, studySessions, readings, userId }) => {
+  const [lastExam, setLastExam] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchLastExam = async () => {
+      const { data } = await supabase
+        .from('oral_exam_history')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (data && data.length > 0) setLastExam(data[0]);
+    };
+    fetchLastExam();
+  }, [userId]);
+
   const legalQuotes = [
     "A justiça é a constante e perpétua vontade de dar a cada um o seu. - Ulpiano",
     "A lei é a razão livre da paixão. - Aristóteles",
@@ -42,7 +59,6 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
     return { value: hours, unit: 'h', sub: 'Horas acumuladas' };
   }, [totalSeconds]);
 
-  // --- Sistema de Patentes ---
   const ranks = [
     { name: 'Bacharel', hours: 0, icon: GraduationCap, color: 'text-slate-400', bg: 'bg-slate-100', border: 'border-slate-200' },
     { name: 'Advogado Júnior', hours: 20, icon: Briefcase, color: 'text-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-200' },
@@ -69,7 +85,6 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
     tasks.forEach(t => { if (t.completed && t.completedAt) activityDates.add(t.completedAt.split('T')[0]); });
 
     if (activityDates.size === 0) return 0;
-
     const today = getBrasiliaDate();
     const yesterdayDate = new Date();
     yesterdayDate.setDate(yesterdayDate.getDate() - 1);
@@ -77,7 +92,6 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
 
     let currentStreak = 0;
     let checkDateStr = activityDates.has(today) ? today : (activityDates.has(yesterday) ? yesterday : null);
-
     if (!checkDateStr) return 0;
 
     const subtractOneDay = (dateStr: string) => {
@@ -94,72 +108,14 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
     return currentStreak;
   }, [studySessions, tasks]);
 
-  // --- Lógica de Badges ---
   const badges: BadgeData[] = useMemo(() => {
     return [
-      {
-        id: 'early_bird',
-        name: 'Madrugador XI de Agosto',
-        description: 'Sessão iniciada antes das 7h',
-        icon: Sun,
-        isUnlocked: studySessions.some(s => {
-          const time = new Date(s.start_time).getHours();
-          return time < 7;
-        }),
-        color: 'text-amber-500'
-      },
-      {
-        id: 'iron_bacharel',
-        name: 'Bacharel de Ferro',
-        description: 'Estudar 4h+ em um único dia',
-        icon: ZapIcon,
-        isUnlocked: (() => {
-          const days: Record<string, number> = {};
-          studySessions.forEach(s => {
-            const day = s.start_time.split('T')[0];
-            days[day] = (days[day] || 0) + s.duration;
-          });
-          return Object.values(days).some(d => d >= 4 * 3600);
-        })(),
-        color: 'text-sanfran-rubi'
-      },
-      {
-        id: 'constitutionalist',
-        name: 'Constitucionalista',
-        description: 'Revisar 100+ cards de Const.',
-        icon: Shield,
-        isUnlocked: (() => {
-          const constSubject = subjects.find(s => s.name.toLowerCase().includes('const'));
-          if (!constSubject) return false;
-          // Contamos flashcards desta disciplina. Num sistema ideal, contaríamos revisões históricas.
-          return flashcards.filter(f => f.subjectId === constSubject.id).length >= 50; 
-        })(),
-        color: 'text-usp-blue'
-      },
-      {
-        id: 'doctrinator',
-        name: 'Doutrinador',
-        description: 'Possuir 5+ obras na Biblioteca',
-        icon: Book,
-        isUnlocked: readings.length >= 5,
-        color: 'text-emerald-500'
-      },
-      {
-        id: 'impartial',
-        name: 'Imparcial',
-        description: 'Concluir 50 tarefas da Pauta',
-        icon: Gavel,
-        isUnlocked: tasks.filter(t => t.completed).length >= 50,
-        color: 'text-purple-500'
-      },
-      {
-        id: 'partner',
-        name: 'Sócio do XI',
-        description: 'Alcançar patente Sócio-Diretor',
-        icon: Trophy,
-        isUnlocked: totalHours >= 700,
-        color: 'text-usp-gold'
-      }
+      { id: 'early_bird', name: 'Madrugador XI de Agosto', description: 'Sessão iniciada antes das 7h', icon: Sun, isUnlocked: studySessions.some(s => new Date(s.start_time).getHours() < 7), color: 'text-amber-500' },
+      { id: 'iron_bacharel', name: 'Bacharel de Ferro', description: 'Estudar 4h+ em um único dia', icon: ZapIcon, isUnlocked: (() => { const days: Record<string, number> = {}; studySessions.forEach(s => { const day = s.start_time.split('T')[0]; days[day] = (days[day] || 0) + s.duration; }); return Object.values(days).some(d => d >= 4 * 3600); })(), color: 'text-sanfran-rubi' },
+      { id: 'constitutionalist', name: 'Constitucionalista', description: 'Revisar 100+ cards de Const.', icon: Shield, isUnlocked: flashcards.filter(f => subjects.find(s => s.id === f.subjectId)?.name.toLowerCase().includes('const')).length >= 50, color: 'text-usp-blue' },
+      { id: 'doctrinator', name: 'Doutrinador', description: 'Possuir 5+ obras na Biblioteca', icon: Book, isUnlocked: readings.length >= 5, color: 'text-emerald-500' },
+      { id: 'impartial', name: 'Imparcial', description: 'Concluir 50 tarefas da Pauta', icon: Gavel, isUnlocked: tasks.filter(t => t.completed).length >= 50, color: 'text-purple-500' },
+      { id: 'partner', name: 'Sócio do XI', description: 'Alcançar patente Sócio-Diretor', icon: Trophy, isUnlocked: totalHours >= 700, color: 'text-usp-gold' }
     ];
   }, [studySessions, flashcards, tasks, readings, subjects, totalHours]);
 
@@ -168,94 +124,76 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="text-center md:text-left">
           <h2 className="text-3xl md:text-5xl font-black text-slate-950 dark:text-white tracking-tight">Salve, Doutor(a)! 🏛️</h2>
-          <p className="text-slate-700 dark:text-slate-300 mt-2 font-bold text-base md:text-lg">Pronto para dominar as leis hoje?</p>
+          <div className="flex items-center justify-center md:justify-start gap-3 mt-2">
+            <p className="text-slate-700 dark:text-slate-300 font-bold text-base md:text-lg">Pronto para dominar as leis hoje?</p>
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
+               <Sparkles size={12} className="text-emerald-500" />
+               <span className="text-[9px] font-black uppercase text-emerald-600 tracking-widest">IA Gratuita Ativa</span>
+            </div>
+          </div>
         </div>
       </header>
 
-      {/* --- Seção de Carreira (Patentes) --- */}
-      <div className="bg-white dark:bg-sanfran-rubiDark/30 rounded-[2.5rem] p-6 md:p-10 border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl relative overflow-hidden group">
-        <div className="absolute top-0 right-0 p-10 opacity-5 group-hover:opacity-10 transition-opacity">
-           <currentRank.icon size={200} />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* --- Card de Carreira --- */}
+        <div className="lg:col-span-2 bg-white dark:bg-sanfran-rubiDark/30 rounded-[2.5rem] p-6 md:p-10 border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-10 opacity-5 group-hover:opacity-10 transition-opacity"><currentRank.icon size={200} /></div>
+          <div className="flex flex-col md:flex-row md:items-center gap-8 relative z-10">
+            <div className={`w-24 h-24 md:w-32 md:h-32 rounded-[2.5rem] ${currentRank.bg} dark:bg-white/5 border-4 ${currentRank.border} dark:border-white/10 flex items-center justify-center shadow-xl`}>
+               <currentRank.icon className={`w-12 h-12 md:w-16 md:h-16 ${currentRank.color}`} />
+            </div>
+            <div className="flex-1 space-y-4">
+              <div>
+                <p className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] mb-1">Status na Ordem</p>
+                <h3 className={`text-3xl md:text-4xl font-black uppercase tracking-tighter ${currentRank.color} dark:text-white`}>{currentRank.name}</h3>
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between items-end text-[10px] font-black uppercase tracking-widest">
+                  <span className="text-slate-400">Progresso de Carreira</span>
+                  <span className="text-slate-900 dark:text-white">{nextRank ? `Próximo: ${nextRank.name}` : 'Nível Máximo'}</span>
+                </div>
+                <div className="h-4 bg-slate-100 dark:bg-black/40 rounded-full overflow-hidden p-1 shadow-inner">
+                  <div className={`h-full rounded-full transition-all duration-1000 ease-out ${currentRank.color.replace('text', 'bg')}`} style={{ width: `${progressToNext}%` }} />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        
-        <div className="flex flex-col md:flex-row md:items-center gap-8 relative z-10">
-          <div className={`w-24 h-24 md:w-32 md:h-32 rounded-[2.5rem] ${currentRank.bg} dark:bg-white/5 border-4 ${currentRank.border} dark:border-white/10 flex items-center justify-center shadow-xl`}>
-             <currentRank.icon className={`w-12 h-12 md:w-16 md:h-16 ${currentRank.color}`} />
-          </div>
-          
-          <div className="flex-1 space-y-4">
-            <div>
-              <p className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] mb-1">Status na Ordem</p>
-              <h3 className={`text-3xl md:text-4xl font-black uppercase tracking-tighter ${currentRank.color} dark:text-white`}>
-                {currentRank.name}
-              </h3>
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex justify-between items-end text-[10px] font-black uppercase tracking-widest">
-                <span className="text-slate-400">Progresso de Carreira</span>
-                <span className="text-slate-900 dark:text-white">{nextRank ? `Próximo: ${nextRank.name}` : 'Nível Máximo'}</span>
-              </div>
-              <div className="h-4 bg-slate-100 dark:bg-black/40 rounded-full overflow-hidden p-1 shadow-inner">
-                <div 
-                  className={`h-full rounded-full transition-all duration-1000 ease-out ${currentRank.color.replace('text', 'bg')}`}
-                  style={{ width: `${progressToNext}%` }}
-                />
-              </div>
-              {nextRank && (
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                  Faltam {(nextRank.hours - totalHours).toFixed(1)} horas para a próxima promoção.
-                </p>
+
+        {/* --- Card do Último Exame Oral --- */}
+        <div className="bg-white dark:bg-sanfran-rubiDark/30 rounded-[2.5rem] p-8 border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl flex flex-col justify-between border-t-8 border-t-usp-gold">
+           <div>
+              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-4 flex items-center gap-2">
+                 <Star className="text-usp-gold w-3 h-3" /> Último Veredito
+              </p>
+              {lastExam ? (
+                <div className="space-y-3">
+                   <h4 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-none">{lastExam.subject_name}</h4>
+                   <div className="flex items-center gap-2">
+                      <span className={`px-4 py-1.5 rounded-full text-xs font-black text-white ${Number(lastExam.grade) >= 7 ? 'bg-emerald-500' : 'bg-sanfran-rubi'}`}>
+                        NOTA {lastExam.grade}
+                      </span>
+                   </div>
+                   <p className="text-[11px] font-bold text-slate-400 uppercase italic line-clamp-2">"{lastExam.feedback || 'Sem observações da banca.'}"</p>
+                </div>
+              ) : (
+                <div className="text-center py-6 opacity-30">
+                   <Gavel size={32} className="mx-auto mb-2" />
+                   <p className="text-[10px] font-black uppercase tracking-widest">Nenhuma arguição registrada.</p>
+                </div>
               )}
-            </div>
-          </div>
-          
-          <div className="hidden lg:block border-l border-slate-100 dark:border-white/10 pl-8 space-y-2">
-             <div className="flex items-center gap-3 text-slate-900 dark:text-white">
-                <Medal className="w-5 h-5 text-usp-gold" />
-                <span className="text-sm font-black uppercase">Honrarias USP</span>
-             </div>
-             <p className="text-[10px] text-slate-400 font-bold max-w-[150px] leading-relaxed">
-               Sua dedicação acadêmica reflete o espírito do XI de Agosto. Continue a labuta.
-             </p>
-          </div>
+           </div>
+           {lastExam && <p className="text-[9px] font-bold text-slate-300 uppercase mt-4">Avaliado em {new Date(lastExam.created_at).toLocaleDateString()}</p>}
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        <StatCard 
-          icon={<Brain className="text-sanfran-rubi dark:text-white" />} 
-          label="Para Revisar" 
-          value={cardsToReview} 
-          subtext="Flashcards pendentes"
-          bgColor="bg-red-50 dark:bg-sanfran-rubi"
-        />
-        <StatCard 
-          icon={<CheckCircle2 className="text-usp-blue dark:text-white" />} 
-          label="Tarefas" 
-          value={pendingTasks} 
-          subtext="Processos em pauta"
-          bgColor="bg-cyan-50 dark:bg-usp-blue"
-        />
-        <StatCard 
-          icon={<Clock className="text-usp-gold dark:text-white" />} 
-          label="Tempo Total" 
-          value={displayTime.value} 
-          unit={displayTime.unit}
-          subtext={`${sessionsToday} sessões hoje`}
-          bgColor="bg-yellow-50 dark:bg-usp-gold"
-        />
-        <StatCard 
-          icon={<Zap className={streak > 0 ? "text-orange-500 dark:text-white" : "text-slate-400"} />} 
-          label="Ofensiva" 
-          value={streak} 
-          subtext={streak === 1 ? "Dia de labuta" : "Dias seguidos"}
-          bgColor={streak > 0 ? "bg-orange-50 dark:bg-orange-600" : "bg-slate-100 dark:bg-slate-600"}
-          highlight={streak > 0}
-        />
+        <StatCard icon={<Brain className="text-sanfran-rubi dark:text-white" />} label="Para Revisar" value={cardsToReview} subtext="Flashcards pendentes" bgColor="bg-red-50 dark:bg-sanfran-rubi" />
+        <StatCard icon={<CheckCircle2 className="text-usp-blue dark:text-white" />} label="Tarefas" value={pendingTasks} subtext="Processos em pauta" bgColor="bg-cyan-50 dark:bg-usp-blue" />
+        <StatCard icon={<Clock className="text-usp-gold dark:text-white" />} label="Tempo Total" value={displayTime.value} unit={displayTime.unit} subtext={`${sessionsToday} sessões hoje`} bgColor="bg-yellow-50 dark:bg-usp-gold" />
+        <StatCard icon={<Zap className={streak > 0 ? "text-orange-500 dark:text-white" : "text-slate-400"} />} label="Ofensiva" value={streak} subtext={streak === 1 ? "Dia de labuta" : "Dias seguidos"} bgColor={streak > 0 ? "bg-orange-50 dark:bg-orange-600" : "bg-slate-100 dark:bg-slate-600"} highlight={streak > 0} />
       </div>
 
-      {/* --- Galeria de Conquistas (Badges) --- */}
       <BadgeGallery badges={badges} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-10">
@@ -290,9 +228,7 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
                 </div>
               ))
             )}
-            {subjects.length > 5 && (
-              <p className="text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">+ {subjects.length - 5} outras cadeiras</p>
-            )}
+            {subjects.length > 5 && <p className="text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">+ {subjects.length - 5} outras cadeiras</p>}
           </div>
         </div>
       </div>

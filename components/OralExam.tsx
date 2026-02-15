@@ -1,19 +1,28 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Scale, Gavel, GraduationCap, Waves, Volume2, Info } from 'lucide-react';
+import { Mic, MicOff, Scale, Gavel, GraduationCap, Volume2, Info, Sparkles, History, CheckCircle, XCircle } from 'lucide-react';
 import { GoogleGenAI, Modality } from '@google/genai';
 import { Subject } from '../types';
+import { supabase } from '../services/supabaseClient';
+
+interface ExamResult {
+  id: string;
+  subject_name: string;
+  feedback: string;
+  grade: string;
+  created_at: string;
+}
 
 interface OralExamProps {
   subjects: Subject[];
+  userId: string;
 }
 
-const OralExam: React.FC<OralExamProps> = ({ subjects }) => {
+const OralExam: React.FC<OralExamProps> = ({ subjects, userId }) => {
   const [isActive, setIsActive] = useState(false);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(subjects[0]?.id || '');
-  const [transcription, setTranscription] = useState<string>('');
-  const [professorResponse, setProfessorResponse] = useState<string>('');
   const [status, setStatus] = useState<'idle' | 'connecting' | 'active'>('idle');
+  const [history, setHistory] = useState<ExamResult[]>([]);
   
   const audioContextRef = useRef<AudioContext | null>(null);
   const nextStartTimeRef = useRef<number>(0);
@@ -21,6 +30,19 @@ const OralExam: React.FC<OralExamProps> = ({ subjects }) => {
   const sessionRef = useRef<any>(null);
 
   const selectedSubject = subjects.find(s => s.id === selectedSubjectId)?.name || "Direito";
+
+  useEffect(() => {
+    fetchHistory();
+  }, [userId]);
+
+  const fetchHistory = async () => {
+    const { data, error } = await supabase
+      .from('oral_exam_history')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (data) setHistory(data);
+  };
 
   const decodeBase64 = (base64: string) => {
     const binaryString = atob(base64);
@@ -57,7 +79,7 @@ const OralExam: React.FC<OralExamProps> = ({ subjects }) => {
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Charon' } } },
-          systemInstruction: `Você é um Professor da Faculdade de Direito da USP (SanFran). Você está conduzindo um exame oral rigoroso sobre a disciplina de ${selectedSubject}. Use linguagem jurídica formal, trate o aluno como "Doutor" ou "Doutora". Faça uma pergunta por vez, ouça a resposta, avalie a precisão técnica e o fundamento legal, e prossiga com uma pergunta complementar ou mude de tópico se a resposta for satisfatória.`,
+          systemInstruction: `Você é um Professor da Faculdade de Direito da USP (SanFran). Você está conduzindo um exame oral rigoroso sobre a disciplina de ${selectedSubject}. Use linguagem jurídica formal, trate o aluno como "Doutor" ou "Doutora". Faça uma pergunta por vez, ouça a resposta, avalie a precisão técnica e o fundamento legal. Importante: Se o aluno disser "Solicito Veredito", você deve parar as perguntas e dar uma nota de 0 a 10 e um feedback final curto.`,
         },
         callbacks: {
           onopen: () => {
@@ -99,6 +121,7 @@ const OralExam: React.FC<OralExamProps> = ({ subjects }) => {
           onclose: () => {
             setStatus('idle');
             setIsActive(false);
+            fetchHistory();
           },
           onerror: (e) => console.error("Erro Live API:", e)
         }
@@ -127,9 +150,11 @@ const OralExam: React.FC<OralExamProps> = ({ subjects }) => {
           <h2 className="text-4xl font-black text-slate-950 dark:text-white uppercase tracking-tight">Exame Oral AI</h2>
           <p className="text-slate-500 dark:text-slate-400 font-bold italic text-lg mt-1">Treine sua oratória e fundamentação jurídica.</p>
         </div>
-        <div className="bg-usp-gold/10 px-6 py-3 rounded-2xl border border-usp-gold/30 flex items-center gap-3">
-           <GraduationCap className="text-usp-gold" />
-           <span className="text-[10px] font-black uppercase text-usp-gold tracking-widest">Academia SanFran</span>
+        <div className="flex flex-col items-end gap-2">
+           <div className="bg-usp-gold/10 px-6 py-3 rounded-2xl border border-usp-gold/30 flex items-center gap-3">
+              <GraduationCap className="text-usp-gold" />
+              <span className="text-[10px] font-black uppercase text-usp-gold tracking-widest">Academia SanFran</span>
+           </div>
         </div>
       </header>
 
@@ -155,20 +180,33 @@ const OralExam: React.FC<OralExamProps> = ({ subjects }) => {
                 <div className="flex items-start gap-3">
                    <Info className="text-usp-blue w-4 h-4 flex-shrink-0 mt-0.5" />
                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold leading-relaxed uppercase">
-                     O professor irá questionar sobre conceitos fundamentais, doutrina e jurisprudência da cadeira selecionada.
+                     Diga <b>"Solicito Veredito"</b> para que o professor encerre a arguição e avalie seu desempenho técnico.
                    </p>
                 </div>
               </div>
             </div>
           </div>
+
+          <div className="bg-white dark:bg-sanfran-rubiDark/30 p-6 rounded-[2rem] border border-slate-200 dark:border-sanfran-rubi/30 shadow-xl">
+             <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4 flex items-center gap-2"><History size={14} /> Histórico de Bancas</h4>
+             <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                {history.map(exam => (
+                  <div key={exam.id} className="p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-100 dark:border-white/10">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase truncate max-w-[100px]">{exam.subject_name}</span>
+                      <span className={`text-[10px] font-black ${Number(exam.grade) >= 7 ? 'text-emerald-500' : 'text-sanfran-rubi'}`}>NOTA {exam.grade}</span>
+                    </div>
+                    <p className="text-[9px] text-slate-400 font-bold uppercase">{new Date(exam.created_at).toLocaleDateString()}</p>
+                  </div>
+                ))}
+                {history.length === 0 && <p className="text-[9px] text-slate-400 font-black uppercase text-center py-4">Nenhum exame realizado.</p>}
+             </div>
+          </div>
         </div>
 
         <div className="lg:col-span-2">
           <div className="bg-white dark:bg-sanfran-rubiDark/30 rounded-[3rem] p-10 border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl h-full flex flex-col items-center justify-center text-center relative overflow-hidden">
-            {/* Elementos Decorativos */}
-            <div className="absolute top-0 right-0 p-8 opacity-5">
-              <Gavel size={180} />
-            </div>
+            <div className="absolute top-0 right-0 p-8 opacity-5"><Gavel size={180} /></div>
 
             {!isActive ? (
               <div className="space-y-8 relative z-10">
@@ -198,18 +236,11 @@ const OralExam: React.FC<OralExamProps> = ({ subjects }) => {
                       <Mic className="w-5 h-5" />
                     </div>
                   </div>
-                  <div className="flex gap-1">
-                    {[1,2,3,4,5,6].map(i => (
-                      <div key={i} className="w-1.5 h-8 bg-sanfran-rubi rounded-full animate-bounce" style={{ animationDelay: `${i * 0.1}s` }} />
-                    ))}
-                  </div>
                 </div>
-
                 <div className="space-y-4">
                   <h4 className="text-xl font-black text-sanfran-rubi uppercase tracking-widest">Ouvindo sua Tese...</h4>
                   <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em]">Mantenha o decoro e a clareza.</p>
                 </div>
-
                 <button 
                   onClick={stopSession}
                   className="px-8 py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-black transition-all border-b-4 border-black"

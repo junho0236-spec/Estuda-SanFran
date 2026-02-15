@@ -322,8 +322,8 @@ const App: React.FC = () => {
 
         <main className={`flex-1 overflow-y-auto ${isExtremeFocus ? 'p-0' : 'p-4 md:p-10'} relative transition-all duration-700`}>
           <div className={`${isExtremeFocus ? 'max-w-none h-full flex items-center justify-center' : 'max-w-6xl mx-auto'}`}>
-            {currentView === View.Dashboard && <Dashboard subjects={subjects} flashcards={flashcards} tasks={tasks} studySessions={studySessions} readings={readings} />}
-            {currentView === View.OralExam && <OralExam subjects={subjects} />}
+            {currentView === View.Dashboard && <Dashboard subjects={subjects} flashcards={flashcards} tasks={tasks} studySessions={studySessions} readings={readings} userId={session.user.id} />}
+            {currentView === View.OralExam && <OralExam subjects={subjects} userId={session.user.id} />}
             {currentView === View.LegalNews && <LegalNews />}
             {currentView === View.Anki && <Anki subjects={subjects} flashcards={flashcards} setFlashcards={setFlashcards} folders={folders} setFolders={setFolders} userId={session.user.id} />}
             {currentView === View.Library && <Library readings={readings} setReadings={setReadings} subjects={subjects} userId={session.user.id} />}
