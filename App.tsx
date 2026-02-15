@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Timer, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon } from 'lucide-react';
+import { LayoutDashboard, Timer, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession } from './types';
 import Dashboard from './components/Dashboard';
 import Anki from './components/Anki';
@@ -11,13 +11,10 @@ import CalendarView from './components/CalendarView';
 import Login from './components/Login';
 import { supabase } from './services/supabaseClient';
 
-// Helper para obter a data atual no formato YYYY-MM-DD (Brasília)
 export const getBrasiliaDate = () => {
   return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
 };
 
-// Helper para obter o timestamp ISO completo em Brasília (YYYY-MM-DDTHH:mm:ss)
-// Evita que tarefas feitas à noite "pulem" para o dia seguinte no banco de dados
 export const getBrasiliaISOString = () => {
   const now = new Date();
   const formatter = new Intl.DateTimeFormat('sv-SE', { 
@@ -63,7 +60,7 @@ const BrasiliaClock: React.FC = () => {
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>(View.Dashboard);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [session, setSession] = useState<any>(null);
 
@@ -100,39 +97,24 @@ const App: React.FC = () => {
 
   const loadUserData = async () => {
     const userId = session.user.id;
-    
     try {
-      const [
-        resSubs,
-        resFlds,
-        resCards,
-        resTks,
-        resSessions
-      ] = await Promise.all([
+      const [resSubs, resFlds, resCards, resTks, resSessions] = await Promise.all([
         supabase.from('subjects').select('*').eq('user_id', userId),
         supabase.from('folders').select('*').eq('user_id', userId),
         supabase.from('flashcards').select('*').eq('user_id', userId),
         supabase.from('tasks').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
         supabase.from('study_sessions').select('*').eq('user_id', userId).order('start_time', { ascending: false })
       ]);
-
       if (resSubs.data) setSubjects(resSubs.data);
       if (resFlds.data) setFolders(resFlds.data.map(f => ({ id: f.id, name: f.name, parentId: f.parent_id })));
       if (resCards.data) setFlashcards(resCards.data.map(c => ({
         id: c.id, front: c.front, back: c.back, subjectId: c.subject_id, folderId: c.folder_id, nextReview: c.next_review, interval: c.interval
       })));
       if (resTks.data) setTasks(resTks.data.map(t => ({
-        id: t.id, 
-        title: t.title, 
-        completed: t.completed, 
-        subjectId: t.subject_id, 
-        dueDate: t.due_date, 
-        completedAt: t.completed_at,
-        priority: t.priority || 'normal',
-        category: t.category || 'geral'
+        id: t.id, title: t.title, completed: t.completed, subjectId: t.subject_id, dueDate: t.due_date, completedAt: t.completed_at,
+        priority: t.priority || 'normal', category: t.category || 'geral'
       })));
       if (resSessions.data) setStudySessions(resSessions.data);
-
     } catch (err) {
       console.error("Erro crítico no carregamento do protocolo acadêmico:", err);
     }
@@ -144,20 +126,31 @@ const App: React.FC = () => {
     localStorage.setItem('omnistudy_darkmode', JSON.stringify(isDarkMode));
   }, [isDarkMode]);
 
+  const closeSidebar = () => setIsSidebarOpen(false);
+
   if (!isAuthenticated) return <Login onLogin={() => setIsAuthenticated(true)} />;
 
   const navItems = [
     { id: View.Dashboard, icon: LayoutDashboard, label: 'Painel' },
-    { id: View.Anki, icon: BrainCircuit, label: 'Flashcards (Anki)' },
-    { id: View.Timer, icon: Timer, label: 'Cronômetro' },
-    { id: View.Calendar, icon: CalendarIcon, label: 'Calendário' },
-    { id: View.Subjects, icon: BookOpen, label: 'Disciplinas' },
-    { id: View.Tasks, icon: CheckSquare, label: 'Tarefas' },
+    { id: View.Anki, icon: BrainCircuit, label: 'Flashcards' },
+    { id: View.Timer, icon: Timer, label: 'Timer' },
+    { id: View.Calendar, icon: CalendarIcon, label: 'Agenda' },
+    { id: View.Subjects, icon: BookOpen, label: 'Cadeiras' },
+    { id: View.Tasks, icon: CheckSquare, label: 'Pauta' },
   ];
 
   return (
     <div className={`flex h-screen overflow-hidden transition-colors duration-300 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#fcfcfc]'}`}>
-      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 left-0 z-40 w-64 bg-white dark:bg-[#0d0303] border-r border-slate-200 dark:border-sanfran-rubi/30 transition-all lg:relative lg:translate-x-0 flex flex-col`}>
+      {/* Mobile Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden backdrop-blur-sm"
+          onClick={closeSidebar}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 left-0 z-40 w-64 bg-white dark:bg-[#0d0303] border-r border-slate-200 dark:border-sanfran-rubi/30 transition-transform duration-300 lg:relative lg:translate-x-0 flex flex-col`}>
         <div className="p-6 border-b border-slate-100 dark:border-sanfran-rubi/20 flex flex-col">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
@@ -167,36 +160,57 @@ const App: React.FC = () => {
                 <span className="text-[9px] font-black text-sanfran-rubi uppercase">Academia Jurídica</span>
               </div>
             </div>
+            <button onClick={closeSidebar} className="lg:hidden p-2 text-slate-400">
+              <X className="w-5 h-5" />
+            </button>
           </div>
           <BrasiliaClock />
         </div>
-        <nav className="p-4 space-y-2 flex-1 overflow-y-auto">
+        <nav className="p-4 space-y-1 flex-1 overflow-y-auto">
           {navItems.map((item) => (
-            <button key={item.id} onClick={() => setCurrentView(item.id)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${currentView === item.id ? 'bg-sanfran-rubi text-white font-black' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-sanfran-rubi/10'}`}>
+            <button 
+              key={item.id} 
+              onClick={() => { setCurrentView(item.id); closeSidebar(); }} 
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${currentView === item.id ? 'bg-sanfran-rubi text-white font-black shadow-lg shadow-red-900/20' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-sanfran-rubi/10'}`}
+            >
               <item.icon className="w-5 h-5" />
-              <span className="text-xs uppercase font-bold">{item.label}</span>
+              <span className="text-[10px] uppercase font-bold tracking-wider">{item.label}</span>
             </button>
           ))}
         </nav>
-        <div className="p-4 space-y-3">
-          <button onClick={() => setIsDarkMode(!isDarkMode)} className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-slate-100 dark:bg-sanfran-rubiDark text-xs font-black uppercase tracking-widest text-slate-900 dark:text-white">
-            {isDarkMode ? 'Escuro' : 'Claro'}
+        <div className="p-4 space-y-2">
+          <button onClick={() => setIsDarkMode(!isDarkMode)} className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-slate-100 dark:bg-sanfran-rubiDark text-[9px] font-black uppercase tracking-widest text-slate-900 dark:text-white">
+            {isDarkMode ? 'Modo Escuro' : 'Modo Claro'}
             {isDarkMode ? <Moon className="w-4 h-4 text-usp-blue" /> : <Sun className="w-4 h-4 text-usp-gold" />}
           </button>
-          <button onClick={() => supabase.auth.signOut()} className="w-full flex items-center gap-2 px-4 py-3 text-slate-400 hover:text-red-500 font-black uppercase text-[10px] tracking-widest"><LogOut className="w-4 h-4" /> Sair</button>
+          <button onClick={() => supabase.auth.signOut()} className="w-full flex items-center gap-2 px-4 py-3 text-slate-400 hover:text-red-500 font-black uppercase text-[10px] tracking-widest transition-colors"><LogOut className="w-4 h-4" /> Sair</button>
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto p-4 md:p-10">
-        <div className="max-w-6xl mx-auto">
-          {currentView === View.Dashboard && <Dashboard subjects={subjects} flashcards={flashcards} tasks={tasks} studySessions={studySessions} />}
-          {currentView === View.Anki && <Anki subjects={subjects} flashcards={flashcards} setFlashcards={setFlashcards} folders={folders} setFolders={setFolders} userId={session.user.id} />}
-          {currentView === View.Timer && <Pomodoro subjects={subjects} userId={session.user.id} setStudySessions={setStudySessions} />}
-          {currentView === View.Calendar && <CalendarView subjects={subjects} tasks={tasks} userId={session.user.id} studySessions={studySessions} />}
-          {currentView === View.Subjects && <Subjects subjects={subjects} setSubjects={setSubjects} userId={session.user.id} />}
-          {currentView === View.Tasks && <Tasks subjects={subjects} tasks={tasks} setTasks={setTasks} userId={session.user.id} />}
-        </div>
-      </main>
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Mobile Header */}
+        <header className="lg:hidden bg-white dark:bg-[#0d0303] border-b border-slate-200 dark:border-sanfran-rubi/30 p-4 flex items-center justify-between sticky top-0 z-20">
+          <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-slate-100 dark:bg-sanfran-rubi/10 rounded-xl text-slate-600 dark:text-white">
+            <Menu className="w-6 h-6" />
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="bg-sanfran-rubi p-1.5 rounded-lg text-white"><BookOpen className="w-4 h-4" /></div>
+            <span className="text-sm font-black dark:text-white uppercase tracking-tighter">SanFran</span>
+          </div>
+          <div className="w-10"></div> {/* Spacer for symmetry */}
+        </header>
+
+        <main className="flex-1 overflow-y-auto p-4 md:p-10 relative">
+          <div className="max-w-6xl mx-auto">
+            {currentView === View.Dashboard && <Dashboard subjects={subjects} flashcards={flashcards} tasks={tasks} studySessions={studySessions} />}
+            {currentView === View.Anki && <Anki subjects={subjects} flashcards={flashcards} setFlashcards={setFlashcards} folders={folders} setFolders={setFolders} userId={session.user.id} />}
+            {currentView === View.Timer && <Pomodoro subjects={subjects} userId={session.user.id} setStudySessions={setStudySessions} />}
+            {currentView === View.Calendar && <CalendarView subjects={subjects} tasks={tasks} userId={session.user.id} studySessions={studySessions} />}
+            {currentView === View.Subjects && <Subjects subjects={subjects} setSubjects={setSubjects} userId={session.user.id} />}
+            {currentView === View.Tasks && <Tasks subjects={subjects} tasks={tasks} setTasks={setTasks} userId={session.user.id} />}
+          </div>
+        </main>
+      </div>
     </div>
   );
 };

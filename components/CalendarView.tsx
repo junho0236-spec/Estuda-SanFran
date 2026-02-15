@@ -69,35 +69,35 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId, st
   const dailyTasks = tasks.filter(t => t.completed && t.completedAt?.startsWith(selectedFullDate));
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-500 pb-20">
+    <div className="space-y-6 md:space-y-10 animate-in fade-in duration-500 pb-20 px-2 md:px-0">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <h2 className="text-4xl font-black text-slate-950 dark:text-white uppercase tracking-tight">Registro de Labuta</h2>
-          <p className="text-slate-700 dark:text-slate-300 font-bold text-lg">Seu histórico de dedicação acadêmica.</p>
+        <div className="text-center md:text-left">
+          <h2 className="text-3xl md:text-4xl font-black text-slate-950 dark:text-white uppercase tracking-tight leading-none">Labuta</h2>
+          <p className="text-slate-700 dark:text-slate-300 font-bold text-base md:text-lg mt-1">Sua história acadêmica.</p>
         </div>
         
-        <div className="bg-white dark:bg-sanfran-rubiDark/40 p-5 rounded-3xl border border-slate-200 dark:border-sanfran-rubi/30 shadow-xl flex items-center gap-4">
-          <div className="p-3 bg-usp-gold text-white rounded-2xl shadow-lg"><Trophy className="w-6 h-6" /></div>
+        <div className="bg-white dark:bg-sanfran-rubiDark/40 p-4 md:p-5 rounded-2xl md:rounded-3xl border border-slate-200 dark:border-sanfran-rubi/30 shadow-xl flex items-center justify-center gap-4 self-center md:self-auto">
+          <div className="p-2 md:p-3 bg-usp-gold text-white rounded-xl md:rounded-2xl shadow-lg"><Trophy className="w-5 h-5 md:w-6 md:h-6" /></div>
           <div>
-            <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Total Acumulado</p>
-            <p className="text-2xl font-black text-slate-950 dark:text-white">{displayTotal.value} <span className="text-sm font-normal">{displayTotal.unit}</span></p>
+            <p className="text-[9px] md:text-[10px] font-black uppercase text-slate-500 tracking-widest">Total Geral</p>
+            <p className="text-xl md:text-2xl font-black text-slate-950 dark:text-white">{displayTotal.value} <span className="text-xs font-normal">{displayTotal.unit}</span></p>
           </div>
         </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-10 items-start">
-        <div className="lg:col-span-3 bg-white dark:bg-sanfran-rubiDark/30 rounded-[3rem] p-8 border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl">
-          <div className="flex items-center justify-between mb-10">
-            <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase">{monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}</h3>
-            <div className="flex gap-3">
-              <button onClick={prevMonth} className="p-3 bg-slate-100 dark:bg-white/10 rounded-xl hover:bg-sanfran-rubi hover:text-white transition-all"><ChevronLeft /></button>
-              <button onClick={nextMonth} className="p-3 bg-slate-100 dark:bg-white/10 rounded-xl hover:bg-sanfran-rubi hover:text-white transition-all"><ChevronRight /></button>
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 md:gap-10 items-start">
+        <div className="lg:col-span-3 bg-white dark:bg-sanfran-rubiDark/30 rounded-[2rem] md:rounded-[3rem] p-4 md:p-8 border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl">
+          <div className="flex items-center justify-between mb-6 md:mb-10">
+            <h3 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white uppercase">{monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}</h3>
+            <div className="flex gap-2">
+              <button onClick={prevMonth} className="p-2 md:p-3 bg-slate-100 dark:bg-white/10 rounded-xl hover:bg-sanfran-rubi hover:text-white transition-all"><ChevronLeft className="w-5 h-5 md:w-6 md:h-6" /></button>
+              <button onClick={nextMonth} className="p-2 md:p-3 bg-slate-100 dark:bg-white/10 rounded-xl hover:bg-sanfran-rubi hover:text-white transition-all"><ChevronRight className="w-5 h-5 md:w-6 md:h-6" /></button>
             </div>
           </div>
 
-          <div className="grid grid-cols-7 gap-4">
+          <div className="grid grid-cols-7 gap-2 md:gap-4">
             {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map(d => (
-              <div key={d} className="text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{d}</div>
+              <div key={d} className="text-center text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest md:tracking-[0.2em]">{d}</div>
             ))}
             {blanks.map(b => <div key={`b-${b}`} />)}
             {days.map(day => {
@@ -113,10 +113,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId, st
                 <button 
                   key={day} 
                   onClick={() => setSelectedDay(day)}
-                  className={`aspect-square rounded-2xl border-2 flex flex-col items-center justify-center relative transition-all group ${isSelected ? 'bg-sanfran-rubi border-sanfran-rubi text-white shadow-xl scale-105 z-10' : hasActivity ? 'bg-sanfran-rubi/5 border-sanfran-rubi/30 text-sanfran-rubi hover:bg-sanfran-rubi/10' : 'bg-slate-50 dark:bg-white/5 border-transparent text-slate-400 hover:border-slate-300'} ${isToday && !isSelected ? 'ring-2 ring-usp-gold ring-offset-2 dark:ring-offset-sanfran-rubiBlack' : ''}`}
+                  className={`aspect-square rounded-xl md:rounded-2xl border flex flex-col items-center justify-center relative transition-all group ${isSelected ? 'bg-sanfran-rubi border-sanfran-rubi text-white shadow-xl scale-105 z-10' : hasActivity ? 'bg-sanfran-rubi/5 border-sanfran-rubi/30 text-sanfran-rubi hover:bg-sanfran-rubi/10' : 'bg-slate-50 dark:bg-white/5 border-transparent text-slate-400 hover:border-slate-300'} ${isToday && !isSelected ? 'ring-2 ring-usp-gold ring-offset-2 dark:ring-offset-sanfran-rubiBlack' : ''}`}
                 >
-                  <span className="font-black text-lg">{day}</span>
-                  {hasActivity && !isSelected && <div className="absolute top-2 right-2 w-2 h-2 bg-sanfran-rubi rounded-full shadow-md"></div>}
+                  <span className="font-black text-sm md:text-lg">{day}</span>
+                  {hasActivity && !isSelected && <div className="absolute top-1 md:top-2 right-1 md:right-2 w-1.5 h-1.5 md:w-2 md:h-2 bg-sanfran-rubi rounded-full shadow-sm"></div>}
                 </button>
               );
             })}
@@ -124,40 +124,39 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId, st
         </div>
 
         <div className="lg:col-span-2 space-y-6 animate-in slide-in-from-right-6 duration-500" key={selectedDay}>
-          <div className="bg-white dark:bg-sanfran-rubiDark/30 rounded-[2.5rem] p-8 border-t-[12px] border-t-sanfran-rubi border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl relative overflow-hidden">
-            <Scale className="absolute -bottom-4 -right-4 w-32 h-32 text-slate-100 dark:text-white/5 pointer-events-none" />
-            <h3 className="text-xl font-black mb-1 text-slate-900 dark:text-white uppercase flex items-center gap-2"><History className="text-sanfran-rubi w-5 h-5" /> Resumo do Dia</h3>
-            <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-8 border-b border-slate-100 dark:border-white/10 pb-4">Protocolo de {selectedDay} de {monthNames[currentDate.getMonth()]}</p>
-            <div className="space-y-8 relative z-10">
+          <div className="bg-white dark:bg-sanfran-rubiDark/30 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-8 border-t-[10px] md:border-t-[12px] border-t-sanfran-rubi border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl relative overflow-hidden">
+            <h3 className="text-lg md:text-xl font-black mb-1 text-slate-900 dark:text-white uppercase flex items-center gap-2"><History className="text-sanfran-rubi w-5 h-5" /> Protocolo</h3>
+            <p className="text-[9px] md:text-[10px] font-black uppercase text-slate-400 tracking-widest mb-6 border-b border-slate-100 dark:border-white/10 pb-4">{selectedDay} de {monthNames[currentDate.getMonth()]}</p>
+            <div className="space-y-6 relative z-10">
               <div>
-                <h4 className="text-[11px] font-black uppercase text-slate-500 tracking-tighter mb-4 flex items-center gap-2"><Clock className="w-4 h-4" /> Sessões de Estudo</h4>
-                <div className="space-y-3">
+                <h4 className="text-[9px] md:text-[11px] font-black uppercase text-slate-500 tracking-tighter mb-3 flex items-center gap-2"><Clock className="w-3.5 h-3.5" /> Sessões</h4>
+                <div className="space-y-2">
                   {dailySessions.map(s => {
                     const subject = subjects.find(sub => sub.id === s.subject_id);
                     const durationMins = Math.max(1, Math.round(Number(s.duration) / 60));
                     return (
-                      <div key={s.id} className="p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/10 flex items-center justify-between group hover:bg-white dark:hover:bg-white/10 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: subject?.color || '#9B111E' }}></div>
-                          <span className="font-bold text-slate-900 dark:text-white text-sm">{subject?.name || 'Geral'}</span>
+                      <div key={s.id} className="p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-100 dark:border-white/10 flex items-center justify-between group">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: subject?.color || '#9B111E' }}></div>
+                          <span className="font-bold text-slate-900 dark:text-white text-xs truncate max-w-[120px]">{subject?.name || 'Geral'}</span>
                         </div>
-                        <span className="text-xs font-black text-sanfran-rubi">{durationMins} min</span>
+                        <span className="text-[10px] font-black text-sanfran-rubi">{durationMins} min</span>
                       </div>
                     );
                   })}
-                  {dailySessions.length === 0 && <p className="text-[10px] italic text-slate-400 font-bold uppercase tracking-widest text-center py-4 border-2 border-dashed border-slate-100 dark:border-white/5 rounded-2xl">Sem atividades registradas</p>}
+                  {dailySessions.length === 0 && <p className="text-[9px] italic text-slate-400 font-bold uppercase tracking-widest text-center py-4 border-2 border-dashed border-slate-100 dark:border-white/5 rounded-xl">Vazio</p>}
                 </div>
               </div>
               <div>
-                <h4 className="text-[11px] font-black uppercase text-slate-500 tracking-tighter mb-4 flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-usp-blue" /> Tarefas Concluídas</h4>
-                <div className="space-y-3">
+                <h4 className="text-[9px] md:text-[11px] font-black uppercase text-slate-500 tracking-tighter mb-3 flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-usp-blue" /> Julgados</h4>
+                <div className="space-y-2">
                   {dailyTasks.map(t => (
-                    <div key={t.id} className="p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/10 flex items-center gap-3">
-                      <div className="p-1.5 bg-usp-blue/10 text-usp-blue rounded-lg"><Gavel className="w-4 h-4" /></div>
-                      <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{t.title}</span>
+                    <div key={t.id} className="p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-100 dark:border-white/10 flex items-center gap-2">
+                      <Gavel className="w-3.5 h-3.5 text-usp-blue" />
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{t.title}</span>
                     </div>
                   ))}
-                  {dailyTasks.length === 0 && <p className="text-[10px] italic text-slate-400 font-bold uppercase tracking-widest text-center py-4 border-2 border-dashed border-slate-100 dark:border-white/5 rounded-2xl">Nenhuma tarefa finalizada</p>}
+                  {dailyTasks.length === 0 && <p className="text-[9px] italic text-slate-400 font-bold uppercase tracking-widest text-center py-4 border-2 border-dashed border-slate-100 dark:border-white/5 rounded-xl">Vazio</p>}
                 </div>
               </div>
             </div>

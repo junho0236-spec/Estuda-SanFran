@@ -28,7 +28,6 @@ const Pomodoro: React.FC<PomodoroProps> = ({ subjects, userId, setStudySessions 
   }, [subjects, selectedSubject]);
 
   const saveSession = async (duration: number) => {
-    // Gerar carimbo de tempo ISO-like ajustado para Brasília
     const now = new Date();
     const brDate = new Intl.DateTimeFormat('sv-SE', { 
       timeZone: 'America/Sao_Paulo',
@@ -52,11 +51,8 @@ const Pomodoro: React.FC<PomodoroProps> = ({ subjects, userId, setStudySessions 
         subject_id: selectedSubject || null,
         start_time: brDate
       };
-
       const { error } = await supabase.from('study_sessions').insert(dbPayload);
-      
       if (error) throw error;
-
       setStudySessions(prev => [newSession, ...prev]);
     } catch (e) {
       console.error("Erro ao protocolar tempo no banco de dados:", e);
@@ -109,94 +105,81 @@ const Pomodoro: React.FC<PomodoroProps> = ({ subjects, userId, setStudySessions 
   const progress = ((totalTime - secondsLeft) / totalTime) * 100;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-10 animate-in zoom-in duration-300 pb-20">
+    <div className="max-w-2xl mx-auto space-y-6 md:space-y-10 animate-in zoom-in duration-300 pb-20 px-2">
       <header className="flex items-center justify-between">
         <div className="text-left">
-          <h2 className="text-4xl font-black text-slate-950 dark:text-white uppercase tracking-tight">Cronômetro</h2>
-          <p className="text-slate-500 dark:text-slate-400 font-bold italic mt-1">Sua produtividade em foco.</p>
+          <h2 className="text-3xl md:text-4xl font-black text-slate-950 dark:text-white uppercase tracking-tight">Timer</h2>
+          <p className="text-slate-500 dark:text-slate-400 font-bold italic text-sm md:text-base">Produtividade em foco.</p>
         </div>
         <button 
           onClick={() => setShowSettings(!showSettings)}
-          className={`p-4 rounded-2xl border-2 transition-all ${showSettings ? 'bg-sanfran-rubi text-white border-sanfran-rubi shadow-xl' : 'bg-white dark:bg-sanfran-rubiDark/20 text-slate-500 border-slate-200 dark:border-sanfran-rubi/30'}`}
+          className={`p-3 md:p-4 rounded-2xl border-2 transition-all ${showSettings ? 'bg-sanfran-rubi text-white border-sanfran-rubi shadow-xl' : 'bg-white dark:bg-sanfran-rubiDark/20 text-slate-500 border-slate-200 dark:border-sanfran-rubi/30'}`}
         >
           <Settings2 className="w-6 h-6" />
         </button>
       </header>
 
       {showSettings && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in slide-in-from-top-4 duration-300">
-          <div className="bg-white dark:bg-sanfran-rubiDark/40 p-6 rounded-[2rem] border border-slate-200 dark:border-sanfran-rubi/30 shadow-xl">
-            <label className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4">
-              <Clock className="w-4 h-4 text-sanfran-rubi" /> Tempo de Foco (Min)
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in slide-in-from-top-4 duration-300">
+          <div className="bg-white dark:bg-sanfran-rubiDark/40 p-5 md:p-6 rounded-[2rem] border border-slate-200 dark:border-sanfran-rubi/30 shadow-xl">
+            <label className="flex items-center gap-2 text-[9px] font-black uppercase text-slate-400 tracking-widest mb-4">
+              <Clock className="w-4 h-4 text-sanfran-rubi" /> Foco (Min)
             </label>
-            <div className="flex items-center gap-4">
-              <input 
-                type="range" min="1" max="120" step="5"
-                value={workMinutes}
-                onChange={(e) => setWorkMinutes(parseInt(e.target.value))}
-                className="flex-1 accent-sanfran-rubi h-2 bg-slate-100 dark:bg-black/40 rounded-full appearance-none cursor-pointer"
-              />
-              <span className="text-xl font-black text-sanfran-rubi w-10 text-right">{workMinutes}</span>
+            <div className="flex items-center gap-3">
+              <input type="range" min="1" max="120" step="5" value={workMinutes} onChange={(e) => setWorkMinutes(parseInt(e.target.value))} className="flex-1 accent-sanfran-rubi h-2 bg-slate-100 dark:bg-black/40 rounded-full appearance-none cursor-pointer" />
+              <span className="text-lg font-black text-sanfran-rubi w-8 text-right">{workMinutes}</span>
             </div>
           </div>
-          <div className="bg-white dark:bg-sanfran-rubiDark/40 p-6 rounded-[2rem] border border-slate-200 dark:border-sanfran-rubi/30 shadow-xl">
-            <label className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4">
-              <Coffee className="w-4 h-4 text-usp-blue" /> Tempo de Pausa (Min)
+          <div className="bg-white dark:bg-sanfran-rubiDark/40 p-5 md:p-6 rounded-[2rem] border border-slate-200 dark:border-sanfran-rubi/30 shadow-xl">
+            <label className="flex items-center gap-2 text-[9px] font-black uppercase text-slate-400 tracking-widest mb-4">
+              <Coffee className="w-4 h-4 text-usp-blue" /> Pausa (Min)
             </label>
-            <div className="flex items-center gap-4">
-              <input 
-                type="range" min="1" max="30" step="1"
-                value={breakMinutes}
-                onChange={(e) => setBreakMinutes(parseInt(e.target.value))}
-                className="flex-1 accent-usp-blue h-2 bg-slate-100 dark:bg-black/40 rounded-full appearance-none cursor-pointer"
-              />
-              <span className="text-xl font-black text-usp-blue w-10 text-right">{breakMinutes}</span>
+            <div className="flex items-center gap-3">
+              <input type="range" min="1" max="30" step="1" value={breakMinutes} onChange={(e) => setBreakMinutes(parseInt(e.target.value))} className="flex-1 accent-usp-blue h-2 bg-slate-100 dark:bg-black/40 rounded-full appearance-none cursor-pointer" />
+              <span className="text-lg font-black text-usp-blue w-8 text-right">{breakMinutes}</span>
             </div>
           </div>
         </div>
       )}
 
-      <div className="bg-white dark:bg-[#0d0303] rounded-[4rem] p-12 md:p-16 border-b-[16px] border-b-sanfran-rubi border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl flex flex-col items-center relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-sanfran-rubi/5 rounded-full -mr-16 -mt-16" />
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-usp-gold/5 rounded-full -ml-12 -mb-12" />
-
-        <div className="relative w-72 h-72 md:w-80 md:h-80 mb-12">
+      <div className="bg-white dark:bg-[#0d0303] rounded-[3rem] md:rounded-[4rem] p-8 md:p-16 border-b-[12px] md:border-b-[16px] border-b-sanfran-rubi border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl flex flex-col items-center relative overflow-hidden">
+        <div className="relative w-60 h-60 sm:w-72 sm:h-72 md:w-80 md:h-80 mb-8 md:mb-12">
           <svg className="w-full h-full transform -rotate-90 filter drop-shadow-xl">
-            <circle cx="50%" cy="50%" r="48%" stroke="currentColor" className="text-slate-100 dark:text-white/5" strokeWidth="8" fill="transparent" />
-            <circle cx="50%" cy="50%" r="48%" stroke="currentColor" strokeWidth="10" fill="transparent" strokeDasharray="100" strokeDashoffset={100 - progress} className={`transition-all duration-1000 ${mode === 'work' ? 'text-sanfran-rubi' : 'text-usp-blue'}`} pathLength="100" strokeLinecap="round" />
+            <circle cx="50%" cy="50%" r="48%" stroke="currentColor" className="text-slate-100 dark:text-white/5" strokeWidth="6 md:strokeWidth-8" fill="transparent" />
+            <circle cx="50%" cy="50%" r="48%" stroke="currentColor" strokeWidth="8 md:strokeWidth-10" fill="transparent" strokeDasharray="100" strokeDashoffset={100 - progress} className={`transition-all duration-1000 ${mode === 'work' ? 'text-sanfran-rubi' : 'text-usp-blue'}`} pathLength="100" strokeLinecap="round" />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-7xl md:text-8xl font-black tabular-nums text-slate-950 dark:text-white tracking-tighter drop-shadow-sm">{formatTime(secondsLeft)}</span>
-            <div className={`mt-4 px-5 py-2 rounded-full font-black uppercase text-[10px] tracking-[0.2em] shadow-lg flex items-center gap-2 ${mode === 'work' ? 'bg-sanfran-rubi text-white' : 'bg-usp-blue text-white'}`}>
-              {mode === 'work' ? <ShieldCheck className="w-4 h-4" /> : <Coffee className="w-4 h-4" />}
-              {mode === 'work' ? 'Estudando' : 'Descansando'}
+            <span className="text-5xl sm:text-7xl md:text-8xl font-black tabular-nums text-slate-950 dark:text-white tracking-tighter drop-shadow-sm">{formatTime(secondsLeft)}</span>
+            <div className={`mt-3 md:mt-4 px-4 py-1.5 rounded-full font-black uppercase text-[8px] md:text-[10px] tracking-widest shadow-lg flex items-center gap-2 ${mode === 'work' ? 'bg-sanfran-rubi text-white' : 'bg-usp-blue text-white'}`}>
+              {mode === 'work' ? <ShieldCheck className="w-3.5 h-3.5" /> : <Coffee className="w-3.5 h-3.5" />}
+              {mode === 'work' ? 'Estudo' : 'Descanso'}
             </div>
           </div>
         </div>
 
-        <div className="flex gap-6 mb-12 w-full max-w-sm">
+        <div className="flex gap-4 md:gap-6 mb-8 md:mb-12 w-full max-w-sm">
           <button 
             onClick={toggleTimer} 
-            className={`flex-1 py-6 rounded-[2rem] flex items-center justify-center transition-all shadow-2xl hover:scale-[1.03] active:scale-95 border-b-4 ${isActive ? 'bg-slate-100 dark:bg-white/10 text-slate-500 border-slate-300 dark:border-white/10' : 'bg-sanfran-rubi text-white border-sanfran-rubiDark'}`}
+            className={`flex-1 py-5 md:py-6 rounded-3xl md:rounded-[2rem] flex items-center justify-center transition-all shadow-xl hover:scale-[1.03] active:scale-95 border-b-4 ${isActive ? 'bg-slate-100 dark:bg-white/10 text-slate-500 border-slate-300 dark:border-white/10' : 'bg-sanfran-rubi text-white border-sanfran-rubiDark'}`}
           >
-            {isActive ? <Pause className="w-8 h-8" /> : <Play className="w-8 h-8 fill-current" />}
+            {isActive ? <Pause className="w-6 h-6 md:w-8 md:h-8" /> : <Play className="w-6 h-6 md:w-8 md:h-8 fill-current" />}
           </button>
           <button 
             onClick={resetTimer} 
-            className="w-24 bg-white dark:bg-white/5 border-2 border-slate-200 dark:border-sanfran-rubi/30 text-slate-400 hover:text-sanfran-rubi hover:border-sanfran-rubi rounded-[2rem] flex items-center justify-center transition-all shadow-xl active:scale-90"
+            className="w-16 md:w-24 bg-white dark:bg-white/5 border-2 border-slate-200 dark:border-sanfran-rubi/30 text-slate-400 hover:text-sanfran-rubi hover:border-sanfran-rubi rounded-3xl md:rounded-[2rem] flex items-center justify-center transition-all shadow-lg active:scale-90"
           >
-            <RotateCcw className="w-7 h-7" />
+            <RotateCcw className="w-6 h-6 md:w-7 md:h-7" />
           </button>
         </div>
 
         <div className="w-full space-y-3 max-w-sm">
-          <label className="text-[10px] text-center block font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Matéria Vinculada</label>
+          <label className="text-[9px] md:text-[10px] text-center block font-black text-slate-400 uppercase tracking-widest">Protocolar em</label>
           <select 
             value={selectedSubject || ''} 
             onChange={(e) => setSelectedSubject(e.target.value || null)} 
-            className="w-full p-5 bg-slate-50 dark:bg-black/60 border-2 border-slate-200 dark:border-sanfran-rubi/30 rounded-3xl font-black text-center outline-none focus:border-sanfran-rubi text-slate-900 dark:text-white transition-all shadow-inner"
+            className="w-full p-4 md:p-5 bg-slate-50 dark:bg-black/60 border-2 border-slate-200 dark:border-sanfran-rubi/30 rounded-2xl md:rounded-3xl font-black text-center outline-none focus:border-sanfran-rubi text-sm md:text-base text-slate-900 dark:text-white transition-all shadow-inner"
           >
-            <option value="">Geral / Sem Matéria</option>
+            <option value="">Sem Matéria</option>
             {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>
