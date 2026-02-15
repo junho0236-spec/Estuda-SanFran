@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Play, Pause, RotateCcw, Gavel, AlertCircle, Clock, FileText, CheckCircle2 } from 'lucide-react';
+import { Mic, Play, Pause, RotateCcw, Gavel, AlertCircle, Clock, FileText, CheckCircle2, Save } from 'lucide-react';
 
 const REGIMENTAL_TIME = 15 * 60; // 15 minutos em segundos
 const WARNING_THRESHOLD = 60; // Aviso quando faltar 1 minuto (60 segundos)
@@ -10,51 +10,98 @@ const OralArgument: React.FC = () => {
   const [isActive, setIsActive] = useState(false);
   const [status, setStatus] = useState<'idle' | 'running' | 'warning' | 'finished'>('idle');
   const [notes, setNotes] = useState('');
+  const [isSaved, setIsSaved] = useState(true);
   
-  // Áudios (Links diretos para efeitos sonoros)
+  // Ref para o elemento de áudio
   const bellRef = useRef<HTMLAudioElement | null>(null);
   
-  // URL de som de sino (Campainha de serviço/mesa)
-  const BELL_SOUND_URL = "https://cdn.pixabay.com/download/audio/2022/03/24/audio_823c0b8754.mp3?filename=service-bell-ring-14610.mp3";
+  // URL estável para som de campainha de serviço (Mixkit CDN)
+  const BELL_SOUND_URL = "https://assets.mixkit.co/sfx/preview/mixkit-service-bell-ring-1461.mp3";
 
+  // Carregar notas salvas localmente ao iniciar
+  useEffect(() => {
+    const savedNotes = localStorage.getItem('sanfran_oral_argument_notes');
+    if (savedNotes) {
+      setNotes(savedNotes);
+    }
+  }, []);
+
+  // Salvar notas automaticamente quando alteradas
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      localStorage.setItem('sanfran_oral_argument_notes', notes);
+      setIsSaved(true);
+    }, 1000);
+
+    return () => clearTimeout(timeoutId);
+  }, [notes]);
+
+  const handleNoteChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setNotes(e.target.value);
+    setIsSaved(false);
+  };
+
+  // Lógica do Cronômetro
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
 
     if (isActive && timeLeft > 0) {
       interval = setInterval(() => {
-        setTimeLeft((prev) => {
-          const newValue = prev - 1;
-          
-          // Lógica da Campainha de 1 Minuto Restante (Aos 14:00 decorridos / 1:00 restante)
-          if (newValue === WARNING_THRESHOLD) {
-            setStatus('warning');
-            playBell();
-          }
-
-          // Lógica de Encerramento (Tempo Esgotado)
-          if (newValue === 0) {
-            setStatus('finished');
-            setIsActive(false);
-            playBell();
-            setTimeout(playBell, 800); // Toca duas vezes no final
-          }
-
-          return newValue;
-        });
+        setTimeLeft((prev) => prev - 1);
       }, 1000);
+    } else if (timeLeft === 0 && isActive) {
+      // Tempo esgotou
+      setIsActive(false);
+      setStatus('finished');
     }
 
     return () => clearInterval(interval);
   }, [isActive, timeLeft]);
 
+  // Lógica dos Efeitos Sonoros (Monitora o timeLeft)
+  useEffect(() => {
+    if (!isActive) return;
+
+    // Aos 14:00 (Faltando 60 segundos)
+    if (timeLeft === WARNING_THRESHOLD) {
+      setStatus('warning');
+      playBell();
+    }
+
+    // Aos 15:00 (Tempo Esgotado)
+    if (timeLeft === 0) {
+      playBell();
+      // Toca novamente após 1 segundo para ênfase
+      setTimeout(playBell, 1200);
+    }
+  }, [timeLeft, isActive]);
+
   const playBell = () => {
     if (bellRef.current) {
       bellRef.current.currentTime = 0;
-      bellRef.current.play().catch(e => console.log("Erro ao tocar áudio:", e));
+      bellRef.current.volume = 1.0;
+      bellRef.current.play().catch(e => console.log("Erro ao tocar áudio (Autoplay bloqueado?):", e));
     }
   };
 
-  const toggleTimer = () => setIsActive(!isActive);
+  // Função para iniciar e "desbloquear" o áudio no navegador
+  const toggleTimer = () => {
+    if (!isActive) {
+      // Warm-up: Toca o áudio mudo rapidamente para o navegador liberar o autoplay
+      if (bellRef.current) {
+        bellRef.current.volume = 0; // Mudo
+        bellRef.current.play().then(() => {
+          bellRef.current.pause();
+          bellRef.current.currentTime = 0;
+          bellRef.current.volume = 1; // Restaura volume
+        }).catch(e => console.log("Warm-up de áudio falhou:", e));
+      }
+      setIsActive(true);
+      setStatus('running');
+    } else {
+      setIsActive(false);
+    }
+  };
 
   const resetTimer = () => {
     setIsActive(false);
@@ -66,15 +113,6 @@ const OralArgument: React.FC = () => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
-
-  const getStatusColor = () => {
-    switch (status) {
-      case 'warning': return 'text-orange-500 border-orange-500 bg-orange-50 dark:bg-orange-900/10';
-      case 'finished': return 'text-red-600 border-red-600 bg-red-50 dark:bg-red-900/10';
-      case 'running': return 'text-sanfran-rubi border-sanfran-rubi bg-white dark:bg-black/20';
-      default: return 'text-slate-400 border-slate-200 dark:border-white/10 bg-white dark:bg-black/20';
-    }
   };
 
   return (
@@ -162,14 +200,22 @@ const OralArgument: React.FC = () => {
                  <FileText className="text-slate-400" size={20} />
                  <h4 className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Roteiro de Fala</h4>
               </div>
-              <div className="text-[9px] font-bold text-slate-300 dark:text-slate-600 uppercase">
-                 Notas Privadas
+              <div className="flex items-center gap-2">
+                 {isSaved ? (
+                   <span className="text-[9px] font-bold text-emerald-500 uppercase flex items-center gap-1">
+                     <CheckCircle2 size={10} /> Salvo Localmente
+                   </span>
+                 ) : (
+                   <span className="text-[9px] font-bold text-slate-300 uppercase flex items-center gap-1">
+                     <Save size={10} /> Digitando...
+                   </span>
+                 )}
               </div>
            </div>
            
            <textarea
              value={notes}
-             onChange={(e) => setNotes(e.target.value)}
+             onChange={handleNoteChange}
              className="flex-1 w-full bg-transparent border-none outline-none resize-none font-serif text-lg leading-relaxed text-slate-800 dark:text-slate-200 placeholder:text-slate-300 dark:placeholder:text-slate-600"
              placeholder={`Excelentíssimos Senhores Ministros,\n\n1. Do Cabimento (Tempestividade e Preparo)\n2. Breve Síntese dos Fatos\n3. Do Mérito:\n   - Tese Principal\n   - Jurisprudência STJ/STF\n4. Dos Pedidos`}
            />
