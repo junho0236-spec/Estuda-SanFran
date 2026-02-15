@@ -30,6 +30,9 @@ export interface Subject {
   color: string;
 }
 
+export type TaskPriority = 'urgente' | 'alta' | 'normal';
+export type TaskCategory = 'peticao' | 'estudo' | 'audiencia' | 'admin' | 'geral';
+
 export interface Task {
   id: string;
   title: string;
@@ -37,11 +40,12 @@ export interface Task {
   subjectId?: string;
   dueDate?: string;
   completedAt?: string;
+  priority?: TaskPriority;
+  category?: TaskCategory;
 }
 
 export interface StudySession {
   id: string;
-  // Adicionando user_id para compatibilidade com o retorno do Supabase e criação de objetos locais
   user_id: string;
   start_time: string;
   duration: number;

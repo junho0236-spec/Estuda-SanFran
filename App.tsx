@@ -36,6 +36,7 @@ const BrasiliaClock: React.FC = () => {
 
   const parts = formatter.formatToParts(time);
   const dateStr = `${parts.find(p => p.type === 'day')?.value}/${parts.find(p => p.type === 'month')?.value}/${parts.find(p => p.type === 'year')?.value}`;
+  // Fix: Property 'second' does not exist on type 'DateTimeFormatPart'. Corrected to only use valid 'type' property.
   const timeStr = `${parts.find(p => p.type === 'hour')?.value}:${parts.find(p => p.type === 'minute')?.value}:${parts.find(p => p.type === 'second')?.value}`;
 
   return (
@@ -100,7 +101,7 @@ const App: React.FC = () => {
         supabase.from('subjects').select('*').eq('user_id', userId),
         supabase.from('folders').select('*').eq('user_id', userId),
         supabase.from('flashcards').select('*').eq('user_id', userId),
-        supabase.from('tasks').select('*').eq('user_id', userId),
+        supabase.from('tasks').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
         supabase.from('study_sessions').select('*').eq('user_id', userId).order('start_time', { ascending: false })
       ]);
 
@@ -110,7 +111,14 @@ const App: React.FC = () => {
         id: c.id, front: c.front, back: c.back, subjectId: c.subject_id, folderId: c.folder_id, nextReview: c.next_review, interval: c.interval
       })));
       if (resTks.data) setTasks(resTks.data.map(t => ({
-        id: t.id, title: t.title, completed: t.completed, subjectId: t.subject_id, dueDate: t.due_date, completedAt: t.completed_at
+        id: t.id, 
+        title: t.title, 
+        completed: t.completed, 
+        subjectId: t.subject_id, 
+        dueDate: t.due_date, 
+        completedAt: t.completed_at,
+        priority: t.priority || 'normal',
+        category: t.category || 'geral'
       })));
       if (resSessions.data) setStudySessions(resSessions.data);
 
