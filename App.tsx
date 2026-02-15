@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon } from 'lucide-react';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser } from './types';
 import Dashboard from './components/Dashboard';
 import Anki from './components/Anki';
@@ -13,6 +13,7 @@ import Library from './components/Library';
 import Largo from './components/Largo';
 import Mural from './components/Mural';
 import GradeCalculator from './components/GradeCalculator';
+import OralArgument from './components/OralArgument';
 import Login from './components/Login';
 import Atmosphere from './components/Atmosphere';
 import Scratchpad from './components/Scratchpad';
@@ -297,6 +298,7 @@ const App: React.FC = () => {
     { id: View.Anki, icon: BrainCircuit, label: 'Flashcards', color: 'text-usp-blue', bg: 'bg-cyan-100' },
     { id: View.Library, icon: LibraryIcon, label: 'Biblioteca', color: 'text-indigo-600', bg: 'bg-indigo-100' },
     { id: View.Timer, icon: TimerIcon, label: 'Timer', color: 'text-sanfran-rubi', bg: 'bg-red-100' },
+    { id: View.OralArgument, icon: Mic, label: 'Sustentação', color: 'text-rose-600', bg: 'bg-rose-100' },
     { id: View.Largo, icon: Users, label: 'O Largo', color: 'text-cyan-600', bg: 'bg-cyan-100' },
     { id: View.Mural, icon: MessageSquare, label: 'Mural', color: 'text-orange-600', bg: 'bg-orange-100' },
     { id: View.Calendar, icon: CalendarIcon, label: 'Agenda', color: 'text-violet-600', bg: 'bg-violet-100' },
@@ -436,6 +438,7 @@ const App: React.FC = () => {
               />
             )}
 
+            {currentView === View.OralArgument && <OralArgument />}
             {currentView === View.Calendar && <CalendarView subjects={subjects} tasks={tasks} userId={session.user.id} studySessions={studySessions} />}
             {currentView === View.Ranking && <Ranking userId={session.user.id} session={session} />}
             {currentView === View.Subjects && <Subjects subjects={subjects} setSubjects={setSubjects} userId={session.user.id} />}

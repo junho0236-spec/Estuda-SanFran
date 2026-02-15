@@ -10,7 +10,8 @@ export enum View {
   Library = 'library',
   Largo = 'largo',
   Mural = 'mural',
-  Calculator = 'calculator'
+  Calculator = 'calculator',
+  OralArgument = 'oral_argument'
 }
 
 export interface Folder {
