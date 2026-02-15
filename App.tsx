@@ -16,6 +16,18 @@ export const getBrasiliaDate = () => {
   return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
 };
 
+// Helper para obter o timestamp ISO completo em Brasília (YYYY-MM-DDTHH:mm:ss)
+// Evita que tarefas feitas à noite "pulem" para o dia seguinte no banco de dados
+export const getBrasiliaISOString = () => {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('sv-SE', { 
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
+  });
+  return formatter.format(now).replace(' ', 'T');
+};
+
 const BrasiliaClock: React.FC = () => {
   const [time, setTime] = useState(new Date());
 
@@ -36,7 +48,6 @@ const BrasiliaClock: React.FC = () => {
 
   const parts = formatter.formatToParts(time);
   const dateStr = `${parts.find(p => p.type === 'day')?.value}/${parts.find(p => p.type === 'month')?.value}/${parts.find(p => p.type === 'year')?.value}`;
-  // Fix: Property 'second' does not exist on type 'DateTimeFormatPart'. Corrected to only use valid 'type' property.
   const timeStr = `${parts.find(p => p.type === 'hour')?.value}:${parts.find(p => p.type === 'minute')?.value}:${parts.find(p => p.type === 'second')?.value}`;
 
   return (

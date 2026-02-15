@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Clock, History, Trophy, Gavel, Scale, CheckCircle2 } from 'lucide-react';
 import { Subject, StudySession, Task } from '../types';
 
@@ -11,15 +11,19 @@ interface CalendarViewProps {
 }
 
 const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId, studySessions }) => {
-  // Inicializa com a data local de Brasília para o calendário
-  const [currentDate, setCurrentDate] = useState(new Date());
-  
-  // Obter o dia atual em Brasília para seleção padrão
-  const getBrDay = () => {
-    return parseInt(new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit' }).format(new Date()));
+  // Helper para obter o "Agora" em Brasília como um objeto de data limpo
+  const getBrasiliaNow = () => {
+    const formatter = new Intl.DateTimeFormat('sv-SE', { 
+      timeZone: 'America/Sao_Paulo',
+      year: 'numeric', month: '2-digit', day: '2-digit'
+    });
+    const parts = formatter.format(new Date()).split('-');
+    return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
   };
-  
-  const [selectedDay, setSelectedDay] = useState<number>(getBrDay());
+
+  const brNow = useMemo(() => getBrasiliaNow(), []);
+  const [currentDate, setCurrentDate] = useState(brNow);
+  const [selectedDay, setSelectedDay] = useState<number>(brNow.getDate());
 
   const getDaysInMonth = (year: number, month: number) => {
     return new Date(year, month + 1, 0).getDate();
@@ -34,12 +38,20 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId, st
   const days = Array.from({ length: totalDays }, (_, i) => i + 1);
   const blanks = Array.from({ length: firstDayOfMonth }, (_, i) => i);
 
-  const prevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
-  const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+  const prevMonth = () => {
+    const newDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+    setCurrentDate(newDate);
+    setSelectedDay(1); // Reseta o dia ao mudar o mês
+  };
+
+  const nextMonth = () => {
+    const newDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
+    setCurrentDate(newDate);
+    setSelectedDay(1);
+  };
 
   const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
-  // Helper para formatar a data selecionada para busca (YYYY-MM-DD)
   const getSelectedDateStr = () => {
     const y = currentDate.getFullYear();
     const m = (currentDate.getMonth() + 1).toString().padStart(2, '0');
@@ -49,6 +61,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId, st
 
   const selectedFullDate = getSelectedDateStr();
   const dailySessions = studySessions.filter(s => s.start_time.startsWith(selectedFullDate));
+  
+  // Filtro de tarefas agora usa a string de data que condiz com o fuso de Brasília
   const dailyTasks = tasks.filter(t => t.completed && t.completedAt?.startsWith(selectedFullDate));
 
   return (
@@ -90,8 +104,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId, st
               const dateStr = `${y}-${m}-${d}`;
               
               const sessionsOnDay = studySessions.filter(s => s.start_time.startsWith(dateStr));
-              const hasActivity = sessionsOnDay.length > 0;
+              const tasksOnDay = tasks.filter(t => t.completedAt?.startsWith(dateStr));
+              const hasActivity = sessionsOnDay.length > 0 || tasksOnDay.length > 0;
               const isSelected = selectedDay === day;
+              const isToday = day === brNow.getDate() && currentDate.getMonth() === brNow.getMonth() && currentDate.getFullYear() === brNow.getFullYear();
 
               return (
                 <button 
@@ -102,6 +118,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId, st
                     ${isSelected ? 'bg-sanfran-rubi border-sanfran-rubi text-white shadow-xl scale-105 z-10' : 
                       hasActivity ? 'bg-sanfran-rubi/5 border-sanfran-rubi/30 text-sanfran-rubi hover:bg-sanfran-rubi/10' : 
                       'bg-slate-50 dark:bg-white/5 border-transparent text-slate-400 hover:border-slate-300'}
+                    ${isToday && !isSelected ? 'ring-2 ring-usp-gold ring-offset-2 dark:ring-offset-sanfran-rubiBlack' : ''}
                   `}
                 >
                   <span className="font-black text-lg">{day}</span>

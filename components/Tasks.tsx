@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { Task, Subject, TaskPriority, TaskCategory } from '../types';
 import { supabase } from '../services/supabaseClient';
-import { getBrasiliaDate } from '../App';
+import { getBrasiliaDate, getBrasiliaISOString } from '../App';
 
 interface TasksProps {
   subjects: Subject[];
@@ -41,6 +41,7 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
     if (!newTaskTitle.trim()) return;
     const newId = Math.random().toString(36).substr(2, 9);
     const today = getBrasiliaDate();
+    const now = getBrasiliaISOString();
     
     try {
       const dbPayload = {
@@ -52,7 +53,7 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
         due_date: today,
         priority: selectedPriority,
         category: selectedCategory,
-        created_at: new Date().toISOString()
+        created_at: now
       };
 
       const { error } = await supabase.from('tasks').insert(dbPayload);
@@ -73,15 +74,15 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
       setIsAdding(false);
     } catch (err) {
       console.error(err);
-      alert("Erro ao protocolar tarefa no dossiê. Verifique se as colunas 'priority' e 'category' foram criadas no Supabase.");
+      alert("Erro ao protocolar tarefa no dossiê.");
     }
   };
 
   const toggleTask = async (task: Task) => {
     const isNowCompleted = !task.completed;
-    const completionTimestamp = isNowCompleted ? new Date().toISOString() : null;
+    // CRÍTICO: Usar getBrasiliaISOString() em vez de new Date().toISOString()
+    const completionTimestamp = isNowCompleted ? getBrasiliaISOString() : null;
 
-    // Atualização Otimista para resposta instantânea
     setTasks(prev => prev.map(t => t.id === task.id ? { 
       ...t, 
       completed: isNowCompleted, 
@@ -101,7 +102,6 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
       if (error) throw error;
     } catch (err) {
       console.error("Erro na sincronização da tarefa:", err);
-      // Reverter estado local em caso de falha crítica
       setTasks(prev => prev.map(t => t.id === task.id ? task : t));
     }
   };
@@ -308,7 +308,7 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
                    )}
                    <span className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                      <Calendar className="w-4 h-4 text-slate-300" /> 
-                     {task.completed ? `Concluído em ${new Date(task.completedAt!).toLocaleDateString()}` : `Protocolado: ${task.dueDate || 'Imediato'}`}
+                     {task.completed ? `Concluído em ${new Date(task.completedAt!).toLocaleDateString('pt-BR')}` : `Protocolado: ${task.dueDate || 'Imediato'}`}
                    </span>
                 </div>
               </div>
