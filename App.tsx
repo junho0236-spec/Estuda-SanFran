@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause } from 'lucide-react';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession } from './types';
 import Dashboard from './components/Dashboard';
 import Anki from './components/Anki';
@@ -8,6 +8,7 @@ import Pomodoro from './components/Pomodoro';
 import Subjects from './components/Subjects';
 import Tasks from './components/Tasks';
 import CalendarView from './components/CalendarView';
+import Ranking from './components/Ranking';
 import Login from './components/Login';
 import { supabase } from './services/supabaseClient';
 
@@ -101,12 +102,24 @@ const App: React.FC = () => {
     if (timerMode === 'work') {
       await saveStudySession(timerTotalInitial);
       setTimerMode('break');
-      // Default break time logic (can be overriden in Pomodoro component)
       alert("Ciclo concluído! Hora do descanso.");
     } else {
       setTimerMode('work');
       alert("Descanso encerrado. De volta aos estudos.");
     }
+  };
+
+  const manualFinalize = async () => {
+    const elapsed = timerTotalInitial - timerSecondsLeft;
+    if (elapsed < 10) {
+      if (!confirm("O tempo decorrido é muito curto. Deseja realmente protocolar apenas alguns segundos?")) return;
+    }
+    
+    if (timerMode === 'work' && elapsed > 0) {
+      await saveStudySession(elapsed);
+    }
+    
+    setTimerIsActive(false);
   };
 
   const saveStudySession = async (duration: number) => {
@@ -203,6 +216,7 @@ const App: React.FC = () => {
     { id: View.Anki, icon: BrainCircuit, label: 'Flashcards' },
     { id: View.Timer, icon: TimerIcon, label: 'Timer' },
     { id: View.Calendar, icon: CalendarIcon, label: 'Agenda' },
+    { id: View.Ranking, icon: Trophy, label: 'Ranking' },
     { id: View.Subjects, icon: BookOpen, label: 'Cadeiras' },
     { id: View.Tasks, icon: CheckSquare, label: 'Pauta' },
   ];
@@ -256,7 +270,6 @@ const App: React.FC = () => {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0 relative">
-        {/* Mobile Header */}
         <header className="lg:hidden bg-white dark:bg-[#0d0303] border-b border-slate-200 dark:border-sanfran-rubi/30 p-4 flex items-center justify-between sticky top-0 z-20">
           <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-slate-100 dark:bg-sanfran-rubi/10 rounded-xl text-slate-600 dark:text-white">
             <Menu className="w-6 h-6" />
@@ -279,7 +292,6 @@ const App: React.FC = () => {
                 userId={session.user.id} 
                 studySessions={studySessions} 
                 setStudySessions={setStudySessions}
-                // Props globais do timer
                 isActive={timerIsActive}
                 setIsActive={setTimerIsActive}
                 secondsLeft={timerSecondsLeft}
@@ -289,16 +301,17 @@ const App: React.FC = () => {
                 selectedSubjectId={timerSelectedSubjectId}
                 setSelectedSubjectId={setTimerSelectedSubjectId}
                 setTotalInitial={setTimerTotalInitial}
+                onManualFinalize={manualFinalize}
               />
             )}
 
             {currentView === View.Calendar && <CalendarView subjects={subjects} tasks={tasks} userId={session.user.id} studySessions={studySessions} />}
+            {currentView === View.Ranking && <Ranking userId={session.user.id} />}
             {currentView === View.Subjects && <Subjects subjects={subjects} setSubjects={setSubjects} userId={session.user.id} />}
             {currentView === View.Tasks && <Tasks subjects={subjects} tasks={tasks} setTasks={setTasks} userId={session.user.id} />}
           </div>
         </main>
 
-        {/* --- Global Mini-Timer Widget --- */}
         {timerIsActive && currentView !== View.Timer && (
           <div 
             onClick={() => setCurrentView(View.Timer)}

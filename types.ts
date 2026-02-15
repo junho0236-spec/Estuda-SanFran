@@ -5,7 +5,8 @@ export enum View {
   Timer = 'timer',
   Subjects = 'subjects',
   Tasks = 'tasks',
-  Calendar = 'calendar'
+  Calendar = 'calendar',
+  Ranking = 'ranking'
 }
 
 export interface Folder {
@@ -50,4 +51,11 @@ export interface StudySession {
   start_time: string;
   duration: number;
   subject_id: string;
+}
+
+export interface RankingEntry {
+  user_id: string;
+  name: string;
+  total_seconds: number;
+  rank_name: string;
 }

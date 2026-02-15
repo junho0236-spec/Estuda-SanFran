@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Play, Pause, RotateCcw, Clock, Settings2, ShieldCheck, Coffee, History, Trash2, ArrowLeft, Calendar, Gavel, Trash } from 'lucide-react';
+import { Play, Pause, RotateCcw, Clock, Settings2, ShieldCheck, Coffee, History, Trash2, ArrowLeft, Calendar, Gavel, Trash, Check } from 'lucide-react';
 import { Subject, StudySession } from '../types';
 import { supabase } from '../services/supabaseClient';
 
@@ -9,7 +9,6 @@ interface PomodoroProps {
   userId: string;
   studySessions: StudySession[];
   setStudySessions: React.Dispatch<React.SetStateAction<StudySession[]>>;
-  // Props injetadas pelo App.tsx para persistência global
   isActive: boolean;
   setIsActive: (active: boolean) => void;
   secondsLeft: number;
@@ -19,6 +18,7 @@ interface PomodoroProps {
   selectedSubjectId: string | null;
   setSelectedSubjectId: (id: string | null) => void;
   setTotalInitial: (seconds: number) => void;
+  onManualFinalize?: () => void;
 }
 
 const Pomodoro: React.FC<PomodoroProps> = ({ 
@@ -34,27 +34,27 @@ const Pomodoro: React.FC<PomodoroProps> = ({
   setMode,
   selectedSubjectId,
   setSelectedSubjectId,
-  setTotalInitial
+  setTotalInitial,
+  onManualFinalize
 }) => {
   const [workMinutes, setWorkMinutes] = useState(25);
   const [breakMinutes, setBreakMinutes] = useState(5);
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
 
-  // Sincroniza configuração inicial quando não está ativo
   useEffect(() => {
     if (!isActive) {
       const initial = mode === 'work' ? workMinutes * 60 : breakMinutes * 60;
       setSecondsLeft(initial);
       setTotalInitial(initial);
     }
-  }, [workMinutes, breakMinutes, mode, isActive]);
+  }, [workMinutes, breakMinutes, mode, isActive, setSecondsLeft, setTotalInitial]);
 
   useEffect(() => {
     if (!selectedSubjectId && subjects.length > 0) {
       setSelectedSubjectId(subjects[0].id);
     }
-  }, [subjects, selectedSubjectId]);
+  }, [subjects, selectedSubjectId, setSelectedSubjectId]);
 
   const deleteSession = async (id: string) => {
     if (!confirm("Deseja expurgar este registro do seu histórico acadêmico?")) return;
@@ -135,6 +135,7 @@ const Pomodoro: React.FC<PomodoroProps> = ({
                 const subject = subjects.find(s => s.id === session.subject_id);
                 const date = new Date(session.start_time);
                 const durationMins = Math.floor(session.duration / 60);
+                const durationSecs = session.duration % 60;
                 
                 return (
                   <div key={session.id} className="group p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/10 flex items-center justify-between hover:bg-white dark:hover:bg-white/10 transition-all">
@@ -153,7 +154,7 @@ const Pomodoro: React.FC<PomodoroProps> = ({
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
-                      <span className="text-sm font-black text-sanfran-rubi">{durationMins}m</span>
+                      <span className="text-sm font-black text-sanfran-rubi">{durationMins > 0 ? `${durationMins}m` : ''} {durationSecs}s</span>
                       <button 
                         onClick={() => deleteSession(session.id)}
                         className="p-2 text-slate-200 hover:text-red-500 transition-colors"
@@ -232,19 +233,31 @@ const Pomodoro: React.FC<PomodoroProps> = ({
           </div>
         </div>
 
-        <div className="flex gap-4 md:gap-6 mb-8 md:mb-12 w-full max-w-sm">
-          <button 
-            onClick={toggleTimer} 
-            className={`flex-1 py-5 md:py-6 rounded-3xl md:rounded-[2rem] flex items-center justify-center transition-all shadow-xl hover:scale-[1.03] active:scale-95 border-b-4 ${isActive ? 'bg-slate-100 dark:bg-white/10 text-slate-500 border-slate-300 dark:border-white/10' : 'bg-sanfran-rubi text-white border-sanfran-rubiDark'}`}
-          >
-            {isActive ? <Pause className="w-6 h-6 md:w-8 md:h-8" /> : <Play className="w-6 h-6 md:w-8 md:h-8 fill-current" />}
-          </button>
-          <button 
-            onClick={resetTimer} 
-            className="w-16 md:w-24 bg-white dark:bg-white/5 border-2 border-slate-200 dark:border-sanfran-rubi/30 text-slate-400 hover:text-sanfran-rubi hover:border-sanfran-rubi rounded-3xl md:rounded-[2rem] flex items-center justify-center transition-all shadow-lg active:scale-90"
-          >
-            <RotateCcw className="w-6 h-6 md:w-7 md:h-7" />
-          </button>
+        <div className="flex flex-col md:flex-row gap-4 md:gap-6 mb-8 md:mb-12 w-full max-w-sm">
+          <div className="flex gap-4 flex-1">
+            <button 
+              onClick={toggleTimer} 
+              className={`flex-1 py-5 md:py-6 rounded-3xl md:rounded-[2rem] flex items-center justify-center transition-all shadow-xl hover:scale-[1.03] active:scale-95 border-b-4 ${isActive ? 'bg-slate-100 dark:bg-white/10 text-slate-500 border-slate-300 dark:border-white/10' : 'bg-sanfran-rubi text-white border-sanfran-rubiDark'}`}
+            >
+              {isActive ? <Pause className="w-6 h-6 md:w-8 md:h-8" /> : <Play className="w-6 h-6 md:w-8 md:h-8 fill-current" />}
+            </button>
+            <button 
+              onClick={resetTimer} 
+              className="w-16 md:w-24 bg-white dark:bg-white/5 border-2 border-slate-200 dark:border-sanfran-rubi/30 text-slate-400 hover:text-sanfran-rubi hover:border-sanfran-rubi rounded-3xl md:rounded-[2rem] flex items-center justify-center transition-all shadow-lg active:scale-90"
+            >
+              <RotateCcw className="w-6 h-6 md:w-7 md:h-7" />
+            </button>
+          </div>
+          
+          {/* Botão de Finalização Manual (Protocolar Agora) */}
+          {(isActive || secondsLeft < totalTime) && mode === 'work' && (
+            <button 
+              onClick={onManualFinalize}
+              className="w-full md:w-auto px-8 py-5 md:py-6 bg-emerald-500 hover:bg-emerald-600 text-white rounded-3xl md:rounded-[2rem] flex items-center justify-center gap-3 font-black uppercase text-[10px] tracking-widest shadow-xl shadow-emerald-900/20 transition-all hover:scale-[1.03] active:scale-95 border-b-4 border-emerald-700 animate-in fade-in zoom-in duration-300"
+            >
+              <Check className="w-5 h-5" /> Protocolar
+            </button>
+          )}
         </div>
 
         <div className="w-full space-y-3 max-w-sm">
