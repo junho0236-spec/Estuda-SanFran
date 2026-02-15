@@ -1,72 +1,55 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
+/**
+ * Tenta capturar a chave de API de diversas fontes comuns em builds de frontend (Vite, Webpack, Vercel).
+ */
 export const getSafeApiKey = (): string | null => {
   try {
+    // 1. Tenta o padrão exigido (process.env)
     const processKey = typeof process !== 'undefined' && process.env ? process.env.API_KEY : null;
     if (processKey && processKey !== "undefined" && processKey !== "") return processKey;
 
+    // 2. Tenta o padrão do Vite (import.meta.env) caso o build esteja mascarando process.env
     // @ts-ignore
     const viteKey = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_API_KEY : null;
     if (viteKey && viteKey !== "undefined" && viteKey !== "") return viteKey;
 
+    // 3. Verifica se a chave foi injetada globalmente no index.html
     // @ts-ignore
     const globalKey = window.__API_KEY__;
     if (globalKey && globalKey !== "") return globalKey;
 
-  } catch (e) {}
+  } catch (e) {
+    // Falha silenciosa se os objetos de ambiente não existirem
+  }
   return null;
 };
 
-const cleanJsonResponse = (rawText: string): string => {
-  let cleaned = rawText.trim();
-  cleaned = cleaned.replace(/^```json\n?/, "");
-  cleaned = cleaned.replace(/```$/, "");
-  return cleaned.trim();
-};
-
-export const generateFlashcards = async (
-  text: string, 
-  subjectName: string, 
-  config?: { count: string, frontLength: string, backLength: string }
-) => {
+/**
+ * Gera flashcards utilizando o modelo Gemini.
+ */
+export const generateFlashcards = async (text: string, subjectName: string) => {
   const apiKey = getSafeApiKey();
   
   if (!apiKey) {
-    throw new Error("DILIGÊNCIA NECESSÁRIA: A variável 'API_KEY' não está configurada corretamente.");
+    throw new Error("DILIGÊNCIA NECESSÁRIA: A variável 'API_KEY' não está visível para o navegador. Na Vercel, certifique-se de que a variável foi adicionada e o projeto foi reconstruído.");
   }
 
-  // Sempre cria uma nova instância para garantir que usa a chave mais atual do seletor
   const ai = new GoogleGenAI({ apiKey });
   
-  const countInstruction = config?.count === 'auto' 
-    ? "gere uma quantidade proporcional à densidade do texto" 
-    : `gere exatamente ${config?.count} flashcards`;
-
-  const frontInstruction = {
-    curto: "A frente deve ser uma pergunta direta, curta e objetiva.",
-    medio: "A frente deve ser uma pergunta contextualizada de tamanho médio.",
-    longo: "A frente deve ser um enunciado longo e detalhado."
-  }[config?.frontLength || 'medio'];
-
-  const backInstruction = {
-    curto: "O verso deve ser uma resposta direta e lacônica.",
-    medio: "O verso deve ser uma resposta fundamentada com base legal moderada.",
-    longo: "O verso deve ser uma explicação exaustiva e profunda."
-  }[config?.backLength || 'medio'];
-
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview', 
-      contents: `Você é um tutor de elite da SanFran.
+      contents: `Você é um tutor da SanFran (Academia Jurídica FDUSP). Sua tarefa é converter o texto jurídico abaixo em uma lista de Flashcards para Anki.
       
       DISCIPLINA: ${subjectName}
-      QUANTIDADE: ${countInstruction}
-      ESTILO: Frente ${frontInstruction}, Verso ${backInstruction}
+      TEXTO PARA PROCESSAR: ${text}
       
-      TEXTO: "${text}"
-      
-      REGRAS: Responda APENAS com um array JSON. Sem markdown.`,
+      REGRAS:
+      - Responda APENAS com o JSON.
+      - Foco em prazos, conceitos latinos e doutrina clássica.
+      - Crie perguntas instigantes na frente (front) e respostas fundamentadas no verso (back).`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -74,8 +57,8 @@ export const generateFlashcards = async (
           items: {
             type: Type.OBJECT,
             properties: {
-              front: { type: Type.STRING },
-              back: { type: Type.STRING }
+              front: { type: Type.STRING, description: 'Pergunta (Frente).' },
+              back: { type: Type.STRING, description: 'Resposta (Verso).' }
             },
             required: ["front", "back"]
           }
@@ -83,31 +66,24 @@ export const generateFlashcards = async (
       }
     });
 
-    const rawText = response.text;
-    if (!rawText) throw new Error("O servidor da IA retornou um veredito vazio.");
-    
-    const jsonStr = cleanJsonResponse(rawText);
-    try {
-      return JSON.parse(jsonStr);
-    } catch (parseError) {
-      throw new Error("A IA enviou dados em formato inválido.");
-    }
+    if (!response.text) throw new Error("A IA não retornou conteúdo.");
+    return JSON.parse(response.text.trim());
   } catch (err: any) {
     console.error("Erro Gemini:", err);
-    // Extrai mensagem técnica se disponível
-    const msg = err.message || JSON.stringify(err);
-    throw new Error(msg);
+    throw new Error("Erro no processamento da IA. Verifique se sua chave tem permissão para o modelo Gemini 1.5 Flash.");
   }
 };
 
 export const getStudyMotivation = async (subjects: string[]) => {
   const apiKey = getSafeApiKey();
   if (!apiKey) return "A justiça é a constante e perpétua vontade de dar a cada um o seu. - Ulpiano";
+
   const ai = new GoogleGenAI({ apiKey });
+  
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Gere uma frase de motivação curta para um estudante de Direito da SanFran que estuda: ${subjects.join(', ')}. Estilo erudito.`,
+      contents: `Gere uma frase de motivação curta para um estudante de Direito da SanFran que estuda: ${subjects.join(', ')}. Estilo erudito e clássico.`,
     });
     return response.text;
   } catch (e) {
