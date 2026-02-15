@@ -4,7 +4,6 @@ import {
   Plus, 
   Trash2, 
   CheckCircle2, 
-  CheckSquare,
   Circle, 
   Calendar, 
   Gavel, 
@@ -13,11 +12,12 @@ import {
   Briefcase, 
   BookOpen, 
   Hash,
-  ArrowUpCircle,
   Clock,
-  ChevronDown,
   Sparkles,
-  X
+  X,
+  FileText,
+  Stamp,
+  Scale
 } from 'lucide-react';
 import { Task, Subject, TaskPriority, TaskCategory } from '../types';
 import { supabase } from '../services/supabaseClient';
@@ -37,6 +37,13 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
   const [selectedCategory, setSelectedCategory] = useState<TaskCategory>('geral');
   const [filter, setFilter] = useState<'todos' | 'pendentes' | 'concluidos'>('pendentes');
   const [isAdding, setIsAdding] = useState(false);
+
+  // Gera um número de processo fictício baseado no ID e data
+  const getProcessNumber = (id: string, dateStr?: string) => {
+    const year = dateStr ? new Date(dateStr).getFullYear() : new Date().getFullYear();
+    const suffix = id.substring(0, 4).toUpperCase();
+    return `SF-${suffix}/${year}`;
+  };
 
   const addTask = async () => {
     if (!newTaskTitle.trim()) return;
@@ -75,7 +82,7 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
       setIsAdding(false);
     } catch (err) {
       console.error(err);
-      alert("Erro ao protocolar tarefa no dossiê.");
+      alert("Erro ao autuar processo.");
     }
   };
 
@@ -101,7 +108,7 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
       
       if (error) throw error;
     } catch (err) {
-      console.error("Erro na sincronização da tarefa:", err);
+      console.error("Erro na sentença:", err);
       setTasks(prev => prev.map(t => t.id === task.id ? task : t));
     }
   };
@@ -125,44 +132,58 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
 
   const getPriorityColor = (p?: TaskPriority) => {
     switch (p) {
-      case 'urgente': return 'text-red-600 bg-red-100 dark:bg-red-900/40 border-red-200 dark:border-red-800';
-      case 'alta': return 'text-orange-600 bg-orange-100 dark:bg-orange-900/40 border-orange-200 dark:border-orange-800';
-      default: return 'text-slate-600 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700';
+      case 'urgente': return 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-900/50';
+      case 'alta': return 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-900/50';
+      default: return 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800/50 dark:text-slate-400 dark:border-slate-700';
+    }
+  };
+
+  const getPriorityLabel = (p?: TaskPriority) => {
+    switch (p) {
+      case 'urgente': return 'Prioridade Legal';
+      case 'alta': return 'Tramitação Rápida';
+      default: return 'Rito Ordinário';
     }
   };
 
   const getCategoryIcon = (c?: TaskCategory) => {
     switch (c) {
-      case 'peticao': return <Gavel className="w-4 h-4" />;
-      case 'estudo': return <BookOpen className="w-4 h-4" />;
-      case 'audiencia': return <Clock className="w-4 h-4" />;
-      case 'admin': return <Briefcase className="w-4 h-4" />;
-      default: return <Hash className="w-4 h-4" />;
+      case 'peticao': return <FileText className="w-3 h-3" />;
+      case 'estudo': return <BookOpen className="w-3 h-3" />;
+      case 'audiencia': return <Clock className="w-3 h-3" />;
+      case 'admin': return <Briefcase className="w-3 h-3" />;
+      default: return <Hash className="w-3 h-3" />;
     }
   };
 
   const completedCount = tasks.filter(t => t.completed).length;
-  const progressPercent = tasks.length > 0 ? (completedCount / tasks.length) * 100 : 0;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 md:space-y-10 animate-in slide-in-from-bottom-8 duration-700 pb-20">
-      <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
-        <div className="space-y-2 text-center lg:text-left">
-          <div className="flex flex-col md:flex-row items-center gap-4">
-             <div className="bg-sanfran-rubi p-3 md:p-4 rounded-3xl text-white shadow-2xl shadow-red-900/30"><CheckSquare className="w-6 h-6 md:w-8 md:h-8" /></div>
-             <div>
-                <h2 className="text-3xl md:text-4xl font-black text-slate-950 dark:text-white uppercase tracking-tighter leading-none">Dossiê de Prazos</h2>
-                <p className="text-slate-500 dark:text-slate-400 font-bold text-sm md:text-lg mt-1 italic">Gestão de pauta e excelência.</p>
-             </div>
-          </div>
+    <div className="max-w-5xl mx-auto space-y-8 animate-in slide-in-from-bottom-8 duration-700 pb-20">
+      
+      {/* Header Estilo Diário Oficial */}
+      <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-6 border-b-4 border-double border-slate-200 dark:border-sanfran-rubi/20">
+        <div className="flex items-center gap-6">
+           <div className="bg-slate-900 dark:bg-white p-4 rounded-lg shadow-2xl">
+              <Scale className="w-8 h-8 text-white dark:text-sanfran-rubiBlack" />
+           </div>
+           <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-1">Poder Judiciário Acadêmico</p>
+              <h2 className="text-3xl md:text-5xl font-black text-slate-950 dark:text-white uppercase tracking-tighter font-serif leading-none">
+                Pauta de Julgamento
+              </h2>
+              <p className="text-slate-500 dark:text-slate-400 font-bold text-sm mt-1 font-serif italic">
+                Sessão Ordinária do Largo de São Francisco
+              </p>
+           </div>
         </div>
         
-        <div className="flex bg-white dark:bg-sanfran-rubiDark/20 p-1.5 rounded-2xl border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl backdrop-blur-md self-center">
+        <div className="flex bg-slate-100 dark:bg-sanfran-rubiDark/20 p-1.5 rounded-lg border border-slate-200 dark:border-sanfran-rubi/30 self-start lg:self-center">
           {(['pendentes', 'concluidos', 'todos'] as const).map(f => (
             <button 
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-4 md:px-6 py-2 md:py-3 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${filter === f ? 'bg-sanfran-rubi text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 dark:hover:text-white'}`}
+              className={`px-4 py-2 rounded-md text-[9px] font-black uppercase tracking-widest transition-all ${filter === f ? 'bg-white dark:bg-sanfran-rubi text-slate-900 dark:text-white shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-white'}`}
             >
               {f}
             </button>
@@ -170,160 +191,170 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
         </div>
       </header>
 
-      <div className="bg-white dark:bg-sanfran-rubiDark/30 p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl overflow-hidden relative group">
-        <div className="absolute top-0 right-0 w-24 md:w-32 h-24 md:h-32 bg-sanfran-rubi/5 rounded-full -mr-12 md:-mr-16 -mt-12 md:-mt-16" />
-        <div className="flex items-center justify-between mb-4 md:mb-6">
-          <div className="space-y-1">
-            <h3 className="text-[10px] md:text-[11px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-              <ArrowUpCircle className="w-4 h-4 text-sanfran-rubi" /> Desempenho
-            </h3>
-            <p className="text-[9px] md:text-xs text-slate-400 font-bold uppercase italic">Taxa de cumprimento</p>
-          </div>
-          <span className="text-3xl md:text-4xl font-black text-sanfran-rubi tabular-nums drop-shadow-sm">{Math.round(progressPercent)}%</span>
-        </div>
-        <div className="w-full h-4 md:h-5 bg-slate-100 dark:bg-black/40 rounded-full overflow-hidden shadow-inner p-1">
-          <div 
-            className="h-full bg-sanfran-rubi transition-all duration-1000 ease-out shadow-[0_0_15px_rgba(155,17,30,0.5)] rounded-full"
-            style={{ width: `${progressPercent}%` }}
-          />
-        </div>
-        <div className="mt-4 md:mt-6 flex justify-between text-[9px] font-black text-slate-500 uppercase tracking-widest">
-           <span className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-slate-300 rounded-full"/> {tasks.length - completedCount} Pendentes</span>
-           <span className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-sanfran-rubi rounded-full"/> {completedCount} Julgados</span>
-        </div>
-      </div>
-
-      <div className="bg-white dark:bg-sanfran-rubiDark/30 p-2 md:p-3 rounded-[2rem] md:rounded-[3rem] border-2 border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl focus-within:border-sanfran-rubi transition-all group">
+      {/* Input de Autuação */}
+      <div className={`bg-white dark:bg-sanfran-rubiDark/20 p-1 rounded-2xl border-2 transition-all shadow-lg ${isAdding ? 'border-sanfran-rubi ring-4 ring-sanfran-rubi/5' : 'border-slate-200 dark:border-sanfran-rubi/30'}`}>
         <div className="flex flex-col md:flex-row gap-2">
-          <div className="flex-1 flex items-center px-4 md:px-8 py-3 md:py-4">
-            <Gavel className="w-5 h-5 md:w-7 md:h-7 text-slate-300 group-focus-within:text-sanfran-rubi mr-3 md:mr-5" />
+          <div className="flex-1 flex items-center px-6 py-4">
+            <div className="mr-4 p-2 bg-slate-100 dark:bg-white/5 rounded-lg">
+               <Gavel className="w-6 h-6 text-slate-400" />
+            </div>
             <input 
               type="text" 
               value={newTaskTitle} 
               onChange={(e) => setNewTaskTitle(e.target.value)} 
-              placeholder="Descreva o ato..." 
+              placeholder="Autuar novo processo na pauta..." 
               onFocus={() => setIsAdding(true)}
               onKeyDown={(e) => e.key === 'Enter' && addTask()} 
-              className="flex-1 bg-transparent outline-none text-lg md:text-2xl font-black placeholder:text-slate-200 dark:placeholder:text-slate-800 text-slate-950 dark:text-white" 
+              className="flex-1 bg-transparent outline-none text-lg font-bold placeholder:text-slate-300 dark:placeholder:text-slate-600 text-slate-950 dark:text-white font-serif" 
             />
           </div>
-          <div className="flex justify-end p-2 md:p-0">
+          <div className="p-2">
             <button 
               onClick={addTask}
-              className="w-16 md:w-32 h-16 md:h-auto bg-sanfran-rubi text-white rounded-2xl md:rounded-[2.5rem] flex items-center justify-center hover:bg-sanfran-rubiDark transition-all shadow-xl shadow-red-900/20 active:scale-95"
+              className="w-full md:w-auto h-full px-8 bg-slate-900 dark:bg-sanfran-rubi text-white rounded-xl flex items-center justify-center gap-2 hover:opacity-90 transition-all font-black uppercase text-[10px] tracking-widest shadow-md"
             >
-              <Plus className="w-8 h-8 md:w-10 md:h-10" />
+              <Stamp className="w-4 h-4" /> Autuar
             </button>
           </div>
         </div>
 
         {isAdding && (
-          <div className="p-4 md:p-8 pt-2 md:pt-4 border-t border-slate-100 dark:border-sanfran-rubi/10 grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 animate-in slide-in-from-top-6 duration-400">
-             <div className="space-y-2">
-                <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2 ml-1">
-                  <BookOpen className="w-3 h-3" /> Cadeira
-                </label>
-                <select value={selectedSubjectId} onChange={(e) => setSelectedSubjectId(e.target.value)} className="w-full p-3 md:p-4 bg-slate-50 dark:bg-black/60 rounded-xl text-[10px] font-black border-2 border-transparent focus:border-sanfran-rubi outline-none appearance-none shadow-inner">
-                  <option value="">Administrativo</option>
+          <div className="px-6 pb-6 pt-2 border-t border-slate-100 dark:border-white/5 grid grid-cols-1 sm:grid-cols-3 gap-4 animate-in slide-in-from-top-2">
+             <div className="space-y-1">
+                <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest ml-1">Vara / Competência</label>
+                <select value={selectedSubjectId} onChange={(e) => setSelectedSubjectId(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-black/40 rounded-lg text-xs font-bold border border-slate-200 dark:border-white/10 outline-none focus:border-sanfran-rubi">
+                  <option value="">Geral / Administrativo</option>
                   {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
              </div>
-             <div className="space-y-2">
-                <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2 ml-1">
-                  <AlertTriangle className="w-3 h-3" /> Prioridade
-                </label>
-                <select value={selectedPriority} onChange={(e) => setSelectedPriority(e.target.value as TaskPriority)} className="w-full p-3 md:p-4 bg-slate-50 dark:bg-black/60 rounded-xl text-[10px] font-black border-2 border-transparent focus:border-sanfran-rubi outline-none shadow-inner">
-                  <option value="normal">⚖️ Normal</option>
-                  <option value="alta">⚠️ Alta</option>
-                  <option value="urgente">🚨 Urgente</option>
+             <div className="space-y-1">
+                <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest ml-1">Rito Processual</label>
+                <select value={selectedPriority} onChange={(e) => setSelectedPriority(e.target.value as TaskPriority)} className="w-full p-3 bg-slate-50 dark:bg-black/40 rounded-lg text-xs font-bold border border-slate-200 dark:border-white/10 outline-none focus:border-sanfran-rubi">
+                  <option value="normal">Rito Ordinário</option>
+                  <option value="alta">Tramitação Prioritária</option>
+                  <option value="urgente">Liminar / Urgente</option>
                 </select>
              </div>
-             <div className="space-y-2">
-                <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2 ml-1">
-                  <Sparkles className="w-3 h-3" /> Natureza
-                </label>
-                <div className="relative">
-                  <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value as TaskCategory)} className="w-full p-3 md:p-4 bg-slate-50 dark:bg-black/60 rounded-xl text-[10px] font-black border-2 border-transparent focus:border-sanfran-rubi outline-none shadow-inner">
-                    <option value="geral">Geral</option>
-                    <option value="peticao">Petição</option>
-                    <option value="estudo">Estudo</option>
-                    <option value="audiencia">Audiência</option>
-                  </select>
-                </div>
-             </div>
-             <div className="sm:col-span-3 flex justify-center pt-2">
-               <button onClick={() => setIsAdding(false)} className="text-[9px] font-black uppercase text-slate-400 flex items-center gap-2 hover:text-sanfran-rubi"><X className="w-3 h-3" /> Minimizar Detalhes</button>
+             <div className="space-y-1">
+                <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest ml-1">Natureza da Ação</label>
+                <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value as TaskCategory)} className="w-full p-3 bg-slate-50 dark:bg-black/40 rounded-lg text-xs font-bold border border-slate-200 dark:border-white/10 outline-none focus:border-sanfran-rubi">
+                  <option value="geral">Diversos</option>
+                  <option value="peticao">Petição / Redação</option>
+                  <option value="estudo">Doutrina / Estudo</option>
+                  <option value="audiencia">Audiência / Evento</option>
+                </select>
              </div>
           </div>
         )}
       </div>
 
-      <div className="space-y-4 md:space-y-6">
+      {/* Lista de Processos */}
+      <div className="space-y-4">
         {filteredTasks.map(task => {
           const subject = subjects.find(s => s.id === task.subjectId);
+          const processNumber = getProcessNumber(task.id, task.dueDate);
+          
           return (
             <div 
               key={task.id} 
-              className={`group flex flex-col sm:flex-row sm:items-center gap-4 md:gap-8 p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] border-2 transition-all relative overflow-hidden ${task.completed ? 'bg-slate-50 dark:bg-sanfran-rubiDark/10 border-slate-100 dark:border-sanfran-rubi/10 opacity-60' : 'bg-white dark:bg-sanfran-rubiDark/40 border-slate-200 dark:border-sanfran-rubi/20 shadow-xl'}`}
+              className={`group relative bg-white dark:bg-sanfran-rubiDark/30 border-l-[6px] rounded-r-xl shadow-sm hover:shadow-xl transition-all p-0 flex flex-col md:flex-row overflow-hidden ${task.completed ? 'opacity-60 grayscale-[0.5]' : 'opacity-100'}`}
+              style={{ borderLeftColor: subject?.color || '#334155' }}
             >
-              <div className="absolute left-0 top-0 bottom-0 w-2 md:w-3" style={{ backgroundColor: subject?.color || '#333' }} />
+              {/* Background Pattern de "Papel" */}
+              <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px]"></div>
 
-              <div className="flex items-center gap-4 flex-1 min-w-0">
-                <button 
-                  onClick={() => toggleTask(task)} 
-                  className={`flex-shrink-0 w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center transition-all ${task.completed ? 'bg-emerald-500 text-white shadow-lg' : 'bg-slate-50 dark:bg-black/60 text-slate-200 dark:text-slate-800 border-2 border-slate-100 dark:border-white/5 hover:border-sanfran-rubi'}`}
-                >
-                  {task.completed ? <CheckCircle2 className="w-6 h-6 md:w-8 md:h-8" /> : <Circle className="w-6 h-6 md:w-8 md:h-8" />}
-                </button>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                     <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border ${getPriorityColor(task.priority)}`}>
-                       {task.priority}
-                     </span>
-                     <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1 bg-slate-50 dark:bg-black/20 px-3 py-1 rounded-full">
+              {/* Coluna de Informações do Processo */}
+              <div className="p-5 md:w-64 flex flex-col justify-between border-b md:border-b-0 md:border-r border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-black/20">
+                 <div>
+                    <span className="font-mono text-[10px] font-black text-slate-400 block mb-1 tracking-wider">AUTOS Nº</span>
+                    <span className="font-mono text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-200/50 dark:bg-white/10 px-2 py-1 rounded select-all">
+                      {processNumber}
+                    </span>
+                 </div>
+                 
+                 <div className="mt-4 md:mt-0 space-y-2">
+                    <div className={`inline-flex items-center px-2 py-1 rounded border text-[9px] font-black uppercase tracking-wide ${getPriorityColor(task.priority)}`}>
+                       {task.priority === 'urgente' && <AlertTriangle className="w-3 h-3 mr-1" />}
+                       {getPriorityLabel(task.priority)}
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 uppercase">
                        {getCategoryIcon(task.category)}
-                       {task.category}
-                     </span>
-                  </div>
-                  <h4 className={`text-lg md:text-2xl font-black truncate leading-tight tracking-tight ${task.completed ? 'line-through text-slate-400' : 'text-slate-950 dark:text-white'}`}>
-                    {task.title}
-                  </h4>
-                  <div className="flex flex-wrap items-center gap-3 md:gap-6 mt-2">
-                     {subject && (
-                       <span className="text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 truncate max-w-[150px]">
-                          <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: subject.color }} />
-                          {subject.name}
-                       </span>
-                     )}
-                     <span className="flex items-center gap-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                       <Calendar className="w-3.5 h-3.5" /> 
-                       {task.completed ? `Julgado` : `Pauta: ${task.dueDate || 'Ativa'}`}
-                     </span>
-                  </div>
-                </div>
+                       {task.category || 'Geral'}
+                    </div>
+                 </div>
               </div>
 
-              <div className="flex items-center justify-end sm:opacity-0 group-hover:opacity-100 transition-all">
-                <button onClick={() => removeTask(task.id)} className="p-3 md:p-4 text-slate-300 hover:text-red-500 transition-all bg-slate-50 dark:bg-black/60 rounded-xl md:rounded-3xl border border-slate-100 dark:border-white/5">
-                  <Trash2 className="w-5 h-5 md:w-6 md:h-6" />
-                </button>
+              {/* Conteúdo Principal */}
+              <div className="flex-1 p-5 flex flex-col justify-center relative">
+                 {/* Carimbo de Status */}
+                 <div className="absolute top-2 right-4 pointer-events-none opacity-80 rotate-[-5deg]">
+                    {task.completed ? (
+                       <div className="border-2 border-emerald-600 text-emerald-600 px-3 py-1 rounded text-[10px] font-black uppercase tracking-widest flex items-center gap-1 bg-emerald-50/80 dark:bg-emerald-900/20">
+                          <CheckCircle2 size={12} /> Transitado em Julgado
+                       </div>
+                    ) : (
+                       <div className="border-2 border-sanfran-rubi text-sanfran-rubi px-3 py-1 rounded text-[10px] font-black uppercase tracking-widest flex items-center gap-1 bg-red-50/80 dark:bg-red-900/20">
+                          <BookOpen size={12} /> Concluso p/ Relator
+                       </div>
+                    )}
+                 </div>
+
+                 {subject && (
+                   <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1 flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: subject.color }}></div>
+                      {subject.name}
+                   </span>
+                 )}
+                 
+                 <h3 className={`text-xl md:text-2xl font-serif font-bold leading-tight ${task.completed ? 'line-through text-slate-400 decoration-slate-300' : 'text-slate-900 dark:text-white'}`}>
+                    {task.title}
+                 </h3>
+                 
+                 <div className="mt-4 flex items-center gap-4 text-xs font-medium text-slate-500">
+                    <span className="flex items-center gap-1.5 bg-slate-100 dark:bg-white/5 px-2 py-1 rounded">
+                       <Calendar className="w-3.5 h-3.5" />
+                       <span className="uppercase text-[10px] font-bold tracking-wide">{task.dueDate || 'Sem Prazo'}</span>
+                    </span>
+                 </div>
+              </div>
+
+              {/* Ações */}
+              <div className="p-4 flex md:flex-col items-center justify-center gap-2 border-t md:border-t-0 md:border-l border-slate-100 dark:border-white/5 bg-slate-50/30 dark:bg-black/10">
+                 <button 
+                  onClick={() => toggleTask(task)}
+                  className={`p-3 rounded-xl transition-all shadow-sm ${task.completed ? 'bg-slate-200 text-slate-500 hover:bg-slate-300' : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-900/20 hover:scale-105'}`}
+                  title={task.completed ? "Reabrir Processo" : "Julgar Procedente (Concluir)"}
+                 >
+                    {task.completed ? <CheckCircle2 className="w-5 h-5" /> : <Gavel className="w-5 h-5" />}
+                 </button>
+                 
+                 <button 
+                  onClick={() => removeTask(task.id)}
+                  className="p-3 rounded-xl bg-white dark:bg-white/5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all border border-slate-200 dark:border-white/10"
+                  title="Arquivar Processo"
+                 >
+                    <Trash2 className="w-5 h-5" />
+                 </button>
               </div>
             </div>
           );
         })}
 
         {filteredTasks.length === 0 && (
-          <div className="py-20 md:py-32 text-center bg-white dark:bg-sanfran-rubiDark/20 rounded-[2rem] md:rounded-[4rem] border-4 border-dashed border-slate-100 dark:border-sanfran-rubi/10 flex flex-col items-center gap-6 md:gap-8 animate-in fade-in duration-1000">
-            <div className="bg-slate-50 dark:bg-sanfran-rubiDark p-6 md:p-10 rounded-full relative">
-              <Gavel className="w-16 h-16 md:w-24 md:h-24 text-slate-100 dark:text-sanfran-rubi/10" />
+          <div className="py-24 text-center border-[6px] border-double border-slate-200 dark:border-white/5 rounded-3xl bg-slate-50/50 dark:bg-sanfran-rubiDark/10">
+            <div className="inline-block p-6 rounded-full bg-white dark:bg-white/5 shadow-sm mb-4">
+               <Briefcase className="w-12 h-12 text-slate-300" />
             </div>
-            <div className="space-y-1">
-              <p className="text-2xl md:text-3xl font-black text-slate-300 dark:text-slate-700 uppercase tracking-tighter italic">Pauta Vazia</p>
-              <p className="text-[10px] md:text-sm font-bold text-slate-400 uppercase tracking-widest px-6">Nenhum processo pendente para esta instância.</p>
-            </div>
+            <h3 className="text-xl font-serif font-bold text-slate-700 dark:text-slate-300">Pauta Livre</h3>
+            <p className="text-xs font-black uppercase tracking-widest text-slate-400 mt-1">Nenhum processo aguardando julgamento nesta instância.</p>
           </div>
         )}
+      </div>
+
+      <div className="text-center pt-8 border-t border-slate-200 dark:border-white/10">
+         <p className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-300">
+            Tribunal Acadêmico XI de Agosto • {new Date().getFullYear()}
+         </p>
       </div>
     </div>
   );
