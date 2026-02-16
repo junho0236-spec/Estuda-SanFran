@@ -41,7 +41,8 @@ export enum View {
   SucessaoSimulator = 'sucessao_simulator',
   JurisTinder = 'juris_tinder',
   InternRPG = 'intern_rpg',
-  PrescriptionCalculator = 'prescription_calculator'
+  PrescriptionCalculator = 'prescription_calculator',
+  SanFranIdiomas = 'sanfran_idiomas' // Novo
 }
 
 export interface Folder {
@@ -351,4 +352,29 @@ export interface RPGScenario {
   text: string;
   choices: RPGChoice[];
   image?: React.ElementType; // Icon
+}
+
+// --- SANFRAN IDIOMAS TYPES ---
+export interface IdiomaLesson {
+  id: string;
+  module: string; // "Foundations", "Contracts", "Courtroom"
+  title: string;
+  description: string;
+  theory: string;
+  example_sentence: string;
+  quiz: {
+    question: string;
+    options: string[];
+    answer: number;
+    explanation: string;
+  };
+  xp_reward: number;
+}
+
+export interface IdiomaProgress {
+  current_level_id: string;
+  streak_count: number;
+  total_xp: number;
+  lives: number;
+  completed_lessons: string[];
 }

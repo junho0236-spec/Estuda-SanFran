@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map, Hourglass } from 'lucide-react';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map, Hourglass, Globe } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel } from './types';
 import Dashboard from './components/Dashboard';
 import Anki from './components/Anki';
@@ -45,6 +45,7 @@ import SucessaoSimulator from './components/SucessaoSimulator';
 import JurisTinder from './components/JurisTinder';
 import InternRPG from './components/InternRPG';
 import PrescriptionCalculator from './components/PrescriptionCalculator';
+import SanFranIdiomas from './components/SanFranIdiomas';
 import { supabase } from './services/supabaseClient';
 
 export const getBrasiliaDate = () => {
@@ -397,6 +398,7 @@ const App: React.FC = () => {
 
   const navItems = [
     { id: View.Dashboard, icon: LayoutDashboard, label: 'Painel', color: 'text-slate-600', bg: 'bg-slate-100' },
+    { id: View.SanFranIdiomas, icon: Globe, label: 'Idiomas (Legal English)', color: 'text-sky-500', bg: 'bg-sky-100' },
     { id: View.InternRPG, icon: Map, label: 'Vida de Estagiário', color: 'text-blue-500', bg: 'bg-blue-100' },
     { id: View.PrescriptionCalculator, icon: Hourglass, label: 'Calc. Prescrição', color: 'text-red-600', bg: 'bg-red-50' },
     { id: View.JurisTinder, icon: ThumbsUp, label: 'O Veredito', color: 'text-emerald-500', bg: 'bg-emerald-100' },
@@ -587,6 +589,7 @@ const App: React.FC = () => {
             {currentView === View.JurisTinder && <JurisTinder />}
             {currentView === View.InternRPG && <InternRPG />}
             {currentView === View.PrescriptionCalculator && <PrescriptionCalculator userId={session.user.id} />}
+            {currentView === View.SanFranIdiomas && <SanFranIdiomas userId={session.user.id} />}
             
             {currentView === View.Duel && activeDuel && (
               <DuelArena 
