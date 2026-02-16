@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Building2, User, Clock, ArrowLeft, Play, Pause, LogOut, BookOpen, Shield, Gavel, Scale, Globe, BrainCircuit, HeartPulse, Briefcase, Landmark, Mic, MicOff, Headphones, HeadphoneOff, Radio, Volume2, VolumeX, Signal, Music, Link as LinkIcon, Share2, Info, Youtube, Wifi, WifiOff } from 'lucide-react';
+import { Building2, User, Clock, ArrowLeft, Play, Pause, LogOut, BookOpen, Shield, Gavel, Scale, Globe, BrainCircuit, HeartPulse, Briefcase, Landmark, Mic, MicOff, Headphones, HeadphoneOff, Radio, Volume2, VolumeX, Signal, Music, Link as LinkIcon, Share2, Info, Youtube, Wifi, WifiOff, ExternalLink } from 'lucide-react';
 import { PresenceUser } from '../types';
 import { supabase } from '../services/supabaseClient';
 
@@ -641,16 +641,33 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
                  </div>
                </div>
                
-               {/* Info sobre Play Manual */}
+               {/* Info sobre Play Manual e Limitação Spotify */}
                <div className="px-5 pt-2 flex items-center gap-2 text-slate-500 justify-between">
-                  <div className="flex items-center gap-2">
-                    <Info size={10} />
-                    <p className="text-[9px] font-bold uppercase tracking-wide">
-                        {mediaType === 'spotify' 
-                            ? "Spotify: Requer login Premium para tocar a música inteira." 
-                            : "YouTube: Áudio completo disponível."}
-                    </p>
-                  </div>
+                  {mediaType === 'spotify' ? (
+                    <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center gap-2">
+                            <Info size={10} className="text-orange-500" />
+                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">
+                                Modo Prévia (30s)
+                            </p>
+                        </div>
+                        <a 
+                            href="https://open.spotify.com" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-[8px] font-black uppercase text-sanfran-rubi hover:underline"
+                        >
+                            Login Premium <ExternalLink size={8} />
+                        </a>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                        <Youtube size={10} className="text-red-500" />
+                        <p className="text-[9px] font-bold uppercase tracking-wide">
+                            YouTube: Áudio completo disponível.
+                        </p>
+                    </div>
+                  )}
                </div>
 
                {/* Advanced Controls (Dropdowns, Links) */}
