@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Building2, User, Clock, ArrowLeft, Play, Pause, LogOut, BookOpen, Shield, Gavel, Scale, Globe, BrainCircuit, HeartPulse, Briefcase, Landmark, Mic, MicOff, Headphones, HeadphoneOff, Radio, Volume2, VolumeX, Signal, Music, Link as LinkIcon, Share2, Info, Youtube, Wifi, WifiOff } from 'lucide-react';
 import { PresenceUser } from '../types';
@@ -79,7 +78,7 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
   const [mediaType, setMediaType] = useState<MediaType>('youtube');
   const [customLinkInput, setCustomLinkInput] = useState('');
   const [isSynced, setIsSynced] = useState(true); // "Sincronizado com a Sala"
-  const [showSpotifyControls, setShowSpotifyControls] = useState(false);
+  const [showMediaControls, setShowMediaControls] = useState(false);
   const [lastDJName, setLastDJName] = useState<string>('');
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
 
@@ -555,7 +554,7 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{usersInRoom.length} Estudando</p>
                   </div>
                </div>
-               <button onClick={() => setShowSpotifyControls(!showSpotifyControls)} className={`p-2 rounded-xl transition-colors ${showSpotifyControls ? 'bg-white text-black' : 'bg-white/10 text-white'}`}>
+               <button onClick={() => setShowMediaControls(!showMediaControls)} className={`p-2 rounded-xl transition-colors ${showMediaControls ? 'bg-white text-black' : 'bg-white/10 text-white'}`}>
                   <Music size={18} />
                </button>
             </div>
@@ -635,14 +634,14 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
                </div>
 
                {/* Advanced Controls (Dropdowns, Links) */}
-               {showSpotifyControls && (
+               {showMediaControls && (
                  <div className="px-4 py-3 bg-black/20 animate-in slide-in-from-bottom-2 border-b border-white/5">
                     <div className="space-y-3">
                        <div className="flex gap-2">
                           <input 
                             value={customLinkInput}
                             onChange={(e) => setCustomLinkInput(e.target.value)}
-                            placeholder="Cole link YouTube ou Spotify..." 
+                            placeholder="Cole link do YouTube..." 
                             className="flex-1 bg-white/10 border border-white/10 rounded-xl px-3 py-2 text-[10px] text-white placeholder:text-slate-500 outline-none focus:border-sanfran-rubi"
                           />
                           <button onClick={handleCustomLink} className="p-2 bg-sanfran-rubi text-white rounded-xl">
