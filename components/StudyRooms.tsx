@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { Building2, User, Clock, ArrowLeft, Play, Pause, LogOut, BookOpen, Shield, Gavel, Scale, Globe, BrainCircuit, HeartPulse, Briefcase, Landmark, Mic, MicOff, Headphones, HeadphoneOff, Radio, Volume2, VolumeX, Signal, Music, Link as LinkIcon, Share2 } from 'lucide-react';
+import { Building2, User, Clock, ArrowLeft, Play, Pause, LogOut, BookOpen, Shield, Gavel, Scale, Globe, BrainCircuit, HeartPulse, Briefcase, Landmark, Mic, MicOff, Headphones, HeadphoneOff, Radio, Volume2, VolumeX, Signal, Music, Link as LinkIcon, Share2, Info } from 'lucide-react';
 import { PresenceUser } from '../types';
 import { supabase } from '../services/supabaseClient';
 
@@ -34,9 +33,13 @@ const departments: Department[] = [
 
 const spotifyPresets = [
   { name: 'Lofi Girl', url: 'https://open.spotify.com/playlist/0vvXsWCC9xrXsKd4FyS8kM' },
-  { name: 'Classical Essentials', url: 'https://open.spotify.com/playlist/37i9dQZF1DWWEJlAGA9gs0' },
+  { name: 'Clássica', url: 'https://open.spotify.com/playlist/37i9dQZF1DWWEJlAGA9gs0' },
+  { name: 'MPB Café', url: 'https://open.spotify.com/playlist/37i9dQZF1DX1h3082a939f' },
+  { name: 'Sertanejo', url: 'https://open.spotify.com/playlist/37i9dQZF1DX0cK9f4fE52l' },
+  { name: 'Top Brasil', url: 'https://open.spotify.com/playlist/37i9dQZF1DX0FOF1IUWK1W' },
+  { name: 'Rock Classics', url: 'https://open.spotify.com/playlist/37i9dQZF1DWXRqgorJj26U' },
   { name: 'Jazz Vibes', url: 'https://open.spotify.com/playlist/37i9dQZF1DXbITWG1ZJKYt' },
-  { name: 'Deep Focus', url: 'https://open.spotify.com/playlist/37i9dQZF1DWZeKCadgRdKQ' },
+  { name: 'Funk Hits', url: 'https://open.spotify.com/playlist/37i9dQZF1DWWp1lU52862K' },
 ];
 
 const StudyRooms: React.FC<StudyRoomsProps> = ({ 
@@ -68,14 +71,17 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
   
   const [spotifyEmbedUrl, setSpotifyEmbedUrl] = useState(DEFAULT_EMBED);
   const [customLinkInput, setCustomLinkInput] = useState('');
-  const [isBroadcastingMusic, setIsBroadcastingMusic] = useState(false); // "Transmitir para a sala"
+  const [isBroadcastingMusic, setIsBroadcastingMusic] = useState(true); // Padrão: Transmitir (Modo DJ Ativo)
   const [showSpotifyControls, setShowSpotifyControls] = useState(false);
+  const [lastDJName, setLastDJName] = useState<string>('');
 
   // Helper para converter link normal do Spotify para Embed
   const getEmbedUrl = (url: string) => {
     try {
         const urlObj = new URL(url);
-        // Ex: open.spotify.com/playlist/ID -> open.spotify.com/embed/playlist/ID
+        // Suporta tracks, playlists, albums, artists
+        // Ex: open.spotify.com/track/ID -> open.spotify.com/embed/track/ID
+        
         if (url.includes('/embed/')) return url; // Já é embed
         
         const path = urlObj.pathname; // /playlist/ID
@@ -148,15 +154,15 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
       // Spotify Global Events
       .on('broadcast', { event: 'spotify-update' }, ({ payload }) => {
          // Recebeu mudança de música da sala
-         // Só atualiza se o usuário NÃO estiver transmitindo sua própria música (evita conflito)
-         if (!isBroadcastingMusic) {
+         // Se eu NÃO estou no modo "DJ Pessoal" (transmitindo minha propria), eu obedeço a sala
+         if (isBroadcastingMusic) { // Se eu também estou em modo "Ouvir Sala/Transmitir"
             setSpotifyEmbedUrl(payload.embedUrl);
+            setLastDJName(payload.senderName || 'DJ da Sala');
          }
       })
       .on('broadcast', { event: 'spotify-sync' }, ({ payload }) => {
-         if (!isBroadcastingMusic) {
-            setSpotifyEmbedUrl(payload.embedUrl);
-         }
+         // Ao entrar, sincroniza
+         setSpotifyEmbedUrl(payload.embedUrl);
       })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
@@ -303,6 +309,10 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
     } catch (e) { console.error(e); }
   };
 
+  const toggleBroadcast = () => {
+    setIsBroadcastingMusic(prev => !prev);
+  };
+
   // --- SPOTIFY ACTIONS ---
   const changeStation = (url: string) => {
     const embed = getEmbedUrl(url);
@@ -310,11 +320,13 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
     
     // Se estiver transmitindo, manda pra todo mundo
     if (isBroadcastingMusic) {
+        const myName = presenceUsers.find(u => u.user_id === currentUserId)?.name || 'Alguém';
         channelRef.current?.send({
             type: 'broadcast',
             event: 'spotify-update',
-            payload: { embedUrl: embed }
+            payload: { embedUrl: embed, senderName: myName }
         });
+        setLastDJName('Você');
     }
   };
 
@@ -322,18 +334,6 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
     if (!customLinkInput) return;
     changeStation(customLinkInput);
     setCustomLinkInput('');
-  };
-
-  const toggleBroadcast = () => {
-      setIsBroadcastingMusic(!isBroadcastingMusic);
-      // Se ligou o broadcast, força a sala a ouvir o que estou ouvindo agora
-      if (!isBroadcastingMusic) {
-          channelRef.current?.send({
-              type: 'broadcast',
-              event: 'spotify-update',
-              payload: { embedUrl: spotifyEmbedUrl }
-          });
-      }
   };
 
   // --- NAVIGATION ---
@@ -346,7 +346,6 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
       setSecondsElapsed(0);
       setIsMicOn(false);
       setSpotifyEmbedUrl(DEFAULT_EMBED);
-      setIsBroadcastingMusic(false);
     }
   };
 
@@ -558,7 +557,7 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
             {/* Spotify / Control Section */}
             <div className="bg-[#1e1e24] border-t border-black/20">
                {/* Spotify Embed */}
-               <div className="p-4 pb-0">
+               <div className="p-4 pb-0 relative">
                  <iframe 
                     style={{borderRadius: '12px'}} 
                     src={spotifyEmbedUrl} 
@@ -569,6 +568,19 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
                     allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
                     loading="lazy" 
                   />
+                  {lastDJName && isBroadcastingMusic && (
+                    <div className="absolute top-2 right-6 bg-black/60 backdrop-blur-md px-2 py-1 rounded-md text-[9px] font-bold text-emerald-400 border border-emerald-500/20">
+                       DJ: {lastDJName}
+                    </div>
+                  )}
+               </div>
+               
+               {/* Info sobre Play Manual */}
+               <div className="px-5 pt-2 flex items-center gap-2 text-slate-500">
+                  <Info size={10} />
+                  <p className="text-[9px] font-bold uppercase tracking-wide">
+                     O DJ escolhe a música, mas você deve apertar o Play.
+                  </p>
                </div>
 
                {/* Advanced Controls (Dropdowns, Links) */}
@@ -579,7 +591,7 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
                           <input 
                             value={customLinkInput}
                             onChange={(e) => setCustomLinkInput(e.target.value)}
-                            placeholder="Cole link do Spotify (Playlist/Album)" 
+                            placeholder="Cole qualquer link do Spotify (Música, Álbum, Artista...)" 
                             className="flex-1 bg-white/10 border border-white/10 rounded-xl px-3 py-2 text-[10px] text-white placeholder:text-slate-500 outline-none focus:border-sanfran-rubi"
                           />
                           <button onClick={handleCustomLink} className="p-2 bg-sanfran-rubi text-white rounded-xl">
@@ -601,11 +613,12 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
 
                        <div className="flex items-center justify-between bg-emerald-900/20 p-2 rounded-xl border border-emerald-500/20">
                           <span className="text-[9px] font-black uppercase text-emerald-500 tracking-widest ml-1">
-                             {isBroadcastingMusic ? "Transmitindo para a Sala (DJ)" : "Modo Pessoal (Só você ouve)"}
+                             {isBroadcastingMusic ? "Modo DJ: Sincronizado com a Sala" : "Modo Pessoal: Só você ouve"}
                           </span>
                           <button 
                              onClick={toggleBroadcast}
                              className={`w-8 h-4 rounded-full transition-colors relative ${isBroadcastingMusic ? 'bg-emerald-500' : 'bg-slate-600'}`}
+                             title={isBroadcastingMusic ? "Desligar Sincronização" : "Ligar Sincronização (Ouvir a Sala)"}
                           >
                              <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform ${isBroadcastingMusic ? 'left-4.5' : 'left-0.5'}`} style={{ left: isBroadcastingMusic ? '18px' : '2px' }} />
                           </button>
