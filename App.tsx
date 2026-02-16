@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck } from 'lucide-react';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel } from './types';
 import Dashboard from './components/Dashboard';
 import Anki from './components/Anki';
@@ -39,6 +39,8 @@ import Debate from './components/Debate';
 import Trunfo from './components/Trunfo';
 import Honorarios from './components/Honorarios';
 import Checklist from './components/Checklist';
+import InvestigationBoard from './components/InvestigationBoard';
+import LatinGame from './components/LatinGame';
 import { supabase } from './services/supabaseClient';
 
 export const getBrasiliaDate = () => {
@@ -391,6 +393,8 @@ const App: React.FC = () => {
 
   const navItems = [
     { id: View.Dashboard, icon: LayoutDashboard, label: 'Painel', color: 'text-slate-600', bg: 'bg-slate-100' },
+    { id: View.InvestigationBoard, icon: ScanSearch, label: 'Lousa de Investigação', color: 'text-amber-700', bg: 'bg-amber-100' },
+    { id: View.LatinGame, icon: Languages, label: 'Latim Forense', color: 'text-rose-900', bg: 'bg-rose-50' },
     { id: View.Checklist, icon: ClipboardCheck, label: 'Checklist de Peças', color: 'text-blue-600', bg: 'bg-blue-100' },
     { id: View.Honorarios, icon: Banknote, label: 'Simulador de Honorários', color: 'text-emerald-700', bg: 'bg-emerald-100' },
     { id: View.Trunfo, icon: Dna, label: 'Super Trunfo', color: 'text-purple-700', bg: 'bg-purple-100' },
@@ -564,6 +568,8 @@ const App: React.FC = () => {
             {currentView === View.Dosimetria && <Dosimetria userId={session.user.id} />}
             {currentView === View.Honorarios && <Honorarios userId={session.user.id} />}
             {currentView === View.Checklist && <Checklist userId={session.user.id} />}
+            {currentView === View.InvestigationBoard && <InvestigationBoard userId={session.user.id} />}
+            {currentView === View.LatinGame && <LatinGame userId={session.user.id} />}
             {currentView === View.Debate && <Debate userId={session.user.id} />}
             {currentView === View.Trunfo && <Trunfo userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
             {currentView === View.OabCountdown && <OabCountdown userId={session.user.id} />}

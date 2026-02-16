@@ -33,7 +33,9 @@ export enum View {
   Debate = 'debate',
   Trunfo = 'trunfo',
   Honorarios = 'honorarios',
-  Checklist = 'checklist'
+  Checklist = 'checklist',
+  InvestigationBoard = 'investigation_board',
+  LatinGame = 'latin_game'
 }
 
 export interface Folder {
@@ -272,4 +274,38 @@ export interface PetitumTemplate {
   category: string;
   description: string;
   structure: PetitumSection[];
+}
+
+// Investigation Board Types
+export type NodeType = 'person' | 'evidence' | 'note' | 'place';
+
+export interface BoardNode {
+  id: string;
+  type: NodeType;
+  x: number;
+  y: number;
+  label: string;
+  details?: string;
+}
+
+export interface BoardEdge {
+  id: string;
+  from: string;
+  to: string;
+}
+
+export interface InvestigationBoardData {
+  id: string;
+  title: string;
+  nodes: BoardNode[];
+  edges: BoardEdge[];
+  updated_at: string;
+}
+
+// Latin Game Types
+export interface LatinTerm {
+  id: string;
+  term: string;
+  meaning: string;
+  difficulty?: string;
 }
