@@ -1513,7 +1513,7 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
                {/* STEP 4: SUCCESS */}
                {lessonStep === 'success' && (
                   <div className="space-y-8 w-full animate-in zoom-in duration-500 flex flex-col items-center">
-                     <div className="w-40 h-40 bg-emerald-500 rounded-full flex items-center justify-center shadow-2xl shadow-emerald-500/40 mb-4 animate-bounce">
+                     <div className="w-32 h-32 bg-emerald-500 rounded-full flex items-center justify-center shadow-2xl shadow-emerald-500/40 mb-4 animate-bounce">
                         <Trophy size={80} className="text-white" />
                      </div>
                      
