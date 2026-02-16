@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 import { View, Subject, Flashcard, Task, StudySession, Reading } from '../types';
 import { getBrasiliaDate } from '../App';
 import BadgeGallery, { BadgeData } from './BadgeGallery';
+import CompetenceRadar from './CompetenceRadar';
 
 interface DashboardProps {
   subjects: Subject[];
@@ -256,45 +257,56 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
         />
       </div>
 
-      {/* --- Galeria de Conquistas (Badges) --- */}
-      <BadgeGallery badges={badges} />
-
+      {/* --- RADAR E DOUTRINA LADO A LADO --- */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-10">
-        <div className="lg:col-span-2 bg-white dark:bg-sanfran-rubiDark/30 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl border-t-[10px] md:border-t-[12px] border-t-sanfran-rubi">
-          <div className="flex items-center justify-between mb-6 md:mb-8">
-            <h3 className="text-xl md:text-3xl font-black flex items-center gap-4 text-slate-950 dark:text-white uppercase tracking-tight">
-              <Quote className="w-6 h-6 md:w-8 md:h-8 text-sanfran-rubi dark:text-white" />
-              Doutrina Acadêmica
-            </h3>
-          </div>
-          <div className="bg-slate-50 dark:bg-black/40 rounded-[1.5rem] md:rounded-[2rem] p-6 md:p-8 border border-slate-200 dark:border-sanfran-rubi/20 italic text-slate-900 dark:text-slate-100 text-lg md:text-xl leading-relaxed relative overflow-hidden shadow-inner flex items-center">
-            <div className="absolute top-0 right-0 w-32 h-32 md:w-48 md:h-48 bg-sanfran-rubi opacity-[0.05] -mr-16 md:-mr-24 -mt-16 md:-mt-24 rounded-full" />
-            <span className="relative z-10 font-bold leading-relaxed text-center md:text-left w-full">"{motivation}"</span>
-          </div>
+        <div className="lg:col-span-1">
+           <CompetenceRadar subjects={subjects} studySessions={studySessions} />
         </div>
 
-        <div className="bg-white dark:bg-sanfran-rubiDark/30 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl border-t-[10px] md:border-t-[12px] border-t-usp-blue">
-          <h3 className="text-xl md:text-3xl font-black mb-6 md:mb-10 text-slate-950 dark:text-white uppercase tracking-tight">Cadeiras</h3>
-          <div className="space-y-4 md:space-y-6">
-            {subjects.length === 0 ? (
-              <p className="text-center text-xs text-slate-400 font-bold uppercase italic py-8 md:py-10">Nenhuma cadeira matriculada.</p>
-            ) : (
-              subjects.slice(0, 5).map(s => (
+        <div className="lg:col-span-2 flex flex-col gap-6 md:gap-10">
+          {/* Galeria de Badges */}
+          <BadgeGallery badges={badges} />
+
+          {/* Doutrina */}
+          <div className="bg-white dark:bg-sanfran-rubiDark/30 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl border-t-[10px] md:border-t-[12px] border-t-sanfran-rubi">
+            <div className="flex items-center justify-between mb-6 md:mb-8">
+              <h3 className="text-xl md:text-3xl font-black flex items-center gap-4 text-slate-950 dark:text-white uppercase tracking-tight">
+                <Quote className="w-6 h-6 md:w-8 md:h-8 text-sanfran-rubi dark:text-white" />
+                Doutrina Acadêmica
+              </h3>
+            </div>
+            <div className="bg-slate-50 dark:bg-black/40 rounded-[1.5rem] md:rounded-[2rem] p-6 md:p-8 border border-slate-200 dark:border-sanfran-rubi/20 italic text-slate-900 dark:text-slate-100 text-lg md:text-xl leading-relaxed relative overflow-hidden shadow-inner flex items-center">
+              <div className="absolute top-0 right-0 w-32 h-32 md:w-48 md:h-48 bg-sanfran-rubi opacity-[0.05] -mr-16 md:-mr-24 -mt-16 md:-mt-24 rounded-full" />
+              <span className="relative z-10 font-bold leading-relaxed text-center md:text-left w-full">"{motivation}"</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Cadeiras (Reposicionado) */}
+      <div className="bg-white dark:bg-sanfran-rubiDark/30 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl border-t-[10px] md:border-t-[12px] border-t-usp-blue">
+        <h3 className="text-xl md:text-3xl font-black mb-6 md:mb-10 text-slate-950 dark:text-white uppercase tracking-tight">Cadeiras Matriculadas</h3>
+        <div className="space-y-4 md:space-y-6">
+          {subjects.length === 0 ? (
+            <p className="text-center text-xs text-slate-400 font-bold uppercase italic py-8 md:py-10">Nenhuma cadeira matriculada.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {subjects.slice(0, 6).map(s => (
                 <div key={s.id} className="flex items-center justify-between p-3 md:p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 hover:scale-[1.02] transition-transform">
-                  <div className="flex items-center gap-3 md:gap-4">
-                    <div className="w-4 h-4 md:w-5 md:h-5 rounded-full shadow-lg" style={{ backgroundColor: s.color }} />
-                    <span className="font-black text-slate-900 dark:text-white uppercase text-xs md:text-sm tracking-wide truncate max-w-[120px] md:max-w-none">{s.name}</span>
+                  <div className="flex items-center gap-3 md:gap-4 overflow-hidden">
+                    <div className="w-4 h-4 md:w-5 md:h-5 rounded-full shadow-lg shrink-0" style={{ backgroundColor: s.color }} />
+                    <span className="font-black text-slate-900 dark:text-white uppercase text-xs md:text-sm tracking-wide truncate">{s.name}</span>
                   </div>
-                  <span className="text-[10px] md:text-[11px] font-black text-white bg-slate-950 dark:bg-sanfran-rubi px-3 py-1.5 rounded-full shadow-md">
+                  <span className="text-[10px] md:text-[11px] font-black text-white bg-slate-950 dark:bg-sanfran-rubi px-3 py-1.5 rounded-full shadow-md shrink-0">
                     {flashcards.filter(f => f.subjectId === s.id).length}
                   </span>
                 </div>
-              ))
-            )}
-            {subjects.length > 5 && (
-              <p className="text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">+ {subjects.length - 5} outras cadeiras</p>
-            )}
-          </div>
+              ))}
+            </div>
+          )}
+          {subjects.length > 6 && (
+            <p className="text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">+ {subjects.length - 6} outras cadeiras</p>
+          )}
         </div>
       </div>
     </div>
