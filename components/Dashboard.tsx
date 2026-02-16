@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 import { View, Subject, Flashcard, Task, StudySession, Reading } from '../types';
 import { getBrasiliaDate } from '../App';
 import BadgeGallery, { BadgeData } from './BadgeGallery';
+import VirtualOffice from './VirtualOffice';
 
 interface DashboardProps {
   subjects: Subject[];
@@ -173,54 +174,29 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
         </div>
       </header>
 
-      {/* --- Seção de Carreira (Patentes) --- */}
-      <div className="bg-white dark:bg-sanfran-rubiDark/30 rounded-[2.5rem] p-6 md:p-10 border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl relative overflow-hidden group">
-        <div className="absolute top-0 right-0 p-10 opacity-5 group-hover:opacity-10 transition-opacity">
-           <currentRank.icon size={200} />
-        </div>
-        
-        <div className="flex flex-col md:flex-row md:items-center gap-8 relative z-10">
-          <div className={`w-24 h-24 md:w-32 md:h-32 rounded-[2.5rem] ${currentRank.bg} dark:bg-white/5 border-4 ${currentRank.border} dark:border-white/10 flex items-center justify-center shadow-xl`}>
-             <currentRank.icon className={`w-12 h-12 md:w-16 md:h-16 ${currentRank.color}`} />
-          </div>
-          
-          <div className="flex-1 space-y-4">
-            <div>
-              <p className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] mb-1">Status na Ordem</p>
-              <h3 className={`text-3xl md:text-4xl font-black uppercase tracking-tighter ${currentRank.color} dark:text-white`}>
-                {currentRank.name}
-              </h3>
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex justify-between items-end text-[10px] font-black uppercase tracking-widest">
-                <span className="text-slate-400">Progresso de Carreira</span>
-                <span className="text-slate-900 dark:text-white">{nextRank ? `Próximo: ${nextRank.name}` : 'Nível Máximo'}</span>
-              </div>
-              <div className="h-4 bg-slate-100 dark:bg-black/40 rounded-full overflow-hidden p-1 shadow-inner">
-                <div 
-                  className={`h-full rounded-full transition-all duration-1000 ease-out ${currentRank.color.replace('text', 'bg')}`}
-                  style={{ width: `${progressToNext}%` }}
-                />
-              </div>
-              {nextRank && (
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                  Faltam {(nextRank.hours - totalHours).toFixed(1)} horas para a próxima promoção.
-                </p>
-              )}
-            </div>
-          </div>
-          
-          <div className="hidden lg:block border-l border-slate-100 dark:border-white/10 pl-8 space-y-2">
-             <div className="flex items-center gap-3 text-slate-900 dark:text-white">
-                <Medal className="w-5 h-5 text-usp-gold" />
-                <span className="text-sm font-black uppercase">Honrarias USP</span>
+      {/* --- Escritório Virtual (Visualização Principal) --- */}
+      <VirtualOffice totalHours={totalHours} />
+
+      {/* --- Seção de Status Compacta --- */}
+      <div className="bg-white dark:bg-sanfran-rubiDark/30 rounded-[2rem] p-6 border border-slate-200 dark:border-sanfran-rubi/30 shadow-lg flex items-center justify-between gap-4 relative overflow-hidden">
+          <div className="flex items-center gap-4 relative z-10">
+             <div className={`p-3 rounded-xl ${currentRank.bg} dark:bg-white/5 border border-slate-100 dark:border-white/10`}>
+                <currentRank.icon className={`w-6 h-6 ${currentRank.color}`} />
              </div>
-             <p className="text-[10px] text-slate-400 font-bold max-w-[150px] leading-relaxed">
-               Sua dedicação acadêmica reflete o espírito do XI de Agosto. Continue a labuta.
-             </p>
+             <div>
+                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Patente Atual</p>
+                <h3 className={`text-xl font-black ${currentRank.color} uppercase tracking-tighter`}>{currentRank.name}</h3>
+             </div>
           </div>
-        </div>
+          {nextRank && (
+            <div className="text-right hidden sm:block relative z-10">
+               <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Próxima Promoção</p>
+               <p className="text-sm font-bold text-slate-700 dark:text-slate-300">{Math.round(nextRank.hours - totalHours)}h restantes</p>
+               <div className="h-1.5 w-32 bg-slate-100 dark:bg-black/20 rounded-full mt-1 ml-auto overflow-hidden">
+                  <div className={`h-full ${currentRank.color.replace('text', 'bg')}`} style={{ width: `${progressToNext}%` }}></div>
+               </div>
+            </div>
+          )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
