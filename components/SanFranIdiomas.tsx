@@ -394,11 +394,11 @@ const LESSONS_DB: IdiomaLesson[] = [
     words_unlocked: ['Bail', 'Warrant', 'Defendant', 'Prosecutor']
   },
 
-  // --- MÓDULO 4: ESSENTIAL GRAMMAR (Gramática Jurídica) ---
+  // --- MÓDULO 4: GRAMÁTICA JURÍDICA ESSENCIAL ---
   {
     id: '4-1',
-    module: 'Legal Grammar',
-    title: 'Legal Adverbs',
+    module: 'Gramática Jurídica Essencial',
+    title: 'Advérbios Jurídicos (Adverbs)',
     description: 'Herein, Thereof & Whereby',
     type: 'matching',
     theory: "No 'Legal English', usamos advérbios antigos para precisão. 'Herein' (neste documento), 'Thereof' (disso/daquilo), 'Whereby' (pelo qual/através do qual).",
@@ -416,8 +416,8 @@ const LESSONS_DB: IdiomaLesson[] = [
   },
   {
     id: '4-2',
-    module: 'Legal Grammar',
-    title: 'Authority Prepositions',
+    module: 'Gramática Jurídica Essencial',
+    title: 'Preposições de Autoridade',
     description: 'Pursuant to & Under',
     type: 'fill_blank',
     theory: "'Pursuant to' é a forma formal de dizer 'de acordo com' ou 'em conformidade com' (ex: uma lei). 'Under' também é comum (ex: Under the Constitution).",
@@ -434,8 +434,8 @@ const LESSONS_DB: IdiomaLesson[] = [
   },
   {
     id: '4-3',
-    module: 'Legal Grammar',
-    title: 'Connectors & Clauses',
+    module: 'Gramática Jurídica Essencial',
+    title: 'Conjunções & Cláusulas',
     description: 'Whereas & Provided That',
     type: 'quiz',
     theory: "'Whereas' (Considerando que) inicia preâmbulos para dar contexto. 'Provided that' (Desde que/Ressalvado que) introduz uma condição ou exceção ('Proviso').",
