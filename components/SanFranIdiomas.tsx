@@ -14,7 +14,7 @@ const LESSONS_DB: IdiomaLesson[] = [
   // --- MÓDULO 1: FOUNDATIONS (Fundamentos) ---
   {
     id: '1-1',
-    module: 'Fundations',
+    module: 'Foundations',
     title: 'The Legal Profession',
     description: 'Lawyer, Attorney & Barrister',
     type: 'quiz',
@@ -31,7 +31,7 @@ const LESSONS_DB: IdiomaLesson[] = [
   },
   {
     id: '1-2',
-    module: 'Fundations',
+    module: 'Foundations',
     title: 'Court Structure',
     description: 'Court vs. Tribunal',
     type: 'matching',
@@ -50,7 +50,7 @@ const LESSONS_DB: IdiomaLesson[] = [
   },
   {
     id: '1-3',
-    module: 'Fundations',
+    module: 'Foundations',
     title: 'Building Sentences',
     description: 'Structure of Legal English',
     type: 'scramble',
@@ -171,6 +171,62 @@ const LESSONS_DB: IdiomaLesson[] = [
     },
     xp_reward: 200,
     words_unlocked: ['Bail', 'Warrant', 'Defendant', 'Prosecutor']
+  },
+
+  // --- MÓDULO 4: ESSENTIAL GRAMMAR (Gramática Jurídica) ---
+  {
+    id: '4-1',
+    module: 'Legal Grammar',
+    title: 'Legal Adverbs',
+    description: 'Herein, Thereof & Whereby',
+    type: 'matching',
+    theory: "No 'Legal English', usamos advérbios antigos para precisão. 'Herein' (neste documento), 'Thereof' (disso/daquilo), 'Whereby' (pelo qual/através do qual).",
+    example_sentence: "The parties hereto agree to the terms herein contained.",
+    matching: {
+      pairs: [
+        { term: "Herein", translation: "Neste documento/Aqui" },
+        { term: "Thereof", translation: "Disso/Do mesmo" },
+        { term: "Hereto", translation: "A este/A isto" },
+        { term: "Whereby", translation: "Pelo qual" }
+      ]
+    },
+    xp_reward: 180,
+    words_unlocked: ['Herein', 'Thereof', 'Hereto', 'Whereby']
+  },
+  {
+    id: '4-2',
+    module: 'Legal Grammar',
+    title: 'Authority Prepositions',
+    description: 'Pursuant to & Under',
+    type: 'fill_blank',
+    theory: "'Pursuant to' é a forma formal de dizer 'de acordo com' ou 'em conformidade com' (ex: uma lei). 'Under' também é comum (ex: Under the Constitution).",
+    example_sentence: "Pursuant to Article 5, everyone is equal before the law.",
+    fill_blank: {
+      sentence_start: "The decision was made",
+      sentence_end: "to the company bylaws.",
+      correct_word: "pursuant",
+      options: ["pursuant", "because", "inside", "regarding"],
+      translation: "A decisão foi tomada em conformidade com o estatuto da empresa."
+    },
+    xp_reward: 180,
+    words_unlocked: ['Pursuant to', 'In accordance with', 'Under']
+  },
+  {
+    id: '4-3',
+    module: 'Legal Grammar',
+    title: 'Connectors & Clauses',
+    description: 'Whereas & Provided That',
+    type: 'quiz',
+    theory: "'Whereas' (Considerando que) inicia preâmbulos para dar contexto. 'Provided that' (Desde que/Ressalvado que) introduz uma condição ou exceção ('Proviso').",
+    example_sentence: "Whereas the parties desire to enter into an agreement...",
+    quiz: {
+      question: "Qual termo introduz uma condição essencial ('Desde que')?",
+      options: ["Whereas", "Therefore", "Provided that"],
+      answer: 2,
+      explanation: "'Provided that' é usado para criar uma condição sine qua non ou uma exceção a uma cláusula anterior."
+    },
+    xp_reward: 200,
+    words_unlocked: ['Whereas', 'Provided that', 'Therefore', 'Notwithstanding']
   }
 ];
 
