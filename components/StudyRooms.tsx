@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Building2, User, Clock, ArrowLeft, Play, Pause, LogOut, BookOpen, Shield, Gavel, Scale, Globe, BrainCircuit, HeartPulse, Briefcase, Landmark, Mic, MicOff, Headphones, HeadphoneOff, Radio, Volume2, VolumeX, Signal, Music, Link as LinkIcon, Share2, Info, Youtube } from 'lucide-react';
+import { Building2, User, Clock, ArrowLeft, Play, Pause, LogOut, BookOpen, Shield, Gavel, Scale, Globe, BrainCircuit, HeartPulse, Briefcase, Landmark, Mic, MicOff, Headphones, HeadphoneOff, Radio, Volume2, VolumeX, Signal, Music, Link as LinkIcon, Share2, Info, Youtube, Wifi, WifiOff } from 'lucide-react';
 import { PresenceUser } from '../types';
 import { supabase } from '../services/supabaseClient';
 
@@ -81,18 +81,21 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
   const [isSynced, setIsSynced] = useState(true); // "Sincronizado com a Sala"
   const [showSpotifyControls, setShowSpotifyControls] = useState(false);
   const [lastDJName, setLastDJName] = useState<string>('');
+  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
 
-  // --- HELPERS DE URL ---
+  // --- HELPERS DE URL (BLINDADO) ---
   
   const parseMediaUrl = (input: string): { url: string, type: MediaType } | null => {
     // 1. YouTube
-    if (input.includes('youtube.com') || input.includes('youtu.be')) {
+    if (input.match(/(youtube\.com|youtu\.be)/)) {
       let videoId = '';
-      if (input.includes('v=')) {
-        videoId = input.split('v=')[1]?.split('&')[0];
-      } else if (input.includes('youtu.be/')) {
-        videoId = input.split('youtu.be/')[1]?.split('?')[0];
-      }
+      const vParam = input.match(/[?&]v=([^&]+)/);
+      const embedMatch = input.match(/embed\/([^?&]+)/);
+      const shortMatch = input.match(/youtu\.be\/([^?&]+)/);
+
+      if (vParam) videoId = vParam[1];
+      else if (embedMatch) videoId = embedMatch[1];
+      else if (shortMatch) videoId = shortMatch[1];
       
       if (videoId) {
         return {
@@ -104,9 +107,10 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
 
     // 2. Spotify
     if (input.includes('spotify.com')) {
-      // Limpa URLs sujas (ex: intl-pt, query params)
-      // Regex captura: tipo (track/album/playlist) e o ID
-      const match = input.match(/open\.spotify\.com\/(?:intl-[a-z]{2}\/)?(track|album|playlist|artist)\/([a-zA-Z0-9]+)/);
+      // Procura padrão type/id independente de ser embed ou link normal
+      // Ex: .../track/123... ou .../playlist/abc...
+      const match = input.match(/(track|album|playlist|artist|show|episode)\/([a-zA-Z0-9]+)/);
+      
       if (match) {
         return {
           type: 'spotify',
@@ -147,6 +151,7 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
   useEffect(() => {
     if (!currentRoomId) return;
 
+    setConnectionStatus('connecting');
     const channel = supabase.channel(`room_voice_${currentRoomId}`, {
         config: { broadcast: { self: false } }
     });
@@ -173,7 +178,7 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
              channel.send({
                 type: 'broadcast',
                 event: 'media-sync',
-                payload: { url: mediaUrl, type: mediaType }
+                payload: { url: mediaUrl, type: mediaType, senderName: lastDJName }
              });
           }
         }
@@ -192,15 +197,19 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
          if (isSynced) {
             setMediaUrl(payload.url);
             setMediaType(payload.type);
+            if (payload.senderName) setLastDJName(payload.senderName);
          }
       })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
+          setConnectionStatus('connected');
           channel.send({
             type: 'broadcast',
             event: 'join-voice',
             payload: { userId: currentUserId }
           });
+        } else {
+          setConnectionStatus('error');
         }
       });
 
@@ -216,7 +225,7 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
       supabase.removeChannel(channel);
       channelRef.current = null;
     };
-  }, [currentRoomId, currentUserId, isSynced, mediaUrl, mediaType]); 
+  }, [currentRoomId, currentUserId]); // Dependências reduzidas para evitar re-subscribe loop
 
   // --- WEBRTC HANDLERS (Standard) ---
   const createPeerConnection = (targetUserId: string) => {
@@ -347,9 +356,9 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
     setMediaType(type);
     setLastDJName('Você');
 
-    if (isSynced) {
+    if (isSynced && channelRef.current) {
         const myName = presenceUsers.find(u => u.user_id === currentUserId)?.name || 'Alguém';
-        channelRef.current?.send({
+        channelRef.current.send({
             type: 'broadcast',
             event: 'media-update',
             payload: { url: newUrl, type: type, senderName: myName }
@@ -364,12 +373,11 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
         updateMedia(parsed.url, parsed.type);
         setCustomLinkInput('');
     } else {
-        alert("Link não suportado. Use links do YouTube ou Spotify.");
+        alert("Link não suportado. Tente link direto do YouTube ou Spotify.");
     }
   };
 
   const handlePreset = (preset: MediaPreset) => {
-     // Para presets, se for spotify precisamos garantir o formato embed
      if (preset.type === 'spotify') {
          const parsed = parseMediaUrl(preset.url);
          if (parsed) updateMedia(parsed.url, 'spotify');
@@ -619,11 +627,18 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
                     {mediaType === 'youtube' && <div className="absolute inset-x-0 top-0 h-4 bg-transparent" />} 
                  </div>
 
-                 {lastDJName && isSynced && (
-                    <div className="absolute top-6 right-6 bg-black/80 backdrop-blur-md px-3 py-1 rounded-full text-[9px] font-bold text-emerald-400 border border-emerald-500/20 shadow-lg z-10 flex items-center gap-1">
-                       <Signal size={8} className="animate-pulse" /> DJ: {lastDJName}
+                 {/* Status Badges */}
+                 <div className="absolute top-6 right-6 flex flex-col gap-1 items-end z-10">
+                    <div className={`px-3 py-1 rounded-full text-[9px] font-bold border flex items-center gap-1 backdrop-blur-md ${connectionStatus === 'connected' ? 'bg-emerald-900/50 border-emerald-500/20 text-emerald-400' : 'bg-red-900/50 border-red-500/20 text-red-400'}`}>
+                       {connectionStatus === 'connected' ? <Wifi size={10} /> : <WifiOff size={10} />}
+                       {connectionStatus === 'connected' ? 'Online' : 'Desconectado'}
                     </div>
-                  )}
+                    {lastDJName && isSynced && (
+                        <div className="bg-black/80 backdrop-blur-md px-3 py-1 rounded-full text-[9px] font-bold text-usp-blue border border-usp-blue/20 flex items-center gap-1">
+                           <Signal size={8} className="animate-pulse" /> DJ: {lastDJName}
+                        </div>
+                    )}
+                 </div>
                </div>
                
                {/* Info sobre Play Manual */}
