@@ -42,7 +42,8 @@ export enum View {
   JurisTinder = 'juris_tinder',
   InternRPG = 'intern_rpg',
   PrescriptionCalculator = 'prescription_calculator',
-  SanFranIdiomas = 'sanfran_idiomas'
+  SanFranIdiomas = 'sanfran_idiomas',
+  DigitalID = 'digital_id'
 }
 
 export interface Folder {
