@@ -32,7 +32,8 @@ export enum View {
   Dosimetria = 'dosimetria',
   Debate = 'debate',
   Trunfo = 'trunfo',
-  Honorarios = 'honorarios'
+  Honorarios = 'honorarios',
+  Checklist = 'checklist'
 }
 
 export interface Folder {
