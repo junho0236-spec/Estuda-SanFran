@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Globe, BookOpen, CheckCircle2, Lock, X, Flame, Trophy, Volume2, Star, Quote, Heart, ArrowRight, Flag, BrainCircuit, Ear, Mic, Search, GraduationCap, Zap, Calendar, Shuffle } from 'lucide-react';
+import { Globe, BookOpen, CheckCircle2, Lock, X, Flame, Trophy, Volume2, Star, Quote, Heart, ArrowRight, Flag, BrainCircuit, Ear, Mic, Search, GraduationCap, Zap, Calendar, Shuffle, FileText, Coffee, Sun } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { IdiomaLesson, IdiomaProgress } from '../types';
 import confetti from 'canvas-confetti';
@@ -8,6 +8,40 @@ import confetti from 'canvas-confetti';
 interface SanFranIdiomasProps {
   userId: string;
 }
+
+// --- BANCO DE DADOS: DAILY BRIEFINGS (MICRO-LIÇÕES) ---
+const DAILY_BRIEFINGS = [
+  {
+    id: 'brief_1',
+    title: 'Contract Clause Review',
+    context: 'Você recebeu este e-mail de um associado sênior.',
+    text: "Please review the indemnity clause in the Alpha Agreement. Ensure that the liability cap does not exceed 100% of the fees paid in the preceding 12 months, except in cases of gross negligence or willful misconduct.",
+    question: "Qual é a exceção para o limite de responsabilidade (cap)?",
+    options: ["Atraso no pagamento", "Negligência grave ou dolo", "Quebra de confidencialidade"],
+    answer: 1,
+    translation: "Grave negligência ou má conduta intencional (dolo)."
+  },
+  {
+    id: 'brief_2',
+    title: 'Court Order Update',
+    context: 'Resumo de uma decisão processual recente.',
+    text: "The judge has granted the motion to dismiss without prejudice. This means the plaintiff is allowed to refile the lawsuit if they can correct the procedural defects identified by the court within 30 days.",
+    question: "O que significa 'dismissed without prejudice' neste contexto?",
+    options: ["O caso foi encerrado permanentemente", "O autor pode processar novamente se corrigir erros", "O juiz foi imparcial"],
+    answer: 1,
+    translation: "Extinção sem resolução de mérito (permite nova ação)."
+  },
+  {
+    id: 'brief_3',
+    title: 'Merger & Acquisition Memo',
+    context: 'Nota sobre uma Due Diligence.',
+    text: "During the due diligence process, we uncovered several undisclosed liabilities related to environmental compliance. We advise renegotiating the purchase price or requesting a specific indemnity from the seller.",
+    question: "Qual a recomendação dada após a Due Diligence?",
+    options: ["Cancelar o negócio imediatamente", "Renegociar o preço ou pedir indenização específica", "Ignorar os passivos ambientais"],
+    answer: 1,
+    translation: "Renegociar ou pedir indenização (Indemnity)."
+  }
+];
 
 // --- BANCO DE DADOS DE DETALHES DAS PALAVRAS ---
 const WORD_DATABASE: Record<string, { translation: string; definition: string; example: string }> = {
@@ -461,6 +495,11 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
   const [selectedWord, setSelectedWord] = useState<string | null>(null);
   const [todayXP, setTodayXP] = useState(0); // State local para XP da sessão
   
+  // Briefing State
+  const [showBriefingModal, setShowBriefingModal] = useState(false);
+  const [briefingStep, setBriefingStep] = useState<'read' | 'quiz' | 'success'>('read');
+  const [briefingCompletedToday, setBriefingCompletedToday] = useState(false);
+  
   // Estado da Lição
   const [showLessonModal, setShowLessonModal] = useState(false);
   const [lessonStep, setLessonStep] = useState<'theory' | 'listen' | 'exercise' | 'success'>('theory');
@@ -519,7 +558,11 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
           .single();
         data = newData;
       }
-      if (data) setProgress(data);
+      if (data) {
+        setProgress(data);
+        const today = new Date().toISOString().split('T')[0];
+        setBriefingCompletedToday(data.last_activity_date === today);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -538,56 +581,70 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
     return Array.from(new Set(words)).sort();
   };
 
-  // --- FEATURES DE CONSISTÊNCIA ---
-  const getTermOfTheDay = () => {
-    const keys = Object.keys(WORD_DATABASE);
+  // --- DAILY BRIEFING LOGIC ---
+  const getDailyBriefing = () => {
     const dayOfYear = Math.floor((new Date().getTime() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 1000 / 60 / 60 / 24);
-    const index = dayOfYear % keys.length;
-    return keys[index];
+    const index = dayOfYear % DAILY_BRIEFINGS.length;
+    return DAILY_BRIEFINGS[index];
   };
 
-  const termOfTheDay = getTermOfTheDay();
+  const startDailyBriefing = () => {
+    if (briefingCompletedToday) return;
+    setBriefingStep('read');
+    setQuizSelected(null);
+    setIsQuizCorrect(null);
+    setShowBriefingModal(true);
+  };
 
-  const startFastReview = () => {
-    const unlocked = getUnlockedWords();
-    if (unlocked.length < 4) {
-      alert("Desbloqueie pelo menos 4 termos para iniciar a Revisão Relâmpago.");
-      return;
+  const handleBriefingAnswer = (idx: number) => {
+    const brief = getDailyBriefing();
+    const correct = idx === brief.answer;
+    setQuizSelected(idx);
+    setIsQuizCorrect(correct);
+
+    if (correct) {
+      playSuccessSound();
+      setTimeout(() => setBriefingStep('success'), 1500);
+      confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+    } else {
+      handleWrongAnswer();
+    }
+  };
+
+  const completeBriefing = async () => {
+    if (!progress) return;
+    
+    const today = new Date().toISOString().split('T')[0];
+    let newStreak = progress.streak_count;
+    // Se não completou nada hoje ainda, aumenta streak
+    if (progress.last_activity_date !== today) {
+       newStreak += 1;
     }
 
-    // Pick 4 random words
-    const shuffled = [...unlocked].sort(() => 0.5 - Math.random());
-    const selected = shuffled.slice(0, 4);
-    
-    // Create a dummy lesson
-    const reviewLesson: IdiomaLesson = {
-      id: 'review-session',
-      module: 'Daily Review',
-      title: 'Revisão Relâmpago',
-      description: 'Reforce seu vocabulário',
-      theory: 'A repetição espaçada é a chave para a memorização. Revisão rápida dos termos já aprendidos.',
-      example_sentence: "Consistency is key to mastering legal English.",
-      type: 'matching',
-      matching: {
-        pairs: selected.map(word => ({ term: word, translation: WORD_DATABASE[word].translation }))
-      },
-      xp_reward: 20,
-      words_unlocked: []
-    };
+    const bonusXP = 50; // XP do Briefing
+    const newXP = progress.total_xp + bonusXP;
 
-    setCurrentLesson(reviewLesson);
-    setLessonStep('theory');
-    setSessionLives(3);
-    
-    // Setup Matching
-    const items = reviewLesson.matching!.pairs.flatMap((p, i) => [
-        { id: `t-${i}`, text: p.term, type: 'term', state: 'default' },
-        { id: `d-${i}`, text: p.translation, type: 'def', state: 'default' }
-    ]);
-    setMatchingItems(items.sort(() => Math.random() - 0.5) as any);
-    setSelectedMatchId(null);
+    try {
+      await supabase.from('idiomas_progress').update({
+        total_xp: newXP,
+        streak_count: newStreak,
+        last_activity_date: today
+      }).eq('user_id', userId);
 
-    setShowLessonModal(true);
+      setProgress(prev => prev ? ({
+        ...prev,
+        total_xp: newXP,
+        streak_count: newStreak,
+        last_activity_date: today
+      }) : null);
+
+      setBriefingCompletedToday(true);
+      setShowBriefingModal(false);
+      setTodayXP(prev => prev + bonusXP);
+      confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const startLesson = (lessonId: string) => {
@@ -865,50 +922,56 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
       {activeTab === 'path' && (
          <div className="flex-1 overflow-y-auto custom-scrollbar relative px-4" ref={containerRef}>
             
-            {/* --- PAINEL DE FOCO DIÁRIO --- */}
-            <div className="mb-12 bg-white dark:bg-sanfran-rubiDark/20 p-6 rounded-[2.5rem] border border-slate-200 dark:border-sanfran-rubi/30 shadow-lg relative overflow-hidden">
-               <div className="absolute top-0 right-0 p-6 opacity-5 pointer-events-none">
-                  <Calendar size={120} />
-               </div>
-               
-               <h3 className="text-xl font-black uppercase text-slate-900 dark:text-white mb-6 flex items-center gap-2 relative z-10">
-                  <Zap className="text-usp-gold fill-current" /> Today's Focus
-               </h3>
-
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
-                  {/* Term of the Day */}
-                  <div 
-                     onClick={() => setSelectedWord(termOfTheDay)}
-                     className="bg-indigo-50 dark:bg-indigo-900/20 p-5 rounded-3xl border border-indigo-100 dark:border-indigo-800 cursor-pointer hover:scale-[1.02] transition-transform group"
-                  >
-                     <div className="flex justify-between items-start mb-2">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Term of the Day</span>
-                        <BookOpen size={16} className="text-indigo-300 group-hover:text-indigo-500" />
-                     </div>
-                     <h4 className="text-2xl font-black text-slate-900 dark:text-white mb-1">{termOfTheDay}</h4>
-                     <p className="text-xs font-bold text-slate-500 line-clamp-1">{WORD_DATABASE[termOfTheDay].translation}</p>
+            {/* --- DAILY BRIEFING CARD (O JORNAL) --- */}
+            <div 
+               onClick={startDailyBriefing}
+               className={`mb-12 rounded-[2.5rem] border shadow-lg relative overflow-hidden transition-all duration-300 group cursor-pointer ${briefingCompletedToday ? 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 opacity-80' : 'bg-white dark:bg-sanfran-rubiDark/20 border-slate-200 dark:border-sanfran-rubi/30 hover:shadow-xl hover:border-sanfran-rubi'}`}
+            >
+               <div className="p-6 flex flex-col md:flex-row gap-6 relative z-10">
+                  {/* Left: Icon & Status */}
+                  <div className="flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-white/5 rounded-[1.5rem] border border-slate-100 dark:border-white/5 min-w-[120px]">
+                     {briefingCompletedToday ? (
+                        <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/20 rounded-full flex items-center justify-center mb-2">
+                           <CheckCircle2 size={32} className="text-emerald-500" />
+                        </div>
+                     ) : (
+                        <div className="w-16 h-16 bg-red-50 dark:bg-red-900/10 rounded-full flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                           <Coffee size={32} className="text-sanfran-rubi" />
+                        </div>
+                     )}
+                     <p className={`text-[9px] font-black uppercase tracking-widest ${briefingCompletedToday ? 'text-emerald-600' : 'text-sanfran-rubi'}`}>
+                        {briefingCompletedToday ? 'Lido' : 'Pendente'}
+                     </p>
                   </div>
 
-                  {/* Daily Goal & Review */}
-                  <div className="space-y-4">
-                     <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-3xl border border-orange-100 dark:border-orange-800">
-                        <div className="flex justify-between items-center mb-2">
-                           <span className="text-[10px] font-black uppercase tracking-widest text-orange-400">Daily Goal</span>
-                           <span className="text-xs font-black text-orange-600">{todayXP}/50 XP</span>
-                        </div>
-                        <div className="h-2 bg-orange-200 dark:bg-orange-900/50 rounded-full overflow-hidden">
-                           <div className="h-full bg-orange-500 transition-all duration-1000" style={{ width: `${Math.min((todayXP / 50) * 100, 100)}%` }}></div>
-                        </div>
+                  {/* Right: Content */}
+                  <div className="flex-1 flex flex-col justify-center">
+                     <div className="flex items-center gap-2 mb-2">
+                        <span className="bg-slate-900 text-white px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest">
+                           O Daily Briefing
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                           <Calendar size={10} /> {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric'})}
+                        </span>
                      </div>
-
-                     <button 
-                        onClick={startFastReview}
-                        className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95"
-                     >
-                        <Shuffle size={14} /> Lightning Review (20 XP)
-                     </button>
+                     <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight leading-none mb-2">
+                        {getDailyBriefing().title}
+                     </h3>
+                     <p className="text-xs text-slate-500 font-medium line-clamp-2">
+                        {briefingCompletedToday 
+                           ? "Você já completou a leitura diária. Volte amanhã para mais notícias." 
+                           : "Leia o resumo jurídico do dia, responda uma questão e garanta seu streak."}
+                     </p>
+                     
+                     {!briefingCompletedToday && (
+                        <div className="mt-4 flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 group-hover:text-sanfran-rubi transition-colors">
+                           Ler agora <ArrowRight size={12} />
+                        </div>
+                     )}
                   </div>
                </div>
+               {/* Decorative Background Icon */}
+               <FileText className="absolute -right-6 -bottom-6 w-48 h-48 text-slate-100 dark:text-white/5 rotate-12 opacity-50 pointer-events-none" />
             </div>
 
             {/* Linha Decorativa SVG */}
@@ -1007,6 +1070,110 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
                      ))}
                   </div>
                )}
+            </div>
+         </div>
+      )}
+
+      {/* --- MODAL DE BRIEFING (JORNAL) --- */}
+      {showBriefingModal && (
+         <div className="fixed inset-0 z-50 bg-white dark:bg-[#0d0303] flex flex-col animate-in slide-in-from-bottom-20 duration-300">
+            {/* Header Modal */}
+            <div className="p-6 flex items-center justify-between border-b border-slate-200 dark:border-white/10">
+               <button onClick={() => setShowBriefingModal(false)} className="text-slate-400 hover:text-red-500 transition-colors">
+                  <X size={28} />
+               </button>
+               <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">O Daily Briefing</span>
+               </div>
+               <div className="w-8"></div>
+            </div>
+
+            <div className="flex-1 flex flex-col items-center justify-center p-6 md:p-10 max-w-3xl mx-auto w-full text-center relative">
+               
+               {briefingStep === 'read' && (
+                  <div className="space-y-8 w-full animate-in fade-in zoom-in duration-300">
+                     <span className="inline-block px-4 py-2 bg-slate-100 dark:bg-white/10 rounded-full text-[10px] font-black uppercase tracking-widest text-slate-500">
+                        {getDailyBriefing().context}
+                     </span>
+                     
+                     <div className="bg-[#fdfbf7] dark:bg-[#1a1a1a] p-8 md:p-12 rounded-sm border border-slate-200 dark:border-white/10 shadow-xl relative text-left">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-slate-900 dark:bg-white opacity-20"></div>
+                        <h2 className="font-serif text-3xl font-black text-slate-900 dark:text-white mb-6 border-b-2 border-slate-900 dark:border-white pb-4">
+                           {getDailyBriefing().title}
+                        </h2>
+                        <div className="font-serif text-lg md:text-xl leading-relaxed text-slate-800 dark:text-slate-300">
+                           "{getDailyBriefing().text}"
+                        </div>
+                     </div>
+
+                     <button 
+                        onClick={() => setBriefingStep('quiz')} 
+                        className="w-full py-5 bg-sanfran-rubi text-white rounded-[2rem] font-black uppercase tracking-widest shadow-xl hover:scale-[1.02] active:scale-95 transition-all text-sm flex items-center justify-center gap-2"
+                     >
+                        Compreendi, Próximo <ArrowRight size={16} />
+                     </button>
+                  </div>
+               )}
+
+               {briefingStep === 'quiz' && (
+                  <div className="space-y-8 w-full max-w-lg animate-in slide-in-from-right-10 duration-300">
+                     <span className="text-[10px] font-black uppercase tracking-[0.3em] text-sanfran-rubi bg-red-100 dark:bg-red-900/20 px-3 py-1 rounded-full">Teste de Compreensão</span>
+                     
+                     <h3 className="text-2xl font-bold text-slate-900 dark:text-white leading-tight mb-4">
+                        {getDailyBriefing().question}
+                     </h3>
+                     
+                     <div className="grid gap-4">
+                        {getDailyBriefing().options.map((opt, idx) => {
+                           const isSelected = quizSelected === idx;
+                           const isWrong = isSelected && isQuizCorrect === false;
+                           const isRight = isSelected && isQuizCorrect === true;
+                           let btnClass = "bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:border-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/20";
+                           if (isRight) btnClass = "bg-emerald-500 border-emerald-600 text-white shadow-emerald-500/30";
+                           else if (isWrong) btnClass = "bg-red-500 border-red-600 text-white shadow-red-500/30 animate-shake";
+
+                           return (
+                              <button
+                                 key={idx}
+                                 onClick={() => handleBriefingAnswer(idx)}
+                                 disabled={quizSelected !== null}
+                                 className={`p-6 rounded-2xl border-b-4 font-bold text-left transition-all text-lg flex items-center justify-between shadow-sm ${btnClass}`}
+                              >
+                                 {opt}
+                                 {isRight && <CheckCircle2 size={24} />}
+                                 {isWrong && <X size={24} />}
+                              </button>
+                           )
+                        })}
+                     </div>
+                  </div>
+               )}
+
+               {briefingStep === 'success' && (
+                  <div className="space-y-8 w-full animate-in zoom-in duration-500 flex flex-col items-center">
+                     <div className="w-32 h-32 bg-emerald-500 rounded-full flex items-center justify-center shadow-2xl shadow-emerald-500/40 mb-4 animate-bounce">
+                        <Coffee size={64} className="text-white" />
+                     </div>
+                     
+                     <div>
+                        <h2 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white uppercase tracking-tighter mb-2">Morning Briefing Lido!</h2>
+                        <p className="text-slate-500 font-medium text-lg">Você se atualizou e garantiu sua ofensiva.</p>
+                     </div>
+
+                     <div className="bg-slate-100 dark:bg-white/10 p-6 rounded-[2rem] flex flex-col items-center w-full max-w-sm">
+                        <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Recompensa</p>
+                        <p className="text-3xl font-black text-usp-gold">+50 XP</p>
+                     </div>
+
+                     <button 
+                        onClick={completeBriefing} 
+                        className="w-full max-w-md py-5 bg-sanfran-rubi text-white rounded-[2rem] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all mt-4"
+                     >
+                        Voltar para a Trilha
+                     </button>
+                  </div>
+               )}
+
             </div>
          </div>
       )}
