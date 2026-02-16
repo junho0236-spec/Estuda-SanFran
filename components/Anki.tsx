@@ -12,7 +12,8 @@ import {
   Square,
   X,
   Gavel,
-  Check
+  Check,
+  Archive
 } from 'lucide-react';
 import { Flashcard, Subject, Folder } from '../types';
 import { supabase } from '../services/supabaseClient';
@@ -43,6 +44,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set());
 
+  // Filter out archived cards from the main view
+  const activeFlashcards = flashcards.filter(f => !f.archived_at);
+
   const getSubfolderIds = (folderId: string | null): string[] => {
     let ids: string[] = folderId ? [folderId] : [];
     const children = folders.filter(f => f.parentId === folderId);
@@ -52,7 +56,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     return ids;
   };
 
-  const currentCards = flashcards.filter(f => f.folderId === currentFolderId);
+  const currentCards = activeFlashcards.filter(f => f.folderId === currentFolderId);
 
   const toggleCardSelection = (id: string) => {
     const newSelection = new Set(selectedCardIds);
@@ -72,43 +76,57 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     }
   };
 
-  const deleteSelectedCards = async () => {
+  const archiveSelectedCards = async () => {
     if (selectedCardIds.size === 0) return;
-    if (!confirm(`Deseja realmente eliminar permanentemente estes ${selectedCardIds.size} flashcards? Esta ação é irreversível.`)) return;
+    if (!confirm(`Deseja mover estes ${selectedCardIds.size} cards para o Arquivo Morto?`)) return;
 
     try {
-      const idsToDelete = Array.from(selectedCardIds);
-      const { error } = await supabase.from('flashcards').delete().in('id', idsToDelete).eq('user_id', userId);
+      const idsToArchive = Array.from(selectedCardIds);
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from('flashcards')
+        .update({ archived_at: now })
+        .in('id', idsToArchive)
+        .eq('user_id', userId);
+      
       if (error) throw error;
 
+      // Update local state by removing archived cards from active view
       setFlashcards(prev => prev.filter(f => !selectedCardIds.has(f.id)));
       setSelectedCardIds(new Set());
       setIsSelectionMode(false);
     } catch (err) {
-      alert("Falha ao eliminar cards selecionados.");
+      alert("Falha ao arquivar cards selecionados.");
     }
   };
 
-  const deleteCard = async (id: string, e: React.MouseEvent) => {
+  const archiveCard = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm("Deseja eliminar este flashcard do acervo?")) return;
+    // if (!confirm("Arquivar este card?")) return; // Optional confirmation
     try {
-      const { error } = await supabase.from('flashcards').delete().eq('id', id).eq('user_id', userId);
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from('flashcards')
+        .update({ archived_at: now })
+        .eq('id', id)
+        .eq('user_id', userId);
+      
       if (error) throw error;
       setFlashcards(prev => prev.filter(f => f.id !== id));
+      
       if (selectedCardIds.has(id)) {
         const newSelection = new Set(selectedCardIds);
         newSelection.delete(id);
         setSelectedCardIds(newSelection);
       }
     } catch (err) {
-      alert("Erro ao eliminar card.");
+      alert("Erro ao arquivar card.");
     }
   };
 
   const deleteFolder = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm("Deseja eliminar esta pasta? Todos os flashcards nela contidos ficarão órfãos de categoria (serão movidos para a raiz ou eliminados se preferir).")) return;
+    if (!confirm("Deseja eliminar esta pasta? Todos os flashcards nela contidos ficarão órfãos de categoria.")) return;
     try {
       const { error } = await supabase.from('folders').delete().eq('id', id).eq('user_id', userId);
       if (error) throw error;
@@ -142,7 +160,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
           folder_id: currentFolderId,
           next_review: Date.now(),
           interval: 0,
-          user_id: userId
+          user_id: userId,
+          archived_at: null
         };
       }).filter(Boolean) as any[];
 
@@ -158,7 +177,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         subjectId: c.subject_id, 
         folderId: c.folder_id, 
         nextReview: c.next_review, 
-        interval: c.interval
+        interval: c.interval,
+        archived_at: null
       }));
 
       setFlashcards(prev => [...prev, ...formattedCards]);
@@ -183,7 +203,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         subject_id: selectedSubjectId, 
         folder_id: currentFolderId, 
         next_review: Date.now(), 
-        interval: 0
+        interval: 0,
+        archived_at: null
       });
       if (error) throw error;
       setFlashcards(prev => [...prev, { 
@@ -193,7 +214,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         subjectId: selectedSubjectId, 
         folderId: currentFolderId, 
         nextReview: Date.now(), 
-        interval: 0 
+        interval: 0,
+        archived_at: null
       }]);
       setManualFront(''); 
       setManualBack(''); 
@@ -223,7 +245,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
   const currentFolders = folders.filter(f => f.parentId === currentFolderId);
   const currentContextIds = getSubfolderIds(currentFolderId);
-  const reviewQueue = flashcards.filter(f => 
+  const reviewQueue = activeFlashcards.filter(f => 
     f.nextReview <= Date.now() && 
     (currentFolderId === null ? true : currentContextIds.includes(f.folderId as string))
   );
@@ -280,8 +302,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                     {selectedCardIds.size === currentCards.length && currentCards.length > 0 ? <CheckSquare className="w-4 h-4 text-sanfran-rubi" /> : <Square className="w-4 h-4" />}
                     {selectedCardIds.size === currentCards.length && currentCards.length > 0 ? 'Desmarcar' : 'Tudo'}
                   </button>
-                  <button onClick={deleteSelectedCards} disabled={selectedCardIds.size === 0} className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg disabled:opacity-50">
-                    <Trash2 className="w-4 h-4" /> Deletar ({selectedCardIds.size})
+                  <button onClick={archiveSelectedCards} disabled={selectedCardIds.size === 0} className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg disabled:opacity-50">
+                    <Archive className="w-4 h-4" /> Arquivar ({selectedCardIds.size})
                   </button>
                   <button onClick={() => {setIsSelectionMode(false); setSelectedCardIds(new Set());}} className="p-3 text-slate-500"><X className="w-5 h-5" /></button>
                 </div>
@@ -347,10 +369,11 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               >
                 {!isSelectionMode && (
                   <button 
-                    onClick={(e) => deleteCard(card.id, e)} 
+                    onClick={(e) => archiveCard(card.id, e)} 
                     className="absolute top-4 right-4 p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                    title="Mover para Arquivo Morto"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Archive className="w-4 h-4" />
                   </button>
                 )}
                 {isSelectionMode && (

@@ -18,7 +18,8 @@ export enum View {
   Societies = 'societies',
   LeiSeca = 'lei_seca',
   Editais = 'editais',
-  Timeline = 'timeline'
+  Timeline = 'timeline',
+  DeadArchive = 'dead_archive'
 }
 
 export interface Folder {
@@ -35,6 +36,7 @@ export interface Flashcard {
   folderId: string | null;
   nextReview: number;
   interval: number;
+  archived_at?: string | null;
 }
 
 export interface Subject {
@@ -55,6 +57,7 @@ export interface Task {
   completedAt?: string;
   priority?: TaskPriority;
   category?: TaskCategory;
+  archived_at?: string | null;
 }
 
 export interface StudySession {

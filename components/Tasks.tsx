@@ -17,7 +17,8 @@ import {
   X,
   FileText,
   Stamp,
-  Scale
+  Scale,
+  Archive
 } from 'lucide-react';
 import { Task, Subject, TaskPriority, TaskCategory } from '../types';
 import { supabase } from '../services/supabaseClient';
@@ -62,7 +63,8 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
         due_date: today,
         priority: selectedPriority,
         category: selectedCategory,
-        created_at: now
+        created_at: now,
+        archived_at: null
       };
 
       const { error } = await supabase.from('tasks').insert(dbPayload);
@@ -75,7 +77,8 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
         subjectId: selectedSubjectId || undefined,
         dueDate: today,
         priority: selectedPriority,
-        category: selectedCategory
+        category: selectedCategory,
+        archived_at: null
       };
       
       setTasks(prev => [newTask, ...prev]);
@@ -120,18 +123,29 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
     }
   };
 
-  const removeTask = async (id: string) => {
-    if (!confirm("Deseja arquivar definitivamente este processo?")) return;
+  const archiveTask = async (id: string) => {
+    // Soft Delete (Arquivar)
+    const now = new Date().toISOString();
     try {
-      const { error } = await supabase.from('tasks').delete().eq('id', id).eq('user_id', userId);
+      const { error } = await supabase
+        .from('tasks')
+        .update({ archived_at: now })
+        .eq('id', id)
+        .eq('user_id', userId);
+      
       if (error) throw error;
+      // Remove da visualização atual, mas não deleta
       setTasks(prev => prev.filter(t => t.id !== id));
     } catch (err) {
       console.error(err);
+      alert("Erro ao arquivar processo.");
     }
   };
 
-  const filteredTasks = tasks.filter(t => {
+  // Filtrar tarefas que NÃO estão arquivadas
+  const activeTasks = tasks.filter(t => !t.archived_at);
+
+  const filteredTasks = activeTasks.filter(t => {
     if (filter === 'pendentes') return !t.completed;
     if (filter === 'concluidos') return t.completed;
     return true;
@@ -162,8 +176,6 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
       default: return <Hash className="w-3 h-3" />;
     }
   };
-
-  const completedCount = tasks.filter(t => t.completed).length;
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-in slide-in-from-bottom-8 duration-700 pb-20">
@@ -336,11 +348,11 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
                  </button>
                  
                  <button 
-                  onClick={() => removeTask(task.id)}
-                  className="p-3 rounded-xl bg-white dark:bg-white/5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all border border-slate-200 dark:border-white/10"
-                  title="Arquivar Processo"
+                  onClick={() => archiveTask(task.id)}
+                  className="p-3 rounded-xl bg-white dark:bg-white/5 text-slate-400 hover:text-sanfran-rubi hover:bg-red-50 dark:hover:bg-red-900/20 transition-all border border-slate-200 dark:border-white/10"
+                  title="Arquivar Processo (Arquivo Morto)"
                  >
-                    <Trash2 className="w-5 h-5" />
+                    <Archive className="w-5 h-5" />
                  </button>
               </div>
             </div>

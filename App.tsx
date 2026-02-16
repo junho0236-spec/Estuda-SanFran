@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit } from 'lucide-react';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser } from './types';
 import Dashboard from './components/Dashboard';
 import Anki from './components/Anki';
@@ -24,6 +24,7 @@ import Societies from './components/Societies';
 import LeiSeca from './components/LeiSeca';
 import Editais from './components/Editais';
 import TimelineBuilder from './components/TimelineBuilder';
+import DeadArchive from './components/DeadArchive';
 import { supabase } from './services/supabaseClient';
 
 export const getBrasiliaDate = () => {
@@ -277,19 +278,20 @@ const App: React.FC = () => {
       const [resSubs, resFlds, resCards, resTks, resSessions, resReadings] = await Promise.all([
         supabase.from('subjects').select('*').eq('user_id', userId),
         supabase.from('folders').select('*').eq('user_id', userId),
-        supabase.from('flashcards').select('*').eq('user_id', userId),
-        supabase.from('tasks').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+        // Filter out archived items initially for performance in main views
+        supabase.from('flashcards').select('*').eq('user_id', userId).is('archived_at', null),
+        supabase.from('tasks').select('*').eq('user_id', userId).is('archived_at', null).order('created_at', { ascending: false }),
         supabase.from('study_sessions').select('*').eq('user_id', userId).order('start_time', { ascending: false }),
         supabase.from('readings').select('*').eq('user_id', userId).order('created_at', { ascending: false })
       ]);
       if (resSubs.data) setSubjects(resSubs.data);
       if (resFlds.data) setFolders(resFlds.data.map(f => ({ id: f.id, name: f.name, parentId: f.parent_id })));
       if (resCards.data) setFlashcards(resCards.data.map(c => ({
-        id: c.id, front: c.front, back: c.back, subjectId: c.subject_id, folderId: c.folder_id, nextReview: c.next_review, interval: c.interval
+        id: c.id, front: c.front, back: c.back, subjectId: c.subject_id, folderId: c.folder_id, nextReview: c.next_review, interval: c.interval, archived_at: c.archived_at
       })));
       if (resTks.data) setTasks(resTks.data.map(t => ({
         id: t.id, title: t.title, completed: t.completed, subjectId: t.subject_id, dueDate: t.due_date, completedAt: t.completed_at,
-        priority: t.priority || 'normal', category: t.category || 'geral'
+        priority: t.priority || 'normal', category: t.category || 'geral', archived_at: t.archived_at
       })));
       
       if (resSessions.data) {
@@ -346,6 +348,7 @@ const App: React.FC = () => {
     { id: View.Ranking, icon: Trophy, label: 'Ranking', color: 'text-usp-gold', bg: 'bg-yellow-100' },
     { id: View.Subjects, icon: BookOpen, label: 'Cadeiras', color: 'text-pink-600', bg: 'bg-pink-100' },
     { id: View.Tasks, icon: CheckSquare, label: 'Pauta', color: 'text-slate-800', bg: 'bg-slate-200' },
+    { id: View.DeadArchive, icon: Archive, label: 'Arquivo Morto', color: 'text-stone-500', bg: 'bg-stone-200' },
   ];
 
   return (
@@ -455,6 +458,7 @@ const App: React.FC = () => {
             {currentView === View.LeiSeca && <LeiSeca userId={session.user.id} />}
             {currentView === View.Editais && <Editais userId={session.user.id} />}
             {currentView === View.Timeline && <TimelineBuilder />}
+            {currentView === View.DeadArchive && <DeadArchive userId={session.user.id} />}
             {currentView === View.Anki && <Anki subjects={subjects} flashcards={flashcards} setFlashcards={setFlashcards} folders={folders} setFolders={setFolders} userId={session.user.id} />}
             {currentView === View.Library && <Library readings={readings} setReadings={setReadings} subjects={subjects} userId={session.user.id} />}
             {currentView === View.Largo && <Largo presenceUsers={presenceUsers} currentUserId={session.user.id} />}
