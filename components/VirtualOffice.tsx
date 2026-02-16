@@ -1,12 +1,13 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { StudySession } from '../types';
 import { 
   Layout, Palette, Armchair, Monitor, Trophy, Lock, CheckCircle2, 
   Save, Moon, Sun, MousePointer2, Maximize2, Scale, Gavel, 
-  Coffee, Book, Flower2, Lamp, Frame, Gift, Package, Sparkles, X, Star
+  Coffee, Book, Flower2, Lamp, Frame, Gift, Package, Sparkles, X, Star,
+  BrickWall, Grid3x3, Box, Sword, Globe, Music, Landmark, Leaf, Lightbulb, 
+  Fan, Tv, Scroll, Crown, Gem, Ghost, Briefcase, Clock, Keyboard
 } from 'lucide-react';
-import confetti from 'canvas-confetti'; // Vamos simular confetti com CSS se não tiver a lib, mas farei visual puro CSS.
+import confetti from 'canvas-confetti';
 
 interface VirtualOfficeProps {
   studySessions: StudySession[];
@@ -22,73 +23,91 @@ interface OfficeItem {
   name: string;
   description: string;
   rarity: Rarity;
-  isDefault?: boolean; // Se o item já vem liberado no início
+  icon: React.ElementType; // Ícone para o preview
+  color: string; // Cor base para o preview
+  isDefault?: boolean;
 }
 
-// --- CATÁLOGO DE ITENS ---
+// --- CATÁLOGO EXPANDIDO ---
 const CATALOG: Record<ItemCategory, OfficeItem[]> = {
   wall: [
-    { id: 'wall_white', name: 'Alvenaria Branca', description: 'Simples e limpo.', rarity: 'common', isDefault: true },
-    { id: 'wall_concrete', name: 'Concreto Aparente', description: 'Estilo industrial moderno.', rarity: 'common' },
-    { id: 'wall_navy', name: 'Azul Petróleo', description: 'Foco e serenidade.', rarity: 'rare' },
-    { id: 'wall_classic', name: 'Boiserie Creme', description: 'Clássico advocatício.', rarity: 'rare' },
-    { id: 'wall_wood', name: 'Painel de Nogueira', description: 'Revestimento de alto padrão.', rarity: 'epic' },
-    { id: 'wall_marble', name: 'Mármore Carrara', description: 'O ápice do luxo.', rarity: 'legendary' },
+    { id: 'wall_white', name: 'Alvenaria Branca', description: 'O clássico básico.', rarity: 'common', icon: Box, color: 'bg-slate-100', isDefault: true },
+    { id: 'wall_concrete', name: 'Concreto Aparente', description: 'Estilo industrial moderno.', rarity: 'common', icon: Box, color: 'bg-zinc-400' },
+    { id: 'wall_brick', name: 'Tijolinho Paulista', description: 'Rústico e acolhedor.', rarity: 'rare', icon: BrickWall, color: 'bg-orange-700' },
+    { id: 'wall_navy', name: 'Azul Petróleo', description: 'Foco e serenidade profunda.', rarity: 'rare', icon: Palette, color: 'bg-slate-800' },
+    { id: 'wall_classic', name: 'Boiserie Creme', description: 'Clássico advocatício.', rarity: 'epic', icon: Frame, color: 'bg-amber-50' },
+    { id: 'wall_green', name: 'Verde Biblioteca', description: 'Estilo inglês vitoriano.', rarity: 'epic', icon: Palette, color: 'bg-emerald-900' },
+    { id: 'wall_wood', name: 'Painel de Nogueira', description: 'Revestimento de alto padrão.', rarity: 'legendary', icon: Layout, color: 'bg-amber-900' },
+    { id: 'wall_marble', name: 'Mármore Carrara', description: 'O ápice do luxo.', rarity: 'legendary', icon: Gem, color: 'bg-slate-50' },
   ],
   floor: [
-    { id: 'floor_concrete', name: 'Cimento Queimado', description: 'Frio e funcional.', rarity: 'common', isDefault: true },
-    { id: 'floor_laminate', name: 'Laminado Carvalho', description: 'Aconchego básico.', rarity: 'common' },
-    { id: 'floor_herringbone', name: 'Taco Espinha de Peixe', description: 'Tradicional de SP.', rarity: 'rare' },
-    { id: 'floor_darkwood', name: 'Ébano Envelhecido', description: 'Madeira nobre.', rarity: 'epic' },
-    { id: 'floor_marble', name: 'Mármore Negro', description: 'Reflete seu sucesso.', rarity: 'legendary' },
+    { id: 'floor_concrete', name: 'Cimento Queimado', description: 'Frio e funcional.', rarity: 'common', icon: Box, color: 'bg-zinc-300', isDefault: true },
+    { id: 'floor_laminate', name: 'Laminado Carvalho', description: 'Aconchego básico.', rarity: 'common', icon: Layout, color: 'bg-orange-200' },
+    { id: 'floor_checker', name: 'Xadrez Clássico', description: 'Preto e branco atemporal.', rarity: 'rare', icon: Grid3x3, color: 'bg-slate-900' },
+    { id: 'floor_herringbone', name: 'Taco Espinha', description: 'Tradicional de SP.', rarity: 'rare', icon: Layout, color: 'bg-amber-700' },
+    { id: 'floor_darkwood', name: 'Ébano Envelhecido', description: 'Madeira nobre escura.', rarity: 'epic', icon: Layout, color: 'bg-stone-900' },
+    { id: 'floor_marble', name: 'Mármore Negro', description: 'Reflete seu sucesso.', rarity: 'legendary', icon: Gem, color: 'bg-black' },
   ],
   window: [
-    { id: 'win_basement', name: 'Janela Alta', description: 'Entra pouca luz.', rarity: 'common', isDefault: true },
-    { id: 'win_standard', name: 'Janela Padrão', description: 'Vista para o prédio vizinho.', rarity: 'common' },
-    { id: 'win_large', name: 'Janela Panorâmica', description: 'Muita luz natural.', rarity: 'rare' },
-    { id: 'win_arch', name: 'Arco das Arcadas', description: 'Estilo colonial.', rarity: 'epic' },
-    { id: 'win_glass', name: 'Parede de Vidro', description: 'Vista da Faria Lima.', rarity: 'legendary' },
+    { id: 'win_basement', name: 'Janela Alta', description: 'Entra pouca luz.', rarity: 'common', icon: Box, color: 'bg-slate-200', isDefault: true },
+    { id: 'win_standard', name: 'Janela Padrão', description: 'Vista para o prédio vizinho.', rarity: 'common', icon: Layout, color: 'bg-sky-100' },
+    { id: 'win_blinds', name: 'Persiana Horizontal', description: 'Privacidade total.', rarity: 'rare', icon: Layout, color: 'bg-slate-300' },
+    { id: 'win_large', name: 'Janela Panorâmica', description: 'Muita luz natural.', rarity: 'epic', icon: Maximize2, color: 'bg-sky-200' },
+    { id: 'win_arch', name: 'Arco das Arcadas', description: 'Estilo colonial histórico.', rarity: 'epic', icon: Landmark, color: 'bg-amber-100' },
+    { id: 'win_glass', name: 'Parede de Vidro', description: 'Vista da Faria Lima.', rarity: 'legendary', icon: Maximize2, color: 'bg-cyan-100' },
   ],
   desk: [
-    { id: 'desk_door', name: 'Porta e Cavaletes', description: 'O começo de tudo.', rarity: 'common', isDefault: true },
-    { id: 'desk_white', name: 'Mesa MDF Branca', description: 'Funcional e barata.', rarity: 'common' },
-    { id: 'desk_wood', name: 'Escrivaninha Mogno', description: 'Sólida e respeitável.', rarity: 'rare' },
-    { id: 'desk_l', name: 'Estação em L', description: 'Muito espaço para processos.', rarity: 'epic' },
-    { id: 'desk_president', name: 'Mesa Presidencial', description: 'Madeira maciça esculpida.', rarity: 'legendary' },
+    { id: 'desk_door', name: 'Porta e Cavaletes', description: 'O começo de tudo.', rarity: 'common', icon: Layout, color: 'bg-amber-200', isDefault: true },
+    { id: 'desk_white', name: 'Mesa MDF Branca', description: 'Funcional e barata.', rarity: 'common', icon: Layout, color: 'bg-white' },
+    { id: 'desk_glass', name: 'Vidro Moderno', description: 'Design minimalista.', rarity: 'rare', icon: Monitor, color: 'bg-cyan-200' },
+    { id: 'desk_wood', name: 'Escrivaninha Mogno', description: 'Sólida e respeitável.', rarity: 'rare', icon: Briefcase, color: 'bg-amber-900' },
+    { id: 'desk_l', name: 'Estação em L', description: 'Muito espaço para processos.', rarity: 'epic', icon: Layout, color: 'bg-slate-800' },
+    { id: 'desk_antique', name: 'Mesa do Século XIX', description: 'Uma antiguidade valiosa.', rarity: 'epic', icon: Scroll, color: 'bg-amber-950' },
+    { id: 'desk_president', name: 'Mesa Presidencial', description: 'Madeira maciça esculpida.', rarity: 'legendary', icon: Crown, color: 'bg-yellow-900' },
   ],
   chair: [
-    { id: 'chair_plastic', name: 'Cadeira de Plástico', description: 'Temporária (esperamos).', rarity: 'common', isDefault: true },
-    { id: 'chair_office', name: 'Cadeira Secretária', description: 'Rodinhas que travam.', rarity: 'common' },
-    { id: 'chair_gamer', name: 'Ergonômica Mesh', description: 'Cuide da sua lombar.', rarity: 'rare' },
-    { id: 'chair_leather', name: 'Poltrona Executiva', description: 'Couro sintético premium.', rarity: 'epic' },
-    { id: 'chair_magistrate', name: 'Trono do Juiz', description: 'Veludo vermelho e ouro.', rarity: 'legendary' },
+    { id: 'chair_plastic', name: 'Cadeira de Plástico', description: 'Temporária (esperamos).', rarity: 'common', icon: Armchair, color: 'bg-slate-200', isDefault: true },
+    { id: 'chair_wood', name: 'Banco de Madeira', description: 'Duro, mas honesto.', rarity: 'common', icon: Armchair, color: 'bg-amber-700' },
+    { id: 'chair_office', name: 'Cadeira Secretária', description: 'Rodinhas que travam.', rarity: 'common', icon: Armchair, color: 'bg-blue-900' },
+    { id: 'chair_gamer', name: 'Ergonômica Mesh', description: 'Cuide da sua lombar.', rarity: 'rare', icon: Armchair, color: 'bg-black' },
+    { id: 'chair_velvet', name: 'Poltrona Veludo', description: 'Conforto vintage.', rarity: 'epic', icon: Armchair, color: 'bg-emerald-800' },
+    { id: 'chair_leather', name: 'Executiva Couro', description: 'Couro legítimo.', rarity: 'epic', icon: Armchair, color: 'bg-amber-950' },
+    { id: 'chair_magistrate', name: 'Trono do Juiz', description: 'Espaldar alto e ouro.', rarity: 'legendary', icon: Gavel, color: 'bg-red-900' },
   ],
   rug: [
-    { id: 'rug_none', name: 'Sem Tapete', description: 'Fácil de limpar.', rarity: 'common', isDefault: true },
-    { id: 'rug_grey', name: 'Tapete Cinza', description: 'Discreto.', rarity: 'common' },
-    { id: 'rug_persian', name: 'Tapete Persa', description: 'Herança de família.', rarity: 'epic' },
-    { id: 'rug_sanfran', name: 'Brasão XI de Agosto', description: 'Orgulho acadêmico.', rarity: 'legendary' },
+    { id: 'rug_none', name: 'Sem Tapete', description: 'Fácil de limpar.', rarity: 'common', icon: X, color: 'bg-transparent', isDefault: true },
+    { id: 'rug_grey', name: 'Tapete Cinza', description: 'Discreto.', rarity: 'common', icon: MousePointer2, color: 'bg-slate-400' },
+    { id: 'rug_stripes', name: 'Listrado P&B', description: 'Moderno.', rarity: 'rare', icon: MousePointer2, color: 'bg-slate-800' },
+    { id: 'rug_red', name: 'Tapete Vermelho', description: 'Recepção de gala.', rarity: 'rare', icon: MousePointer2, color: 'bg-red-700' },
+    { id: 'rug_persian', name: 'Tapete Persa', description: 'Herança de família.', rarity: 'epic', icon: Sparkles, color: 'bg-red-900' },
+    { id: 'rug_sanfran', name: 'Brasão XI de Agosto', description: 'Orgulho acadêmico.', rarity: 'legendary', icon: Trophy, color: 'bg-yellow-500' },
   ],
   decor_left: [
-    { id: 'none', name: 'Vazio', description: '', rarity: 'common', isDefault: true },
-    { id: 'plant_pothos', name: 'Jiboia no Vaso', description: 'Purifica o ar.', rarity: 'common' },
-    { id: 'lamp_floor', name: 'Luminária de Piso', description: 'Luz indireta.', rarity: 'common' },
-    { id: 'bookshelf_small', name: 'Estante Baixa', description: 'Vade Mecum e Doutrinas.', rarity: 'rare' },
-    { id: 'statue_themis', name: 'Estátua da Justiça', description: 'Cega e imparcial.', rarity: 'epic' },
+    { id: 'none', name: 'Vazio', description: '', rarity: 'common', icon: X, color: 'bg-transparent', isDefault: true },
+    { id: 'plant_pothos', name: 'Jiboia no Vaso', description: 'Purifica o ar.', rarity: 'common', icon: Leaf, color: 'bg-green-500' },
+    { id: 'lamp_floor', name: 'Luminária de Piso', description: 'Luz indireta.', rarity: 'common', icon: Lightbulb, color: 'bg-yellow-200' },
+    { id: 'fan', name: 'Ventilador Antigo', description: 'Para dias quentes.', rarity: 'rare', icon: Fan, color: 'bg-slate-400' },
+    { id: 'bookshelf_small', name: 'Estante Baixa', description: 'Vade Mecum e Doutrinas.', rarity: 'rare', icon: Book, color: 'bg-amber-800' },
+    { id: 'globe', name: 'Globo Terrestre', description: 'Direito Internacional.', rarity: 'epic', icon: Globe, color: 'bg-blue-600' },
+    { id: 'statue_themis', name: 'Estátua da Justiça', description: 'Cega e imparcial.', rarity: 'epic', icon: Scale, color: 'bg-yellow-600' },
+    { id: 'armor', name: 'Armadura Medieval', description: 'Direito Romano puro.', rarity: 'legendary', icon: Ghost, color: 'bg-slate-300' },
   ],
   decor_right: [
-    { id: 'none', name: 'Vazio', description: '', rarity: 'common', isDefault: true },
-    { id: 'diploma', name: 'Diploma Moldurado', description: 'Sua credencial.', rarity: 'common' },
-    { id: 'painting_abstract', name: 'Arte Abstrata', description: 'Toque de cor.', rarity: 'rare' },
-    { id: 'clock_wall', name: 'Relógio Antigo', description: 'O tempo ruge.', rarity: 'rare' },
-    { id: 'bookshelf_tall', name: 'Biblioteca Parede', description: 'Conhecimento infinito.', rarity: 'legendary' },
+    { id: 'none', name: 'Vazio', description: '', rarity: 'common', icon: X, color: 'bg-transparent', isDefault: true },
+    { id: 'diploma', name: 'Diploma Moldurado', description: 'Sua credencial.', rarity: 'common', icon: Scroll, color: 'bg-white' },
+    { id: 'painting_abstract', name: 'Arte Abstrata', description: 'Toque de cor.', rarity: 'rare', icon: Palette, color: 'bg-purple-500' },
+    { id: 'clock_wall', name: 'Relógio Antigo', description: 'O tempo ruge.', rarity: 'rare', icon: Clock, color: 'bg-amber-900' },
+    { id: 'sword', name: 'Espada Cerimonial', description: 'A força do Direito.', rarity: 'epic', icon: Sword, color: 'bg-slate-400' },
+    { id: 'gramophone', name: 'Gramofone', description: 'Música clássica.', rarity: 'epic', icon: Music, color: 'bg-amber-700' },
+    { id: 'bookshelf_tall', name: 'Biblioteca Parede', description: 'Conhecimento infinito.', rarity: 'legendary', icon: Book, color: 'bg-amber-950' },
   ],
   desktop: [
-    { id: 'none', name: 'Mesa Limpa', description: 'Foco total.', rarity: 'common', isDefault: true },
-    { id: 'messy_papers', name: 'Pilhas de Processos', description: 'Vida de estagiário.', rarity: 'common' },
-    { id: 'laptop_coffee', name: 'Notebook e Café', description: 'Setup padrão.', rarity: 'common' },
-    { id: 'dual_monitor', name: 'Monitores Duplos', description: 'Multitarefa suprema.', rarity: 'epic' },
-    { id: 'gavel_set', name: 'Martelo e Livros', description: 'Autoridade.', rarity: 'legendary' },
+    { id: 'none', name: 'Mesa Limpa', description: 'Foco total.', rarity: 'common', icon: X, color: 'bg-transparent', isDefault: true },
+    { id: 'messy_papers', name: 'Pilhas de Processos', description: 'Vida de estagiário.', rarity: 'common', icon: Scroll, color: 'bg-white' },
+    { id: 'laptop_coffee', name: 'Notebook e Café', description: 'Setup padrão.', rarity: 'common', icon: Monitor, color: 'bg-slate-800' },
+    { id: 'typewriter', name: 'Máquina de Escrever', description: 'Old school.', rarity: 'rare', icon: Keyboard, color: 'bg-slate-600' },
+    { id: 'dual_monitor', name: 'Monitores Duplos', description: 'Multitarefa suprema.', rarity: 'epic', icon: Tv, color: 'bg-black' },
+    { id: 'gavel_set', name: 'Martelo e Livros', description: 'Autoridade.', rarity: 'legendary', icon: Gavel, color: 'bg-amber-800' },
   ]
 };
 
@@ -113,7 +132,7 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
   // --- STATE DO GACHA ---
   const [inventory, setInventory] = useState<string[]>([]);
   const [availableBoxes, setAvailableBoxes] = useState(0);
-  const [totalBoxesEarned, setTotalBoxesEarned] = useState(0); // Histórico para não dar caixas repetidas
+  const [totalBoxesEarned, setTotalBoxesEarned] = useState(0);
   const [isOpeningBox, setIsOpeningBox] = useState(false);
   const [wonItem, setWonItem] = useState<{item: OfficeItem, category: ItemCategory} | null>(null);
 
@@ -122,13 +141,11 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
 
   // Inicialização e Carregamento
   useEffect(() => {
-    // 1. Carregar Configuração da Sala
     const savedConfig = localStorage.getItem(`sanfran_office_v2_${userName}`);
     if (savedConfig) {
       try { setConfig({ ...DEFAULT_CONFIG, ...JSON.parse(savedConfig) }); } catch (e) {}
     }
 
-    // 2. Carregar Inventário e Caixas
     const savedInventory = localStorage.getItem(`sanfran_inventory_${userName}`);
     const savedBoxes = localStorage.getItem(`sanfran_boxes_${userName}`);
     const savedTotalEarned = localStorage.getItem(`sanfran_boxes_earned_${userName}`);
@@ -136,7 +153,6 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
     if (savedInventory) {
       setInventory(JSON.parse(savedInventory));
     } else {
-      // Inventário inicial (apenas itens default)
       const initialItems: string[] = [];
       Object.values(CATALOG).forEach(categoryItems => {
         categoryItems.forEach(item => {
@@ -149,14 +165,13 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
     if (savedBoxes) setAvailableBoxes(parseInt(savedBoxes));
     if (savedTotalEarned) setTotalBoxesEarned(parseInt(savedTotalEarned));
 
-    // Auto day/night
     const hour = new Date().getHours();
     setIsNight(hour < 6 || hour > 18);
   }, [userName]);
 
-  // Lógica de Ganhar Caixas (A cada 20h)
+  // Lógica de Ganhar Caixas (A cada 10h agora, para ser mais frequente)
   useEffect(() => {
-    const boxesShouldHave = Math.floor(totalHours / 20);
+    const boxesShouldHave = Math.floor(totalHours / 10);
     
     if (boxesShouldHave > totalBoxesEarned) {
       const newBoxes = boxesShouldHave - totalBoxesEarned;
@@ -169,20 +184,15 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
 
       localStorage.setItem(`sanfran_boxes_earned_${userName}`, updatedTotal.toString());
       localStorage.setItem(`sanfran_boxes_${userName}`, updatedAvailable.toString());
-      
-      // Notificação simples (poderia ser um toast)
-      // alert(`Você ganhou ${newBoxes} nova(s) caixa(s) por seus estudos!`);
     }
   }, [totalHours, totalBoxesEarned, availableBoxes, userName]);
 
-  // Salvar Inventário ao mudar
   useEffect(() => {
     if (inventory.length > 0) {
       localStorage.setItem(`sanfran_inventory_${userName}`, JSON.stringify(inventory));
     }
   }, [inventory, userName]);
 
-  // Salvar Caixas Disponíveis ao mudar
   useEffect(() => {
     localStorage.setItem(`sanfran_boxes_${userName}`, availableBoxes.toString());
   }, [availableBoxes, userName]);
@@ -201,19 +211,15 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
     setIsOpeningBox(true);
     setAvailableBoxes(prev => prev - 1);
 
-    // Tempo da animação "shaking"
     setTimeout(() => {
-      // 1. Definir Raridade
       const roll = Math.random() * 100;
       let rarity: Rarity = 'common';
-      if (roll > 99) rarity = 'legendary';      // 1%
-      else if (roll > 90) rarity = 'epic';      // 9%
+      if (roll > 98) rarity = 'legendary';      // 2%
+      else if (roll > 90) rarity = 'epic';      // 8%
       else if (roll > 60) rarity = 'rare';      // 30%
       else rarity = 'common';                   // 60%
 
-      // 2. Filtrar Itens Possíveis dessa Raridade que o usuário NÃO tem (prioridade)
       let pool: {item: OfficeItem, category: ItemCategory}[] = [];
-      
       Object.entries(CATALOG).forEach(([cat, items]) => {
         items.forEach(item => {
           if (item.rarity === rarity) {
@@ -222,33 +228,28 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
         });
       });
 
-      // Filtrar não possuídos
       const unowned = pool.filter(p => !inventory.includes(p.item.id));
-      
       let finalPick;
+      
       if (unowned.length > 0) {
         finalPick = unowned[Math.floor(Math.random() * unowned.length)];
       } else {
-        // Se já tem todos daquela raridade, pega um repetido (ou poderia dar um upgrade, mas vamos simplificar)
-        // Vamos dar um fallback para uma raridade diferente se possível, ou apenas dar repetido.
         finalPick = pool[Math.floor(Math.random() * pool.length)];
       }
 
-      // Se por azar o pool estiver vazio (ex: sem lendários no catálogo), fallback para comum
       if (!finalPick) {
-         // Fallback seguro
          const fallbackItem = CATALOG.desk[0];
          finalPick = { item: fallbackItem, category: 'desk' as ItemCategory};
       }
 
-      // 3. Adicionar ao Inventário (Set para evitar duplicatas técnicas, embora a lógica acima priorize novos)
       if (!inventory.includes(finalPick.item.id)) {
         setInventory(prev => [...prev, finalPick.item.id]);
       }
 
       setWonItem(finalPick);
+      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
       
-    }, 2000); // 2 segundos de suspense
+    }, 2000);
   };
 
   const closeBoxModal = () => {
@@ -263,20 +264,25 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
     }
   };
 
-  // --- RENDERERS DE CSS ART (O "Motor Gráfico") ---
+  // --- RENDERERS DE CSS ART ATUALIZADOS ---
 
   const renderWall = () => {
     const style = config.wall;
     let bgClass = "bg-slate-200";
     if (style === 'wall_concrete') bgClass = "bg-[#a3a3a3]";
+    if (style === 'wall_brick') bgClass = "bg-[#7c2d12]"; // Tijolo
     if (style === 'wall_navy') bgClass = "bg-[#1e293b]";
     if (style === 'wall_classic') bgClass = "bg-[#fdfbf7]";
+    if (style === 'wall_green') bgClass = "bg-[#064e3b]";
     if (style === 'wall_wood') bgClass = "bg-[#4a3b32]";
     if (style === 'wall_marble') bgClass = "bg-slate-100"; 
 
     return (
       <div className={`absolute inset-0 ${bgClass} transition-colors duration-1000`}>
         {style === 'wall_concrete' && <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/concrete-wall.png')]"></div>}
+        {style === 'wall_brick' && (
+           <div className="absolute inset-0 opacity-30 bg-[repeating-linear-gradient(0deg,transparent,transparent_19px,#000_20px),repeating-linear-gradient(90deg,transparent,transparent_39px,#000_40px)]"></div>
+        )}
         {style === 'wall_classic' && (
           <div className="w-full h-full flex justify-around px-10 items-center">
              <div className="w-32 h-[70%] border-4 border-[#e2e8f0] shadow-sm rounded-sm"></div>
@@ -284,7 +290,7 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
              <div className="w-32 h-[70%] border-4 border-[#e2e8f0] shadow-sm rounded-sm"></div>
           </div>
         )}
-        {style === 'wall_wood' && (
+        {(style === 'wall_wood' || style === 'wall_green') && (
            <div className="w-full h-full flex">
               {[...Array(10)].map((_, i) => <div key={i} className="flex-1 border-r border-black/20 bg-gradient-to-r from-transparent to-black/10"></div>)}
            </div>
@@ -299,16 +305,18 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
     const style = config.floor;
     let bgClass = "bg-stone-300";
     if (style === 'floor_laminate') bgClass = "bg-[#d4b483]";
+    if (style === 'floor_checker') bgClass = "bg-[#1a1a1a]";
     if (style === 'floor_herringbone') bgClass = "bg-[#a67c52]";
     if (style === 'floor_darkwood') bgClass = "bg-[#271c19]";
     if (style === 'floor_marble') bgClass = "bg-[#1a1a1a]";
 
     return (
       <div className={`absolute bottom-0 w-full h-[35%] ${bgClass} transition-colors duration-1000 perspective-origin-center transform-style-3d`}>
-         {/* Textura de Piso */}
+         {style === 'floor_checker' && (
+            <div className="absolute inset-0 opacity-30 bg-[repeating-linear-gradient(45deg,#ccc_25%,transparent_25%,transparent_75%,#ccc_75%,#ccc),repeating-linear-gradient(45deg,#ccc_25%,transparent_25%,transparent_75%,#ccc_75%,#ccc)] bg-[length:40px_40px]"></div>
+         )}
          {style === 'floor_herringbone' && <div className="absolute inset-0 opacity-10 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,#000_10px,#000_11px)]"></div>}
          {style === 'floor_laminate' && <div className="absolute inset-0 opacity-10 bg-[linear-gradient(90deg,transparent_90%,#000_100%)] bg-[length:100px_100%]"></div>}
-         {/* Reflexo do chão */}
          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none"></div>
       </div>
     );
@@ -316,49 +324,46 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
 
   const renderWindow = () => {
     const style = config.window;
-    // Posição e tamanho
-    let dims = "w-[20%] h-[30%] top-[10%] left-[10%]"; // Basement
-    if (style === 'win_standard') dims = "w-[25%] h-[40%] top-[15%] left-[10%]";
-    if (style === 'win_large') dims = "w-[40%] h-[50%] top-[10%] left-[5%]";
-    if (style === 'win_arch') dims = "w-[25%] h-[60%] top-[10%] left-[10%] rounded-t-full";
-    if (style === 'win_glass') dims = "w-full h-[65%] top-0 left-0 border-none";
+    let bg = "bg-sky-200";
+    let frameColor = "border-slate-100";
+    let width = "w-1/3";
+    let height = "h-1/3";
+    let top = "top-[20%]";
+    let left = "left-1/2 -translate-x-1/2";
+    let blinds = false;
+    let grid = false;
+    let arch = false;
 
-    // View content
-    const skyColor = isNight ? "bg-[#0f172a]" : "bg-sky-300";
-    const celestial = isNight ? "bg-slate-100 shadow-[0_0_20px_white]" : "bg-yellow-300 shadow-[0_0_40px_yellow]";
+    if (style === 'win_basement') { width = "w-1/2"; height = "h-16"; top = "top-[10%]"; }
+    if (style === 'win_standard') { grid = true; }
+    if (style === 'win_blinds') { blinds = true; }
+    if (style === 'win_large') { width = "w-2/3"; height = "h-1/2"; top = "top-[15%]"; }
+    if (style === 'win_arch') { arch = true; width = "w-1/3"; height = "h-1/2"; }
+    if (style === 'win_glass') { width = "w-full"; height = "h-2/3"; top = "top-[10%]"; left="left-0"; frameColor="border-none"; }
 
     return (
-      <div className={`absolute ${dims} bg-slate-800 border-[8px] border-white dark:border-slate-800 overflow-hidden shadow-inner transition-all duration-700 z-0`}>
-         <div className={`absolute inset-0 ${skyColor} transition-colors duration-2000`}>
-            {/* Celestial Body */}
-            <div className={`absolute top-4 right-4 w-8 h-8 rounded-full ${celestial} transition-all duration-2000`}></div>
-            {/* Cityscape Silhouette (CSS Only) */}
-            <div className={`absolute bottom-0 w-full h-1/3 flex items-end ${isNight ? 'opacity-80' : 'opacity-30'}`}>
-               <div className="w-4 h-12 bg-black mx-1"></div>
-               <div className="w-6 h-20 bg-black mx-1"></div>
-               <div className="w-8 h-10 bg-black mx-1"></div>
-               <div className="w-5 h-24 bg-black mx-1"></div>
-               <div className="w-10 h-14 bg-black mx-1"></div>
-               <div className="w-6 h-16 bg-black mx-1"></div>
-               <div className="w-12 h-8 bg-black mx-1"></div>
-            </div>
-            {/* Stars if night */}
-            {isNight && (
-               <>
-                 <div className="absolute top-10 left-10 w-0.5 h-0.5 bg-white animate-pulse"></div>
-                 <div className="absolute top-20 left-1/2 w-0.5 h-0.5 bg-white animate-pulse delay-75"></div>
-               </>
-            )}
-         </div>
-         {/* Glass Reflection */}
-         <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent"></div>
-         {/* Frame Crossbars */}
-         {style !== 'win_glass' && (
-            <>
-              <div className="absolute top-1/2 w-full h-2 bg-white dark:bg-slate-800"></div>
-              {style !== 'win_arch' && <div className="absolute left-1/2 h-full w-2 bg-white dark:bg-slate-800"></div>}
-            </>
-         )}
+      <div className={`absolute ${top} ${left} ${width} ${height} ${arch ? 'rounded-t-full' : ''} bg-sky-300 border-4 ${frameColor} shadow-inner overflow-hidden z-0`}>
+        {/* Sky gradient */}
+        <div className={`absolute inset-0 ${isNight ? 'bg-slate-900' : 'bg-sky-300'}`}>
+           {isNight && <div className="absolute top-4 right-4 w-8 h-8 bg-slate-200 rounded-full shadow-[0_0_20px_white]"></div>}
+           {!isNight && <div className="absolute top-2 right-10 w-12 h-12 bg-yellow-300 rounded-full blur-xl opacity-80"></div>}
+           <div className="absolute bottom-0 w-full h-1/3 bg-slate-700/20 backdrop-blur-[1px]"></div> {/* City silhouette hint */}
+        </div>
+
+        {grid && (
+           <div className="absolute inset-0 border-4 border-slate-100 grid grid-cols-2 grid-rows-2 gap-1 bg-slate-100">
+              <div className="bg-transparent opacity-0"></div>
+           </div>
+        )}
+
+        {blinds && (
+           <div className="absolute inset-0 flex flex-col justify-between py-1">
+              {[...Array(10)].map((_, i) => <div key={i} className="w-full h-2 bg-slate-100 shadow-sm"></div>)}
+           </div>
+        )}
+
+        {/* Reflexo vidro */}
+        <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent pointer-events-none"></div>
       </div>
     );
   };
@@ -367,15 +372,47 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
     const style = config.rug;
     if (style === 'rug_none') return null;
 
-    let css = "";
-    if (style === 'rug_grey') css = "bg-slate-400 rounded-lg";
-    if (style === 'rug_persian') css = "bg-[#7f1d1d] border-4 border-[#450a0a] rounded-sm shadow-sm"; // Red
-    if (style === 'rug_sanfran') css = "bg-[#f59e0b] border-4 border-[#78350f] rounded-full"; // Gold
+    let bgClass = "bg-slate-400";
+    let shape = "rounded-sm";
+    let width = "w-1/2";
+
+    if (style === 'rug_grey') bgClass = "bg-slate-400";
+    if (style === 'rug_stripes') bgClass = "bg-[repeating-linear-gradient(90deg,#1e293b,#1e293b_20px,#f8fafc_20px,#f8fafc_40px)]";
+    if (style === 'rug_red') { bgClass = "bg-red-800 border-4 border-yellow-600"; width="w-[40%]"; }
+    if (style === 'rug_persian') { bgClass = "bg-[radial-gradient(circle,rgba(127,29,29,1)_0%,rgba(69,10,10,1)_100%)] border-8 border-double border-yellow-900"; width="w-[45%]"; }
+    if (style === 'rug_sanfran') { bgClass = "bg-yellow-500 border-4 border-black"; width="w-[30%] rounded-full"; }
 
     return (
-      <div className={`absolute bottom-[10%] left-1/2 -translate-x-1/2 w-[50%] h-[20%] ${css} transform scale-y-50 opacity-90 transition-all duration-500`}>
-         {style === 'rug_persian' && <div className="absolute inset-2 border-2 border-dashed border-[#fbbf24]/30"></div>}
-         {style === 'rug_sanfran' && <div className="w-full h-full flex items-center justify-center text-[#78350f]/20 font-black text-4xl">XI</div>}
+       <div className={`absolute bottom-[10%] left-1/2 -translate-x-1/2 h-[20%] ${width} ${bgClass} ${shape} shadow-sm transform perspective-500 rotate-x-60 opacity-90 pointer-events-none z-10`}>
+          {style === 'rug_sanfran' && <div className="absolute inset-0 flex items-center justify-center text-black font-black text-xs opacity-50">XI DE AGOSTO</div>}
+       </div>
+    );
+  };
+
+  const renderChair = () => {
+    const style = config.chair;
+    
+    let color = "bg-slate-700";
+    let type = "standard"; // standard, fancy, throne
+
+    if (style === 'chair_plastic') { color = "bg-white"; }
+    if (style === 'chair_wood') { color = "bg-[#5D4037]"; }
+    if (style === 'chair_office') { color = "bg-blue-900"; }
+    if (style === 'chair_gamer') { color = "bg-black border-2 border-red-500"; type="fancy"; }
+    if (style === 'chair_velvet') { color = "bg-emerald-800"; type="fancy"; }
+    if (style === 'chair_leather') { color = "bg-[#3E2723]"; type="fancy"; }
+    if (style === 'chair_magistrate') { color = "bg-red-900 border-4 border-yellow-500"; type="throne"; }
+
+    return (
+      <div className="absolute bottom-[25%] left-1/2 -translate-x-1/2 z-10 flex flex-col items-center pointer-events-none">
+         {/* Backrest */}
+         <div className={`w-16 ${type === 'throne' ? 'h-32 rounded-t-full' : type === 'fancy' ? 'h-24 rounded-t-xl' : 'h-20 rounded-t-md'} ${color} shadow-xl relative`}>
+            {type === 'throne' && <div className="absolute top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-yellow-500 rounded-full shadow-md"></div>}
+         </div>
+         {/* Seat */}
+         <div className={`w-16 h-2 ${color} brightness-75`}></div>
+         {/* Legs */}
+         <div className="w-12 h-12 border-l-4 border-r-4 border-slate-800"></div>
       </div>
     );
   };
@@ -383,45 +420,41 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
   const renderDesk = () => {
     const style = config.desk;
     
-    // Base geometry
     let width = "w-[50%]";
-    let height = "h-[30%]"; // Perspective height
     let color = "bg-slate-300";
     let legs = true;
     let legsColor = "bg-slate-400";
+    let glass = false;
 
     if (style === 'desk_white') { color = "bg-white border-b-4 border-slate-200"; width="w-[55%]"; }
     if (style === 'desk_wood') { color = "bg-[#5D4037] border-b-4 border-[#3E2723]"; width="w-[60%]"; legsColor="bg-[#3E2723]"; }
+    if (style === 'desk_glass') { color = "bg-cyan-100/30 backdrop-blur-sm border border-white/50"; width="w-[55%]"; glass=true; legsColor="bg-slate-300"; }
     if (style === 'desk_l') { color = "bg-[#2d3748] border-b-4 border-black"; width="w-[65%]"; legsColor="bg-black"; }
-    if (style === 'desk_president') { color = "bg-[linear-gradient(90deg,#3E2723,#5D4037,#3E2723)] border-b-8 border-[#271c19]"; width="w-[70%]"; legs=false; } // Solid base
+    if (style === 'desk_antique') { color = "bg-[#4a3b32] border-b-8 border-[#271c19]"; width="w-[65%]"; legs=false; }
+    if (style === 'desk_president') { color = "bg-[linear-gradient(90deg,#3E2723,#5D4037,#3E2723)] border-b-8 border-[#271c19]"; width="w-[70%]"; legs=false; }
 
     return (
       <div className="absolute bottom-[12%] left-1/2 -translate-x-1/2 z-20 flex flex-col items-center w-full pointer-events-none">
-         {/* Desktop Surface */}
          <div className={`${width} h-8 ${color} rounded-sm relative shadow-2xl flex items-end justify-center perspective-500`}>
-            {/* Drawers if solid */}
             {!legs && (
-               <div className="absolute top-8 w-[95%] h-32 bg-[#3E2723] flex justify-between px-4 py-2 shadow-2xl">
+               <div className={`absolute top-8 w-[95%] h-32 ${style === 'desk_antique' ? 'bg-[#4a3b32]' : 'bg-[#3E2723]'} flex justify-between px-4 py-2 shadow-2xl`}>
                   <div className="w-1/4 h-full border border-white/10 flex flex-col gap-1 p-1">
-                     <div className="w-full h-1/3 bg-[#271c19] shadow-inner mb-1"></div>
-                     <div className="w-full h-1/3 bg-[#271c19] shadow-inner"></div>
+                     <div className="w-full h-1/3 bg-black/20 shadow-inner mb-1"></div>
+                     <div className="w-full h-1/3 bg-black/20 shadow-inner"></div>
                   </div>
                   <div className="w-1/4 h-full border border-white/10 flex flex-col gap-1 p-1">
-                     <div className="w-full h-1/3 bg-[#271c19] shadow-inner mb-1"></div>
-                     <div className="w-full h-1/3 bg-[#271c19] shadow-inner"></div>
+                     <div className="w-full h-1/3 bg-black/20 shadow-inner mb-1"></div>
+                     <div className="w-full h-1/3 bg-black/20 shadow-inner"></div>
                   </div>
                </div>
             )}
             
-            {/* Desktop Items */}
             {renderDesktopItems()}
          </div>
 
-         {/* Legs */}
          {legs && (
             <div className={`${width} flex justify-between px-4 -mt-1`}>
                {style === 'desk_door' ? (
-                  // Cavaletes
                   <>
                     <div className="w-16 h-24 border-l-4 border-r-4 border-t-4 border-slate-400 skew-x-6"></div>
                     <div className="w-16 h-24 border-l-4 border-r-4 border-t-4 border-slate-400 -skew-x-6"></div>
@@ -434,33 +467,6 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
                )}
             </div>
          )}
-      </div>
-    );
-  };
-
-  const renderChair = () => {
-    const style = config.chair;
-    // Rendered BEHIND the desk
-    let css = "w-16 h-20 bg-slate-600 rounded-t-lg"; // Default
-    let legCss = "bg-slate-700";
-
-    if (style === 'chair_office') { css = "w-16 h-20 bg-blue-900 rounded-t-xl border-2 border-slate-800"; }
-    if (style === 'chair_gamer') { css = "w-20 h-28 bg-black border-x-4 border-red-600 rounded-t-2xl"; }
-    if (style === 'chair_leather') { css = "w-24 h-32 bg-[#3E2723] rounded-t-[2rem] shadow-xl border-4 border-[#281815]"; }
-    if (style === 'chair_magistrate') { css = "w-28 h-40 bg-[#7f1d1d] rounded-t-[3rem] shadow-2xl border-4 border-[#fbbf24]"; } // Red & Gold
-
-    return (
-      <div className="absolute bottom-[25%] left-1/2 -translate-x-1/2 z-10 flex flex-col items-center">
-         <div className={`${css} relative shadow-lg`}>
-            {/* Headrest detail for fancy chairs */}
-            {(style === 'chair_leather' || style === 'chair_magistrate') && (
-               <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-16 h-6 bg-inherit rounded-full shadow-md"></div>
-            )}
-         </div>
-         {/* Stem */}
-         <div className="w-3 h-12 bg-slate-800"></div>
-         {/* Base */}
-         <div className="w-16 h-4 bg-slate-800 rounded-full -mt-2"></div>
       </div>
     );
   };
@@ -487,6 +493,11 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
                   <div className="absolute -right-8 bottom-0"><Coffee className="text-slate-700 w-6 h-6" /></div>
                </div>
             </>
+         )}
+         {style === 'typewriter' && (
+            <div className="w-16 h-10 bg-black rounded-md flex items-center justify-center relative">
+               <div className="w-10 h-4 bg-white absolute -top-2"></div>
+            </div>
          )}
          {style === 'dual_monitor' && (
             <div className="flex gap-1 items-end">
@@ -529,6 +540,12 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
                <Lamp className="w-16 h-48 text-slate-800" />
             </div>
          )}
+         {style === 'fan' && (
+            <div className="flex flex-col items-center">
+               <Fan className="w-16 h-16 text-slate-400 animate-spin-slow" />
+               <div className="w-2 h-20 bg-slate-500"></div>
+            </div>
+         )}
          {(style === 'bookshelf_small' || style === 'bookshelf_tall') && (
             <div className={`${style === 'bookshelf_tall' ? 'w-24 h-64' : 'w-20 h-32'} bg-[#3E2723] border-4 border-[#271c19] shadow-2xl flex flex-col justify-around px-1`}>
                {[...Array(style === 'bookshelf_tall' ? 5 : 2)].map((_,i) => (
@@ -548,24 +565,22 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
                <div className="w-10 h-32 bg-gradient-to-b from-yellow-100 to-yellow-600 rounded-full opacity-80 mt-8"></div>
             </div>
          )}
-         {style === 'painting_abstract' && (
-            <div className="absolute bottom-32 -left-4 w-20 h-28 bg-white border-4 border-black shadow-xl flex items-center justify-center overflow-hidden">
-               <div className="w-full h-full bg-gradient-to-tr from-blue-500 via-red-500 to-yellow-500 transform rotate-45"></div>
+         {style === 'globe' && (
+            <div className="flex flex-col items-center">
+               <Globe className="w-16 h-16 text-blue-600" />
+               <div className="w-12 h-16 bg-amber-800 -mt-2 clip-path-polygon"></div>
             </div>
          )}
-         {style === 'diploma' && (
-            <div className="absolute bottom-40 -right-4 w-16 h-12 bg-white border-4 border-yellow-600 shadow-md flex items-center justify-center p-1">
-               <div className="w-full h-full border border-slate-200 flex flex-col gap-0.5 justify-center items-center">
-                  <div className="w-8 h-0.5 bg-black"></div>
-                  <div className="w-6 h-0.5 bg-black"></div>
-                  <div className="w-2 h-2 rounded-full bg-red-600 mt-1"></div>
-               </div>
+         {style === 'sword' && (
+            <div className="w-8 h-40 bg-slate-800/10 flex items-center justify-center">
+               <Sword className="w-12 h-32 text-slate-400 rotate-180 drop-shadow-xl" />
             </div>
          )}
-         {style === 'clock_wall' && (
-            <div className="absolute bottom-60 -right-4 w-12 h-12 bg-white rounded-full border-4 border-black shadow-lg flex items-center justify-center">
-               <div className="w-0.5 h-4 bg-black absolute top-2 origin-bottom rotate-45"></div>
-               <div className="w-0.5 h-3 bg-black absolute top-3 origin-bottom -rotate-12"></div>
+         {style === 'gramophone' && (
+            <div className="relative">
+               <Music className="absolute -top-10 left-0 animate-bounce text-slate-400" size={16} />
+               <div className="w-16 h-16 bg-amber-900 rounded-lg"></div>
+               <div className="absolute top-0 right-0 w-20 h-20 bg-yellow-600 rounded-full border-4 border-yellow-800 transform scale-x-50 rotate-45 origin-bottom-left opacity-80"></div>
             </div>
          )}
       </div>
@@ -611,7 +626,7 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
               </div>
               <div className="text-left">
                  <p className="text-[8px] font-black uppercase tracking-widest opacity-80">SanFran Box</p>
-                 <p className="text-xs font-black uppercase tracking-tight leading-none">{availableBoxes > 0 ? 'Abrir Agora' : `${(20 - (totalHours % 20)).toFixed(1)}h p/ próxima`}</p>
+                 <p className="text-xs font-black uppercase tracking-tight leading-none">{availableBoxes > 0 ? 'Abrir Agora' : `${(10 - (totalHours % 10)).toFixed(1)}h p/ próxima`}</p>
               </div>
            </button>
 
@@ -638,37 +653,16 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
 
       {/* --- CENA 2.5D --- */}
       <div className={`relative w-full aspect-[16/9] md:aspect-[21/9] rounded-[2rem] border-[8px] border-slate-900 dark:border-black shadow-2xl overflow-hidden transition-all duration-700 bg-black group ${isEditing ? 'scale-[0.98] ring-4 ring-sanfran-rubi/50' : ''}`}>
-         
-         {/* LAYERS (Ordem Importa para o Z-Index "Natural") */}
-         
-         {/* 1. Parede (Fundo) */}
          {renderWall()}
-
-         {/* 2. Janela (Corta a parede) */}
          {renderWindow()}
-
-         {/* 3. Chão (Base) */}
          {renderFloor()}
-
-         {/* 4. Tapete (Sobre o chão) */}
          {renderRug()}
-
-         {/* 5. Decoração Fundo (Esquerda/Direita) */}
          {renderDecor('left')}
          {renderDecor('right')}
-
-         {/* 6. Cadeira (Atrás da mesa) */}
          {renderChair()}
-
-         {/* 7. Mesa (Principal) */}
          {renderDesk()}
-
-         {/* 8. Overlay de Atmosfera (Iluminação Global) */}
          <div className={`absolute inset-0 pointer-events-none mix-blend-overlay transition-colors duration-2000 ${isNight ? 'bg-indigo-900/60' : 'bg-orange-100/10'}`}></div>
-         
-         {/* 9. Partículas de Poeira (Vida) */}
          <div className="absolute inset-0 pointer-events-none opacity-30 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] animate-pulse"></div>
-
       </div>
 
       {/* --- MODAL DE GACHA OPENING --- */}
@@ -684,13 +678,14 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
              </div>
            ) : (
              <div className="bg-white dark:bg-[#1a0505] p-10 rounded-[3rem] shadow-2xl flex flex-col items-center max-w-sm w-full mx-4 border-4 border-sanfran-rubi animate-in zoom-in duration-500 relative overflow-hidden">
-                {/* Raios de luz de fundo */}
-                <div className="absolute inset-0 bg-[conic-gradient(at_center,_var(--tw-gradient-stops))] from-white via-sanfran-rubi/20 to-white opacity-50 animate-spin-slow pointer-events-none"></div>
-                
-                <div className="relative z-10 flex flex-col items-center text-center">
-                   <div className={`w-32 h-32 rounded-full flex items-center justify-center mb-6 shadow-xl ${getRarityColor(wonItem.item.rarity)}`}>
-                      {/* Ícone Genérico baseado na categoria, poderia ser específico */}
-                      <Gift size={64} /> 
+                <div className="relative z-10 flex flex-col items-center text-center w-full">
+                   {/* CARD DO ITEM GANHO */}
+                   <div className={`w-full aspect-square rounded-[2rem] mb-6 shadow-xl flex items-center justify-center relative overflow-hidden ${wonItem.item.color}`}>
+                      <div className="absolute inset-0 bg-white/20"></div>
+                      <wonItem.item.icon size={80} className="text-black/50 drop-shadow-lg" />
+                      <div className="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full backdrop-blur-sm">
+                         {wonItem.item.rarity === 'legendary' ? <Star className="text-yellow-400 fill-current" /> : <Sparkles />}
+                      </div>
                    </div>
                    
                    <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full mb-4 border ${getRarityColor(wonItem.item.rarity)}`}>
@@ -712,7 +707,7 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
 
       {/* --- UI DE CUSTOMIZAÇÃO (LOJA / INVENTÁRIO) --- */}
       {isEditing && (
-        <div className="mt-6 bg-white dark:bg-[#0d0303] rounded-[2rem] border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl overflow-hidden animate-in slide-in-from-bottom-10 flex flex-col md:flex-row h-[400px]">
+        <div className="mt-6 bg-white dark:bg-[#0d0303] rounded-[2rem] border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl overflow-hidden animate-in slide-in-from-bottom-10 flex flex-col md:flex-row h-[500px]">
            
            {/* Sidebar Categorias */}
            <div className="w-full md:w-48 bg-slate-50 dark:bg-white/5 border-b md:border-b-0 md:border-r border-slate-200 dark:border-white/10 p-2 overflow-x-auto md:overflow-y-auto custom-scrollbar flex md:flex-col gap-2">
@@ -737,9 +732,9 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
               ))}
            </div>
 
-           {/* Grid de Itens */}
+           {/* Grid de Itens COM PREVIEW VISUAL */}
            <div className="flex-1 p-6 overflow-y-auto custom-scrollbar bg-slate-100/50 dark:bg-black/20">
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                  {CATALOG[activeTab].map(item => {
                     const isUnlocked = inventory.includes(item.id);
                     const isSelected = config[activeTab] === item.id;
@@ -749,39 +744,56 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
                         key={item.id}
                         disabled={!isUnlocked}
                         onClick={() => handleSelect(activeTab, item.id)}
-                        className={`group relative p-4 rounded-2xl border-2 transition-all text-left flex flex-col justify-between h-36 ${
+                        className={`group relative rounded-2xl border-2 transition-all text-left flex flex-col justify-between overflow-hidden ${
                            isSelected 
-                             ? 'border-sanfran-rubi bg-white dark:bg-white/10 ring-2 ring-sanfran-rubi/20 shadow-xl' 
+                             ? 'border-sanfran-rubi ring-2 ring-sanfran-rubi/20 shadow-xl scale-[1.02]' 
                              : isUnlocked 
-                                ? 'border-slate-200 dark:border-white/5 bg-white dark:bg-white/5 hover:border-slate-300 hover:-translate-y-1 hover:shadow-md' 
-                                : 'border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-black/40 opacity-60 cursor-not-allowed grayscale'
-                        }`}
+                                ? 'border-slate-200 dark:border-white/5 hover:border-slate-300 hover:-translate-y-1 hover:shadow-md' 
+                                : 'border-slate-100 dark:border-white/5 opacity-60 cursor-not-allowed grayscale'
+                        } bg-white dark:bg-[#1a1a1a]`}
                       >
-                         <div className="flex justify-between items-start mb-2">
-                            <span className={`text-[8px] font-black uppercase px-2 py-1 rounded-full border ${
-                               item.rarity === 'legendary' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
-                               item.rarity === 'epic' ? 'bg-purple-100 text-purple-700 border-purple-200' :
-                               item.rarity === 'rare' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                               'bg-slate-100 text-slate-500 border-slate-200'
-                            }`}>
-                               {item.rarity.charAt(0).toUpperCase()}
-                            </span>
-                            {isSelected && <CheckCircle2 size={16} className="text-sanfran-rubi" />}
-                            {!isUnlocked && <Lock size={14} className="text-slate-400" />}
+                         {/* PREVIEW VISUAL BOX */}
+                         <div className={`h-24 w-full ${item.color} flex items-center justify-center relative overflow-hidden`}>
+                            {/* Texture overlay hint */}
+                            <div className="absolute inset-0 bg-gradient-to-tr from-black/20 to-transparent"></div>
+                            
+                            {/* Icon Center */}
+                            <item.icon className="text-white/80 w-10 h-10 drop-shadow-md transform group-hover:scale-110 transition-transform" />
+                            
+                            {isSelected && (
+                               <div className="absolute top-2 right-2 bg-sanfran-rubi text-white p-1 rounded-full shadow-lg">
+                                  <CheckCircle2 size={12} />
+                               </div>
+                            )}
+                            {!isUnlocked && (
+                               <div className="absolute inset-0 bg-black/40 flex items-center justify-center backdrop-blur-[1px]">
+                                  <Lock size={20} className="text-white/50" />
+                               </div>
+                            )}
                          </div>
 
-                         <div>
-                            <p className="font-black text-xs text-slate-900 dark:text-white uppercase leading-tight mb-1">{item.name}</p>
-                            <p className="text-[9px] text-slate-500 font-medium leading-tight">{item.description}</p>
-                         </div>
+                         <div className="p-3">
+                            <div className="flex justify-between items-center mb-1">
+                               <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                                  item.rarity === 'legendary' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
+                                  item.rarity === 'epic' ? 'bg-purple-100 text-purple-700 border-purple-200' :
+                                  item.rarity === 'rare' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                                  'bg-slate-100 text-slate-500 border-slate-200'
+                               }`}>
+                                  {item.rarity.charAt(0).toUpperCase()}
+                               </span>
+                            </div>
 
-                         {!isUnlocked && (
-                           <div className="mt-auto pt-2 border-t border-dashed border-slate-200 dark:border-white/10">
-                              <p className="text-[9px] font-black text-slate-400 uppercase flex items-center gap-1">
-                                <Package size={10} /> Em Caixas
-                              </p>
-                           </div>
-                         )}
+                            <p className="font-black text-[10px] text-slate-900 dark:text-white uppercase leading-tight mb-1 truncate">{item.name}</p>
+                            
+                            {!isUnlocked ? (
+                               <p className="text-[8px] font-black text-slate-400 uppercase flex items-center gap-1 mt-2">
+                                 <Package size={8} /> Em Caixas
+                               </p>
+                            ) : (
+                               <p className="text-[8px] text-slate-500 font-medium leading-tight line-clamp-2">{item.description}</p>
+                            )}
+                         </div>
                       </button>
                     );
                  })}
