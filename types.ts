@@ -42,7 +42,7 @@ export enum View {
   JurisTinder = 'juris_tinder',
   InternRPG = 'intern_rpg',
   PrescriptionCalculator = 'prescription_calculator',
-  SanFranIdiomas = 'sanfran_idiomas' // Novo
+  SanFranIdiomas = 'sanfran_idiomas'
 }
 
 export interface Folder {
@@ -357,12 +357,12 @@ export interface RPGScenario {
 // --- SANFRAN IDIOMAS TYPES ---
 export interface IdiomaLesson {
   id: string;
-  module: string; // "Foundations", "Contracts", "Courtroom"
+  module: string; // "Foundations", "Contracts", "Courtroom", etc
   title: string;
   description: string;
   theory: string;
   example_sentence: string;
-  type?: 'quiz' | 'scramble'; // Support for different exercise types
+  type?: 'quiz' | 'scramble' | 'matching'; // Suporte para 3 tipos de exercício
   scramble?: {
     sentence: string;
     translation: string;
@@ -372,6 +372,9 @@ export interface IdiomaLesson {
     options: string[];
     answer: number;
     explanation: string;
+  };
+  matching?: {
+    pairs: { term: string; translation: string }[];
   };
   xp_reward: number;
   words_unlocked: string[]; // Termos chave aprendidos na lição para o glossário

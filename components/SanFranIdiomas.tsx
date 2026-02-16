@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Globe, BookOpen, CheckCircle2, Lock, X, Flame, Trophy, Volume2, Star, Quote, ArrowLeft, GraduationCap } from 'lucide-react';
+import { Globe, BookOpen, CheckCircle2, Lock, X, Flame, Trophy, Volume2, Star, Quote, Heart, ArrowRight } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { IdiomaLesson, IdiomaProgress } from '../types';
 import confetti from 'canvas-confetti';
@@ -9,7 +9,7 @@ interface SanFranIdiomasProps {
   userId: string;
 }
 
-// --- BANCO DE DADOS DE LIÇÕES ---
+// --- BANCO DE DADOS DE LIÇÕES (EXPANDIDO) ---
 const LESSONS_DB: IdiomaLesson[] = [
   // --- MÓDULO 1: FOUNDATIONS ---
   {
@@ -34,19 +34,20 @@ const LESSONS_DB: IdiomaLesson[] = [
     module: 'Foundations',
     title: 'Court Structure',
     description: 'Court vs. Tribunal',
-    type: 'quiz',
-    theory: "'Court' é o termo para o Poder Judiciário (ex: Supreme Court). 'Tribunal' refere-se a cortes especializadas ou administrativas (ex: Employment Tribunal, Arbitration Tribunal). Falso cognato comum!",
-    example_sentence: "The case was heard in the High Court after the arbitration tribunal failed to reach a decision.",
-    quiz: {
-      question: "Como se chama o Supremo Tribunal dos EUA?",
-      options: ["Supreme Court", "Supreme Tribunal", "High Court"],
-      answer: 0,
-      explanation: "Supreme Court é o termo correto. Tribunal é usado para órgãos administrativos ou arbitragem."
+    type: 'matching',
+    theory: "'Court' é o Judiciário. 'Tribunal' são cortes administrativas ou de arbitragem. O 'Judge' preside, o 'Jury' decide os fatos.",
+    example_sentence: "The case was heard in the High Court.",
+    matching: {
+      pairs: [
+        { term: "Judge", translation: "Juiz" },
+        { term: "Court", translation: "Tribunal (Judiciário)" },
+        { term: "Jury", translation: "Júri" },
+        { term: "Verdict", translation: "Veredito" }
+      ]
     },
     xp_reward: 100,
-    words_unlocked: ['Court', 'Tribunal', 'Hearing']
+    words_unlocked: ['Court', 'Tribunal', 'Judge', 'Jury']
   },
-  // --- NOVA LIÇÃO TIPO SCRAMBLE ---
   {
     id: '1-3',
     module: 'Foundations',
@@ -60,12 +61,13 @@ const LESSONS_DB: IdiomaLesson[] = [
       translation: "O autor protocolou um pedido de extinção/arquivamento."
     },
     xp_reward: 120,
-    words_unlocked: ['Motion', 'Dismiss', 'File']
+    words_unlocked: ['Motion', 'Dismiss', 'File', 'Plaintiff']
   },
+  
   // --- MÓDULO 2: CONTRACT LAW ---
   {
     id: '2-1',
-    module: 'Contracts',
+    module: 'Contract Law',
     title: 'The Art of Drafting',
     description: 'Drafting vs. Writing',
     type: 'quiz',
@@ -82,35 +84,75 @@ const LESSONS_DB: IdiomaLesson[] = [
   },
   {
     id: '2-2',
-    module: 'Contracts',
-    title: 'Modal Verbs',
-    description: 'Shall vs. May',
-    type: 'quiz',
-    theory: "'Shall' impõe obrigação (dever). É o imperativo contratual. 'May' indica permissão ou faculdade (poder). Trocar um pelo outro pode mudar uma obrigação de pagar para uma opção de pagar.",
-    example_sentence: "The Tenant shall pay the rent on the 5th. The Landlord may inspect the property with notice.",
-    quiz: {
-      question: "Se a cláusula diz 'The party may terminate', a rescisão é obrigatória?",
-      options: ["Sim", "Não"],
-      answer: 1,
-      explanation: "'May' indica discricionariedade (permissão), não obrigação."
+    module: 'Contract Law',
+    title: 'Contract Essentials',
+    description: 'Breach & Remedies',
+    type: 'matching',
+    theory: "Violação contratual é 'Breach'. A solução/reparação é 'Remedy'. Cláusula penal é 'Liquidated Damages'.",
+    example_sentence: "A material breach gives rise to the right to terminate.",
+    matching: {
+      pairs: [
+        { term: "Breach", translation: "Violação/Inadimplemento" },
+        { term: "Remedy", translation: "Solução/Remédio" },
+        { term: "Party", translation: "Parte" },
+        { term: "Binding", translation: "Vinculante" }
+      ]
     },
     xp_reward: 150,
-    words_unlocked: ['Shall', 'May', 'Obligation']
+    words_unlocked: ['Breach', 'Remedy', 'Binding']
   },
   {
     id: '2-3',
-    module: 'Contracts',
-    title: 'Contract Construction',
-    description: 'Boilerplate Clauses',
+    module: 'Contract Law',
+    title: 'Boilerplate Clauses',
+    description: 'Standard Provisions',
     type: 'scramble',
-    theory: "Cláusulas padrão são chamadas de 'Boilerplate'. Ex: Severability (divisibilidade), Entire Agreement (acordo integral).",
+    theory: "Cláusulas padrão são 'Boilerplate'. Ex: Severability (divisibilidade), Entire Agreement (acordo integral).",
     example_sentence: "This agreement constitutes the entire understanding between parties.",
     scramble: {
       sentence: "This agreement shall be governed by the laws of Brazil",
       translation: "Este contrato será regido pelas leis do Brasil."
     },
     xp_reward: 150,
-    words_unlocked: ['Governing Law', 'Jurisdiction', 'Binding']
+    words_unlocked: ['Governing Law', 'Jurisdiction', 'Boilerplate']
+  },
+
+  // --- MÓDULO 3: CRIMINAL LAW ---
+  {
+    id: '3-1',
+    module: 'Criminal Law',
+    title: 'Crime Elements',
+    description: 'Mens Rea & Actus Reus',
+    type: 'quiz',
+    theory: "O crime exige o ato ('Actus Reus') e a intenção ('Mens Rea'). Sem intenção, pode ser 'Manslaughter' (homicídio culposo) e não 'Murder' (doloso).",
+    example_sentence: "The prosecution failed to prove mens rea beyond reasonable doubt.",
+    quiz: {
+      question: "O que significa 'Mens Rea'?",
+      options: ["Ato Culpável", "Mente Culpável (Intenção)", "Homem Real"],
+      answer: 1,
+      explanation: "Mens Rea refere-se ao estado mental ou intenção criminosa do agente."
+    },
+    xp_reward: 200,
+    words_unlocked: ['Mens Rea', 'Actus Reus', 'Felony']
+  },
+  {
+    id: '3-2',
+    module: 'Criminal Law',
+    title: 'Trial Vocabulary',
+    description: 'Key Criminal Terms',
+    type: 'matching',
+    theory: "'Guilty' (Culpado) vs 'Innocent' (Inocente). 'Bail' é fiança. 'Prosecutor' é o Promotor de Justiça.",
+    example_sentence: "The defendant was released on bail pending trial.",
+    matching: {
+      pairs: [
+        { term: "Bail", translation: "Fiança" },
+        { term: "Guilty", translation: "Culpado" },
+        { term: "Prosecutor", translation: "Promotor" },
+        { term: "Warrant", translation: "Mandado" }
+      ]
+    },
+    xp_reward: 200,
+    words_unlocked: ['Bail', 'Warrant', 'Defendant', 'Prosecution']
   }
 ];
 
@@ -125,15 +167,18 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
   // Estado da Lição
   const [showLessonModal, setShowLessonModal] = useState(false);
   const [lessonStep, setLessonStep] = useState<'theory' | 'listen' | 'exercise' | 'success'>('theory');
+  const [sessionLives, setSessionLives] = useState(3);
   
-  // Quiz State
+  // Exercise States
   const [quizSelected, setQuizSelected] = useState<number | null>(null);
   const [isQuizCorrect, setIsQuizCorrect] = useState<boolean | null>(null);
 
-  // Scramble State
   const [scrambleWords, setScrambleWords] = useState<string[]>([]);
   const [scrambleSolution, setScrambleSolution] = useState<string[]>([]);
   const [isScrambleCorrect, setIsScrambleCorrect] = useState<boolean | null>(null);
+
+  const [matchingItems, setMatchingItems] = useState<{id: string, text: string, type: 'term' | 'def', state: 'default' | 'selected' | 'matched' | 'wrong'}[]>([]);
+  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   
   const [isLoading, setIsLoading] = useState(true);
 
@@ -183,6 +228,7 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
     if (lesson) {
       setCurrentLesson(lesson);
       setLessonStep('theory');
+      setSessionLives(3);
       
       // Reset Quiz
       setQuizSelected(null);
@@ -196,9 +242,37 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
          setIsScrambleCorrect(null);
       }
 
+      // Reset Matching
+      if (lesson.type === 'matching' && lesson.matching) {
+         const items = lesson.matching.pairs.flatMap((p, i) => [
+            { id: `t-${i}`, text: p.term, type: 'term', state: 'default' },
+            { id: `d-${i}`, text: p.translation, type: 'def', state: 'default' }
+         ]);
+         // Shuffle
+         setMatchingItems(items.sort(() => Math.random() - 0.5) as any);
+         setSelectedMatchId(null);
+      }
+
       setShowLessonModal(true);
     }
   };
+
+  const handleWrongAnswer = () => {
+     setSessionLives(prev => prev - 1);
+     const audio = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-wrong-answer-fail-notification-946.mp3');
+     audio.volume = 0.3;
+     audio.play().catch(() => {});
+     
+     if (sessionLives <= 1) {
+        // Game Over logic inside lesson could be added here
+     }
+  };
+
+  const playSuccessSound = () => {
+     const audio = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-correct-answer-tone-2870.mp3');
+     audio.volume = 0.3;
+     audio.play().catch(() => {});
+  }
 
   const playAudio = (text: string) => {
     if ('speechSynthesis' in window) {
@@ -218,8 +292,11 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
     setIsQuizCorrect(correct);
 
     if (correct) {
+      playSuccessSound();
       setTimeout(() => setLessonStep('success'), 1500);
       confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+    } else {
+      handleWrongAnswer();
     }
   };
 
@@ -247,10 +324,62 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
      setIsScrambleCorrect(correct);
 
      if (correct) {
+        playSuccessSound();
         setTimeout(() => setLessonStep('success'), 1500);
         confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
      } else {
-        setTimeout(() => setIsScrambleCorrect(null), 1000); // Reset visual feedback
+        handleWrongAnswer();
+        setTimeout(() => setIsScrambleCorrect(null), 1000); 
+     }
+  };
+
+  // --- MATCHING LOGIC ---
+  const handleMatchClick = (id: string) => {
+     const clickedItem = matchingItems.find(i => i.id === id);
+     if (!clickedItem || clickedItem.state === 'matched') return;
+
+     // Se já tem um selecionado
+     if (selectedMatchId) {
+        const firstItem = matchingItems.find(i => i.id === selectedMatchId);
+        if (!firstItem) return;
+
+        // Se clicou no mesmo
+        if (selectedMatchId === id) {
+           setSelectedMatchId(null);
+           setMatchingItems(prev => prev.map(i => i.id === id ? { ...i, state: 'default' } : i));
+           return;
+        }
+
+        // Verifica match (index deve ser igual ex: t-0 e d-0)
+        const firstIndex = firstItem.id.split('-')[1];
+        const secondIndex = clickedItem.id.split('-')[1];
+        const isMatch = firstIndex === secondIndex && firstItem.type !== clickedItem.type;
+
+        if (isMatch) {
+           playSuccessSound();
+           setMatchingItems(prev => prev.map(i => (i.id === id || i.id === selectedMatchId) ? { ...i, state: 'matched' } : i));
+           setSelectedMatchId(null);
+           
+           // Check if all matched
+           const allMatched = matchingItems.filter(i => i.state !== 'matched').length <= 2; // <=2 pq estamos atualizando state agora
+           if (allMatched) {
+              setTimeout(() => setLessonStep('success'), 1000);
+              confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+           }
+        } else {
+           handleWrongAnswer();
+           // Show Error
+           setMatchingItems(prev => prev.map(i => (i.id === id || i.id === selectedMatchId) ? { ...i, state: 'wrong' } : i));
+           setTimeout(() => {
+              setMatchingItems(prev => prev.map(i => (i.id === id || i.id === selectedMatchId) ? { ...i, state: 'default' } : i));
+              setSelectedMatchId(null);
+           }, 800);
+        }
+
+     } else {
+        // Primeiro clique
+        setSelectedMatchId(id);
+        setMatchingItems(prev => prev.map(i => i.id === id ? { ...i, state: 'selected' } : i));
      }
   };
 
@@ -289,8 +418,7 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
         completed_lessons: newCompleted,
         current_level_id: nextLessonId,
         total_xp: newXP,
-        streak_count: newStreak,
-        last_activity_date: today
+        streak_count: newStreak
       }) : null);
 
       setShowLessonModal(false);
@@ -354,50 +482,60 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
       {/* --- ABA TRILHA (PATH) --- */}
       {activeTab === 'path' && (
          <div className="flex-1 overflow-y-auto custom-scrollbar relative px-4">
-            {/* Linha Central Decorativa */}
-            <div className="absolute left-1/2 top-0 bottom-0 w-3 bg-slate-100 dark:bg-white/5 -translate-x-1/2 rounded-full -z-10" />
+            {/* Linha Central Decorativa (Zigue-Zague simulado via grid/margin) */}
+            <div className="absolute left-1/2 top-0 bottom-0 w-2 bg-slate-100 dark:bg-white/5 -translate-x-1/2 rounded-full -z-10" />
 
             <div className="space-y-16 pb-20 pt-8">
                {MODULES.map((module, modIdx) => (
                   <div key={module} className="relative">
-                     <div className="flex justify-center mb-8 sticky top-0 z-20">
-                        <div className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 px-6 py-2 rounded-full shadow-lg text-xs font-black uppercase tracking-[0.2em] text-slate-400">
-                           Módulo {modIdx + 1}: {module}
+                     <div className="flex justify-center mb-12 sticky top-0 z-20">
+                        <div className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 px-6 py-2 rounded-full shadow-lg text-xs font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
+                           <Star size={12} className="text-usp-gold" fill="currentColor" /> Módulo {modIdx + 1}: {module}
                         </div>
                      </div>
 
-                     <div className="flex flex-col gap-12 relative">
+                     <div className="flex flex-col gap-16 relative">
                         {LESSONS_DB.filter(l => l.module === module).map((lesson, idx) => {
                            const isCompleted = progress.completed_lessons.includes(lesson.id);
                            const isCurrent = lesson.id === progress.current_level_id;
                            const isLocked = !isCompleted && !isCurrent;
-                           const alignClass = idx % 2 === 0 ? 'items-start md:pr-[50%]' : 'items-end md:pl-[50%]';
-                           const nodeMargin = idx % 2 === 0 ? 'md:ml-auto md:mr-[-30px]' : 'md:mr-auto md:ml-[-30px]';
-
+                           
+                           // ZigZag Logic:
+                           // 0: Center, 1: Left, 2: Right, 3: Center...
+                           // Or simpler: Left, Right, Left, Right
+                           const offsetClass = idx % 2 === 0 ? 'md:translate-x-[-30px]' : 'md:translate-x-[30px]';
+                           
                            return (
-                              <div key={lesson.id} className={`flex flex-col ${alignClass} relative group`}>
+                              <div key={lesson.id} className={`flex flex-col items-center relative group ${offsetClass}`}>
                                  <button 
                                     onClick={() => !isLocked && startLesson(lesson.id)}
                                     disabled={isLocked}
                                     className={`
-                                       relative w-20 h-20 rounded-full border-b-[6px] transition-all duration-300 flex items-center justify-center shadow-xl z-10
-                                       ${nodeMargin}
-                                       ${isCompleted ? 'bg-sky-500 border-sky-700 text-white' : 
-                                         isCurrent ? 'bg-sanfran-rubi border-[#7a0d18] text-white animate-bounce-slow' : 
+                                       relative w-24 h-24 rounded-full border-[6px] transition-all duration-300 flex items-center justify-center shadow-xl z-10
+                                       ${isCompleted ? 'bg-sky-500 border-sky-600 text-white' : 
+                                         isCurrent ? 'bg-sanfran-rubi border-[#7a0d18] text-white ring-4 ring-sanfran-rubi/20 scale-110' : 
                                          'bg-slate-200 dark:bg-white/10 border-slate-300 dark:border-white/5 text-slate-400 grayscale cursor-not-allowed'}
-                                       active:border-b-0 active:translate-y-[6px] hover:scale-105
+                                       active:scale-95 hover:scale-105
                                     `}
                                  >
-                                    {isCompleted ? <CheckCircle2 size={32} /> : isLocked ? <Lock size={28} /> : <Star size={32} fill="currentColor" />}
+                                    {isCompleted ? <CheckCircle2 size={36} /> : isLocked ? <Lock size={32} /> : <Star size={36} fill="currentColor" />}
+                                    
+                                    {/* Star Rating Visualization (Simulated) */}
+                                    {isCompleted && (
+                                       <div className="absolute -bottom-2 flex gap-0.5">
+                                          <Star size={10} className="text-usp-gold fill-current" />
+                                          <Star size={10} className="text-usp-gold fill-current" />
+                                          <Star size={10} className="text-usp-gold fill-current" />
+                                       </div>
+                                    )}
                                  </button>
 
                                  <div className={`
-                                    mt-3 bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-white/10 shadow-lg text-center w-40 z-10 transition-all
-                                    ${nodeMargin}
-                                    ${isLocked ? 'opacity-50' : 'opacity-100'}
+                                    mt-4 bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-white/10 shadow-lg text-center w-48 z-10 transition-all
+                                    ${isLocked ? 'opacity-50 grayscale' : 'opacity-100'}
                                  `}>
-                                    <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Lição {idx + 1}</p>
-                                    <p className="text-xs font-bold text-slate-900 dark:text-white leading-tight">{lesson.title}</p>
+                                    <p className="text-[9px] font-black uppercase text-slate-400 mb-1 tracking-widest">Lição {idx + 1}</p>
+                                    <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight">{lesson.title}</p>
                                  </div>
                               </div>
                            );
@@ -451,16 +589,22 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
                   <X size={28} />
                </button>
                
-               <div className="flex-1 max-w-md mx-6 h-4 bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden">
-                  <div 
-                     className="h-full bg-sky-500 transition-all duration-500 ease-out" 
-                     style={{ 
-                        width: lessonStep === 'theory' ? '25%' : lessonStep === 'listen' ? '50%' : lessonStep === 'exercise' ? '75%' : '100%' 
-                     }} 
-                  />
+               <div className="flex-1 mx-6 flex flex-col gap-2">
+                  <div className="h-4 bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden">
+                     <div 
+                        className="h-full bg-sky-500 transition-all duration-500 ease-out" 
+                        style={{ 
+                           width: lessonStep === 'theory' ? '25%' : lessonStep === 'listen' ? '50%' : lessonStep === 'exercise' ? '75%' : '100%' 
+                        }} 
+                     />
+                  </div>
                </div>
                
-               <div className="w-8" />
+               <div className="flex gap-1 text-red-500">
+                  {[...Array(3)].map((_, i) => (
+                     <Heart key={i} size={20} className={i < sessionLives ? "fill-current" : "text-slate-300 dark:text-slate-700"} />
+                  ))}
+               </div>
             </div>
 
             {/* Conteúdo Dinâmico */}
@@ -482,9 +626,9 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
 
                      <button 
                         onClick={() => setLessonStep('listen')} 
-                        className="w-full py-5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2rem] font-black uppercase tracking-widest shadow-xl hover:scale-[1.02] active:scale-95 transition-all text-sm"
+                        className="w-full py-5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2rem] font-black uppercase tracking-widest shadow-xl hover:scale-[1.02] active:scale-95 transition-all text-sm flex items-center justify-center gap-2"
                      >
-                        Entendi, Próximo
+                        Entendi, Próximo <ArrowRight size={16} />
                      </button>
                   </div>
                )}
@@ -521,7 +665,7 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
                   </div>
                )}
 
-               {/* STEP 3: EXERCISE (QUIZ OR SCRAMBLE) */}
+               {/* STEP 3: EXERCISE (QUIZ, SCRAMBLE, OR MATCHING) */}
                {lessonStep === 'exercise' && (
                   <div className="space-y-8 w-full max-w-lg animate-in slide-in-from-right-10 duration-300">
                      <span className="text-[10px] font-black uppercase tracking-[0.3em] text-sanfran-rubi bg-red-100 dark:bg-red-900/20 px-3 py-1 rounded-full">Prática Jurídica</span>
@@ -589,12 +733,37 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
                         </>
                      )}
 
-                     {/* Feedback Panel (Generico) */}
-                     {isQuizCorrect === false && (
+                     {/* TIPO 3: MATCHING (ASSOCIAÇÃO) */}
+                     {currentLesson.type === 'matching' && (
+                        <>
+                           <h3 className="text-xl font-bold text-slate-900 dark:text-white leading-tight mb-6">Associe os Termos Corretos</h3>
+                           <div className="grid grid-cols-2 gap-4">
+                              {matchingItems.map((item) => (
+                                 <button
+                                    key={item.id}
+                                    disabled={item.state === 'matched'}
+                                    onClick={() => handleMatchClick(item.id)}
+                                    className={`
+                                       p-4 rounded-2xl border-b-4 font-bold text-sm transition-all shadow-sm
+                                       ${item.state === 'matched' ? 'bg-emerald-100 text-emerald-700 border-emerald-300 opacity-50 scale-95' : 
+                                         item.state === 'selected' ? 'bg-sky-100 border-sky-300 text-sky-700 scale-105 ring-2 ring-sky-200' :
+                                         item.state === 'wrong' ? 'bg-red-100 border-red-300 text-red-700 animate-shake' :
+                                         'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50'
+                                       }
+                                    `}
+                                 >
+                                    {item.text}
+                                 </button>
+                              ))}
+                           </div>
+                        </>
+                     )}
+
+                     {/* Feedback Panel (Generico para Erros) */}
+                     {(isQuizCorrect === false || isScrambleCorrect === false) && (
                         <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-2xl border border-red-200 dark:border-red-800 text-left animate-in slide-in-from-bottom-2">
                            <p className="text-red-600 dark:text-red-400 font-bold text-sm mb-1">Incorreto</p>
-                           <p className="text-red-800 dark:text-red-200 text-xs">Tente novamente ou revise a teoria.</p>
-                           <button onClick={() => { setQuizSelected(null); setIsQuizCorrect(null); }} className="mt-3 text-[10px] font-black uppercase text-red-500 underline">Tentar de novo</button>
+                           <p className="text-red-800 dark:text-red-200 text-xs">Você perdeu uma vida.</p>
                         </div>
                      )}
                   </div>
