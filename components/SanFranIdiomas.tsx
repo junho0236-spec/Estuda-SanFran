@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Globe, BookOpen, CheckCircle2, Lock, X, Flame, Trophy, Volume2, Star, Quote, Heart, ArrowRight, Flag } from 'lucide-react';
+import { Globe, BookOpen, CheckCircle2, Lock, X, Flame, Trophy, Volume2, Star, Quote, Heart, ArrowRight, Flag, BrainCircuit, Ear, Mic } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { IdiomaLesson, IdiomaProgress } from '../types';
 import confetti from 'canvas-confetti';
@@ -141,20 +141,17 @@ const LESSONS_DB: IdiomaLesson[] = [
   {
     id: '3-2',
     module: 'Criminal Law',
-    title: 'The Verdict',
-    description: 'Guilty or Not Guilty',
-    type: 'fill_blank',
-    theory: "O júri entrega um 'Verdict'. O réu pode ser considerado 'Guilty' (Culpado) ou 'Not Guilty' (Inocente/Absolvido). Em inglês, 'Innocent' é um estado de fato, 'Not Guilty' é o resultado legal.",
-    example_sentence: "The jury found the defendant not guilty.",
-    fill_blank: {
-      sentence_start: "The jury reached a",
-      sentence_end: "of guilty.",
-      correct_word: "verdict",
-      options: ["sentence", "verdict", "decree", "order"],
-      translation: "O júri chegou a um veredito de culpado."
+    title: 'Burden of Proof',
+    description: 'Escuta e Escrita',
+    type: 'dictation',
+    theory: "Em Direito Penal, 'The burden of proof lies with the prosecution' (O ônus da prova cabe à acusação). A dúvida beneficia o réu ('benefit of the doubt').",
+    example_sentence: "The defendant is presumed innocent until proven guilty.",
+    dictation: {
+      text: "The burden of proof lies with the prosecution",
+      translation: "O ônus da prova cabe à acusação."
     },
-    xp_reward: 200,
-    words_unlocked: ['Verdict', 'Guilty', 'Acquittal']
+    xp_reward: 250,
+    words_unlocked: ['Burden of Proof', 'Prosecution', 'Presumption']
   },
   {
     id: '3-3',
@@ -173,7 +170,7 @@ const LESSONS_DB: IdiomaLesson[] = [
       ]
     },
     xp_reward: 200,
-    words_unlocked: ['Bail', 'Warrant', 'Defendant', 'Prosecution']
+    words_unlocked: ['Bail', 'Warrant', 'Defendant', 'Prosecutor']
   }
 ];
 
@@ -203,6 +200,9 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
 
   const [fillSelected, setFillSelected] = useState<string | null>(null);
   const [isFillCorrect, setIsFillCorrect] = useState<boolean | null>(null);
+
+  const [dictationInput, setDictationInput] = useState('');
+  const [isDictationCorrect, setIsDictationCorrect] = useState<boolean | null>(null);
   
   const [isLoading, setIsLoading] = useState(true);
 
@@ -248,6 +248,21 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
     }
   };
 
+  const addToFlashcards = async (front: string, back: string) => {
+    try {
+      await supabase.from('flashcards').insert({
+        user_id: userId,
+        front: front,
+        back: `Legal English: ${back}`,
+        next_review: Date.now(),
+        interval: 0
+      });
+      alert(`Card "${front}" adicionado ao Anki!`);
+    } catch (e) {
+      alert("Erro ao adicionar flashcard.");
+    }
+  };
+
   // --- AÇÕES DE AULA ---
 
   const startLesson = (lessonId: string) => {
@@ -264,6 +279,10 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
       // Reset Fill
       setFillSelected(null);
       setIsFillCorrect(null);
+
+      // Reset Dictation
+      setDictationInput('');
+      setIsDictationCorrect(null);
 
       // Reset Scramble
       if (lesson.type === 'scramble' && lesson.scramble) {
@@ -337,6 +356,23 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
     setFillSelected(word);
     const correct = word === currentLesson.fill_blank.correct_word;
     setIsFillCorrect(correct);
+
+    if (correct) {
+        playSuccessSound();
+        setTimeout(() => setLessonStep('success'), 1500);
+        confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+    } else {
+        handleWrongAnswer();
+    }
+  };
+
+  const checkDictation = () => {
+    if (isDictationCorrect !== null || !currentLesson?.dictation) return;
+
+    const normalize = (str: string) => str.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"").trim();
+    const correct = normalize(dictationInput) === normalize(currentLesson.dictation.text);
+    
+    setIsDictationCorrect(correct);
 
     if (correct) {
         playSuccessSound();
@@ -630,7 +666,12 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                      {getUnlockedWords().map((word, idx) => (
                         <div key={idx} className="bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-4 rounded-2xl flex flex-col justify-between hover:border-sky-500 transition-colors group cursor-default">
-                           <span className="text-xs font-black uppercase text-slate-400 tracking-widest mb-2">Termo {idx + 1}</span>
+                           <div className="flex justify-between items-start mb-2">
+                              <span className="text-xs font-black uppercase text-slate-400 tracking-widest">#{idx + 1}</span>
+                              <button onClick={() => addToFlashcards(word, "Legal Term")} className="text-slate-300 hover:text-sanfran-rubi p-1 rounded hover:bg-slate-200 dark:hover:bg-white/10 transition-colors" title="Criar Flashcard">
+                                 <BrainCircuit size={14} />
+                              </button>
+                           </div>
                            <div className="flex items-center justify-between">
                               <p className="font-bold text-slate-800 dark:text-white">{word}</p>
                               <button onClick={() => playAudio(word)} className="text-slate-400 hover:text-sky-500 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -730,7 +771,7 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
                   </div>
                )}
 
-               {/* STEP 3: EXERCISE (QUIZ, SCRAMBLE, OR MATCHING) */}
+               {/* STEP 3: EXERCISE */}
                {lessonStep === 'exercise' && (
                   <div className="space-y-8 w-full max-w-lg animate-in slide-in-from-right-10 duration-300">
                      <span className="text-[10px] font-black uppercase tracking-[0.3em] text-sanfran-rubi bg-red-100 dark:bg-red-900/20 px-3 py-1 rounded-full">Prática Jurídica</span>
@@ -824,7 +865,7 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
                         </>
                      )}
 
-                     {/* TIPO 4: FILL IN THE BLANK (NOVO) */}
+                     {/* TIPO 4: FILL IN THE BLANK */}
                      {currentLesson.type === 'fill_blank' && currentLesson.fill_blank && (
                         <>
                            <h3 className="text-xl font-bold text-slate-900 dark:text-white leading-tight mb-2">Complete a Lacuna</h3>
@@ -840,7 +881,6 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
 
                            <div className="grid grid-cols-2 gap-4">
                               {currentLesson.fill_blank.options.map((opt, idx) => {
-                                 const isCorrect = opt === currentLesson.fill_blank?.correct_word;
                                  let btnClass = "bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:border-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/20";
                                  
                                  // Feedback visual após seleção
@@ -866,8 +906,43 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
                         </>
                      )}
 
+                     {/* TIPO 5: DICTATION (DITADO) */}
+                     {currentLesson.type === 'dictation' && currentLesson.dictation && (
+                        <>
+                           <h3 className="text-xl font-bold text-slate-900 dark:text-white leading-tight mb-2">Escute e Escreva</h3>
+                           <p className="text-sm font-serif italic text-slate-600 dark:text-slate-400 mb-8">Transcreva exatamente o que ouvir.</p>
+                           
+                           <div className="flex justify-center mb-8">
+                              <button 
+                                 onClick={() => playAudio(currentLesson.dictation!.text)}
+                                 className="w-20 h-20 bg-purple-500 rounded-full flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-all"
+                              >
+                                 <Ear size={32} className="text-white" />
+                              </button>
+                           </div>
+
+                           <div className="space-y-4">
+                              <input 
+                                value={dictationInput}
+                                onChange={(e) => setDictationInput(e.target.value)}
+                                placeholder="Digite a frase em inglês..."
+                                disabled={isDictationCorrect === true}
+                                className={`w-full p-4 text-center text-lg font-bold rounded-2xl border-2 outline-none transition-all ${isDictationCorrect === true ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : isDictationCorrect === false ? 'border-red-500 bg-red-50 text-red-700' : 'border-slate-300 dark:border-white/10 bg-white dark:bg-white/5 text-slate-900 dark:text-white focus:border-sanfran-rubi'}`}
+                              />
+                              
+                              <button 
+                                 onClick={checkDictation}
+                                 disabled={!dictationInput || isDictationCorrect === true}
+                                 className="w-full py-4 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-sm shadow-xl hover:bg-sanfran-rubiDark transition-all disabled:opacity-50"
+                              >
+                                 Verificar
+                              </button>
+                           </div>
+                        </>
+                     )}
+
                      {/* Feedback Panel (Generico para Erros) */}
-                     {(isQuizCorrect === false || isScrambleCorrect === false || isFillCorrect === false) && (
+                     {(isQuizCorrect === false || isScrambleCorrect === false || isFillCorrect === false || isDictationCorrect === false) && (
                         <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-2xl border border-red-200 dark:border-red-800 text-left animate-in slide-in-from-bottom-2">
                            <p className="text-red-600 dark:text-red-400 font-bold text-sm mb-1">Incorreto</p>
                            <p className="text-red-800 dark:text-red-200 text-xs">Você perdeu uma vida.</p>
@@ -907,6 +982,14 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
                                  <span key={w} className="bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 px-3 py-1 rounded-lg text-xs font-bold">{w}</span>
                               ))}
                            </div>
+                           <button 
+                              onClick={() => {
+                                 currentLesson.words_unlocked.forEach(w => addToFlashcards(w, `From lesson: ${currentLesson.title}`));
+                              }}
+                              className="mt-4 w-full py-2 bg-slate-100 dark:bg-white/10 text-slate-500 hover:text-sanfran-rubi text-[10px] font-black uppercase rounded-xl flex items-center justify-center gap-2 transition-all"
+                           >
+                              <BrainCircuit size={12} /> Adicionar Todos ao Anki
+                           </button>
                         </div>
                      )}
 

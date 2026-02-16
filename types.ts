@@ -362,7 +362,7 @@ export interface IdiomaLesson {
   description: string;
   theory: string;
   example_sentence: string;
-  type?: 'quiz' | 'scramble' | 'matching' | 'fill_blank'; // Adicionado fill_blank
+  type?: 'quiz' | 'scramble' | 'matching' | 'fill_blank' | 'dictation'; // Adicionado dictation
   scramble?: {
     sentence: string;
     translation: string;
@@ -377,10 +377,14 @@ export interface IdiomaLesson {
     pairs: { term: string; translation: string }[];
   };
   fill_blank?: {
-    sentence_start: string; // Parte antes da lacuna
-    sentence_end: string;   // Parte depois da lacuna
-    correct_word: string;   // A palavra que falta
-    options: string[];      // Opções para a lacuna
+    sentence_start: string;
+    sentence_end: string;
+    correct_word: string;
+    options: string[];
+    translation: string;
+  };
+  dictation?: {
+    text: string;
     translation: string;
   };
   xp_reward: number;
