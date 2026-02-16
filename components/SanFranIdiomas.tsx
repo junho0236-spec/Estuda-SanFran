@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Globe, BookOpen, CheckCircle2, Lock, X, Flame, Trophy, Volume2, Star, Quote } from 'lucide-react';
+import { Globe, BookOpen, CheckCircle2, Lock, X, Flame, Trophy, Volume2, Star, Quote, ArrowLeft, GraduationCap } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { IdiomaLesson, IdiomaProgress } from '../types';
 import confetti from 'canvas-confetti';
@@ -289,7 +289,8 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
         completed_lessons: newCompleted,
         current_level_id: nextLessonId,
         total_xp: newXP,
-        streak_count: newStreak
+        streak_count: newStreak,
+        last_activity_date: today
       }) : null);
 
       setShowLessonModal(false);

@@ -383,4 +383,5 @@ export interface IdiomaProgress {
   total_xp: number;
   lives: number;
   completed_lessons: string[];
+  last_activity_date?: string | null;
 }
