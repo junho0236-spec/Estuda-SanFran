@@ -26,6 +26,7 @@ export enum View {
   JurisprudenceMural = 'jurisprudence_mural',
   SumulaChallenge = 'sumula_challenge',
   Sebo = 'sebo',
+  ClassificadosPatio = 'classificados_patio',
   Duel = 'duel',
   OabCountdown = 'oab_countdown',
   Specialization = 'specialization',
@@ -239,6 +240,18 @@ export interface OfficeTrade {
   offered_item_id: string;
   requested_item_id: string;
   status: 'open' | 'completed' | 'cancelled';
+  created_at: string;
+}
+
+export interface ClassifiedAd {
+  id: string;
+  user_id: string;
+  user_name: string;
+  category: 'resumos' | 'grupo_estudo' | 'material' | 'plantao' | 'outros';
+  title: string;
+  description: string;
+  contact_info: string;
+  is_boosted: boolean;
   created_at: string;
 }
 

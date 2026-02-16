@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map, Hourglass, Globe, IdCard } from 'lucide-react';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map, Hourglass, Globe, IdCard, Pin } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel } from './types';
 import Dashboard from './components/Dashboard';
 import Anki from './components/Anki';
@@ -29,6 +29,7 @@ import CitationGenerator from './components/CitationGenerator';
 import JurisprudenceMural from './components/JurisprudenceMural';
 import SumulaChallenge from './components/SumulaChallenge';
 import Sebo from './components/Sebo';
+import ClassificadosPatio from './components/ClassificadosPatio';
 import DuelArena from './components/DuelArena';
 import OabCountdown from './components/OabCountdown';
 import SpecializationTree from './components/SpecializationTree';
@@ -418,6 +419,7 @@ const App: React.FC = () => {
     { id: View.Specialization, icon: Network, label: 'Árvore de Especialização', color: 'text-purple-600', bg: 'bg-purple-100' },
     { id: View.Office, icon: Armchair, label: 'Escritório', color: 'text-amber-600', bg: 'bg-amber-100' },
     { id: View.Sebo, icon: ShoppingBag, label: 'O Sebo', color: 'text-stone-600', bg: 'bg-stone-100' },
+    { id: View.ClassificadosPatio, icon: Megaphone, label: 'Classificados Pátio', color: 'text-yellow-600', bg: 'bg-yellow-100' },
     { id: View.SumulaChallenge, icon: Gamepad2, label: 'Game Súmulas', color: 'text-orange-500', bg: 'bg-orange-50' },
     { id: View.JurisprudenceMural, icon: Scale, label: 'Jurisprudência', color: 'text-indigo-600', bg: 'bg-indigo-100' },
     { id: View.Timeline, icon: GitCommit, label: 'Timeline', color: 'text-pink-600', bg: 'bg-pink-100' },
@@ -563,6 +565,7 @@ const App: React.FC = () => {
             {currentView === View.DigitalID && <DigitalID userId={session.user.id} userName={session.user.user_metadata?.full_name} studySessions={studySessions} tasks={tasks} />}
             {currentView === View.Office && <VirtualOffice studySessions={studySessions} userName={session.user.user_metadata?.full_name} />}
             {currentView === View.Sebo && <Sebo userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
+            {currentView === View.ClassificadosPatio && <ClassificadosPatio userId={session.user.id} userName={session.user.user_metadata?.full_name} studySessions={studySessions} />}
             {currentView === View.Specialization && <SpecializationTree subjects={subjects} studySessions={studySessions} />}
             {currentView === View.SumulaChallenge && <SumulaChallenge userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
             {currentView === View.JurisprudenceMural && <JurisprudenceMural userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
