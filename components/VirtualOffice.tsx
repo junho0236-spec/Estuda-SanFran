@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { StudySession } from '../types';
 import { 
@@ -5,9 +6,10 @@ import {
   Save, Moon, Sun, MousePointer2, Maximize2, Scale, Gavel, 
   Coffee, Book, Flower2, Lamp, Frame, Gift, Package, Sparkles, X, Star,
   BrickWall, Grid3x3, Box, Sword, Globe, Music, Landmark, Leaf, Lightbulb, 
-  Fan, Tv, Scroll, Crown, Gem, Ghost, Briefcase, Clock, Keyboard
+  Fan, Tv, Scroll, Crown, Gem, Ghost, Briefcase, Clock, Keyboard, AlertCircle
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { supabase } from '../services/supabaseClient';
 
 interface VirtualOfficeProps {
   studySessions: StudySession[];
@@ -128,90 +130,117 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState<ItemCategory>('desk');
   const [isNight, setIsNight] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [dbError, setDbError] = useState(false);
   
-  // --- STATE DO GACHA ---
+  // --- STATE DO GACHA (AGORA VIA SUPABASE) ---
   const [inventory, setInventory] = useState<string[]>([]);
   const [availableBoxes, setAvailableBoxes] = useState(0);
-  const [totalBoxesEarned, setTotalBoxesEarned] = useState(0);
+  const [boxesOpened, setBoxesOpened] = useState(0);
   const [isOpeningBox, setIsOpeningBox] = useState(false);
   const [wonItem, setWonItem] = useState<{item: OfficeItem, category: ItemCategory} | null>(null);
 
   const totalSeconds = studySessions.reduce((acc, s) => acc + (Number(s.duration) || 0), 0);
   const totalHours = totalSeconds / 3600;
 
-  // Inicialização e Carregamento
+  // Carregar dados do Supabase
   useEffect(() => {
-    const savedConfig = localStorage.getItem(`sanfran_office_v2_${userName}`);
-    if (savedConfig) {
-      try { setConfig({ ...DEFAULT_CONFIG, ...JSON.parse(savedConfig) }); } catch (e) {}
-    }
+    const loadOfficeData = async () => {
+      setIsLoading(true);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
-    const savedInventory = localStorage.getItem(`sanfran_inventory_${userName}`);
-    const savedBoxes = localStorage.getItem(`sanfran_boxes_${userName}`);
-    const savedTotalEarned = localStorage.getItem(`sanfran_boxes_earned_${userName}`);
+        let { data, error } = await supabase
+          .from('office_state')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
 
-    if (savedInventory) {
-      setInventory(JSON.parse(savedInventory));
-    } else {
-      const initialItems: string[] = [];
-      Object.values(CATALOG).forEach(categoryItems => {
-        categoryItems.forEach(item => {
-          if (item.isDefault) initialItems.push(item.id);
-        });
-      });
-      setInventory(initialItems);
-    }
+        if (error && error.code === 'PGRST116') {
+          // Usuário não tem estado, criar inicial
+          const initialItems: string[] = [];
+          Object.values(CATALOG).forEach(categoryItems => {
+            categoryItems.forEach(item => {
+              if (item.isDefault) initialItems.push(item.id);
+            });
+          });
 
-    if (savedBoxes) setAvailableBoxes(parseInt(savedBoxes));
-    if (savedTotalEarned) setTotalBoxesEarned(parseInt(savedTotalEarned));
+          const { data: newData, error: insertError } = await supabase
+            .from('office_state')
+            .insert({
+              user_id: user.id,
+              inventory: initialItems,
+              config: DEFAULT_CONFIG,
+              boxes_opened: 0
+            })
+            .select()
+            .single();
+          
+          if (insertError) throw insertError;
+          data = newData;
+        } else if (error) {
+          throw error;
+        }
+
+        if (data) {
+          setInventory(data.inventory || []);
+          setConfig(data.config || DEFAULT_CONFIG);
+          setBoxesOpened(data.boxes_opened || 0);
+        }
+      } catch (err) {
+        console.error("Erro ao carregar escritório:", err);
+        setDbError(true);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadOfficeData();
 
     const hour = new Date().getHours();
     setIsNight(hour < 6 || hour > 18);
   }, [userName]);
 
-  // Lógica de Ganhar Caixas (A cada 10h agora, para ser mais frequente)
+  // Lógica de Ganhar Caixas (Cálculo Persistente)
+  // Total Ganhas = Horas Totais / 20 (arredondado para baixo)
+  // Caixas Disponíveis = Total Ganhas - Total Abertas
   useEffect(() => {
-    const boxesShouldHave = Math.floor(totalHours / 10);
-    
-    if (boxesShouldHave > totalBoxesEarned) {
-      const newBoxes = boxesShouldHave - totalBoxesEarned;
-      
-      const updatedTotal = totalBoxesEarned + newBoxes;
-      const updatedAvailable = availableBoxes + newBoxes;
-
-      setTotalBoxesEarned(updatedTotal);
-      setAvailableBoxes(updatedAvailable);
-
-      localStorage.setItem(`sanfran_boxes_earned_${userName}`, updatedTotal.toString());
-      localStorage.setItem(`sanfran_boxes_${userName}`, updatedAvailable.toString());
+    if (!isLoading) {
+        const boxesEarnedTotal = Math.floor(totalHours / 20);
+        const boxesToOpen = Math.max(0, boxesEarnedTotal - boxesOpened);
+        setAvailableBoxes(boxesToOpen);
     }
-  }, [totalHours, totalBoxesEarned, availableBoxes, userName]);
-
-  useEffect(() => {
-    if (inventory.length > 0) {
-      localStorage.setItem(`sanfran_inventory_${userName}`, JSON.stringify(inventory));
-    }
-  }, [inventory, userName]);
-
-  useEffect(() => {
-    localStorage.setItem(`sanfran_boxes_${userName}`, availableBoxes.toString());
-  }, [availableBoxes, userName]);
+  }, [totalHours, boxesOpened, isLoading]);
 
 
-  const handleSelect = (category: ItemCategory, id: string) => {
+  const handleSelect = async (category: ItemCategory, id: string) => {
     const newConfig = { ...config, [category]: id };
-    setConfig(newConfig);
-    localStorage.setItem(`sanfran_office_v2_${userName}`, JSON.stringify(newConfig));
+    setConfig(newConfig); // Atualiza UI instantaneamente
+    
+    // Salva no banco
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            await supabase.from('office_state').update({ config: newConfig }).eq('user_id', user.id);
+        }
+    } catch (e) {
+        console.error("Falha ao salvar configuração", e);
+    }
   };
 
   // --- LÓGICA DO GACHA (ABRIR CAIXA) ---
-  const openBox = () => {
+  const openBox = async () => {
     if (availableBoxes <= 0) return;
 
     setIsOpeningBox(true);
+    // Optimistic update
     setAvailableBoxes(prev => prev - 1);
+    const newBoxesOpenedCount = boxesOpened + 1;
+    setBoxesOpened(newBoxesOpenedCount);
 
-    setTimeout(() => {
+    setTimeout(async () => {
+      // 1. Sorteio
       const roll = Math.random() * 100;
       let rarity: Rarity = 'common';
       if (roll > 98) rarity = 'legendary';      // 2%
@@ -242,8 +271,30 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
          finalPick = { item: fallbackItem, category: 'desk' as ItemCategory};
       }
 
-      if (!inventory.includes(finalPick.item.id)) {
-        setInventory(prev => [...prev, finalPick.item.id]);
+      // 2. Persistência no Supabase
+      try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+              const newInventory = inventory.includes(finalPick.item.id) 
+                  ? inventory 
+                  : [...inventory, finalPick.item.id];
+              
+              if (!inventory.includes(finalPick.item.id)) {
+                  setInventory(newInventory);
+              }
+
+              await supabase.from('office_state').update({ 
+                  inventory: newInventory,
+                  boxes_opened: newBoxesOpenedCount
+              }).eq('user_id', user.id);
+          }
+      } catch (e) {
+          console.error("Erro ao salvar recompensa", e);
+          alert("Erro de conexão ao salvar item. A caixa será restaurada.");
+          setAvailableBoxes(prev => prev + 1);
+          setBoxesOpened(prev => prev - 1);
+          setIsOpeningBox(false);
+          return;
       }
 
       setWonItem(finalPick);
@@ -264,13 +315,14 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
     }
   };
 
-  // --- RENDERERS DE CSS ART ATUALIZADOS ---
-
+  // --- RENDERERS DE CSS ART ---
+  // (Mantidos iguais, omitidos para brevidade se não houver mudança visual, mas incluídos para garantir funcionamento)
+  
   const renderWall = () => {
     const style = config.wall;
     let bgClass = "bg-slate-200";
     if (style === 'wall_concrete') bgClass = "bg-[#a3a3a3]";
-    if (style === 'wall_brick') bgClass = "bg-[#7c2d12]"; // Tijolo
+    if (style === 'wall_brick') bgClass = "bg-[#7c2d12]";
     if (style === 'wall_navy') bgClass = "bg-[#1e293b]";
     if (style === 'wall_classic') bgClass = "bg-[#fdfbf7]";
     if (style === 'wall_green') bgClass = "bg-[#064e3b]";
@@ -295,7 +347,6 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
               {[...Array(10)].map((_, i) => <div key={i} className="flex-1 border-r border-black/20 bg-gradient-to-r from-transparent to-black/10"></div>)}
            </div>
         )}
-        {/* Sombra do teto */}
         <div className="absolute top-0 w-full h-32 bg-gradient-to-b from-black/30 to-transparent pointer-events-none"></div>
       </div>
     );
@@ -343,26 +394,21 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
 
     return (
       <div className={`absolute ${top} ${left} ${width} ${height} ${arch ? 'rounded-t-full' : ''} bg-sky-300 border-4 ${frameColor} shadow-inner overflow-hidden z-0`}>
-        {/* Sky gradient */}
         <div className={`absolute inset-0 ${isNight ? 'bg-slate-900' : 'bg-sky-300'}`}>
            {isNight && <div className="absolute top-4 right-4 w-8 h-8 bg-slate-200 rounded-full shadow-[0_0_20px_white]"></div>}
            {!isNight && <div className="absolute top-2 right-10 w-12 h-12 bg-yellow-300 rounded-full blur-xl opacity-80"></div>}
-           <div className="absolute bottom-0 w-full h-1/3 bg-slate-700/20 backdrop-blur-[1px]"></div> {/* City silhouette hint */}
+           <div className="absolute bottom-0 w-full h-1/3 bg-slate-700/20 backdrop-blur-[1px]"></div>
         </div>
-
         {grid && (
            <div className="absolute inset-0 border-4 border-slate-100 grid grid-cols-2 grid-rows-2 gap-1 bg-slate-100">
               <div className="bg-transparent opacity-0"></div>
            </div>
         )}
-
         {blinds && (
            <div className="absolute inset-0 flex flex-col justify-between py-1">
               {[...Array(10)].map((_, i) => <div key={i} className="w-full h-2 bg-slate-100 shadow-sm"></div>)}
            </div>
         )}
-
-        {/* Reflexo vidro */}
         <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent pointer-events-none"></div>
       </div>
     );
@@ -371,17 +417,14 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
   const renderRug = () => {
     const style = config.rug;
     if (style === 'rug_none') return null;
-
     let bgClass = "bg-slate-400";
     let shape = "rounded-sm";
     let width = "w-1/2";
-
     if (style === 'rug_grey') bgClass = "bg-slate-400";
     if (style === 'rug_stripes') bgClass = "bg-[repeating-linear-gradient(90deg,#1e293b,#1e293b_20px,#f8fafc_20px,#f8fafc_40px)]";
     if (style === 'rug_red') { bgClass = "bg-red-800 border-4 border-yellow-600"; width="w-[40%]"; }
     if (style === 'rug_persian') { bgClass = "bg-[radial-gradient(circle,rgba(127,29,29,1)_0%,rgba(69,10,10,1)_100%)] border-8 border-double border-yellow-900"; width="w-[45%]"; }
     if (style === 'rug_sanfran') { bgClass = "bg-yellow-500 border-4 border-black"; width="w-[30%] rounded-full"; }
-
     return (
        <div className={`absolute bottom-[10%] left-1/2 -translate-x-1/2 h-[20%] ${width} ${bgClass} ${shape} shadow-sm transform perspective-500 rotate-x-60 opacity-90 pointer-events-none z-10`}>
           {style === 'rug_sanfran' && <div className="absolute inset-0 flex items-center justify-center text-black font-black text-xs opacity-50">XI DE AGOSTO</div>}
@@ -391,10 +434,8 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
 
   const renderChair = () => {
     const style = config.chair;
-    
     let color = "bg-slate-700";
-    let type = "standard"; // standard, fancy, throne
-
+    let type = "standard";
     if (style === 'chair_plastic') { color = "bg-white"; }
     if (style === 'chair_wood') { color = "bg-[#5D4037]"; }
     if (style === 'chair_office') { color = "bg-blue-900"; }
@@ -402,16 +443,12 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
     if (style === 'chair_velvet') { color = "bg-emerald-800"; type="fancy"; }
     if (style === 'chair_leather') { color = "bg-[#3E2723]"; type="fancy"; }
     if (style === 'chair_magistrate') { color = "bg-red-900 border-4 border-yellow-500"; type="throne"; }
-
     return (
       <div className="absolute bottom-[25%] left-1/2 -translate-x-1/2 z-10 flex flex-col items-center pointer-events-none">
-         {/* Backrest */}
          <div className={`w-16 ${type === 'throne' ? 'h-32 rounded-t-full' : type === 'fancy' ? 'h-24 rounded-t-xl' : 'h-20 rounded-t-md'} ${color} shadow-xl relative`}>
             {type === 'throne' && <div className="absolute top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-yellow-500 rounded-full shadow-md"></div>}
          </div>
-         {/* Seat */}
          <div className={`w-16 h-2 ${color} brightness-75`}></div>
-         {/* Legs */}
          <div className="w-12 h-12 border-l-4 border-r-4 border-slate-800"></div>
       </div>
     );
@@ -419,20 +456,17 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
 
   const renderDesk = () => {
     const style = config.desk;
-    
     let width = "w-[50%]";
     let color = "bg-slate-300";
     let legs = true;
     let legsColor = "bg-slate-400";
     let glass = false;
-
     if (style === 'desk_white') { color = "bg-white border-b-4 border-slate-200"; width="w-[55%]"; }
     if (style === 'desk_wood') { color = "bg-[#5D4037] border-b-4 border-[#3E2723]"; width="w-[60%]"; legsColor="bg-[#3E2723]"; }
     if (style === 'desk_glass') { color = "bg-cyan-100/30 backdrop-blur-sm border border-white/50"; width="w-[55%]"; glass=true; legsColor="bg-slate-300"; }
     if (style === 'desk_l') { color = "bg-[#2d3748] border-b-4 border-black"; width="w-[65%]"; legsColor="bg-black"; }
     if (style === 'desk_antique') { color = "bg-[#4a3b32] border-b-8 border-[#271c19]"; width="w-[65%]"; legs=false; }
     if (style === 'desk_president') { color = "bg-[linear-gradient(90deg,#3E2723,#5D4037,#3E2723)] border-b-8 border-[#271c19]"; width="w-[70%]"; legs=false; }
-
     return (
       <div className="absolute bottom-[12%] left-1/2 -translate-x-1/2 z-20 flex flex-col items-center w-full pointer-events-none">
          <div className={`${width} h-8 ${color} rounded-sm relative shadow-2xl flex items-end justify-center perspective-500`}>
@@ -448,10 +482,8 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
                   </div>
                </div>
             )}
-            
             {renderDesktopItems()}
          </div>
-
          {legs && (
             <div className={`${width} flex justify-between px-4 -mt-1`}>
                {style === 'desk_door' ? (
@@ -474,7 +506,6 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
   const renderDesktopItems = () => {
     const style = config.desktop;
     if (style === 'none') return null;
-
     return (
       <div className="absolute -top-10 w-full flex justify-center items-end gap-4 pointer-events-none">
          {style === 'messy_papers' && (
@@ -523,9 +554,7 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
   const renderDecor = (pos: 'left' | 'right') => {
     const style = pos === 'left' ? config.decor_left : config.decor_right;
     const cssPos = pos === 'left' ? "left-[5%]" : "right-[5%]";
-    
     if (style === 'none') return null;
-
     return (
       <div className={`absolute bottom-[25%] ${cssPos} z-10 transition-all duration-500`}>
          {style === 'plant_pothos' && (
@@ -599,6 +628,24 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
     }
   };
 
+  if (isLoading) {
+    return (
+        <div className="h-full flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-sanfran-rubi"></div>
+        </div>
+    );
+  }
+
+  if (dbError) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center text-center p-6">
+         <AlertCircle className="w-16 h-16 text-red-500 mb-4" />
+         <h2 className="text-2xl font-black uppercase text-slate-900 dark:text-white">Erro de Conexão</h2>
+         <p className="text-slate-500 font-bold max-w-md mt-2">Não foi possível carregar seu escritório. Verifique se a tabela 'office_state' foi criada no Supabase.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full flex flex-col animate-in fade-in duration-1000 relative pb-20 px-2 md:px-0">
       
@@ -626,7 +673,7 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
               </div>
               <div className="text-left">
                  <p className="text-[8px] font-black uppercase tracking-widest opacity-80">SanFran Box</p>
-                 <p className="text-xs font-black uppercase tracking-tight leading-none">{availableBoxes > 0 ? 'Abrir Agora' : `${(10 - (totalHours % 10)).toFixed(1)}h p/ próxima`}</p>
+                 <p className="text-xs font-black uppercase tracking-tight leading-none">{availableBoxes > 0 ? 'Abrir Agora' : `${(20 - (totalHours % 20)).toFixed(1)}h p/ próxima`}</p>
               </div>
            </button>
 
