@@ -169,3 +169,11 @@ export interface DailyQuestData {
   quests: Quest[];
   claimed: boolean;
 }
+
+export interface ArticleAnnotation {
+  id?: string;
+  law_id: string;
+  article_id: string;
+  content: string;
+  color: 'yellow' | 'green' | 'pink' | 'blue' | 'none';
+}
