@@ -15,7 +15,8 @@ export enum View {
   OralArgument = 'oral_argument',
   StudyRoom = 'study_room',
   Office = 'office',
-  Societies = 'societies'
+  Societies = 'societies',
+  LeiSeca = 'lei_seca'
 }
 
 export interface Folder {
