@@ -13,7 +13,8 @@ export enum View {
   Calculator = 'calculator',
   DeadlineCalculator = 'deadline_calculator',
   OralArgument = 'oral_argument',
-  StudyRoom = 'study_room'
+  StudyRoom = 'study_room',
+  Office = 'office'
 }
 
 export interface Folder {
