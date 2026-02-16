@@ -176,6 +176,9 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
      }
   };
 
+  // Extract unique modules
+  const uniqueModules = Array.from(new Set(MOCK_LESSONS.map(l => l.module)));
+
   return (
     <div className="h-full flex flex-col animate-in fade-in duration-500 pb-20 px-2 md:px-0 max-w-4xl mx-auto">
        <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 shrink-0 mb-8">
@@ -194,29 +197,60 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
       </header>
 
       {lessonStep === 'list' && (
-         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {MOCK_LESSONS.map((lesson) => {
-               const isCompleted = completedLessons.has(lesson.id);
+         <div className="space-y-10">
+            {uniqueModules.map((moduleName, modIdx) => {
+               const moduleLessons = MOCK_LESSONS.filter(l => l.module === moduleName);
+               const completedCount = moduleLessons.filter(l => completedLessons.has(l.id)).length;
+               const progressPercent = (completedCount / moduleLessons.length) * 100;
+
                return (
-                  <button 
-                     key={lesson.id} 
-                     onClick={() => startLesson(lesson)}
-                     className={`text-left p-6 rounded-[2.5rem] border-2 transition-all hover:scale-[1.02] shadow-xl relative overflow-hidden group ${isCompleted ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800' : 'bg-white dark:bg-sanfran-rubiDark/30 border-slate-200 dark:border-sanfran-rubi/30 hover:border-sky-400'}`}
-                  >
-                     <div className="flex justify-between items-start mb-4">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{lesson.module}</span>
-                        {isCompleted ? <CheckCircle2 className="text-emerald-500" size={20} /> : <div className="w-5 h-5 rounded-full border-2 border-slate-200 dark:border-white/10" />}
+                  <div key={moduleName} className="space-y-6">
+                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-white/5 p-6 rounded-3xl border border-slate-100 dark:border-white/5 shadow-sm">
+                        <div>
+                           <div className="flex items-center gap-2 mb-1">
+                              <span className="px-2 py-0.5 bg-slate-100 dark:bg-white/10 rounded text-[9px] font-black uppercase text-slate-500">Módulo {modIdx + 1}</span>
+                           </div>
+                           <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">{moduleName}</h3>
+                        </div>
+                        <div className="flex flex-col md:items-end gap-2 w-full md:w-auto">
+                           <div className="flex justify-between md:justify-end w-full gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                              <span>Progresso</span>
+                              <span>{Math.round(progressPercent)}%</span>
+                           </div>
+                           <div className="w-full md:w-48 h-2.5 bg-slate-100 dark:bg-black/30 rounded-full overflow-hidden">
+                              <div className="h-full bg-emerald-500 transition-all duration-1000 shadow-[0_0_10px_rgba(16,185,129,0.5)]" style={{ width: `${progressPercent}%` }}></div>
+                           </div>
+                           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{completedCount}/{moduleLessons.length} Lições</span>
+                        </div>
                      </div>
-                     <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">{lesson.title}</h3>
-                     <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-6">{lesson.description}</p>
-                     
-                     <div className="flex gap-2">
-                        {lesson.words_unlocked.slice(0, 2).map(w => (
-                           <span key={w} className="text-[9px] font-bold bg-slate-100 dark:bg-white/10 px-2 py-1 rounded text-slate-500">{w}</span>
-                        ))}
-                        {lesson.words_unlocked.length > 2 && <span className="text-[9px] font-bold bg-slate-100 dark:bg-white/10 px-2 py-1 rounded text-slate-500">+{lesson.words_unlocked.length - 2}</span>}
+
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {moduleLessons.map((lesson) => {
+                           const isCompleted = completedLessons.has(lesson.id);
+                           return (
+                              <button 
+                                 key={lesson.id} 
+                                 onClick={() => startLesson(lesson)}
+                                 className={`text-left p-6 rounded-[2.5rem] border-2 transition-all hover:scale-[1.02] shadow-xl relative overflow-hidden group ${isCompleted ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800' : 'bg-white dark:bg-sanfran-rubiDark/30 border-slate-200 dark:border-sanfran-rubi/30 hover:border-sky-400'}`}
+                              >
+                                 <div className="flex justify-between items-start mb-4">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Lição {lesson.id}</span>
+                                    {isCompleted ? <CheckCircle2 className="text-emerald-500" size={20} /> : <div className="w-5 h-5 rounded-full border-2 border-slate-200 dark:border-white/10 group-hover:border-sky-400" />}
+                                 </div>
+                                 <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2 leading-tight">{lesson.title}</h3>
+                                 <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-6 line-clamp-2">{lesson.description}</p>
+                                 
+                                 <div className="flex gap-2">
+                                    {lesson.words_unlocked.slice(0, 2).map(w => (
+                                       <span key={w} className="text-[9px] font-bold bg-slate-100 dark:bg-white/10 px-2 py-1 rounded text-slate-500">{w}</span>
+                                    ))}
+                                    {lesson.words_unlocked.length > 2 && <span className="text-[9px] font-bold bg-slate-100 dark:bg-white/10 px-2 py-1 rounded text-slate-500">+{lesson.words_unlocked.length - 2}</span>}
+                                 </div>
+                              </button>
+                           )
+                        })}
                      </div>
-                  </button>
+                  </div>
                )
             })}
          </div>
