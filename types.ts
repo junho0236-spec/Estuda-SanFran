@@ -3,6 +3,7 @@ import React from 'react';
 
 export enum View {
   Dashboard = 'dashboard',
+  Profile = 'profile',
   Anki = 'anki',
   Timer = 'timer',
   Subjects = 'subjects',

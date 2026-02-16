@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map, Hourglass, Globe, IdCard, Pin, Landmark } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel } from './types';
 import Dashboard from './components/Dashboard';
+import Profile from './components/Profile';
 import Anki from './components/Anki';
 import Pomodoro from './components/Pomodoro';
 import Subjects from './components/Subjects';
@@ -477,13 +478,18 @@ const App: React.FC = () => {
       <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${isExtremeFocus ? '-translate-x-full lg:-translate-x-full lg:w-0' : 'lg:relative lg:translate-x-0 lg:w-72'} fixed inset-y-0 left-0 z-40 bg-white dark:bg-[#0d0303] border-r border-slate-200 dark:border-sanfran-rubi/30 transition-all duration-700 flex flex-col shadow-2xl lg:shadow-none`}>
         <div className="p-6 border-b border-slate-100 dark:border-sanfran-rubi/20 flex flex-col">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="bg-sanfran-rubi p-2.5 rounded-2xl text-white shadow-lg shadow-red-900/20"><BookOpen className="w-6 h-6" /></div>
-              <div>
-                <h1 className="text-xl font-black dark:text-white leading-none tracking-tight">SanFran</h1>
-                <span className="text-[9px] font-black text-sanfran-rubi uppercase tracking-[0.2em]">Academia</span>
+            <button
+              onClick={() => { setCurrentView(View.Profile); closeSidebar(); }}
+              className="flex items-center gap-3 group text-left"
+            >
+              <div className="bg-sanfran-rubi p-2.5 rounded-2xl text-white shadow-lg shadow-red-900/20 group-hover:scale-105 transition-transform">
+                <BookOpen className="w-6 h-6" />
               </div>
-            </div>
+              <div>
+                <h1 className="text-xl font-black dark:text-white leading-none tracking-tight">SanFran Academy</h1>
+                <span className="text-[9px] font-black text-sanfran-rubi uppercase tracking-[0.2em]">XI de Agosto</span>
+              </div>
+            </button>
             <button onClick={closeSidebar} className="lg:hidden p-2 text-slate-400 hover:text-sanfran-rubi transition-colors">
               <X className="w-6 h-6" />
             </button>
@@ -564,6 +570,7 @@ const App: React.FC = () => {
                 onNavigate={setCurrentView}
               />
             )}
+            {currentView === View.Profile && <Profile />}
             {currentView === View.DominioJuridico && <DominioJuridico subjects={subjects} studySessions={studySessions} />}
             {currentView === View.DigitalID && <DigitalID userId={session.user.id} userName={session.user.user_metadata?.full_name} studySessions={studySessions} tasks={tasks} />}
             {currentView === View.Office && <VirtualOffice studySessions={studySessions} userName={session.user.user_metadata?.full_name} />}
