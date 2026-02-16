@@ -27,7 +27,8 @@ export enum View {
   Duel = 'duel',
   OabCountdown = 'oab_countdown',
   Specialization = 'specialization',
-  TypingChallenge = 'typing_challenge'
+  TypingChallenge = 'typing_challenge',
+  Petitum = 'petitum'
 }
 
 export interface Folder {
@@ -252,4 +253,18 @@ export interface Duel {
 
 export interface UserConfig {
   oab_exam_date: string;
+}
+
+export interface PetitumSection {
+  title: string;
+  skeleton: string;
+  explanation: string;
+}
+
+export interface PetitumTemplate {
+  id: string;
+  title: string;
+  category: string;
+  description: string;
+  structure: PetitumSection[];
 }
