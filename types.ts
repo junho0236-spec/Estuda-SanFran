@@ -30,7 +30,9 @@ export enum View {
   TypingChallenge = 'typing_challenge',
   Petitum = 'petitum',
   Dosimetria = 'dosimetria',
-  Debate = 'debate'
+  Debate = 'debate',
+  Trunfo = 'trunfo',
+  Honorarios = 'honorarios'
 }
 
 export interface Folder {
