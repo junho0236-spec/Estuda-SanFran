@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Building2, User, Clock, ArrowLeft, Play, Pause, LogOut, BookOpen, Shield, Gavel, Scale, Globe, BrainCircuit, HeartPulse, Briefcase, Landmark, Mic, MicOff, Headphones, HeadphoneOff, Radio, Volume2, VolumeX, Signal } from 'lucide-react';
+import { Building2, User, Clock, ArrowLeft, Play, Pause, LogOut, BookOpen, Shield, Gavel, Scale, Globe, BrainCircuit, HeartPulse, Briefcase, Landmark, Mic, MicOff, Headphones, HeadphoneOff, Radio, Volume2, Signal } from 'lucide-react';
 import { PresenceUser } from '../types';
 import { supabase } from '../services/supabaseClient';
 
@@ -51,8 +51,13 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
   // Voice Chat State
   const [isMicOn, setIsMicOn] = useState(false);
   const [isDeafened, setIsDeafened] = useState(false);
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [peers, setPeers] = useState<Record<string, RTCPeerConnection>>({});
+  
+  // Refs para WebRTC (Estabilidade)
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const peersRef = useRef<Record<string, RTCPeerConnection>>({});
+  const channelRef = useRef<any>(null);
+  
+  // State para UI
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
   const [speakingUsers, setSpeakingUsers] = useState<Set<string>>(new Set());
 
@@ -82,31 +87,24 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
     return () => clearInterval(interval);
   }, [isActive]);
 
-  // --- WEBRTC LOGIC ---
+  // --- WEBRTC SIGNALING ---
   const rtcConfig = {
     iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
   };
 
   useEffect(() => {
-    if (!currentRoomId) {
-      // Cleanup when leaving room
-      if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-        setLocalStream(null);
-      }
-      Object.values(peers).forEach(p => p.close());
-      setPeers({});
-      setRemoteStreams({});
-      setIsMicOn(false);
-      return;
-    }
+    if (!currentRoomId) return;
 
-    const channel = supabase.channel(`room_voice_${currentRoomId}`);
+    // Configura canal de sinalização
+    const channel = supabase.channel(`room_voice_${currentRoomId}`, {
+        config: { broadcast: { self: false } }
+    });
+    channelRef.current = channel;
 
     channel
       .on('broadcast', { event: 'offer' }, async ({ payload }) => {
         if (payload.target === currentUserId) {
-          await handleReceiveOffer(payload.offer, payload.caller, channel);
+          await handleReceiveOffer(payload.offer, payload.caller);
         }
       })
       .on('broadcast', { event: 'answer' }, async ({ payload }) => {
@@ -121,12 +119,13 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
       })
       .on('broadcast', { event: 'join-voice' }, async ({ payload }) => {
         if (payload.userId !== currentUserId) {
-          await initiateCall(payload.userId, channel);
+          // Alguém entrou ou ligou o mic, vamos conectar
+          await initiateCall(payload.userId);
         }
       })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
-          // Announce presence to others for voice
+          // Anuncia presença
           channel.send({
             type: 'broadcast',
             event: 'join-voice',
@@ -136,131 +135,28 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
       });
 
     return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [currentRoomId, localStream]); // Dependency on localStream ensures we attach tracks if stream exists
-
-  const toggleMic = async () => {
-    if (isMicOn) {
-      // Turn off
-      if (localStream) {
-        localStream.getTracks().forEach(t => t.stop());
-        setLocalStream(null);
+      // Cleanup completo ao sair da sala
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach(track => track.stop());
+        localStreamRef.current = null;
       }
+      Object.values(peersRef.current).forEach(p => p.close());
+      peersRef.current = {};
+      setRemoteStreams({});
       setIsMicOn(false);
-    } else {
-      // Turn on
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        setLocalStream(stream);
-        setIsMicOn(true);
-        
-        // Add tracks to existing connections
-        Object.values(peers).forEach(pc => {
-          stream.getTracks().forEach(track => {
-             // Check if sender already exists to avoid duplication errors
-             const senders = pc.getSenders();
-             const hasTrack = senders.some(s => s.track?.kind === track.kind);
-             if (!hasTrack) {
-               pc.addTrack(track, stream);
-             }
-          });
-        });
-
-        // Setup Audio Analysis for Visuals (Talking Indicator)
-        setupAudioAnalysis(stream, currentUserId);
-
-      } catch (err) {
-        console.error("Error accessing mic:", err);
-        alert("Não foi possível acessar o microfone. Verifique as permissões.");
-      }
-    }
-  };
-
-  const setupAudioAnalysis = (stream: MediaStream, userId: string) => {
-    const audioContext = new AudioContext();
-    const source = audioContext.createMediaStreamSource(stream);
-    const analyser = audioContext.createAnalyser();
-    analyser.fftSize = 256;
-    source.connect(analyser);
-
-    const dataArray = new Uint8Array(analyser.frequencyBinCount);
-    
-    const checkAudio = () => {
-      analyser.getByteFrequencyData(dataArray);
-      const sum = dataArray.reduce((a, b) => a + b, 0);
-      const avg = sum / dataArray.length;
-      
-      if (avg > 15) { // Threshold
-        setSpeakingUsers(prev => new Set(prev).add(userId));
-      } else {
-        setSpeakingUsers(prev => {
-          const next = new Set(prev);
-          next.delete(userId);
-          return next;
-        });
-      }
-      
-      if (stream.active) requestAnimationFrame(checkAudio);
-      else audioContext.close();
+      supabase.removeChannel(channel);
+      channelRef.current = null;
     };
-    
-    checkAudio();
-  };
+  }, [currentRoomId, currentUserId]); 
 
-  const initiateCall = async (targetUserId: string, channel: any) => {
-    const pc = createPeerConnection(targetUserId, channel);
-    if (localStream) {
-      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-    }
-    
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
+  // --- WEBRTC HANDLERS ---
 
-    channel.send({
-      type: 'broadcast',
-      event: 'offer',
-      payload: { target: targetUserId, caller: currentUserId, offer }
-    });
-  };
-
-  const handleReceiveOffer = async (offer: RTCSessionDescriptionInit, callerId: string, channel: any) => {
-    const pc = createPeerConnection(callerId, channel);
-    if (localStream) {
-      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-    }
-
-    await pc.setRemoteDescription(new RTCSessionDescription(offer));
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-
-    channel.send({
-      type: 'broadcast',
-      event: 'answer',
-      payload: { target: callerId, caller: currentUserId, answer }
-    });
-  };
-
-  const handleReceiveAnswer = async (answer: RTCSessionDescriptionInit, callerId: string) => {
-    const pc = peers[callerId];
-    if (pc) {
-      await pc.setRemoteDescription(new RTCSessionDescription(answer));
-    }
-  };
-
-  const handleReceiveIce = async (candidate: RTCIceCandidateInit, callerId: string) => {
-    const pc = peers[callerId];
-    if (pc) {
-      await pc.addIceCandidate(new RTCIceCandidate(candidate));
-    }
-  };
-
-  const createPeerConnection = (targetUserId: string, channel: any) => {
+  const createPeerConnection = (targetUserId: string) => {
     const pc = new RTCPeerConnection(rtcConfig);
     
     pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        channel.send({
+      if (event.candidate && channelRef.current) {
+        channelRef.current.send({
           type: 'broadcast',
           event: 'ice-candidate',
           payload: { target: targetUserId, caller: currentUserId, candidate: event.candidate }
@@ -269,13 +165,177 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
     };
 
     pc.ontrack = (event) => {
-      const remoteStream = event.streams[0];
-      setRemoteStreams(prev => ({ ...prev, [targetUserId]: remoteStream }));
-      setupAudioAnalysis(remoteStream, targetUserId);
+      const stream = event.streams[0];
+      setRemoteStreams(prev => ({ ...prev, [targetUserId]: stream }));
+      setupAudioAnalysis(stream, targetUserId);
     };
 
-    setPeers(prev => ({ ...prev, [targetUserId]: pc }));
+    peersRef.current[targetUserId] = pc;
     return pc;
+  };
+
+  const initiateCall = async (targetUserId: string) => {
+    // Fecha conexão anterior se existir para reiniciar limpo
+    if (peersRef.current[targetUserId]) {
+        peersRef.current[targetUserId].close();
+    }
+
+    const pc = createPeerConnection(targetUserId);
+    
+    // Adiciona tracks locais se existirem
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => pc.addTrack(track, localStreamRef.current!));
+    }
+    
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'offer',
+      payload: { target: targetUserId, caller: currentUserId, offer }
+    });
+  };
+
+  const handleReceiveOffer = async (offer: RTCSessionDescriptionInit, callerId: string) => {
+    // Se receber oferta, cria ou recupera PC (renegociação)
+    let pc = peersRef.current[callerId];
+    if (!pc || pc.signalingState === 'closed') {
+        pc = createPeerConnection(callerId);
+    }
+
+    await pc.setRemoteDescription(new RTCSessionDescription(offer));
+    
+    // Adiciona nosso áudio à resposta se o mic estiver ligado
+    if (localStreamRef.current) {
+       const senders = pc.getSenders();
+       localStreamRef.current.getTracks().forEach(track => {
+           // Evita adicionar duplicado
+           if (!senders.find(s => s.track?.id === track.id)) {
+               pc.addTrack(track, localStreamRef.current!);
+           }
+       });
+    }
+
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'answer',
+      payload: { target: callerId, caller: currentUserId, answer }
+    });
+  };
+
+  const handleReceiveAnswer = async (answer: RTCSessionDescriptionInit, callerId: string) => {
+    const pc = peersRef.current[callerId];
+    if (pc) {
+      await pc.setRemoteDescription(new RTCSessionDescription(answer));
+    }
+  };
+
+  const handleReceiveIce = async (candidate: RTCIceCandidateInit, callerId: string) => {
+    const pc = peersRef.current[callerId];
+    if (pc) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (e) {
+        console.error("Erro ao adicionar ICE candidate", e);
+      }
+    }
+  };
+
+  const toggleMic = async () => {
+    if (isMicOn) {
+      // Desligar Mic
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach(t => t.stop());
+        localStreamRef.current = null;
+      }
+      setIsMicOn(false);
+      // Nota: Idealmente enviaríamos "pare de me ouvir", mas parar a track local já silencia.
+    } else {
+      // Ligar Mic
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        localStreamRef.current = stream;
+        setIsMicOn(true);
+        setupAudioAnalysis(stream, currentUserId);
+        
+        // Renegociação: Adiciona track a todos os peers existentes e envia nova oferta
+        const peers = peersRef.current;
+        const promises = Object.entries(peers).map(async ([targetId, pc]) => {
+             stream.getTracks().forEach(track => {
+                 pc.addTrack(track, stream);
+             });
+             
+             // Cria nova oferta para avisar o outro lado do novo áudio
+             const offer = await pc.createOffer();
+             await pc.setLocalDescription(offer);
+             
+             channelRef.current?.send({
+                 type: 'broadcast',
+                 event: 'offer',
+                 payload: { target: targetId, caller: currentUserId, offer }
+             });
+        });
+        
+        // Se não tiver ninguém conectado, avisa para conectarem
+        if (Object.keys(peers).length === 0) {
+            channelRef.current?.send({
+                type: 'broadcast',
+                event: 'join-voice',
+                payload: { userId: currentUserId }
+            });
+        }
+        
+        await Promise.all(promises);
+
+      } catch (err) {
+        console.error("Error accessing mic:", err);
+        alert("Não foi possível acessar o microfone. Verifique as permissões do navegador.");
+      }
+    }
+  };
+
+  const setupAudioAnalysis = (stream: MediaStream, userId: string) => {
+    // Simples visualizador de áudio para saber quem está falando
+    try {
+        const audioContext = new AudioContext();
+        const source = audioContext.createMediaStreamSource(stream);
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        
+        const checkAudio = () => {
+          if (!stream.active) {
+              audioContext.close();
+              return;
+          }
+          
+          analyser.getByteFrequencyData(dataArray);
+          const sum = dataArray.reduce((a, b) => a + b, 0);
+          const avg = sum / dataArray.length;
+          
+          if (avg > 15) { // Limiar de fala
+            setSpeakingUsers(prev => new Set(prev).add(userId));
+          } else {
+            setSpeakingUsers(prev => {
+              const next = new Set(prev);
+              next.delete(userId);
+              return next;
+            });
+          }
+          
+          requestAnimationFrame(checkAudio);
+        };
+        
+        checkAudio();
+    } catch (e) {
+        console.error("Audio Analysis setup failed", e);
+    }
   };
 
   // --- RADIO LOGIC ---
@@ -409,9 +469,15 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
       {Object.entries(remoteStreams).map(([userId, stream]) => (
          <audio 
             key={userId} 
-            ref={ref => { if (ref) ref.srcObject = stream }} 
+            ref={ref => { 
+                if (ref && ref.srcObject !== stream) {
+                    ref.srcObject = stream;
+                    // Ensure autoplay works
+                    ref.play().catch(e => console.log("Autoplay prevented", e));
+                } 
+            }} 
             autoPlay 
-            muted={isDeafened} // Handle deafen locally
+            muted={isDeafened}
          />
       ))}
       <audio ref={radioRef} src={radioTracks[currentRadioIndex].url} loop />
