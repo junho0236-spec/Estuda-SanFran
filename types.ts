@@ -44,7 +44,8 @@ export enum View {
   InternRPG = 'intern_rpg',
   PrescriptionCalculator = 'prescription_calculator',
   SanFranIdiomas = 'sanfran_idiomas',
-  DigitalID = 'digital_id'
+  DigitalID = 'digital_id',
+  DominioJuridico = 'dominio_juridico'
 }
 
 export interface Folder {
