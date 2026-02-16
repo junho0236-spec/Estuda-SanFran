@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { Globe, BookOpen, CheckCircle2, Lock, X, Flame, Trophy, Volume2, Star, Quote, Heart, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Globe, BookOpen, CheckCircle2, Lock, X, Flame, Trophy, Volume2, Star, Quote, Heart, ArrowRight, Flag } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { IdiomaLesson, IdiomaProgress } from '../types';
 import confetti from 'canvas-confetti';
@@ -11,10 +11,10 @@ interface SanFranIdiomasProps {
 
 // --- BANCO DE DADOS DE LIÇÕES (EXPANDIDO) ---
 const LESSONS_DB: IdiomaLesson[] = [
-  // --- MÓDULO 1: FOUNDATIONS ---
+  // --- MÓDULO 1: FOUNDATIONS (Fundamentos) ---
   {
     id: '1-1',
-    module: 'Foundations',
+    module: 'Fundations',
     title: 'The Legal Profession',
     description: 'Lawyer, Attorney & Barrister',
     type: 'quiz',
@@ -31,7 +31,7 @@ const LESSONS_DB: IdiomaLesson[] = [
   },
   {
     id: '1-2',
-    module: 'Foundations',
+    module: 'Fundations',
     title: 'Court Structure',
     description: 'Court vs. Tribunal',
     type: 'matching',
@@ -50,7 +50,7 @@ const LESSONS_DB: IdiomaLesson[] = [
   },
   {
     id: '1-3',
-    module: 'Foundations',
+    module: 'Fundations',
     title: 'Building Sentences',
     description: 'Structure of Legal English',
     type: 'scramble',
@@ -64,7 +64,7 @@ const LESSONS_DB: IdiomaLesson[] = [
     words_unlocked: ['Motion', 'Dismiss', 'File', 'Plaintiff']
   },
   
-  // --- MÓDULO 2: CONTRACT LAW ---
+  // --- MÓDULO 2: CONTRACT LAW (Contratos) ---
   {
     id: '2-1',
     module: 'Contract Law',
@@ -85,8 +85,26 @@ const LESSONS_DB: IdiomaLesson[] = [
   {
     id: '2-2',
     module: 'Contract Law',
-    title: 'Contract Essentials',
-    description: 'Breach & Remedies',
+    title: 'Binding Agreement',
+    description: 'Elementos do Contrato',
+    type: 'fill_blank',
+    theory: "Para um contrato ser válido ('binding'), deve haver Oferta, Aceitação e 'Consideration' (contraprestação/valor).",
+    example_sentence: "This contract is legally binding between the parties.",
+    fill_blank: {
+      sentence_start: "Without valid consideration, the contract is not",
+      sentence_end: ".",
+      correct_word: "binding",
+      options: ["binding", "writing", "drafting", "holding"],
+      translation: "Sem contraprestação válida, o contrato não é vinculante."
+    },
+    xp_reward: 150,
+    words_unlocked: ['Consideration', 'Binding', 'Offer']
+  },
+  {
+    id: '2-3',
+    module: 'Contract Law',
+    title: 'Breach & Remedies',
+    description: 'Violação Contratual',
     type: 'matching',
     theory: "Violação contratual é 'Breach'. A solução/reparação é 'Remedy'. Cláusula penal é 'Liquidated Damages'.",
     example_sentence: "A material breach gives rise to the right to terminate.",
@@ -95,29 +113,14 @@ const LESSONS_DB: IdiomaLesson[] = [
         { term: "Breach", translation: "Violação/Inadimplemento" },
         { term: "Remedy", translation: "Solução/Remédio" },
         { term: "Party", translation: "Parte" },
-        { term: "Binding", translation: "Vinculante" }
+        { term: "Damages", translation: "Perdas e Danos" }
       ]
     },
     xp_reward: 150,
-    words_unlocked: ['Breach', 'Remedy', 'Binding']
-  },
-  {
-    id: '2-3',
-    module: 'Contract Law',
-    title: 'Boilerplate Clauses',
-    description: 'Standard Provisions',
-    type: 'scramble',
-    theory: "Cláusulas padrão são 'Boilerplate'. Ex: Severability (divisibilidade), Entire Agreement (acordo integral).",
-    example_sentence: "This agreement constitutes the entire understanding between parties.",
-    scramble: {
-      sentence: "This agreement shall be governed by the laws of Brazil",
-      translation: "Este contrato será regido pelas leis do Brasil."
-    },
-    xp_reward: 150,
-    words_unlocked: ['Governing Law', 'Jurisdiction', 'Boilerplate']
+    words_unlocked: ['Breach', 'Remedy', 'Damages']
   },
 
-  // --- MÓDULO 3: CRIMINAL LAW ---
+  // --- MÓDULO 3: CRIMINAL LAW (Penal) ---
   {
     id: '3-1',
     module: 'Criminal Law',
@@ -138,10 +141,28 @@ const LESSONS_DB: IdiomaLesson[] = [
   {
     id: '3-2',
     module: 'Criminal Law',
+    title: 'The Verdict',
+    description: 'Guilty or Not Guilty',
+    type: 'fill_blank',
+    theory: "O júri entrega um 'Verdict'. O réu pode ser considerado 'Guilty' (Culpado) ou 'Not Guilty' (Inocente/Absolvido). Em inglês, 'Innocent' é um estado de fato, 'Not Guilty' é o resultado legal.",
+    example_sentence: "The jury found the defendant not guilty.",
+    fill_blank: {
+      sentence_start: "The jury reached a",
+      sentence_end: "of guilty.",
+      correct_word: "verdict",
+      options: ["sentence", "verdict", "decree", "order"],
+      translation: "O júri chegou a um veredito de culpado."
+    },
+    xp_reward: 200,
+    words_unlocked: ['Verdict', 'Guilty', 'Acquittal']
+  },
+  {
+    id: '3-3',
+    module: 'Criminal Law',
     title: 'Trial Vocabulary',
     description: 'Key Criminal Terms',
     type: 'matching',
-    theory: "'Guilty' (Culpado) vs 'Innocent' (Inocente). 'Bail' é fiança. 'Prosecutor' é o Promotor de Justiça.",
+    theory: "'Bail' é fiança. 'Prosecutor' é o Promotor. 'Defendant' é o Réu. 'Warrant' é o Mandado.",
     example_sentence: "The defendant was released on bail pending trial.",
     matching: {
       pairs: [
@@ -179,8 +200,14 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
 
   const [matchingItems, setMatchingItems] = useState<{id: string, text: string, type: 'term' | 'def', state: 'default' | 'selected' | 'matched' | 'wrong'}[]>([]);
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
+
+  const [fillSelected, setFillSelected] = useState<string | null>(null);
+  const [isFillCorrect, setIsFillCorrect] = useState<boolean | null>(null);
   
   const [isLoading, setIsLoading] = useState(true);
+
+  // SVG Refs para o Mapa
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Carregar dados
   useEffect(() => {
@@ -234,6 +261,10 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
       setQuizSelected(null);
       setIsQuizCorrect(null);
 
+      // Reset Fill
+      setFillSelected(null);
+      setIsFillCorrect(null);
+
       // Reset Scramble
       if (lesson.type === 'scramble' && lesson.scramble) {
          const words = lesson.scramble.sentence.split(' ').sort(() => Math.random() - 0.5);
@@ -283,7 +314,7 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
     }
   };
 
-  // --- QUIZ LOGIC ---
+  // --- EXERCISE LOGIC ---
   const checkAnswer = (idx: number) => {
     if (isQuizCorrect !== null || !currentLesson?.quiz) return;
     
@@ -300,7 +331,22 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
     }
   };
 
-  // --- SCRAMBLE LOGIC ---
+  const checkFillBlank = (word: string) => {
+    if (isFillCorrect !== null || !currentLesson?.fill_blank) return;
+
+    setFillSelected(word);
+    const correct = word === currentLesson.fill_blank.correct_word;
+    setIsFillCorrect(correct);
+
+    if (correct) {
+        playSuccessSound();
+        setTimeout(() => setLessonStep('success'), 1500);
+        confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+    } else {
+        handleWrongAnswer();
+    }
+  };
+
   const handleScrambleClick = (word: string, index: number, source: 'pool' | 'solution') => {
      if (isScrambleCorrect === true) return;
 
@@ -333,7 +379,6 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
      }
   };
 
-  // --- MATCHING LOGIC ---
   const handleMatchClick = (id: string) => {
      const clickedItem = matchingItems.find(i => i.id === id);
      if (!clickedItem || clickedItem.state === 'matched') return;
@@ -440,6 +485,26 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
     return Array.from(new Set(words)).sort();
   };
 
+  // --- RENDER MAP HELPER ---
+  // Função para desenhar a linha curva entre os botões
+  const renderMapPaths = () => {
+     // A lógica aqui é visual apenas, criando SVGs absolutos baseados no layout conhecido
+     // Simplificação: Desenhar curvas fixas assumindo a grid
+     // Em uma app real complexa, calcularíamos as posições dos refs.
+     return (
+        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-0" style={{ minHeight: '1000px' }}>
+           <path 
+             d="M 50% 100 Q 50% 200, 30% 300 T 50% 500 T 70% 700 T 50% 900" 
+             fill="none" 
+             stroke="#e2e8f0" 
+             strokeWidth="8" 
+             strokeDasharray="12 12"
+             className="dark:stroke-white/10"
+           />
+        </svg>
+     );
+  };
+
   if (isLoading || !progress) return <div className="h-full flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-sanfran-rubi"></div></div>;
 
   return (
@@ -482,46 +547,47 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
 
       {/* --- ABA TRILHA (PATH) --- */}
       {activeTab === 'path' && (
-         <div className="flex-1 overflow-y-auto custom-scrollbar relative px-4">
-            {/* Linha Central Decorativa (Zigue-Zague simulado via grid/margin) */}
-            <div className="absolute left-1/2 top-0 bottom-0 w-2 bg-slate-100 dark:bg-white/5 -translate-x-1/2 rounded-full -z-10" />
+         <div className="flex-1 overflow-y-auto custom-scrollbar relative px-4" ref={containerRef}>
+            {/* Linha Decorativa SVG */}
+            {/* Como o layout é flex column com offsets, vamos usar uma linha central simples com CSS dash por enquanto para garantir responsividade sem cálculos complexos de SVG */}
+            <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-slate-200 dark:bg-white/5 -translate-x-1/2 rounded-full -z-10 border-l-2 border-dashed border-slate-300 dark:border-white/10" />
 
-            <div className="space-y-16 pb-20 pt-8">
+            <div className="space-y-24 pb-20 pt-8">
                {MODULES.map((module, modIdx) => (
                   <div key={module} className="relative">
-                     <div className="flex justify-center mb-12 sticky top-0 z-20">
+                     <div className="flex justify-center mb-16 sticky top-0 z-20">
                         <div className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 px-6 py-2 rounded-full shadow-lg text-xs font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
-                           <Star size={12} className="text-usp-gold" fill="currentColor" /> Módulo {modIdx + 1}: {module}
+                           <Flag size={12} className="text-usp-gold" fill="currentColor" /> Módulo {modIdx + 1}: {module}
                         </div>
                      </div>
 
-                     <div className="flex flex-col gap-16 relative">
+                     <div className="flex flex-col gap-20 relative">
                         {LESSONS_DB.filter(l => l.module === module).map((lesson, idx) => {
                            const isCompleted = progress.completed_lessons.includes(lesson.id);
                            const isCurrent = lesson.id === progress.current_level_id;
                            const isLocked = !isCompleted && !isCurrent;
                            
-                           // ZigZag Logic:
-                           const offsetClass = idx % 2 === 0 ? 'md:translate-x-[-30px]' : 'md:translate-x-[30px]';
+                           // ZigZag Logic (Alternando Esquerda/Direita)
+                           const offsetClass = idx % 2 === 0 ? 'md:-translate-x-20' : 'md:translate-x-20';
                            
                            return (
-                              <div key={lesson.id} className={`flex flex-col items-center relative group ${offsetClass}`}>
+                              <div key={lesson.id} className={`flex flex-col items-center relative group transition-transform duration-500 ${offsetClass}`}>
                                  <button 
                                     onClick={() => !isLocked && startLesson(lesson.id)}
                                     disabled={isLocked}
                                     className={`
-                                       relative w-24 h-24 rounded-full border-[6px] transition-all duration-300 flex items-center justify-center shadow-xl z-10
+                                       relative w-28 h-28 rounded-[2.5rem] border-[6px] transition-all duration-300 flex items-center justify-center shadow-2xl z-10
                                        ${isCompleted ? 'bg-sky-500 border-sky-600 text-white' : 
-                                         isCurrent ? 'bg-sanfran-rubi border-[#7a0d18] text-white ring-4 ring-sanfran-rubi/20 scale-110' : 
+                                         isCurrent ? 'bg-sanfran-rubi border-[#7a0d18] text-white ring-8 ring-sanfran-rubi/20 scale-110' : 
                                          'bg-slate-200 dark:bg-white/10 border-slate-300 dark:border-white/5 text-slate-400 grayscale cursor-not-allowed'}
                                        active:scale-95 hover:scale-105
                                     `}
                                  >
-                                    {isCompleted ? <CheckCircle2 size={36} /> : isLocked ? <Lock size={32} /> : <Star size={36} fill="currentColor" />}
+                                    {isCompleted ? <CheckCircle2 size={40} /> : isLocked ? <Lock size={32} /> : <Star size={40} fill="currentColor" />}
                                     
-                                    {/* Star Rating Visualization (Simulated) */}
+                                    {/* Stars Reward Indicator */}
                                     {isCompleted && (
-                                       <div className="absolute -bottom-2 flex gap-0.5">
+                                       <div className="absolute -bottom-3 bg-white dark:bg-slate-900 px-2 py-1 rounded-full border border-slate-100 dark:border-white/10 flex gap-0.5">
                                           <Star size={10} className="text-usp-gold fill-current" />
                                           <Star size={10} className="text-usp-gold fill-current" />
                                           <Star size={10} className="text-usp-gold fill-current" />
@@ -530,8 +596,8 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
                                  </button>
 
                                  <div className={`
-                                    mt-4 bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-white/10 shadow-lg text-center w-48 z-10 transition-all
-                                    ${isLocked ? 'opacity-50 grayscale' : 'opacity-100'}
+                                    mt-5 bg-white dark:bg-slate-800 p-4 rounded-2xl border-2 border-slate-100 dark:border-white/5 shadow-xl text-center w-56 z-10 transition-all
+                                    ${isLocked ? 'opacity-50 grayscale blur-[1px]' : 'opacity-100'}
                                  `}>
                                     <p className="text-[9px] font-black uppercase text-slate-400 mb-1 tracking-widest">Lição {idx + 1}</p>
                                     <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight">{lesson.title}</p>
@@ -758,8 +824,50 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
                         </>
                      )}
 
+                     {/* TIPO 4: FILL IN THE BLANK (NOVO) */}
+                     {currentLesson.type === 'fill_blank' && currentLesson.fill_blank && (
+                        <>
+                           <h3 className="text-xl font-bold text-slate-900 dark:text-white leading-tight mb-2">Complete a Lacuna</h3>
+                           <p className="text-sm font-serif italic text-slate-600 dark:text-slate-400 mb-8">"{currentLesson.fill_blank.translation}"</p>
+                           
+                           <div className="text-2xl font-bold text-slate-900 dark:text-white mb-10 leading-relaxed text-center">
+                              {currentLesson.fill_blank.sentence_start} 
+                              <span className={`mx-2 inline-block min-w-[100px] border-b-4 text-center ${isFillCorrect === true ? 'border-emerald-500 text-emerald-600' : isFillCorrect === false ? 'border-red-500 text-red-600' : 'border-slate-300 text-slate-400'}`}>
+                                 {fillSelected || "____"}
+                              </span>
+                              {currentLesson.fill_blank.sentence_end}
+                           </div>
+
+                           <div className="grid grid-cols-2 gap-4">
+                              {currentLesson.fill_blank.options.map((opt, idx) => {
+                                 const isCorrect = opt === currentLesson.fill_blank?.correct_word;
+                                 let btnClass = "bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:border-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/20";
+                                 
+                                 // Feedback visual após seleção
+                                 if (fillSelected) {
+                                    if (fillSelected === opt) {
+                                       if (isFillCorrect) btnClass = "bg-emerald-500 border-emerald-600 text-white shadow-emerald-500/30";
+                                       else btnClass = "bg-red-500 border-red-600 text-white shadow-red-500/30 animate-shake";
+                                    }
+                                 }
+
+                                 return (
+                                    <button
+                                       key={idx}
+                                       onClick={() => checkFillBlank(opt)}
+                                       disabled={fillSelected !== null}
+                                       className={`p-6 rounded-2xl border-b-4 font-bold text-center transition-all text-lg shadow-sm ${btnClass}`}
+                                    >
+                                       {opt}
+                                    </button>
+                                 );
+                              })}
+                           </div>
+                        </>
+                     )}
+
                      {/* Feedback Panel (Generico para Erros) */}
-                     {(isQuizCorrect === false || isScrambleCorrect === false) && (
+                     {(isQuizCorrect === false || isScrambleCorrect === false || isFillCorrect === false) && (
                         <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-2xl border border-red-200 dark:border-red-800 text-left animate-in slide-in-from-bottom-2">
                            <p className="text-red-600 dark:text-red-400 font-bold text-sm mb-1">Incorreto</p>
                            <p className="text-red-800 dark:text-red-200 text-xs">Você perdeu uma vida.</p>

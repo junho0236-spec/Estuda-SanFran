@@ -362,7 +362,7 @@ export interface IdiomaLesson {
   description: string;
   theory: string;
   example_sentence: string;
-  type?: 'quiz' | 'scramble' | 'matching'; // Suporte para 3 tipos de exercício
+  type?: 'quiz' | 'scramble' | 'matching' | 'fill_blank'; // Adicionado fill_blank
   scramble?: {
     sentence: string;
     translation: string;
@@ -375,6 +375,13 @@ export interface IdiomaLesson {
   };
   matching?: {
     pairs: { term: string; translation: string }[];
+  };
+  fill_blank?: {
+    sentence_start: string; // Parte antes da lacuna
+    sentence_end: string;   // Parte depois da lacuna
+    correct_word: string;   // A palavra que falta
+    options: string[];      // Opções para a lacuna
+    translation: string;
   };
   xp_reward: number;
   words_unlocked: string[]; // Termos chave aprendidos na lição para o glossário
