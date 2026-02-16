@@ -1,3 +1,4 @@
+import React from 'react';
 
 export enum View {
   Dashboard = 'dashboard',
@@ -35,7 +36,10 @@ export enum View {
   Honorarios = 'honorarios',
   Checklist = 'checklist',
   InvestigationBoard = 'investigation_board',
-  LatinGame = 'latin_game'
+  LatinGame = 'latin_game',
+  SucessaoSimulator = 'sucessao_simulator',
+  JurisTinder = 'juris_tinder',
+  InternRPG = 'intern_rpg'
 }
 
 export interface Folder {
@@ -308,4 +312,41 @@ export interface LatinTerm {
   term: string;
   meaning: string;
   difficulty?: string;
+}
+
+// Juris Tinder Types
+export interface JurisTinderCard {
+  id: string;
+  theme: string;
+  case_scenario: string; // O caso concreto resumido
+  is_procedent: boolean; // true = deferido/procedente, false = indeferido
+  ruling_summary: string; // Explicação da decisão
+  source: string; // e.g. "Súmula Vinculante 12"
+}
+
+// InternRPG Types
+export interface RPGStat {
+  label: string;
+  value: number;
+  max: number;
+  color: string;
+}
+
+export interface RPGChoice {
+  text: string;
+  nextId: string;
+  effect?: {
+    sanity?: number;
+    reputation?: number;
+    energy?: number;
+  };
+  feedback?: string;
+}
+
+export interface RPGScenario {
+  id: string;
+  title: string;
+  text: string;
+  choices: RPGChoice[];
+  image?: React.ElementType; // Icon
 }
