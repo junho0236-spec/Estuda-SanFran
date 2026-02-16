@@ -1,11 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StudySession } from '../types';
 import { 
   Layout, Palette, Armchair, Monitor, Trophy, Lock, CheckCircle2, 
   Save, Moon, Sun, MousePointer2, Maximize2, Scale, Gavel, 
-  Coffee, Book, Flower2, Lamp, Frame
+  Coffee, Book, Flower2, Lamp, Frame, Gift, Package, Sparkles, X, Star
 } from 'lucide-react';
+import confetti from 'canvas-confetti'; // Vamos simular confetti com CSS se não tiver a lib, mas farei visual puro CSS.
 
 interface VirtualOfficeProps {
   studySessions: StudySession[];
@@ -14,79 +15,80 @@ interface VirtualOfficeProps {
 
 // --- TIPOS ---
 type ItemCategory = 'wall' | 'floor' | 'window' | 'desk' | 'chair' | 'rug' | 'decor_left' | 'decor_right' | 'desktop';
+type Rarity = 'common' | 'rare' | 'epic' | 'legendary';
 
 interface OfficeItem {
   id: string;
   name: string;
-  hoursRequired: number;
   description: string;
-  rarity: 'common' | 'rare' | 'epic' | 'legendary';
+  rarity: Rarity;
+  isDefault?: boolean; // Se o item já vem liberado no início
 }
 
 // --- CATÁLOGO DE ITENS ---
 const CATALOG: Record<ItemCategory, OfficeItem[]> = {
   wall: [
-    { id: 'wall_white', name: 'Alvenaria Branca', hoursRequired: 0, description: 'Simples e limpo.', rarity: 'common' },
-    { id: 'wall_concrete', name: 'Concreto Aparente', hoursRequired: 20, description: 'Estilo industrial moderno.', rarity: 'common' },
-    { id: 'wall_navy', name: 'Azul Petróleo', hoursRequired: 100, description: 'Foco e serenidade.', rarity: 'rare' },
-    { id: 'wall_classic', name: 'Boiserie Creme', hoursRequired: 300, description: 'Clássico advocatício.', rarity: 'rare' },
-    { id: 'wall_wood', name: 'Painel de Nogueira', hoursRequired: 700, description: 'Revestimento de alto padrão.', rarity: 'epic' },
-    { id: 'wall_marble', name: 'Mármore Carrara', hoursRequired: 1500, description: 'O ápice do luxo.', rarity: 'legendary' },
+    { id: 'wall_white', name: 'Alvenaria Branca', description: 'Simples e limpo.', rarity: 'common', isDefault: true },
+    { id: 'wall_concrete', name: 'Concreto Aparente', description: 'Estilo industrial moderno.', rarity: 'common' },
+    { id: 'wall_navy', name: 'Azul Petróleo', description: 'Foco e serenidade.', rarity: 'rare' },
+    { id: 'wall_classic', name: 'Boiserie Creme', description: 'Clássico advocatício.', rarity: 'rare' },
+    { id: 'wall_wood', name: 'Painel de Nogueira', description: 'Revestimento de alto padrão.', rarity: 'epic' },
+    { id: 'wall_marble', name: 'Mármore Carrara', description: 'O ápice do luxo.', rarity: 'legendary' },
   ],
   floor: [
-    { id: 'floor_concrete', name: 'Cimento Queimado', hoursRequired: 0, description: 'Frio e funcional.', rarity: 'common' },
-    { id: 'floor_laminate', name: 'Laminado Carvalho', hoursRequired: 20, description: 'Aconchego básico.', rarity: 'common' },
-    { id: 'floor_herringbone', name: 'Taco Espinha de Peixe', hoursRequired: 150, description: 'Tradicional de SP.', rarity: 'rare' },
-    { id: 'floor_darkwood', name: 'Ébano Envelhecido', hoursRequired: 500, description: 'Madeira nobre.', rarity: 'epic' },
-    { id: 'floor_marble', name: 'Mármore Negro', hoursRequired: 1500, description: 'Reflete seu sucesso.', rarity: 'legendary' },
+    { id: 'floor_concrete', name: 'Cimento Queimado', description: 'Frio e funcional.', rarity: 'common', isDefault: true },
+    { id: 'floor_laminate', name: 'Laminado Carvalho', description: 'Aconchego básico.', rarity: 'common' },
+    { id: 'floor_herringbone', name: 'Taco Espinha de Peixe', description: 'Tradicional de SP.', rarity: 'rare' },
+    { id: 'floor_darkwood', name: 'Ébano Envelhecido', description: 'Madeira nobre.', rarity: 'epic' },
+    { id: 'floor_marble', name: 'Mármore Negro', description: 'Reflete seu sucesso.', rarity: 'legendary' },
   ],
   window: [
-    { id: 'win_basement', name: 'Janela Alta', hoursRequired: 0, description: 'Entra pouca luz.', rarity: 'common' },
-    { id: 'win_standard', name: 'Janela Padrão', hoursRequired: 50, description: 'Vista para o prédio vizinho.', rarity: 'common' },
-    { id: 'win_large', name: 'Janela Panorâmica', hoursRequired: 200, description: 'Muita luz natural.', rarity: 'rare' },
-    { id: 'win_arch', name: 'Arco das Arcadas', hoursRequired: 600, description: 'Estilo colonial.', rarity: 'epic' },
-    { id: 'win_glass', name: 'Parede de Vidro', hoursRequired: 1200, description: 'Vista da Faria Lima.', rarity: 'legendary' },
+    { id: 'win_basement', name: 'Janela Alta', description: 'Entra pouca luz.', rarity: 'common', isDefault: true },
+    { id: 'win_standard', name: 'Janela Padrão', description: 'Vista para o prédio vizinho.', rarity: 'common' },
+    { id: 'win_large', name: 'Janela Panorâmica', description: 'Muita luz natural.', rarity: 'rare' },
+    { id: 'win_arch', name: 'Arco das Arcadas', description: 'Estilo colonial.', rarity: 'epic' },
+    { id: 'win_glass', name: 'Parede de Vidro', description: 'Vista da Faria Lima.', rarity: 'legendary' },
   ],
   desk: [
-    { id: 'desk_door', name: 'Porta e Cavaletes', hoursRequired: 0, description: 'O começo de tudo.', rarity: 'common' },
-    { id: 'desk_white', name: 'Mesa MDF Branca', hoursRequired: 30, description: 'Funcional e barata.', rarity: 'common' },
-    { id: 'desk_wood', name: 'Escrivaninha Mogno', hoursRequired: 150, description: 'Sólida e respeitável.', rarity: 'rare' },
-    { id: 'desk_l', name: 'Estação em L', hoursRequired: 400, description: 'Muito espaço para processos.', rarity: 'epic' },
-    { id: 'desk_president', name: 'Mesa Presidencial', hoursRequired: 1000, description: 'Madeira maciça esculpida.', rarity: 'legendary' },
+    { id: 'desk_door', name: 'Porta e Cavaletes', description: 'O começo de tudo.', rarity: 'common', isDefault: true },
+    { id: 'desk_white', name: 'Mesa MDF Branca', description: 'Funcional e barata.', rarity: 'common' },
+    { id: 'desk_wood', name: 'Escrivaninha Mogno', description: 'Sólida e respeitável.', rarity: 'rare' },
+    { id: 'desk_l', name: 'Estação em L', description: 'Muito espaço para processos.', rarity: 'epic' },
+    { id: 'desk_president', name: 'Mesa Presidencial', description: 'Madeira maciça esculpida.', rarity: 'legendary' },
   ],
   chair: [
-    { id: 'chair_plastic', name: 'Cadeira de Plástico', hoursRequired: 0, description: 'Temporária (esperamos).', rarity: 'common' },
-    { id: 'chair_office', name: 'Cadeira Secretária', hoursRequired: 20, description: 'Rodinhas que travam.', rarity: 'common' },
-    { id: 'chair_gamer', name: 'Ergonômica Mesh', hoursRequired: 100, description: 'Cuide da sua lombar.', rarity: 'rare' },
-    { id: 'chair_leather', name: 'Poltrona Executiva', hoursRequired: 500, description: 'Couro sintético premium.', rarity: 'epic' },
-    { id: 'chair_magistrate', name: 'Trono do Juiz', hoursRequired: 1500, description: 'Veludo vermelho e ouro.', rarity: 'legendary' },
+    { id: 'chair_plastic', name: 'Cadeira de Plástico', description: 'Temporária (esperamos).', rarity: 'common', isDefault: true },
+    { id: 'chair_office', name: 'Cadeira Secretária', description: 'Rodinhas que travam.', rarity: 'common' },
+    { id: 'chair_gamer', name: 'Ergonômica Mesh', description: 'Cuide da sua lombar.', rarity: 'rare' },
+    { id: 'chair_leather', name: 'Poltrona Executiva', description: 'Couro sintético premium.', rarity: 'epic' },
+    { id: 'chair_magistrate', name: 'Trono do Juiz', description: 'Veludo vermelho e ouro.', rarity: 'legendary' },
   ],
   rug: [
-    { id: 'rug_none', name: 'Sem Tapete', hoursRequired: 0, description: 'Fácil de limpar.', rarity: 'common' },
-    { id: 'rug_grey', name: 'Tapete Cinza', hoursRequired: 40, description: 'Discreto.', rarity: 'common' },
-    { id: 'rug_persian', name: 'Tapete Persa', hoursRequired: 300, description: 'Herança de família.', rarity: 'epic' },
-    { id: 'rug_sanfran', name: 'Brasão XI de Agosto', hoursRequired: 800, description: 'Orgulho acadêmico.', rarity: 'legendary' },
+    { id: 'rug_none', name: 'Sem Tapete', description: 'Fácil de limpar.', rarity: 'common', isDefault: true },
+    { id: 'rug_grey', name: 'Tapete Cinza', description: 'Discreto.', rarity: 'common' },
+    { id: 'rug_persian', name: 'Tapete Persa', description: 'Herança de família.', rarity: 'epic' },
+    { id: 'rug_sanfran', name: 'Brasão XI de Agosto', description: 'Orgulho acadêmico.', rarity: 'legendary' },
   ],
   decor_left: [
-    { id: 'none', name: 'Vazio', hoursRequired: 0, description: '', rarity: 'common' },
-    { id: 'plant_pothos', name: 'Jiboia no Vaso', hoursRequired: 10, description: 'Purifica o ar.', rarity: 'common' },
-    { id: 'lamp_floor', name: 'Luminária de Piso', hoursRequired: 80, description: 'Luz indireta.', rarity: 'common' },
-    { id: 'bookshelf_small', name: 'Estante Baixa', hoursRequired: 200, description: 'Vade Mecum e Doutrinas.', rarity: 'rare' },
-    { id: 'statue_themis', name: 'Estátua da Justiça', hoursRequired: 600, description: 'Cega e imparcial.', rarity: 'epic' },
+    { id: 'none', name: 'Vazio', description: '', rarity: 'common', isDefault: true },
+    { id: 'plant_pothos', name: 'Jiboia no Vaso', description: 'Purifica o ar.', rarity: 'common' },
+    { id: 'lamp_floor', name: 'Luminária de Piso', description: 'Luz indireta.', rarity: 'common' },
+    { id: 'bookshelf_small', name: 'Estante Baixa', description: 'Vade Mecum e Doutrinas.', rarity: 'rare' },
+    { id: 'statue_themis', name: 'Estátua da Justiça', description: 'Cega e imparcial.', rarity: 'epic' },
   ],
   decor_right: [
-    { id: 'none', name: 'Vazio', hoursRequired: 0, description: '', rarity: 'common' },
-    { id: 'diploma', name: 'Diploma Moldurado', hoursRequired: 50, description: 'Sua credencial.', rarity: 'common' },
-    { id: 'painting_abstract', name: 'Arte Abstrata', hoursRequired: 150, description: 'Toque de cor.', rarity: 'rare' },
-    { id: 'clock_wall', name: 'Relógio Antigo', hoursRequired: 300, description: 'O tempo ruge.', rarity: 'rare' },
-    { id: 'bookshelf_tall', name: 'Biblioteca Parede', hoursRequired: 900, description: 'Conhecimento infinito.', rarity: 'legendary' },
+    { id: 'none', name: 'Vazio', description: '', rarity: 'common', isDefault: true },
+    { id: 'diploma', name: 'Diploma Moldurado', description: 'Sua credencial.', rarity: 'common' },
+    { id: 'painting_abstract', name: 'Arte Abstrata', description: 'Toque de cor.', rarity: 'rare' },
+    { id: 'clock_wall', name: 'Relógio Antigo', description: 'O tempo ruge.', rarity: 'rare' },
+    { id: 'bookshelf_tall', name: 'Biblioteca Parede', description: 'Conhecimento infinito.', rarity: 'legendary' },
   ],
   desktop: [
-    { id: 'none', name: 'Mesa Limpa', hoursRequired: 0, description: 'Foco total.', rarity: 'common' },
-    { id: 'messy_papers', name: 'Pilhas de Processos', hoursRequired: 10, description: 'Vida de estagiário.', rarity: 'common' },
-    { id: 'laptop_coffee', name: 'Notebook e Café', hoursRequired: 50, description: 'Setup padrão.', rarity: 'common' },
-    { id: 'dual_monitor', name: 'Monitores Duplos', hoursRequired: 250, description: 'Multitarefa suprema.', rarity: 'epic' },
-    { id: 'gavel_set', name: 'Martelo e Livros', hoursRequired: 1000, description: 'Autoridade.', rarity: 'legendary' },
+    { id: 'none', name: 'Mesa Limpa', description: 'Foco total.', rarity: 'common', isDefault: true },
+    { id: 'messy_papers', name: 'Pilhas de Processos', description: 'Vida de estagiário.', rarity: 'common' },
+    { id: 'laptop_coffee', name: 'Notebook e Café', description: 'Setup padrão.', rarity: 'common' },
+    { id: 'dual_monitor', name: 'Monitores Duplos', description: 'Multitarefa suprema.', rarity: 'epic' },
+    { id: 'gavel_set', name: 'Martelo e Livros', description: 'Autoridade.', rarity: 'legendary' },
   ]
 };
 
@@ -107,23 +109,158 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState<ItemCategory>('desk');
   const [isNight, setIsNight] = useState(false);
+  
+  // --- STATE DO GACHA ---
+  const [inventory, setInventory] = useState<string[]>([]);
+  const [availableBoxes, setAvailableBoxes] = useState(0);
+  const [totalBoxesEarned, setTotalBoxesEarned] = useState(0); // Histórico para não dar caixas repetidas
+  const [isOpeningBox, setIsOpeningBox] = useState(false);
+  const [wonItem, setWonItem] = useState<{item: OfficeItem, category: ItemCategory} | null>(null);
 
-  const totalHours = studySessions.reduce((acc, s) => acc + (Number(s.duration) || 0), 0) / 3600;
+  const totalSeconds = studySessions.reduce((acc, s) => acc + (Number(s.duration) || 0), 0);
+  const totalHours = totalSeconds / 3600;
 
+  // Inicialização e Carregamento
   useEffect(() => {
-    const saved = localStorage.getItem(`sanfran_office_v2_${userName}`);
-    if (saved) {
-      try { setConfig({ ...DEFAULT_CONFIG, ...JSON.parse(saved) }); } catch (e) {}
+    // 1. Carregar Configuração da Sala
+    const savedConfig = localStorage.getItem(`sanfran_office_v2_${userName}`);
+    if (savedConfig) {
+      try { setConfig({ ...DEFAULT_CONFIG, ...JSON.parse(savedConfig) }); } catch (e) {}
     }
-    // Auto day/night based on hour
+
+    // 2. Carregar Inventário e Caixas
+    const savedInventory = localStorage.getItem(`sanfran_inventory_${userName}`);
+    const savedBoxes = localStorage.getItem(`sanfran_boxes_${userName}`);
+    const savedTotalEarned = localStorage.getItem(`sanfran_boxes_earned_${userName}`);
+
+    if (savedInventory) {
+      setInventory(JSON.parse(savedInventory));
+    } else {
+      // Inventário inicial (apenas itens default)
+      const initialItems: string[] = [];
+      Object.values(CATALOG).forEach(categoryItems => {
+        categoryItems.forEach(item => {
+          if (item.isDefault) initialItems.push(item.id);
+        });
+      });
+      setInventory(initialItems);
+    }
+
+    if (savedBoxes) setAvailableBoxes(parseInt(savedBoxes));
+    if (savedTotalEarned) setTotalBoxesEarned(parseInt(savedTotalEarned));
+
+    // Auto day/night
     const hour = new Date().getHours();
     setIsNight(hour < 6 || hour > 18);
   }, [userName]);
+
+  // Lógica de Ganhar Caixas (A cada 20h)
+  useEffect(() => {
+    const boxesShouldHave = Math.floor(totalHours / 20);
+    
+    if (boxesShouldHave > totalBoxesEarned) {
+      const newBoxes = boxesShouldHave - totalBoxesEarned;
+      
+      const updatedTotal = totalBoxesEarned + newBoxes;
+      const updatedAvailable = availableBoxes + newBoxes;
+
+      setTotalBoxesEarned(updatedTotal);
+      setAvailableBoxes(updatedAvailable);
+
+      localStorage.setItem(`sanfran_boxes_earned_${userName}`, updatedTotal.toString());
+      localStorage.setItem(`sanfran_boxes_${userName}`, updatedAvailable.toString());
+      
+      // Notificação simples (poderia ser um toast)
+      // alert(`Você ganhou ${newBoxes} nova(s) caixa(s) por seus estudos!`);
+    }
+  }, [totalHours, totalBoxesEarned, availableBoxes, userName]);
+
+  // Salvar Inventário ao mudar
+  useEffect(() => {
+    if (inventory.length > 0) {
+      localStorage.setItem(`sanfran_inventory_${userName}`, JSON.stringify(inventory));
+    }
+  }, [inventory, userName]);
+
+  // Salvar Caixas Disponíveis ao mudar
+  useEffect(() => {
+    localStorage.setItem(`sanfran_boxes_${userName}`, availableBoxes.toString());
+  }, [availableBoxes, userName]);
+
 
   const handleSelect = (category: ItemCategory, id: string) => {
     const newConfig = { ...config, [category]: id };
     setConfig(newConfig);
     localStorage.setItem(`sanfran_office_v2_${userName}`, JSON.stringify(newConfig));
+  };
+
+  // --- LÓGICA DO GACHA (ABRIR CAIXA) ---
+  const openBox = () => {
+    if (availableBoxes <= 0) return;
+
+    setIsOpeningBox(true);
+    setAvailableBoxes(prev => prev - 1);
+
+    // Tempo da animação "shaking"
+    setTimeout(() => {
+      // 1. Definir Raridade
+      const roll = Math.random() * 100;
+      let rarity: Rarity = 'common';
+      if (roll > 99) rarity = 'legendary';      // 1%
+      else if (roll > 90) rarity = 'epic';      // 9%
+      else if (roll > 60) rarity = 'rare';      // 30%
+      else rarity = 'common';                   // 60%
+
+      // 2. Filtrar Itens Possíveis dessa Raridade que o usuário NÃO tem (prioridade)
+      let pool: {item: OfficeItem, category: ItemCategory}[] = [];
+      
+      Object.entries(CATALOG).forEach(([cat, items]) => {
+        items.forEach(item => {
+          if (item.rarity === rarity) {
+            pool.push({ item, category: cat as ItemCategory });
+          }
+        });
+      });
+
+      // Filtrar não possuídos
+      const unowned = pool.filter(p => !inventory.includes(p.item.id));
+      
+      let finalPick;
+      if (unowned.length > 0) {
+        finalPick = unowned[Math.floor(Math.random() * unowned.length)];
+      } else {
+        // Se já tem todos daquela raridade, pega um repetido (ou poderia dar um upgrade, mas vamos simplificar)
+        // Vamos dar um fallback para uma raridade diferente se possível, ou apenas dar repetido.
+        finalPick = pool[Math.floor(Math.random() * pool.length)];
+      }
+
+      // Se por azar o pool estiver vazio (ex: sem lendários no catálogo), fallback para comum
+      if (!finalPick) {
+         // Fallback seguro
+         const fallbackItem = CATALOG.desk[0];
+         finalPick = { item: fallbackItem, category: 'desk' as ItemCategory};
+      }
+
+      // 3. Adicionar ao Inventário (Set para evitar duplicatas técnicas, embora a lógica acima priorize novos)
+      if (!inventory.includes(finalPick.item.id)) {
+        setInventory(prev => [...prev, finalPick.item.id]);
+      }
+
+      setWonItem(finalPick);
+      
+    }, 2000); // 2 segundos de suspense
+  };
+
+  const closeBoxModal = () => {
+    setIsOpeningBox(false);
+    setWonItem(null);
+  };
+
+  const equipItem = () => {
+    if (wonItem) {
+      handleSelect(wonItem.category, wonItem.item.id);
+      closeBoxModal();
+    }
   };
 
   // --- RENDERERS DE CSS ART (O "Motor Gráfico") ---
@@ -135,7 +272,7 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
     if (style === 'wall_navy') bgClass = "bg-[#1e293b]";
     if (style === 'wall_classic') bgClass = "bg-[#fdfbf7]";
     if (style === 'wall_wood') bgClass = "bg-[#4a3b32]";
-    if (style === 'wall_marble') bgClass = "bg-slate-100"; // Simplificado
+    if (style === 'wall_marble') bgClass = "bg-slate-100"; 
 
     return (
       <div className={`absolute inset-0 ${bgClass} transition-colors duration-1000`}>
@@ -439,10 +576,10 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
 
   const getRarityColor = (rarity: string) => {
     switch (rarity) {
-      case 'common': return 'text-slate-500';
-      case 'rare': return 'text-blue-500';
-      case 'epic': return 'text-purple-600';
-      case 'legendary': return 'text-yellow-600';
+      case 'common': return 'text-slate-500 bg-slate-100 border-slate-200';
+      case 'rare': return 'text-blue-600 bg-blue-50 border-blue-200';
+      case 'epic': return 'text-purple-600 bg-purple-50 border-purple-200';
+      case 'legendary': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
       default: return 'text-slate-500';
     }
   };
@@ -454,14 +591,35 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
       <div className="flex flex-col md:flex-row justify-between items-end mb-6 gap-4">
         <div>
           <h2 className="text-4xl md:text-5xl font-black text-slate-950 dark:text-white uppercase tracking-tighter">Gabinete Virtual</h2>
-          <p className="text-slate-500 font-bold italic text-sm md:text-lg">Construa seu império jurídico, hora após hora.</p>
+          <p className="text-slate-500 font-bold italic text-sm md:text-lg">Construa seu império jurídico, caixa por caixa.</p>
         </div>
         
         <div className="flex gap-2">
+           {/* BOTÃO DA CAIXA DE RECOMPENSAS */}
+           <button 
+             onClick={openBox}
+             disabled={availableBoxes <= 0}
+             className={`group relative px-6 py-2 rounded-xl flex items-center gap-3 border-2 transition-all shadow-lg ${availableBoxes > 0 ? 'bg-sanfran-rubi border-sanfran-rubi text-white hover:scale-105 hover:bg-sanfran-rubiDark' : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-400 cursor-not-allowed'}`}
+           >
+              <div className="relative">
+                 <Gift className={`w-5 h-5 ${availableBoxes > 0 ? 'animate-bounce' : ''}`} />
+                 {availableBoxes > 0 && (
+                   <span className="absolute -top-2 -right-2 w-4 h-4 bg-usp-gold text-slate-900 rounded-full text-[9px] font-black flex items-center justify-center shadow-sm">
+                     {availableBoxes}
+                   </span>
+                 )}
+              </div>
+              <div className="text-left">
+                 <p className="text-[8px] font-black uppercase tracking-widest opacity-80">SanFran Box</p>
+                 <p className="text-xs font-black uppercase tracking-tight leading-none">{availableBoxes > 0 ? 'Abrir Agora' : `${(20 - (totalHours % 20)).toFixed(1)}h p/ próxima`}</p>
+              </div>
+           </button>
+
            <div className="bg-slate-100 dark:bg-white/10 px-4 py-2 rounded-xl flex items-center gap-2 border border-slate-200 dark:border-white/10">
               <Trophy className="w-4 h-4 text-usp-gold" />
               <span className="font-black text-slate-900 dark:text-white tabular-nums">{totalHours.toFixed(1)}h</span>
            </div>
+           
            <button 
              onClick={() => setIsNight(!isNight)} 
              className="p-3 rounded-xl bg-slate-100 dark:bg-white/10 text-slate-500 hover:text-sanfran-rubi transition-colors"
@@ -470,7 +628,7 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
            </button>
            <button 
              onClick={() => setIsEditing(!isEditing)} 
-             className={`flex items-center gap-2 px-6 py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-all shadow-lg ${isEditing ? 'bg-sanfran-rubi text-white' : 'bg-white dark:bg-sanfran-rubiDark/40 text-slate-900 dark:text-white border border-slate-200 dark:border-sanfran-rubi/30'}`}
+             className={`flex items-center gap-2 px-6 py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-all shadow-lg ${isEditing ? 'bg-white text-sanfran-rubi border-2 border-sanfran-rubi' : 'bg-white dark:bg-sanfran-rubiDark/40 text-slate-900 dark:text-white border border-slate-200 dark:border-sanfran-rubi/30'}`}
            >
              {isEditing ? <CheckCircle2 size={16} /> : <Palette size={16} />}
              {isEditing ? 'Concluir' : 'Decorar'}
@@ -513,7 +671,46 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
 
       </div>
 
-      {/* --- UI DE CUSTOMIZAÇÃO (LOJA) --- */}
+      {/* --- MODAL DE GACHA OPENING --- */}
+      {isOpeningBox && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+           {!wonItem ? (
+             <div className="flex flex-col items-center animate-bounce-slow">
+                <div className="relative">
+                   <div className="absolute inset-0 bg-sanfran-rubi blur-3xl opacity-50 animate-pulse"></div>
+                   <Package size={150} className="text-white relative z-10 animate-shake" />
+                </div>
+                <p className="text-white font-black uppercase tracking-[0.5em] mt-8 animate-pulse">Abrindo Caixa...</p>
+             </div>
+           ) : (
+             <div className="bg-white dark:bg-[#1a0505] p-10 rounded-[3rem] shadow-2xl flex flex-col items-center max-w-sm w-full mx-4 border-4 border-sanfran-rubi animate-in zoom-in duration-500 relative overflow-hidden">
+                {/* Raios de luz de fundo */}
+                <div className="absolute inset-0 bg-[conic-gradient(at_center,_var(--tw-gradient-stops))] from-white via-sanfran-rubi/20 to-white opacity-50 animate-spin-slow pointer-events-none"></div>
+                
+                <div className="relative z-10 flex flex-col items-center text-center">
+                   <div className={`w-32 h-32 rounded-full flex items-center justify-center mb-6 shadow-xl ${getRarityColor(wonItem.item.rarity)}`}>
+                      {/* Ícone Genérico baseado na categoria, poderia ser específico */}
+                      <Gift size={64} /> 
+                   </div>
+                   
+                   <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full mb-4 border ${getRarityColor(wonItem.item.rarity)}`}>
+                      {wonItem.item.rarity === 'legendary' ? 'Item Lendário' : wonItem.item.rarity === 'epic' ? 'Item Épico' : wonItem.item.rarity === 'rare' ? 'Item Raro' : 'Item Comum'}
+                   </span>
+
+                   <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight leading-none mb-2">{wonItem.item.name}</h3>
+                   <p className="text-xs text-slate-500 font-bold mb-8">{wonItem.item.description}</p>
+
+                   <div className="flex gap-3 w-full">
+                      <button onClick={closeBoxModal} className="flex-1 py-4 bg-slate-100 dark:bg-white/10 text-slate-500 rounded-2xl font-black uppercase text-xs">Guardar</button>
+                      <button onClick={equipItem} className="flex-1 py-4 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs shadow-lg">Equipar</button>
+                   </div>
+                </div>
+             </div>
+           )}
+        </div>
+      )}
+
+      {/* --- UI DE CUSTOMIZAÇÃO (LOJA / INVENTÁRIO) --- */}
       {isEditing && (
         <div className="mt-6 bg-white dark:bg-[#0d0303] rounded-[2rem] border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl overflow-hidden animate-in slide-in-from-bottom-10 flex flex-col md:flex-row h-[400px]">
            
@@ -544,7 +741,7 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
            <div className="flex-1 p-6 overflow-y-auto custom-scrollbar bg-slate-100/50 dark:bg-black/20">
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                  {CATALOG[activeTab].map(item => {
-                    const isUnlocked = totalHours >= item.hoursRequired;
+                    const isUnlocked = inventory.includes(item.id);
                     const isSelected = config[activeTab] === item.id;
                     
                     return (
@@ -557,7 +754,7 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
                              ? 'border-sanfran-rubi bg-white dark:bg-white/10 ring-2 ring-sanfran-rubi/20 shadow-xl' 
                              : isUnlocked 
                                 ? 'border-slate-200 dark:border-white/5 bg-white dark:bg-white/5 hover:border-slate-300 hover:-translate-y-1 hover:shadow-md' 
-                                : 'border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-black/40 opacity-50 cursor-not-allowed grayscale'
+                                : 'border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-black/40 opacity-60 cursor-not-allowed grayscale'
                         }`}
                       >
                          <div className="flex justify-between items-start mb-2">
@@ -567,7 +764,7 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
                                item.rarity === 'rare' ? 'bg-blue-100 text-blue-700 border-blue-200' :
                                'bg-slate-100 text-slate-500 border-slate-200'
                             }`}>
-                               {item.rarity}
+                               {item.rarity.charAt(0).toUpperCase()}
                             </span>
                             {isSelected && <CheckCircle2 size={16} className="text-sanfran-rubi" />}
                             {!isUnlocked && <Lock size={14} className="text-slate-400" />}
@@ -580,7 +777,9 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
 
                          {!isUnlocked && (
                            <div className="mt-auto pt-2 border-t border-dashed border-slate-200 dark:border-white/10">
-                              <p className="text-[9px] font-black text-red-500 uppercase">Requer {item.hoursRequired}h</p>
+                              <p className="text-[9px] font-black text-slate-400 uppercase flex items-center gap-1">
+                                <Package size={10} /> Em Caixas
+                              </p>
                            </div>
                          )}
                       </button>
