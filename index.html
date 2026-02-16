@@ -30,6 +30,22 @@
                 blue: '#1094ab',
                 gold: '#fcb421',
               }
+            },
+            keyframes: {
+              shake: {
+                '0%, 100%': { transform: 'translateX(0)' },
+                '25%': { transform: 'translateX(-5px)' },
+                '75%': { transform: 'translateX(5px)' },
+              },
+              flicker: {
+                '0%, 100%': { opacity: '1' },
+                '50%': { opacity: '0.8' },
+              }
+            },
+            animation: {
+              'bounce-slow': 'bounce 3s infinite',
+              'shake': 'shake 0.4s ease-in-out',
+              'flicker': 'flicker 0.2s infinite',
             }
           }
         }
@@ -43,6 +59,17 @@
         .dark ::-webkit-scrollbar { width: 8px; }
         .dark ::-webkit-scrollbar-track { background: #1a0505; }
         .dark ::-webkit-scrollbar-thumb { background: #9B111E; border-radius: 10px; }
+        /* Utilitários extras para animações de entrada */
+        .animate-in { animation-duration: 0.5s; animation-fill-mode: both; }
+        .fade-in { animation-name: fadeIn; }
+        .slide-in-from-bottom-10 { animation-name: slideInBottom; }
+        .slide-in-from-top-4 { animation-name: slideInTop; }
+        .zoom-in-95 { animation-name: zoomIn; }
+        
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideInBottom { from { transform: translateY(2.5rem); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes slideInTop { from { transform: translateY(-1rem); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes zoomIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
     </style>
 <script type="importmap">
 {

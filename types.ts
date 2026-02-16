@@ -362,13 +362,19 @@ export interface IdiomaLesson {
   description: string;
   theory: string;
   example_sentence: string;
-  quiz: {
+  type?: 'quiz' | 'scramble'; // Support for different exercise types
+  scramble?: {
+    sentence: string;
+    translation: string;
+  };
+  quiz?: {
     question: string;
     options: string[];
     answer: number;
     explanation: string;
   };
   xp_reward: number;
+  words_unlocked: string[]; // Termos chave aprendidos na lição para o glossário
 }
 
 export interface IdiomaProgress {

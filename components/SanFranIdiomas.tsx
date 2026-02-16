@@ -1,122 +1,163 @@
-import React, { useState, useEffect } from 'react';
-import { Globe, BookOpen, CheckCircle2, Lock, ArrowRight, X, Heart, Star, Flame, Trophy, FileText, Scale, Quote } from 'lucide-react';
+
+import React, { useState, useEffect, useRef } from 'react';
+import { Globe, BookOpen, CheckCircle2, Lock, X, Heart, Star, Flame, Trophy, Volume2, ArrowLeft, GraduationCap, Sparkles, Quote, Bot, Send, BrainCircuit, Mic } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { IdiomaLesson, IdiomaProgress } from '../types';
+import { GoogleGenAI } from "@google/genai";
 import confetti from 'canvas-confetti';
 
 interface SanFranIdiomasProps {
   userId: string;
 }
 
-// MOCK DATA PARA AS LIÇÕES (Hardcoded para garantir constância e sem IA)
+// --- BANCO DE DADOS DE LIÇÕES (EXPANDIDO) ---
 const LESSONS_DB: IdiomaLesson[] = [
   // --- MÓDULO 1: FOUNDATIONS ---
   {
     id: '1-1',
     module: 'Foundations',
-    title: 'Lawyer vs. Attorney',
-    description: 'A diferença básica entre os profissionais.',
-    theory: "Em inglês, 'Lawyer' é o termo genérico para qualquer pessoa formada em Direito. 'Attorney' (ou Attorney-at-Law) é especificamente quem passou no exame da ordem (Bar Exam) e pode representar clientes em juízo nos EUA. No Reino Unido, a divisão é entre 'Solicitor' (escritório) e 'Barrister' (tribunal).",
-    example_sentence: "He is a qualified lawyer, but he works in compliance, not as a practicing attorney.",
+    title: 'The Legal Profession',
+    description: 'Lawyer, Attorney & Barrister',
+    type: 'quiz',
+    theory: "Em inglês, 'Lawyer' é o gênero (qualquer jurista). 'Attorney' (EUA) é quem tem a carteira da ordem (Bar). No Reino Unido, divide-se em 'Solicitor' (escritório/contratos) e 'Barrister' (tribunal/beca).",
+    example_sentence: "Although she is a qualified lawyer, she is not practicing as an attorney currently.",
     quiz: {
-      question: "Qual termo descreve melhor alguém que atua representando clientes na corte americana?",
-      options: ["Lawyer", "Attorney", "Legal Advisor"],
+      question: "Qual termo descreve o advogado que atua no tribunal (UK)?",
+      options: ["Solicitor", "Barrister", "Paralegal"],
       answer: 1,
-      explanation: "Attorney-at-Law é o termo correto para quem tem licença para advogar nos EUA."
+      explanation: "Barristers são os advogados especializados em sustentação oral e litígio nas cortes superiores do Reino Unido."
     },
-    xp_reward: 100
+    xp_reward: 100,
+    words_unlocked: ['Lawyer', 'Attorney-at-Law', 'Barrister', 'Solicitor']
   },
   {
     id: '1-2',
     module: 'Foundations',
-    title: 'Court vs. Tribunal',
-    description: 'Onde a justiça acontece.',
-    theory: "'Court' é o termo padrão para o poder judiciário (ex: Supreme Court). 'Tribunal' geralmente se refere a órgãos especializados ou administrativos (ex: Employment Tribunal, Arbitration Tribunal), embora em português usemos 'Tribunal' para quase tudo.",
-    example_sentence: "The case was heard in the High Court, but the dispute was settled by an arbitration tribunal.",
+    title: 'Court Structure',
+    description: 'Court vs. Tribunal',
+    type: 'quiz',
+    theory: "'Court' é o termo para o Poder Judiciário (ex: Supreme Court). 'Tribunal' refere-se a cortes especializadas ou administrativas (ex: Employment Tribunal, Arbitration Tribunal). Falso cognato comum!",
+    example_sentence: "The case was heard in the High Court after the arbitration tribunal failed to reach a decision.",
     quiz: {
-      question: "Para se referir ao Supremo Tribunal dos EUA, você usaria:",
+      question: "Como se chama o Supremo Tribunal dos EUA?",
       options: ["Supreme Court", "Supreme Tribunal", "High Court"],
       answer: 0,
-      explanation: "Nos EUA e UK, as instâncias judiciais máximas são chamadas de 'Courts'."
+      explanation: "Supreme Court é o termo correto. Tribunal é usado para órgãos administrativos ou arbitragem."
     },
-    xp_reward: 100
+    xp_reward: 100,
+    words_unlocked: ['Court', 'Tribunal', 'Hearing']
   },
+  // --- NOVA LIÇÃO TIPO SCRAMBLE ---
   {
     id: '1-3',
     module: 'Foundations',
-    title: 'Plaintiff & Defendant',
-    description: 'As partes do processo.',
-    theory: "'Plaintiff' é o Autor da ação (quem processa) no cível. 'Defendant' é o Réu. No penal, o acusador é o 'Prosecutor'. No Reino Unido, o termo 'Plaintiff' foi modernizado para 'Claimant' em 1999, mas 'Plaintiff' ainda reina nos EUA.",
-    example_sentence: "The plaintiff filed a lawsuit claiming damages against the defendant.",
-    quiz: {
-      question: "Quem é o 'Defendant'?",
-      options: ["O Autor", "O Réu", "O Juiz"],
-      answer: 1,
-      explanation: "Defendant é aquele que se defende (Réu)."
+    title: 'Building Sentences',
+    description: 'Structure of Legal English',
+    type: 'scramble',
+    theory: "No inglês jurídico, a ordem das palavras é crucial. Sujeito + Verbo + Objeto Direto. Ex: 'The Plaintiff filed a lawsuit'.",
+    example_sentence: "The defendant shall pay the damages immediately.",
+    scramble: {
+      sentence: "The plaintiff filed a motion to dismiss",
+      translation: "O autor protocolou um pedido de extinção/arquivamento."
     },
-    xp_reward: 100
+    xp_reward: 120,
+    words_unlocked: ['Motion', 'Dismiss', 'File']
   },
   // --- MÓDULO 2: CONTRACT LAW ---
   {
     id: '2-1',
-    module: 'Contract Law',
-    title: 'Drafting vs. Writing',
-    description: 'Escrever juridicamente.',
-    theory: "Advogados não 'write' contratos, eles 'draft' (redigem/minutam). O substantivo é 'draft' (minuta). 'Drafting' envolve a técnica de escolher as palavras precisas para criar obrigações legais.",
-    example_sentence: "I spent the whole afternoon drafting the merger agreement.",
+    module: 'Contracts',
+    title: 'The Art of Drafting',
+    description: 'Drafting vs. Writing',
+    type: 'quiz',
+    theory: "Juristas não 'write' contratos, eles 'draft' (redigem/minutam). O substantivo é 'draft' (minuta). 'To execute a contract' significa assiná-lo/formalizá-lo, não matá-lo.",
+    example_sentence: "I spent the whole afternoon drafting the merger agreement to be executed tomorrow.",
     quiz: {
-      question: "Qual o verbo correto para 'fazer uma minuta'?",
+      question: "Qual o verbo técnico para 'redigir' um contrato?",
       options: ["Make", "Write", "Draft"],
       answer: 2,
-      explanation: "Draft é o termo técnico para redação legal de instrumentos."
+      explanation: "To Draft é o verbo técnico para a elaboração de documentos legais."
     },
-    xp_reward: 150
+    xp_reward: 150,
+    words_unlocked: ['Draft', 'Execute', 'Agreement']
   },
   {
     id: '2-2',
-    module: 'Contract Law',
-    title: 'Shall vs. May',
-    description: 'Obrigação vs. Permissão.',
-    theory: "'Shall' indica obrigação estrita (deve/fará). É o imperativo legal. 'May' indica permissão ou faculdade (pode). Errar isso muda completamente o sentido de uma cláusula.",
+    module: 'Contracts',
+    title: 'Modal Verbs',
+    description: 'Shall vs. May',
+    type: 'quiz',
+    theory: "'Shall' impõe obrigação (dever). É o imperativo contratual. 'May' indica permissão ou faculdade (poder). Trocar um pelo outro pode mudar uma obrigação de pagar para uma opção de pagar.",
     example_sentence: "The Tenant shall pay the rent on the 5th. The Landlord may inspect the property with notice.",
     quiz: {
-      question: "Se a cláusula diz 'The party may terminate', a parte é obrigada a terminar?",
+      question: "Se a cláusula diz 'The party may terminate', a rescisão é obrigatória?",
       options: ["Sim", "Não"],
       answer: 1,
-      explanation: "'May' indica uma faculdade/direito, não um dever."
+      explanation: "'May' indica discricionariedade (permissão), não obrigação."
     },
-    xp_reward: 150
+    xp_reward: 150,
+    words_unlocked: ['Shall', 'May', 'Obligation']
   },
   {
     id: '2-3',
-    module: 'Contract Law',
-    title: 'Breach of Contract',
-    description: 'Inadimplemento.',
-    theory: "'Breach' é a violação ou quebra do contrato. Pode ser 'Material Breach' (grave, permite rescisão) ou 'Minor Breach'. Quem comete a violação é a 'Breaching Party'.",
-    example_sentence: "Failure to deliver the goods constitutes a material breach of this Agreement.",
-    quiz: {
-      question: "Como se diz 'Quebra de Contrato'?",
-      options: ["Break of Contract", "Breach of Contract", "Smash of Contract"],
-      answer: 1,
-      explanation: "'Breach' é o termo técnico para violação contratual."
+    module: 'Contracts',
+    title: 'Contract Construction',
+    description: 'Boilerplate Clauses',
+    type: 'scramble',
+    theory: "Cláusulas padrão são chamadas de 'Boilerplate'. Ex: Severability (divisibilidade), Entire Agreement (acordo integral).",
+    example_sentence: "This agreement constitutes the entire understanding between parties.",
+    scramble: {
+      sentence: "This agreement shall be governed by the laws of Brazil",
+      translation: "Este contrato será regido pelas leis do Brasil."
     },
-    xp_reward: 150
+    xp_reward: 150,
+    words_unlocked: ['Governing Law', 'Jurisdiction', 'Binding']
   }
 ];
+
+// Helper para agrupar lições por módulo
+const MODULES = Array.from(new Set(LESSONS_DB.map(l => l.module)));
 
 const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
   const [progress, setProgress] = useState<IdiomaProgress | null>(null);
   const [currentLesson, setCurrentLesson] = useState<IdiomaLesson | null>(null);
-  const [showLesson, setShowLesson] = useState(false);
-  const [quizStep, setQuizStep] = useState<'theory' | 'example' | 'quiz' | 'result'>('theory');
-  const [selectedOption, setSelectedOption] = useState<number | null>(null);
-  const [isCorrect, setIsCorrect] = useState(false);
+  const [activeTab, setActiveTab] = useState<'path' | 'glossary' | 'oracle'>('path');
+  
+  // Estado da Lição
+  const [showLessonModal, setShowLessonModal] = useState(false);
+  const [lessonStep, setLessonStep] = useState<'theory' | 'listen' | 'exercise' | 'success'>('theory');
+  
+  // Quiz State
+  const [quizSelected, setQuizSelected] = useState<number | null>(null);
+  const [isQuizCorrect, setIsQuizCorrect] = useState<boolean | null>(null);
+
+  // Scramble State
+  const [scrambleWords, setScrambleWords] = useState<string[]>([]);
+  const [scrambleSolution, setScrambleSolution] = useState<string[]>([]);
+  const [isScrambleCorrect, setIsScrambleCorrect] = useState<boolean | null>(null);
+  
+  // Oracle State
+  const [chatMessages, setChatMessages] = useState<{role: 'user' | 'model', text: string}[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatTyping, setIsChatTyping] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
   const [isLoading, setIsLoading] = useState(true);
 
-  // Inicialização
+  // Carregar dados
   useEffect(() => {
     fetchProgress();
   }, [userId]);
+
+  useEffect(() => {
+    if (activeTab === 'oracle') {
+        scrollToBottom();
+    }
+  }, [chatMessages, activeTab]);
+
+  const scrollToBottom = () => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   const fetchProgress = async () => {
     setIsLoading(true);
@@ -128,7 +169,6 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
         .single();
 
       if (error && error.code === 'PGRST116') {
-        // Criar progresso inicial
         const initialProgress = {
           user_id: userId,
           current_level_id: '1-1',
@@ -145,7 +185,6 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
           .single();
         data = newData;
       }
-
       if (data) setProgress(data);
     } catch (e) {
       console.error(e);
@@ -154,241 +193,565 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
     }
   };
 
+  // --- AÇÕES DE AULA ---
+
   const startLesson = (lessonId: string) => {
     const lesson = LESSONS_DB.find(l => l.id === lessonId);
     if (lesson) {
       setCurrentLesson(lesson);
-      setQuizStep('theory');
-      setSelectedOption(null);
-      setShowLesson(true);
-    }
-  };
+      setLessonStep('theory');
+      
+      // Reset Quiz
+      setQuizSelected(null);
+      setIsQuizCorrect(null);
 
-  const handleQuizAnswer = (idx: number) => {
-    if (!currentLesson) return;
-    setSelectedOption(idx);
-    
-    if (idx === currentLesson.quiz.answer) {
-      setIsCorrect(true);
-      setTimeout(() => setQuizStep('result'), 1500);
-    } else {
-      setIsCorrect(false);
-      // Reduzir vida (visual por enquanto, ou implementar lógica de update no DB)
-      if (progress && progress.lives > 0) {
-         // Opcional: Atualizar vidas no DB
+      // Reset Scramble
+      if (lesson.type === 'scramble' && lesson.scramble) {
+         const words = lesson.scramble.sentence.split(' ').sort(() => Math.random() - 0.5);
+         setScrambleWords(words);
+         setScrambleSolution([]);
+         setIsScrambleCorrect(null);
       }
+
+      setShowLessonModal(true);
     }
   };
 
-  const finishLesson = async () => {
+  const playAudio = (text: string) => {
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US'; 
+      utterance.rate = 0.9;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  // --- QUIZ LOGIC ---
+  const checkAnswer = (idx: number) => {
+    if (isQuizCorrect !== null || !currentLesson?.quiz) return;
+    
+    const correct = idx === currentLesson.quiz.answer;
+    setQuizSelected(idx);
+    setIsQuizCorrect(correct);
+
+    if (correct) {
+      setTimeout(() => setLessonStep('success'), 1500);
+      confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+    }
+  };
+
+  // --- SCRAMBLE LOGIC ---
+  const handleScrambleClick = (word: string, index: number, source: 'pool' | 'solution') => {
+     if (isScrambleCorrect === true) return;
+
+     if (source === 'pool') {
+        const newPool = [...scrambleWords];
+        newPool.splice(index, 1);
+        setScrambleWords(newPool);
+        setScrambleSolution([...scrambleSolution, word]);
+     } else {
+        const newSolution = [...scrambleSolution];
+        newSolution.splice(index, 1);
+        setScrambleSolution(newSolution);
+        setScrambleWords([...scrambleWords, word]);
+     }
+  };
+
+  const checkScramble = () => {
+     if (!currentLesson?.scramble) return;
+     const attempt = scrambleSolution.join(' ');
+     const correct = attempt === currentLesson.scramble.sentence;
+     setIsScrambleCorrect(correct);
+
+     if (correct) {
+        setTimeout(() => setLessonStep('success'), 1500);
+        confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+     } else {
+        setTimeout(() => setIsScrambleCorrect(null), 1000); // Reset visual feedback
+     }
+  };
+
+  // --- ORACLE AI LOGIC ---
+  const sendMessageToOracle = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!chatInput.trim()) return;
+
+    const userMsg = chatInput.trim();
+    setChatMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+    setChatInput('');
+    setIsChatTyping(true);
+
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      // Using Gemini 3 Flash as per guidelines for basic text
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: [
+            { role: 'user', parts: [{ text: "You are Oracle Lex, an expert Legal English Tutor for Brazilian law students. Explain concepts comparing Common Law vs Civil Law when necessary. Be concise, encouraging, and use emojis. Use Markdown." }] },
+            ...chatMessages.map(m => ({ role: m.role, parts: [{ text: m.text }] })),
+            { role: 'user', parts: [{ text: userMsg }] }
+        ]
+      });
+
+      const reply = response.text;
+      if (reply) {
+         setChatMessages(prev => [...prev, { role: 'model', text: reply }]);
+      }
+    } catch (err) {
+      setChatMessages(prev => [...prev, { role: 'model', text: "❌ Connection error with the Oracle. Please try again." }]);
+    } finally {
+      setIsChatTyping(false);
+    }
+  };
+
+  const completeLesson = async () => {
     if (!currentLesson || !progress) return;
 
+    // Lógica de atualização
     const newCompleted = [...(progress.completed_lessons || [])];
     if (!newCompleted.includes(currentLesson.id)) {
       newCompleted.push(currentLesson.id);
     }
 
-    // Calcular próximo nível simples (próximo no array)
     const currentIndex = LESSONS_DB.findIndex(l => l.id === currentLesson.id);
     const nextLessonId = LESSONS_DB[currentIndex + 1]?.id || currentLesson.id;
 
-    // Atualizar Streak (simples: se last_activity != hoje, +1)
+    // Atualizar Streak
     const today = new Date().toISOString().split('T')[0];
     let newStreak = progress.streak_count;
     if (progress.last_activity_date !== today) {
        newStreak += 1;
     }
 
+    const newXP = progress.total_xp + currentLesson.xp_reward;
+
     try {
       await supabase.from('idiomas_progress').update({
         completed_lessons: newCompleted,
         current_level_id: nextLessonId,
-        total_xp: progress.total_xp + currentLesson.xp_reward,
+        total_xp: newXP,
         streak_count: newStreak,
         last_activity_date: today
       }).eq('user_id', userId);
 
-      // Atualizar estado local
       setProgress(prev => prev ? ({
         ...prev,
         completed_lessons: newCompleted,
         current_level_id: nextLessonId,
-        total_xp: prev.total_xp + currentLesson.xp_reward,
+        total_xp: newXP,
         streak_count: newStreak
       }) : null);
 
+      setShowLessonModal(false);
       confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-      setShowLesson(false);
     } catch (e) {
       console.error(e);
     }
   };
 
+  const getUnlockedWords = () => {
+    if (!progress) return [];
+    const words: string[] = [];
+    LESSONS_DB.forEach(lesson => {
+      if (progress.completed_lessons.includes(lesson.id)) {
+        words.push(...lesson.words_unlocked);
+      }
+    });
+    return Array.from(new Set(words)).sort();
+  };
+
   if (isLoading || !progress) return <div className="h-full flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-sanfran-rubi"></div></div>;
 
   return (
-    <div className="h-full flex flex-col relative pb-20 px-2 md:px-0 max-w-4xl mx-auto">
+    <div className="h-full flex flex-col relative pb-20 px-2 md:px-0 max-w-4xl mx-auto font-sans">
       
-      {/* HEADER */}
-      <header className="flex items-center justify-between py-6 shrink-0 bg-white dark:bg-black/20 p-4 rounded-3xl border border-slate-100 dark:border-white/10 mb-8 shadow-sm">
+      {/* HEADER PREMIUM */}
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 shrink-0 mb-8">
          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-               <Globe className="w-5 h-5 text-sky-500" />
-               <span className="font-black text-sm text-slate-900 dark:text-white uppercase tracking-tight">Legal English</span>
+            <div className="bg-sky-100 dark:bg-sky-900/20 p-3 rounded-2xl border border-sky-200 dark:border-sky-800">
+               <Globe className="w-8 h-8 text-sky-600 dark:text-sky-400" />
+            </div>
+            <div>
+               <h2 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Legal English</h2>
+               <div className="flex gap-4 mt-2">
+                  <div className="flex items-center gap-1.5 text-orange-500 font-black text-xs uppercase tracking-widest bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded-lg">
+                     <Flame size={12} fill="currentColor" /> {progress.streak_count} Dias
+                  </div>
+                  <div className="flex items-center gap-1.5 text-usp-gold font-black text-xs uppercase tracking-widest bg-yellow-50 dark:bg-yellow-900/20 px-2 py-1 rounded-lg">
+                     <Trophy size={12} fill="currentColor" /> {progress.total_xp} XP
+                  </div>
+               </div>
             </div>
          </div>
-         <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1 text-orange-500">
-               <Flame className="w-5 h-5 fill-current" />
-               <span className="font-black text-sm">{progress.streak_count}</span>
-            </div>
-            <div className="flex items-center gap-1 text-usp-gold">
-               <Trophy className="w-5 h-5 fill-current" />
-               <span className="font-black text-sm">{progress.total_xp}</span>
-            </div>
-            <div className="flex items-center gap-1 text-red-500">
-               <Heart className="w-5 h-5 fill-current" />
-               <span className="font-black text-sm">{progress.lives}</span>
-            </div>
+
+         <div className="bg-slate-100 dark:bg-white/5 p-1 rounded-xl flex gap-1">
+            <button 
+               onClick={() => setActiveTab('path')}
+               className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'path' ? 'bg-white dark:bg-sanfran-rubi text-slate-900 dark:text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+               Trilha
+            </button>
+            <button 
+               onClick={() => setActiveTab('glossary')}
+               className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'glossary' ? 'bg-white dark:bg-sanfran-rubi text-slate-900 dark:text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+               Vault
+            </button>
+            <button 
+               onClick={() => setActiveTab('oracle')}
+               className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeTab === 'oracle' ? 'bg-white dark:bg-sanfran-rubi text-slate-900 dark:text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+               <Bot size={14} /> Oracle
+            </button>
          </div>
       </header>
 
-      {/* MAPA DE PROGRESSO */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col items-center gap-8 py-8 relative">
-         {/* Linha conectora de fundo */}
-         <div className="absolute top-0 bottom-0 w-2 bg-slate-100 dark:bg-white/5 rounded-full left-1/2 -translate-x-1/2 -z-10"></div>
+      {/* --- ABA TRILHA (PATH) --- */}
+      {activeTab === 'path' && (
+         <div className="flex-1 overflow-y-auto custom-scrollbar relative px-4">
+            {/* Linha Central Decorativa */}
+            <div className="absolute left-1/2 top-0 bottom-0 w-3 bg-slate-100 dark:bg-white/5 -translate-x-1/2 rounded-full -z-10" />
 
-         {LESSONS_DB.map((lesson, index) => {
-            const isCompleted = progress.completed_lessons?.includes(lesson.id);
-            const isCurrent = lesson.id === progress.current_level_id;
-            const isLocked = !isCompleted && !isCurrent;
-            const offset = index % 2 === 0 ? '-translate-x-12' : 'translate-x-12';
-
-            return (
-               <div key={lesson.id} className={`relative flex flex-col items-center z-10 transition-transform ${isCurrent ? 'scale-110' : 'scale-100'}`}>
-                  <button 
-                    disabled={isLocked}
-                    onClick={() => startLesson(lesson.id)}
-                    className={`w-20 h-20 rounded-full flex items-center justify-center border-4 shadow-xl transition-all relative group
-                      ${isCompleted ? 'bg-sky-500 border-sky-600 text-white' : 
-                        isCurrent ? 'bg-white dark:bg-sanfran-rubi border-sanfran-rubi animate-bounce-slow text-sanfran-rubi dark:text-white' : 
-                        'bg-slate-200 dark:bg-white/10 border-slate-300 dark:border-white/5 text-slate-400 cursor-not-allowed'}
-                    `}
-                  >
-                     {isCompleted ? <CheckCircle2 size={32} /> : isLocked ? <Lock size={24} /> : <Star size={32} fill="currentColor" />}
-                     
-                     {/* Tooltip Mobile/Desktop */}
-                     <div className={`absolute top-full mt-2 bg-white dark:bg-slate-800 px-3 py-2 rounded-xl shadow-lg border border-slate-100 dark:border-white/10 w-40 text-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-20`}>
-                        <p className="text-[10px] font-black uppercase text-slate-400 mb-1">{lesson.module}</p>
-                        <p className="text-xs font-bold text-slate-900 dark:text-white leading-tight">{lesson.title}</p>
+            <div className="space-y-16 pb-20 pt-8">
+               {MODULES.map((module, modIdx) => (
+                  <div key={module} className="relative">
+                     <div className="flex justify-center mb-8 sticky top-0 z-20">
+                        <div className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 px-6 py-2 rounded-full shadow-lg text-xs font-black uppercase tracking-[0.2em] text-slate-400">
+                           Módulo {modIdx + 1}: {module}
+                        </div>
                      </div>
-                  </button>
-               </div>
-            );
-         })}
-         
-         <div className="py-10 text-center opacity-50">
-            <p className="text-xs font-black uppercase tracking-widest text-slate-400">Fim do Módulo 1</p>
-         </div>
-      </div>
 
-      {/* LIÇÃO MODAL */}
-      {showLesson && currentLesson && (
-         <div className="fixed inset-0 z-50 bg-[#f8f9fa] dark:bg-[#0d0303] flex flex-col animate-in slide-in-from-bottom-10 duration-300">
-            {/* Header Lição */}
-            <div className="p-6 flex items-center justify-between border-b border-slate-200 dark:border-white/10">
-               <button onClick={() => setShowLesson(false)}><X size={24} className="text-slate-400" /></button>
-               <div className="w-full max-w-xs h-2 bg-slate-200 dark:bg-white/10 rounded-full mx-4 overflow-hidden">
-                  <div 
-                    className="h-full bg-sky-500 transition-all duration-500" 
-                    style={{ width: quizStep === 'theory' ? '33%' : quizStep === 'example' ? '66%' : '100%' }} 
-                  />
+                     <div className="flex flex-col gap-12 relative">
+                        {LESSONS_DB.filter(l => l.module === module).map((lesson, idx) => {
+                           const isCompleted = progress.completed_lessons.includes(lesson.id);
+                           const isCurrent = lesson.id === progress.current_level_id;
+                           const isLocked = !isCompleted && !isCurrent;
+                           const alignClass = idx % 2 === 0 ? 'items-start md:pr-[50%]' : 'items-end md:pl-[50%]';
+                           const nodeMargin = idx % 2 === 0 ? 'md:ml-auto md:mr-[-30px]' : 'md:mr-auto md:ml-[-30px]';
+
+                           return (
+                              <div key={lesson.id} className={`flex flex-col ${alignClass} relative group`}>
+                                 <button 
+                                    onClick={() => !isLocked && startLesson(lesson.id)}
+                                    disabled={isLocked}
+                                    className={`
+                                       relative w-20 h-20 rounded-full border-b-[6px] transition-all duration-300 flex items-center justify-center shadow-xl z-10
+                                       ${nodeMargin}
+                                       ${isCompleted ? 'bg-sky-500 border-sky-700 text-white' : 
+                                         isCurrent ? 'bg-sanfran-rubi border-[#7a0d18] text-white animate-bounce-slow' : 
+                                         'bg-slate-200 dark:bg-white/10 border-slate-300 dark:border-white/5 text-slate-400 grayscale cursor-not-allowed'}
+                                       active:border-b-0 active:translate-y-[6px] hover:scale-105
+                                    `}
+                                 >
+                                    {isCompleted ? <CheckCircle2 size={32} /> : isLocked ? <Lock size={28} /> : <Star size={32} fill="currentColor" />}
+                                 </button>
+
+                                 <div className={`
+                                    mt-3 bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-white/10 shadow-lg text-center w-40 z-10 transition-all
+                                    ${nodeMargin}
+                                    ${isLocked ? 'opacity-50' : 'opacity-100'}
+                                 `}>
+                                    <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Lição {idx + 1}</p>
+                                    <p className="text-xs font-bold text-slate-900 dark:text-white leading-tight">{lesson.title}</p>
+                                 </div>
+                              </div>
+                           );
+                        })}
+                     </div>
+                  </div>
+               ))}
+            </div>
+         </div>
+      )}
+
+      {/* --- ABA VADE MECUM (GLOSSÁRIO) --- */}
+      {activeTab === 'glossary' && (
+         <div className="flex-1 overflow-y-auto custom-scrollbar animate-in slide-in-from-right-8">
+            <div className="bg-white dark:bg-sanfran-rubiDark/20 p-8 rounded-[3rem] border-2 border-slate-200 dark:border-sanfran-rubi/30 shadow-xl min-h-[400px]">
+               <h3 className="text-2xl font-black uppercase text-slate-900 dark:text-white mb-2 flex items-center gap-3">
+                  <BookOpen className="text-sanfran-rubi" /> The Vault
+               </h3>
+               <p className="text-sm text-slate-500 font-bold mb-8">Seu arsenal lexical desbloqueado.</p>
+
+               {getUnlockedWords().length === 0 ? (
+                  <div className="text-center py-20 opacity-50">
+                     <Lock size={64} className="mx-auto mb-4 text-slate-300" />
+                     <p className="font-black uppercase text-slate-400">Nenhum termo desbloqueado ainda.</p>
+                  </div>
+               ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                     {getUnlockedWords().map((word, idx) => (
+                        <div key={idx} className="bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-4 rounded-2xl flex flex-col justify-between hover:border-sky-500 transition-colors group cursor-default">
+                           <span className="text-xs font-black uppercase text-slate-400 tracking-widest mb-2">Termo {idx + 1}</span>
+                           <div className="flex items-center justify-between">
+                              <p className="font-bold text-slate-800 dark:text-white">{word}</p>
+                              <button onClick={() => playAudio(word)} className="text-slate-400 hover:text-sky-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                 <Volume2 size={16} />
+                              </button>
+                           </div>
+                        </div>
+                     ))}
+                  </div>
+               )}
+            </div>
+         </div>
+      )}
+
+      {/* --- ABA ORACLE AI (CHAT) --- */}
+      {activeTab === 'oracle' && (
+         <div className="flex-1 flex flex-col bg-white dark:bg-sanfran-rubiDark/20 rounded-[3rem] border-2 border-slate-200 dark:border-sanfran-rubi/30 shadow-xl overflow-hidden animate-in slide-in-from-right-8">
+            <div className="p-6 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-white/5 flex items-center gap-4">
+               <div className="w-12 h-12 bg-sanfran-rubi rounded-2xl flex items-center justify-center shadow-lg">
+                  <Bot size={24} className="text-white" />
                </div>
-               <div className="w-6"></div>
+               <div>
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Oracle Lex</h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Seu Tutor de Inglês Jurídico 24h</p>
+               </div>
             </div>
 
-            {/* Conteúdo */}
-            <div className="flex-1 flex flex-col items-center justify-center p-8 max-w-2xl mx-auto w-full text-center">
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+               {chatMessages.length === 0 && (
+                  <div className="text-center py-20 opacity-50">
+                     <BrainCircuit size={48} className="mx-auto mb-4 text-slate-300" />
+                     <p className="text-sm font-bold text-slate-400">Pergunte sobre termos, traduções ou conceitos.</p>
+                     <p className="text-xs text-slate-300 mt-2">Ex: "Como digo 'Mandado de Segurança'?"</p>
+                  </div>
+               )}
+               {chatMessages.map((msg, idx) => (
+                  <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                     <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${msg.role === 'user' ? 'bg-slate-900 text-white rounded-tr-none' : 'bg-slate-100 dark:bg-white/10 text-slate-800 dark:text-slate-200 rounded-tl-none border border-slate-200 dark:border-white/5'}`}>
+                        {msg.text}
+                     </div>
+                  </div>
+               ))}
+               {isChatTyping && (
+                  <div className="flex justify-start">
+                     <div className="bg-slate-100 dark:bg-white/10 px-4 py-3 rounded-2xl rounded-tl-none flex gap-1">
+                        <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></span>
+                        <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-100"></span>
+                        <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-200"></span>
+                     </div>
+                  </div>
+               )}
+               <div ref={chatEndRef} />
+            </div>
+
+            <form onSubmit={sendMessageToOracle} className="p-4 bg-white dark:bg-black/20 border-t border-slate-100 dark:border-white/5 flex gap-2">
+               <input 
+                  value={chatInput}
+                  onChange={e => setChatInput(e.target.value)}
+                  placeholder="Digite sua dúvida jurídica..."
+                  className="flex-1 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm font-medium outline-none focus:border-sanfran-rubi transition-colors"
+               />
+               <button 
+                  type="submit"
+                  disabled={!chatInput.trim() || isChatTyping}
+                  className="p-3 bg-sanfran-rubi text-white rounded-2xl shadow-lg hover:bg-sanfran-rubiDark transition-colors disabled:opacity-50"
+               >
+                  <Send size={20} />
+               </button>
+            </form>
+         </div>
+      )}
+
+      {/* --- MODAL DA LIÇÃO --- */}
+      {showLessonModal && currentLesson && (
+         <div className="fixed inset-0 z-50 bg-[#f8f9fa] dark:bg-[#0d0303] flex flex-col animate-in slide-in-from-bottom-20 duration-300">
+            {/* Header Modal */}
+            <div className="p-6 flex items-center justify-between border-b border-slate-200 dark:border-white/10">
+               <button onClick={() => setShowLessonModal(false)} className="text-slate-400 hover:text-red-500 transition-colors">
+                  <X size={28} />
+               </button>
                
-               {quizStep === 'theory' && (
-                  <div className="space-y-8 animate-in fade-in zoom-in">
-                     <h2 className="text-sm font-black uppercase tracking-[0.3em] text-sky-500">Briefing do Dia</h2>
-                     <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white">{currentLesson.title}</h1>
-                     <div className="bg-white dark:bg-white/5 p-8 rounded-[2rem] border-2 border-slate-100 dark:border-white/10 shadow-xl">
-                        <p className="text-lg md:text-xl font-medium leading-relaxed text-slate-700 dark:text-slate-200">
+               <div className="flex-1 max-w-md mx-6 h-4 bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden">
+                  <div 
+                     className="h-full bg-sky-500 transition-all duration-500 ease-out" 
+                     style={{ 
+                        width: lessonStep === 'theory' ? '25%' : lessonStep === 'listen' ? '50%' : lessonStep === 'exercise' ? '75%' : '100%' 
+                     }} 
+                  />
+               </div>
+               
+               <div className="w-8" />
+            </div>
+
+            {/* Conteúdo Dinâmico */}
+            <div className="flex-1 flex flex-col items-center justify-center p-6 md:p-10 max-w-3xl mx-auto w-full text-center">
+               
+               {/* STEP 1: THEORY */}
+               {lessonStep === 'theory' && (
+                  <div className="space-y-8 w-full animate-in fade-in zoom-in duration-300">
+                     <span className="text-[10px] font-black uppercase tracking-[0.3em] text-sky-500 bg-sky-100 dark:bg-sky-900/20 px-3 py-1 rounded-full">Briefing Teórico</span>
+                     
+                     <h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white leading-tight">{currentLesson.title}</h1>
+                     
+                     <div className="bg-white dark:bg-white/5 p-8 md:p-10 rounded-[3rem] border-2 border-slate-100 dark:border-white/5 shadow-2xl relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-sky-400 to-blue-600"></div>
+                        <p className="text-lg md:text-2xl font-medium leading-relaxed text-slate-700 dark:text-slate-200 font-serif">
                            {currentLesson.theory}
                         </p>
                      </div>
-                     <button onClick={() => setQuizStep('example')} className="w-full py-4 bg-sky-500 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg hover:bg-sky-600 transition-all">
-                        Continuar
+
+                     <button 
+                        onClick={() => setLessonStep('listen')} 
+                        className="w-full py-5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2rem] font-black uppercase tracking-widest shadow-xl hover:scale-[1.02] active:scale-95 transition-all text-sm"
+                     >
+                        Entendi, Próximo
                      </button>
                   </div>
                )}
 
-               {quizStep === 'example' && (
-                  <div className="space-y-8 animate-in slide-in-from-right-8">
-                     <h2 className="text-sm font-black uppercase tracking-[0.3em] text-emerald-500">Na Prática</h2>
-                     <div className="relative">
-                        <Quote size={48} className="absolute -top-6 -left-4 text-emerald-200 dark:text-emerald-900/40" />
-                        <p className="text-2xl md:text-3xl font-serif italic text-slate-800 dark:text-slate-100 leading-relaxed">
+               {/* STEP 2: LISTENING */}
+               {lessonStep === 'listen' && (
+                  <div className="space-y-10 w-full animate-in slide-in-from-right-10 duration-300">
+                     <span className="text-[10px] font-black uppercase tracking-[0.3em] text-purple-500 bg-purple-100 dark:bg-purple-900/20 px-3 py-1 rounded-full">Pronúncia & Contexto</span>
+                     
+                     <div className="relative py-10">
+                        <Quote size={60} className="absolute top-0 left-0 text-purple-200 dark:text-purple-900/30 -translate-x-4 -translate-y-4" />
+                        <p className="text-2xl md:text-4xl font-serif italic text-slate-800 dark:text-slate-100 leading-snug">
                            "{currentLesson.example_sentence}"
                         </p>
+                        <Quote size={60} className="absolute bottom-0 right-0 text-purple-200 dark:text-purple-900/30 translate-x-4 translate-y-4 rotate-180" />
                      </div>
-                     <button onClick={() => setQuizStep('quiz')} className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg hover:bg-emerald-600 transition-all">
-                        Ir para o Teste
+
+                     <div className="flex justify-center">
+                        <button 
+                           onClick={() => playAudio(currentLesson.example_sentence)}
+                           className="w-24 h-24 bg-purple-500 rounded-full flex items-center justify-center shadow-2xl shadow-purple-500/40 hover:scale-110 active:scale-90 transition-all group"
+                        >
+                           <Volume2 size={40} className="text-white group-hover:animate-pulse" />
+                        </button>
+                     </div>
+                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Toque para Ouvir</p>
+
+                     <button 
+                        onClick={() => setLessonStep('exercise')} 
+                        className="w-full py-5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2rem] font-black uppercase tracking-widest shadow-xl hover:scale-[1.02] active:scale-95 transition-all text-sm mt-8"
+                     >
+                        Ir para o Desafio
                      </button>
                   </div>
                )}
 
-               {quizStep === 'quiz' && (
-                  <div className="space-y-8 w-full animate-in slide-in-from-right-8">
-                     <h2 className="text-sm font-black uppercase tracking-[0.3em] text-sanfran-rubi">Desafio Rápido</h2>
-                     <h3 className="text-xl font-bold text-slate-900 dark:text-white">{currentLesson.quiz.question}</h3>
+               {/* STEP 3: EXERCISE (QUIZ OR SCRAMBLE) */}
+               {lessonStep === 'exercise' && (
+                  <div className="space-y-8 w-full max-w-lg animate-in slide-in-from-right-10 duration-300">
+                     <span className="text-[10px] font-black uppercase tracking-[0.3em] text-sanfran-rubi bg-red-100 dark:bg-red-900/20 px-3 py-1 rounded-full">Prática Jurídica</span>
                      
-                     <div className="grid gap-4">
-                        {currentLesson.quiz.options.map((opt, idx) => {
-                           const isSelected = selectedOption === idx;
-                           let btnClass = "bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 hover:border-sky-500";
-                           
-                           if (isSelected) {
-                              if (isCorrect) btnClass = "bg-emerald-500 border-emerald-600 text-white";
-                              else btnClass = "bg-red-500 border-red-600 text-white";
-                           }
+                     {/* TIPO 1: QUIZ CLÁSSICO */}
+                     {(!currentLesson.type || currentLesson.type === 'quiz') && currentLesson.quiz && (
+                        <>
+                           <h3 className="text-2xl font-bold text-slate-900 dark:text-white leading-tight mb-4">
+                              {currentLesson.quiz.question}
+                           </h3>
+                           <div className="grid gap-4">
+                              {currentLesson.quiz.options.map((opt, idx) => {
+                                 const isSelected = quizSelected === idx;
+                                 const isWrong = isSelected && isQuizCorrect === false;
+                                 const isRight = isSelected && isQuizCorrect === true;
+                                 let btnClass = "bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:border-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/20";
+                                 if (isRight) btnClass = "bg-emerald-500 border-emerald-600 text-white shadow-emerald-500/30";
+                                 else if (isWrong) btnClass = "bg-red-500 border-red-600 text-white shadow-red-500/30 animate-shake";
 
-                           return (
-                              <button
-                                 key={idx}
-                                 onClick={() => handleQuizAnswer(idx)}
-                                 className={`p-6 rounded-2xl border-2 font-bold text-left transition-all ${btnClass}`}
-                              >
-                                 {opt}
-                              </button>
-                           )
-                        })}
-                     </div>
-                     {selectedOption !== null && !isCorrect && (
-                        <p className="text-red-500 font-bold animate-shake">Tente novamente!</p>
+                                 return (
+                                    <button
+                                       key={idx}
+                                       onClick={() => checkAnswer(idx)}
+                                       disabled={quizSelected !== null}
+                                       className={`p-6 rounded-2xl border-b-4 font-bold text-left transition-all text-lg flex items-center justify-between shadow-sm ${btnClass}`}
+                                    >
+                                       {opt}
+                                       {isRight && <CheckCircle2 size={24} />}
+                                       {isWrong && <X size={24} />}
+                                    </button>
+                                 )
+                              })}
+                           </div>
+                        </>
+                     )}
+
+                     {/* TIPO 2: SCRAMBLE (ORDENAR FRASE) */}
+                     {currentLesson.type === 'scramble' && currentLesson.scramble && (
+                        <>
+                           <h3 className="text-xl font-bold text-slate-900 dark:text-white leading-tight mb-2">Traduza para o Inglês Jurídico:</h3>
+                           <p className="text-lg font-serif italic text-slate-600 dark:text-slate-400 mb-6">"{currentLesson.scramble.translation}"</p>
+                           
+                           {/* Solution Area */}
+                           <div className="min-h-[80px] p-4 bg-slate-100 dark:bg-white/5 rounded-2xl border-2 border-dashed border-slate-300 dark:border-white/10 flex flex-wrap gap-2 justify-center items-center mb-6">
+                              {scrambleSolution.length === 0 && <span className="text-slate-400 text-xs font-bold uppercase tracking-widest">Toque nas palavras abaixo</span>}
+                              {scrambleSolution.map((word, idx) => (
+                                 <button key={`${word}-${idx}`} onClick={() => handleScrambleClick(word, idx, 'solution')} className="bg-white dark:bg-slate-700 shadow-md px-3 py-2 rounded-xl font-bold text-sm animate-in zoom-in">{word}</button>
+                              ))}
+                           </div>
+
+                           {/* Word Pool */}
+                           <div className="flex flex-wrap gap-2 justify-center mb-8">
+                              {scrambleWords.map((word, idx) => (
+                                 <button key={`${word}-${idx}`} onClick={() => handleScrambleClick(word, idx, 'pool')} className="bg-white dark:bg-slate-800 border-b-4 border-slate-200 dark:border-slate-700 px-4 py-3 rounded-xl font-bold text-sm hover:-translate-y-1 transition-transform">{word}</button>
+                              ))}
+                           </div>
+
+                           <button 
+                              onClick={checkScramble} 
+                              disabled={scrambleWords.length > 0}
+                              className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl transition-all ${scrambleWords.length === 0 ? 'bg-sanfran-rubi text-white hover:scale-105' : 'bg-slate-200 dark:bg-white/10 text-slate-400 cursor-not-allowed'} ${isScrambleCorrect === false ? 'animate-shake bg-red-500 text-white' : ''}`}
+                           >
+                              {isScrambleCorrect === false ? 'Tentar Novamente' : 'Verificar'}
+                           </button>
+                        </>
+                     )}
+
+                     {/* Feedback Panel (Generico) */}
+                     {isQuizCorrect === false && (
+                        <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-2xl border border-red-200 dark:border-red-800 text-left animate-in slide-in-from-bottom-2">
+                           <p className="text-red-600 dark:text-red-400 font-bold text-sm mb-1">Incorreto</p>
+                           <p className="text-red-800 dark:text-red-200 text-xs">Tente novamente ou revise a teoria.</p>
+                           <button onClick={() => { setQuizSelected(null); setIsQuizCorrect(null); }} className="mt-3 text-[10px] font-black uppercase text-red-500 underline">Tentar de novo</button>
+                        </div>
                      )}
                   </div>
                )}
 
-               {quizStep === 'result' && (
-                  <div className="space-y-8 w-full animate-in zoom-in">
-                     <div className="w-32 h-32 bg-emerald-500 rounded-full flex items-center justify-center mx-auto shadow-2xl animate-bounce">
-                        <CheckCircle2 size={64} className="text-white" />
+               {/* STEP 4: SUCCESS */}
+               {lessonStep === 'success' && (
+                  <div className="space-y-8 w-full animate-in zoom-in duration-500 flex flex-col items-center">
+                     <div className="w-40 h-40 bg-emerald-500 rounded-full flex items-center justify-center shadow-2xl shadow-emerald-500/40 mb-4 animate-bounce">
+                        <Trophy size={80} className="text-white" />
                      </div>
+                     
                      <div>
-                        <h2 className="text-3xl font-black text-emerald-500 uppercase tracking-tighter">Correto!</h2>
-                        <p className="text-slate-500 font-medium mt-2">{currentLesson.quiz.explanation}</p>
+                        <h2 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white uppercase tracking-tighter mb-2">Excelente!</h2>
+                        <p className="text-slate-500 font-medium text-lg">Lição concluída com sucesso.</p>
                      </div>
-                     <div className="bg-slate-100 dark:bg-white/10 p-4 rounded-xl inline-flex items-center gap-2">
-                        <span className="text-xs font-black uppercase text-slate-400 tracking-widest">Recompensa</span>
-                        <div className="flex items-center gap-1 text-usp-gold font-black">
-                           <Trophy size={16} /> +{currentLesson.xp_reward} XP
+
+                     <div className="grid grid-cols-2 gap-4 w-full max-w-sm mt-8">
+                        <div className="bg-slate-100 dark:bg-white/10 p-6 rounded-[2rem] flex flex-col items-center">
+                           <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Recompensa</p>
+                           <p className="text-2xl font-black text-usp-gold">+{currentLesson.xp_reward} XP</p>
+                        </div>
+                        <div className="bg-slate-100 dark:bg-white/10 p-6 rounded-[2rem] flex flex-col items-center">
+                           <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Desbloqueado</p>
+                           <p className="text-2xl font-black text-sky-500">{currentLesson.words_unlocked.length} Words</p>
                         </div>
                      </div>
-                     <button onClick={finishLesson} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl hover:scale-105 transition-all">
-                        Concluir Briefing
+
+                     {currentLesson.words_unlocked.length > 0 && (
+                        <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-4 rounded-2xl w-full max-w-sm">
+                           <p className="text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Novos Termos no Vade Mecum</p>
+                           <div className="flex flex-wrap gap-2 justify-center">
+                              {currentLesson.words_unlocked.map(w => (
+                                 <span key={w} className="bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 px-3 py-1 rounded-lg text-xs font-bold">{w}</span>
+                              ))}
+                           </div>
+                        </div>
+                     )}
+
+                     <button 
+                        onClick={completeLesson} 
+                        className="w-full max-w-md py-5 bg-sanfran-rubi text-white rounded-[2rem] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all mt-8"
+                     >
+                        Resgatar & Continuar
                      </button>
                   </div>
                )}
