@@ -502,8 +502,6 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
                            const isLocked = !isCompleted && !isCurrent;
                            
                            // ZigZag Logic:
-                           // 0: Center, 1: Left, 2: Right, 3: Center...
-                           // Or simpler: Left, Right, Left, Right
                            const offsetClass = idx % 2 === 0 ? 'md:translate-x-[-30px]' : 'md:translate-x-[30px]';
                            
                            return (
