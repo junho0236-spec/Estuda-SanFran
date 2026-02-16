@@ -1,16 +1,15 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Globe, BookOpen, CheckCircle2, Lock, X, Heart, Star, Flame, Trophy, Volume2, ArrowLeft, GraduationCap, Sparkles, Quote, Bot, Send, BrainCircuit, Mic } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Globe, BookOpen, CheckCircle2, Lock, X, Flame, Trophy, Volume2, Star, Quote } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { IdiomaLesson, IdiomaProgress } from '../types';
-import { GoogleGenAI } from "@google/genai";
 import confetti from 'canvas-confetti';
 
 interface SanFranIdiomasProps {
   userId: string;
 }
 
-// --- BANCO DE DADOS DE LIÇÕES (EXPANDIDO) ---
+// --- BANCO DE DADOS DE LIÇÕES ---
 const LESSONS_DB: IdiomaLesson[] = [
   // --- MÓDULO 1: FOUNDATIONS ---
   {
@@ -121,7 +120,7 @@ const MODULES = Array.from(new Set(LESSONS_DB.map(l => l.module)));
 const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
   const [progress, setProgress] = useState<IdiomaProgress | null>(null);
   const [currentLesson, setCurrentLesson] = useState<IdiomaLesson | null>(null);
-  const [activeTab, setActiveTab] = useState<'path' | 'glossary' | 'oracle'>('path');
+  const [activeTab, setActiveTab] = useState<'path' | 'glossary'>('path');
   
   // Estado da Lição
   const [showLessonModal, setShowLessonModal] = useState(false);
@@ -136,28 +135,12 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
   const [scrambleSolution, setScrambleSolution] = useState<string[]>([]);
   const [isScrambleCorrect, setIsScrambleCorrect] = useState<boolean | null>(null);
   
-  // Oracle State
-  const [chatMessages, setChatMessages] = useState<{role: 'user' | 'model', text: string}[]>([]);
-  const [chatInput, setChatInput] = useState('');
-  const [isChatTyping, setIsChatTyping] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
-
   const [isLoading, setIsLoading] = useState(true);
 
   // Carregar dados
   useEffect(() => {
     fetchProgress();
   }, [userId]);
-
-  useEffect(() => {
-    if (activeTab === 'oracle') {
-        scrollToBottom();
-    }
-  }, [chatMessages, activeTab]);
-
-  const scrollToBottom = () => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
 
   const fetchProgress = async () => {
     setIsLoading(true);
@@ -271,39 +254,6 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
      }
   };
 
-  // --- ORACLE AI LOGIC ---
-  const sendMessageToOracle = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    if (!chatInput.trim()) return;
-
-    const userMsg = chatInput.trim();
-    setChatMessages(prev => [...prev, { role: 'user', text: userMsg }]);
-    setChatInput('');
-    setIsChatTyping(true);
-
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      // Using Gemini 3 Flash as per guidelines for basic text
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: [
-            { role: 'user', parts: [{ text: "You are Oracle Lex, an expert Legal English Tutor for Brazilian law students. Explain concepts comparing Common Law vs Civil Law when necessary. Be concise, encouraging, and use emojis. Use Markdown." }] },
-            ...chatMessages.map(m => ({ role: m.role, parts: [{ text: m.text }] })),
-            { role: 'user', parts: [{ text: userMsg }] }
-        ]
-      });
-
-      const reply = response.text;
-      if (reply) {
-         setChatMessages(prev => [...prev, { role: 'model', text: reply }]);
-      }
-    } catch (err) {
-      setChatMessages(prev => [...prev, { role: 'model', text: "❌ Connection error with the Oracle. Please try again." }]);
-    } finally {
-      setIsChatTyping(false);
-    }
-  };
-
   const completeLesson = async () => {
     if (!currentLesson || !progress) return;
 
@@ -397,12 +347,6 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
             >
                Vault
             </button>
-            <button 
-               onClick={() => setActiveTab('oracle')}
-               className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeTab === 'oracle' ? 'bg-white dark:bg-sanfran-rubi text-slate-900 dark:text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-               <Bot size={14} /> Oracle
-            </button>
          </div>
       </header>
 
@@ -494,64 +438,6 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
                   </div>
                )}
             </div>
-         </div>
-      )}
-
-      {/* --- ABA ORACLE AI (CHAT) --- */}
-      {activeTab === 'oracle' && (
-         <div className="flex-1 flex flex-col bg-white dark:bg-sanfran-rubiDark/20 rounded-[3rem] border-2 border-slate-200 dark:border-sanfran-rubi/30 shadow-xl overflow-hidden animate-in slide-in-from-right-8">
-            <div className="p-6 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-white/5 flex items-center gap-4">
-               <div className="w-12 h-12 bg-sanfran-rubi rounded-2xl flex items-center justify-center shadow-lg">
-                  <Bot size={24} className="text-white" />
-               </div>
-               <div>
-                  <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Oracle Lex</h3>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Seu Tutor de Inglês Jurídico 24h</p>
-               </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
-               {chatMessages.length === 0 && (
-                  <div className="text-center py-20 opacity-50">
-                     <BrainCircuit size={48} className="mx-auto mb-4 text-slate-300" />
-                     <p className="text-sm font-bold text-slate-400">Pergunte sobre termos, traduções ou conceitos.</p>
-                     <p className="text-xs text-slate-300 mt-2">Ex: "Como digo 'Mandado de Segurança'?"</p>
-                  </div>
-               )}
-               {chatMessages.map((msg, idx) => (
-                  <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                     <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${msg.role === 'user' ? 'bg-slate-900 text-white rounded-tr-none' : 'bg-slate-100 dark:bg-white/10 text-slate-800 dark:text-slate-200 rounded-tl-none border border-slate-200 dark:border-white/5'}`}>
-                        {msg.text}
-                     </div>
-                  </div>
-               ))}
-               {isChatTyping && (
-                  <div className="flex justify-start">
-                     <div className="bg-slate-100 dark:bg-white/10 px-4 py-3 rounded-2xl rounded-tl-none flex gap-1">
-                        <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></span>
-                        <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-100"></span>
-                        <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-200"></span>
-                     </div>
-                  </div>
-               )}
-               <div ref={chatEndRef} />
-            </div>
-
-            <form onSubmit={sendMessageToOracle} className="p-4 bg-white dark:bg-black/20 border-t border-slate-100 dark:border-white/5 flex gap-2">
-               <input 
-                  value={chatInput}
-                  onChange={e => setChatInput(e.target.value)}
-                  placeholder="Digite sua dúvida jurídica..."
-                  className="flex-1 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm font-medium outline-none focus:border-sanfran-rubi transition-colors"
-               />
-               <button 
-                  type="submit"
-                  disabled={!chatInput.trim() || isChatTyping}
-                  className="p-3 bg-sanfran-rubi text-white rounded-2xl shadow-lg hover:bg-sanfran-rubiDark transition-colors disabled:opacity-50"
-               >
-                  <Send size={20} />
-               </button>
-            </form>
          </div>
       )}
 
