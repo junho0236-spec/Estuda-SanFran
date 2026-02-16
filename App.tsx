@@ -485,9 +485,10 @@ const App: React.FC = () => {
               <div className="bg-sanfran-rubi p-2.5 rounded-2xl text-white shadow-lg shadow-red-900/20 group-hover:scale-105 transition-transform">
                 <BookOpen className="w-6 h-6" />
               </div>
-              <div>
-                <h1 className="text-xl font-black dark:text-white leading-none tracking-tight">SanFran Academy</h1>
-                <span className="text-[9px] font-black text-sanfran-rubi uppercase tracking-[0.2em]">XI de Agosto</span>
+              <div className="flex flex-col">
+                <span className="text-xl font-black dark:text-white leading-none tracking-tight">SanFran</span>
+                <span className="text-xl font-black dark:text-white leading-none tracking-tight">Academy</span>
+                <span className="text-[9px] font-black text-sanfran-rubi uppercase tracking-[0.2em] mt-1">XI de Agosto</span>
               </div>
             </button>
             <button onClick={closeSidebar} className="lg:hidden p-2 text-slate-400 hover:text-sanfran-rubi transition-colors">
