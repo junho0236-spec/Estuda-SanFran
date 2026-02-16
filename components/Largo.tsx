@@ -1,12 +1,23 @@
 
 import React from 'react';
-import { Users, User, Zap, BookOpen, BrainCircuit, Coffee, Clock, ShieldCheck, Map as MapIcon, Sparkles } from 'lucide-react';
-import { PresenceUser, View } from '../types';
+import { Users, User, Zap, BookOpen, BrainCircuit, Coffee, Clock, ShieldCheck, Map as MapIcon, Sparkles, Sword } from 'lucide-react';
+import { PresenceUser, View, DuelQuestion } from '../types';
+import { supabase } from '../services/supabaseClient';
 
 interface LargoProps {
   presenceUsers: PresenceUser[];
   currentUserId: string;
 }
+
+const QUESTIONS_POOL: DuelQuestion[] = [
+  { id: '1', question: 'Qual o rito processual para crimes com pena máxima igual ou superior a 4 anos?', options: ['Ordinário', 'Sumário', 'Sumaríssimo', 'Especial'], answer: 0, category: 'Direito Processual Penal' },
+  { id: '2', question: 'A "Pacta Sunt Servanda" refere-se a:', options: ['Livre arbítrio', 'Obrigatoriedade dos contratos', 'Responsabilidade civil', 'Direito de família'], answer: 1, category: 'Direito Civil' },
+  { id: '3', question: 'O Habeas Corpus é um remédio constitucional que protege:', options: ['Propriedade', 'Informação', 'Liberdade de locomoção', 'Direitos políticos'], answer: 2, category: 'Direito Constitucional' },
+  { id: '4', question: 'Quem é o atual Presidente do STF (2024)?', options: ['Gilmar Mendes', 'Luís Roberto Barroso', 'Alexandre de Moraes', 'Cármen Lúcia'], answer: 1, category: 'Atualidades Jurídicas' },
+  { id: '5', question: 'Qual o prazo regimental para sustentação oral nos Tribunais superiores?', options: ['5 minutos', '10 minutos', '15 minutos', '20 minutos'], answer: 2, category: 'Prática Jurídica' },
+  { id: '6', question: 'O princípio da insignificância afasta a:', options: ['Tipicidade formal', 'Tipicidade material', 'Ilicitude', 'Culpabilidade'], answer: 1, category: 'Direito Penal' },
+  { id: '7', question: 'A responsabilidade civil do Estado no Brasil é, via de regra:', options: ['Subjetiva', 'Objetiva', 'Inexistente', 'Solidária apenas'], answer: 1, category: 'Direito Administrativo' }
+];
 
 const Largo: React.FC<LargoProps> = ({ presenceUsers, currentUserId }) => {
   const onlineCount = presenceUsers.length;
@@ -22,6 +33,7 @@ const Largo: React.FC<LargoProps> = ({ presenceUsers, currentUserId }) => {
       case View.Ranking: return 'No Hall da Fama';
       case View.Library: return 'Consultando a Doutrina';
       case View.Largo: return 'No Largo São Francisco';
+      case View.Duel: return 'Em Combate Intelectual';
       default: return 'Caminhando pelas Arcadas';
     }
   };
@@ -32,7 +44,33 @@ const Largo: React.FC<LargoProps> = ({ presenceUsers, currentUserId }) => {
       case View.Anki: return <BrainCircuit className="w-4 h-4 text-usp-blue" />;
       case View.Library: return <BookOpen className="w-4 h-4 text-emerald-500" />;
       case View.Ranking: return <Sparkles className="w-4 h-4 text-usp-gold" />;
+      case View.Duel: return <Sword className="w-4 h-4 text-red-500 animate-bounce" />;
       default: return <User className="w-4 h-4 text-slate-400" />;
+    }
+  };
+
+  const challengeUser = async (opponent: PresenceUser) => {
+    const challenger = presenceUsers.find(u => u.user_id === currentUserId);
+    if (!challenger) return;
+
+    // Sorteia 5 questões
+    const shuffled = [...QUESTIONS_POOL].sort(() => 0.5 - Math.random());
+    const selectedQuestions = shuffled.slice(0, 5);
+
+    try {
+      const { error } = await supabase.from('duels').insert({
+        challenger_id: currentUserId,
+        challenger_name: challenger.name,
+        opponent_id: opponent.user_id,
+        opponent_name: opponent.name,
+        status: 'pending',
+        questions: selectedQuestions
+      });
+
+      if (error) throw error;
+      alert(`Desafio enviado para ${opponent.name}! Aguardando aceite...`);
+    } catch (e) {
+      alert("Falha ao protocolar desafio.");
     }
   };
 
@@ -121,7 +159,16 @@ const Largo: React.FC<LargoProps> = ({ presenceUsers, currentUserId }) => {
             </div>
 
             <div className="mt-6 pt-4 border-t border-slate-100 dark:border-white/5 flex items-center justify-between">
-               <span className="text-[8px] font-bold text-slate-300 uppercase">SanFran Connect</span>
+               {user.user_id !== currentUserId ? (
+                 <button 
+                  onClick={() => challengeUser(user)}
+                  className="flex items-center gap-2 px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg hover:scale-105 transition-transform"
+                 >
+                   <Sword size={14} /> Desafiar
+                 </button>
+               ) : (
+                 <span className="text-[8px] font-bold text-slate-300 uppercase">SanFran Connect</span>
+               )}
                <div className="flex gap-1">
                   <ShieldCheck className="w-3 h-3 text-slate-200" />
                   <Coffee className="w-3 h-3 text-slate-200" />

@@ -1,10 +1,11 @@
 
-import { Brain, CheckCircle2, Clock, Zap, TrendingUp, Medal, Gavel, Award, Scale, Briefcase, GraduationCap, Quote, Sun, Book, Shield, Zap as ZapIcon, Trophy, BookOpen, Layout, MousePointerClick, Calculator } from 'lucide-react';
-import React, { useMemo } from 'react';
+import { Brain, CheckCircle2, Clock, Zap, TrendingUp, Medal, Gavel, Award, Scale, Briefcase, GraduationCap, Quote, Sun, Book, Shield, Zap as ZapIcon, Trophy, BookOpen, Layout, MousePointerClick, Calculator, Target, Calendar } from 'lucide-react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, Subject, Flashcard, Task, StudySession, Reading } from '../types';
 import { getBrasiliaDate } from '../App';
 import BadgeGallery, { BadgeData } from './BadgeGallery';
 import CompetenceRadar from './CompetenceRadar';
+import { supabase } from '../services/supabaseClient';
 
 interface DashboardProps {
   subjects: Subject[];
@@ -16,6 +17,26 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, studySessions, readings, onNavigate }) => {
+  const [oabDate, setOabDate] = useState<string>('2024-12-01');
+
+  useEffect(() => {
+    const fetchConfig = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase.from('user_configs').select('oab_exam_date').eq('user_id', user.id).single();
+        if (data) setOabDate(data.oab_exam_date);
+      }
+    };
+    fetchConfig();
+  }, []);
+
+  const daysToOab = useMemo(() => {
+    const target = new Date(oabDate + 'T00:00:00');
+    const now = new Date();
+    const diffTime = target.getTime() - now.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  }, [oabDate]);
+
   const legalQuotes = [
     "A justiça é a constante e perpétua vontade de dar a cada um o seu. - Ulpiano",
     "A lei é a razão livre da paixão. - Aristóteles",
@@ -44,7 +65,6 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
     return { value: hours, unit: 'h', sub: 'Horas acumuladas' };
   }, [totalSeconds]);
 
-  // --- Sistema de Patentes ---
   const ranks = [
     { name: 'Bacharel', hours: 0, icon: GraduationCap, color: 'text-slate-400', bg: 'bg-slate-100', border: 'border-slate-200' },
     { name: 'Advogado Júnior', hours: 20, icon: Briefcase, color: 'text-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-200' },
@@ -96,7 +116,6 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
     return currentStreak;
   }, [studySessions, tasks]);
 
-  // --- Lógica de Badges ---
   const badges: BadgeData[] = useMemo(() => {
     return [
       {
@@ -133,7 +152,6 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
         isUnlocked: (() => {
           const constSubject = subjects.find(s => s.name.toLowerCase().includes('const'));
           if (!constSubject) return false;
-          // Contamos flashcards desta disciplina. Num sistema ideal, contaríamos revisões históricas.
           return flashcards.filter(f => f.subjectId === constSubject.id).length >= 50; 
         })(),
         color: 'text-usp-blue'
@@ -167,6 +185,42 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
 
   return (
     <div className="space-y-8 md:space-y-12 animate-in fade-in duration-500 pb-20">
+      
+      {/* Widget OAB Countdown no Topo */}
+      <div 
+        onClick={() => onNavigate(View.OabCountdown)}
+        className={`group cursor-pointer rounded-[2rem] p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 border-b-[8px] transition-all hover:scale-[1.01] active:scale-[0.99] shadow-2xl relative overflow-hidden ${
+          daysToOab < 15 ? 'bg-sanfran-rubi border-sanfran-rubiDark text-white' : 
+          daysToOab < 45 ? 'bg-orange-500 border-orange-700 text-white' : 
+          'bg-usp-blue border-[#0b6a7a] text-white'
+        }`}
+      >
+        <div className="absolute top-0 left-0 p-10 opacity-10 pointer-events-none group-hover:scale-110 transition-transform">
+           <Target size={180} />
+        </div>
+        
+        <div className="flex items-center gap-6 relative z-10 text-center md:text-left">
+           <div className="w-16 h-16 md:w-20 md:h-20 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-md border border-white/30">
+              <Target size={32} className="text-white" />
+           </div>
+           <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-80 mb-1">Missão Principal</p>
+              <h3 className="text-2xl md:text-3xl font-black uppercase tracking-tighter">Aprovação na OAB</h3>
+              <p className="text-xs font-bold opacity-70 flex items-center gap-2 justify-center md:justify-start">
+                 <Calendar size={12} /> {new Date(oabDate).toLocaleDateString('pt-BR')}
+              </p>
+           </div>
+        </div>
+
+        <div className="flex flex-col items-center md:items-end relative z-10">
+           <span className="text-[10px] font-black uppercase tracking-widest opacity-80 mb-1">Contagem de Urgência</span>
+           <div className="flex items-baseline gap-2">
+              <span className="text-5xl md:text-7xl font-black tabular-nums">{daysToOab > 0 ? daysToOab : '0'}</span>
+              <span className="text-xl font-black uppercase tracking-tighter">Dias</span>
+           </div>
+        </div>
+      </div>
+
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="text-center md:text-left">
           <h2 className="text-3xl md:text-5xl font-black text-slate-950 dark:text-white tracking-tight">Salve, Doutor(a)! 🏛️</h2>
@@ -257,17 +311,14 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
         />
       </div>
 
-      {/* --- RADAR E DOUTRINA LADO A LADO --- */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-10">
         <div className="lg:col-span-1">
            <CompetenceRadar subjects={subjects} studySessions={studySessions} />
         </div>
 
         <div className="lg:col-span-2 flex flex-col gap-6 md:gap-10">
-          {/* Galeria de Badges */}
           <BadgeGallery badges={badges} />
 
-          {/* Doutrina */}
           <div className="bg-white dark:bg-sanfran-rubiDark/30 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl border-t-[10px] md:border-t-[12px] border-t-sanfran-rubi">
             <div className="flex items-center justify-between mb-6 md:mb-8">
               <h3 className="text-xl md:text-3xl font-black flex items-center gap-4 text-slate-950 dark:text-white uppercase tracking-tight">
@@ -283,7 +334,6 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
         </div>
       </div>
 
-      {/* Cadeiras (Reposicionado) */}
       <div className="bg-white dark:bg-sanfran-rubiDark/30 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl border-t-[10px] md:border-t-[12px] border-t-usp-blue">
         <h3 className="text-xl md:text-3xl font-black mb-6 md:mb-10 text-slate-950 dark:text-white uppercase tracking-tight">Cadeiras Matriculadas</h3>
         <div className="space-y-4 md:space-y-6">

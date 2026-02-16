@@ -21,7 +21,13 @@ export enum View {
   Timeline = 'timeline',
   DeadArchive = 'dead_archive',
   CitationGenerator = 'citation_generator',
-  JurisprudenceMural = 'jurisprudence_mural'
+  JurisprudenceMural = 'jurisprudence_mural',
+  SumulaChallenge = 'sumula_challenge',
+  Sebo = 'sebo',
+  Duel = 'duel',
+  OabCountdown = 'oab_countdown',
+  Specialization = 'specialization',
+  TypingChallenge = 'typing_challenge'
 }
 
 export interface Folder {
@@ -151,6 +157,16 @@ export interface SocietyMessage {
   created_at: string;
 }
 
+export interface SocietyDeadline {
+  id: string;
+  society_id: string;
+  title: string;
+  date: string; // YYYY-MM-DD
+  category: 'prova' | 'trabalho' | 'seminario' | 'outros';
+  created_by: string;
+  created_at: string;
+}
+
 export type QuestType = 'focus_time' | 'review_cards' | 'complete_task';
 
 export interface Quest {
@@ -198,4 +214,42 @@ export interface JurisVote {
   vote: 'deferido' | 'indeferido';
   foundation: string;
   created_at: string;
+}
+
+export interface OfficeTrade {
+  id: string;
+  user_id: string;
+  user_name: string;
+  offered_item_id: string;
+  requested_item_id: string;
+  status: 'open' | 'completed' | 'cancelled';
+  created_at: string;
+}
+
+export interface DuelQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  answer: number;
+  category: string;
+}
+
+export interface Duel {
+  id: string;
+  challenger_id: string;
+  challenger_name: string;
+  opponent_id: string;
+  opponent_name: string;
+  status: 'pending' | 'active' | 'finished' | 'declined';
+  questions: DuelQuestion[];
+  challenger_score: number;
+  opponent_score: number;
+  challenger_progress: number;
+  opponent_progress: number;
+  winner_id: string | null;
+  created_at: string;
+}
+
+export interface UserConfig {
+  oab_exam_date: string;
 }

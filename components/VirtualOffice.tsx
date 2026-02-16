@@ -17,10 +17,10 @@ interface VirtualOfficeProps {
 }
 
 // --- TIPOS ---
-type ItemCategory = 'wall' | 'floor' | 'window' | 'desk' | 'chair' | 'rug' | 'decor_left' | 'decor_right' | 'desktop';
-type Rarity = 'common' | 'rare' | 'epic' | 'legendary';
+export type ItemCategory = 'wall' | 'floor' | 'window' | 'desk' | 'chair' | 'rug' | 'decor_left' | 'decor_right' | 'desktop';
+export type Rarity = 'common' | 'rare' | 'epic' | 'legendary';
 
-interface OfficeItem {
+export interface OfficeItem {
   id: string;
   name: string;
   description: string;
@@ -31,7 +31,7 @@ interface OfficeItem {
 }
 
 // --- CATÁLOGO EXPANDIDO ---
-const CATALOG: Record<ItemCategory, OfficeItem[]> = {
+export const CATALOG: Record<ItemCategory, OfficeItem[]> = {
   wall: [
     { id: 'wall_white', name: 'Alvenaria Branca', description: 'O clássico básico.', rarity: 'common', icon: Box, color: 'bg-slate-100', isDefault: true },
     { id: 'wall_concrete', name: 'Concreto Aparente', description: 'Estilo industrial moderno.', rarity: 'common', icon: Box, color: 'bg-zinc-400' },
@@ -206,7 +206,6 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
   }, [userName]);
 
   // Lógica de Ganhar Caixas (Cálculo Persistente)
-  // Total Ganhas = (Horas Totais / 20) + BonusBoxes - BoxesOpened
   useEffect(() => {
     if (!isLoading) {
         const boxesEarnedFromHours = Math.floor(totalHours / 20);
@@ -273,17 +272,12 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
          finalPick = { item: fallbackItem, category: 'desk' as ItemCategory};
       }
 
-      // 2. Persistência no Supabase
+      // 2. Persistência no Supabase - AGORA PERMITE DUPLICADOS
       try {
           const { data: { user } } = await supabase.auth.getUser();
           if (user) {
-              const newInventory = inventory.includes(finalPick.item.id) 
-                  ? inventory 
-                  : [...inventory, finalPick.item.id];
-              
-              if (!inventory.includes(finalPick.item.id)) {
-                  setInventory(newInventory);
-              }
+              const newInventory = [...inventory, finalPick.item.id];
+              setInventory(newInventory);
 
               await supabase.from('office_state').update({ 
                   inventory: newInventory,
@@ -317,7 +311,7 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
     }
   };
 
-  // ... (RENDERERS MANTIDOS)
+  // ... (RESTO DOS RENDERERS MANTIDOS IGUAL)
   const renderWall = () => {
     const style = config.wall;
     let bgClass = "bg-slate-200";

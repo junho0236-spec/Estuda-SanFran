@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale } from 'lucide-react';
-import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser } from './types';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard } from 'lucide-react';
+import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel } from './types';
 import Dashboard from './components/Dashboard';
 import Anki from './components/Anki';
 import Pomodoro from './components/Pomodoro';
@@ -27,6 +27,12 @@ import TimelineBuilder from './components/TimelineBuilder';
 import DeadArchive from './components/DeadArchive';
 import CitationGenerator from './components/CitationGenerator';
 import JurisprudenceMural from './components/JurisprudenceMural';
+import SumulaChallenge from './components/SumulaChallenge';
+import Sebo from './components/Sebo';
+import DuelArena from './components/DuelArena';
+import OabCountdown from './components/OabCountdown';
+import SpecializationTree from './components/SpecializationTree';
+import TypingChallenge from './components/TypingChallenge';
 import { supabase } from './services/supabaseClient';
 
 export const getBrasiliaDate = () => {
@@ -83,6 +89,10 @@ const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
   const [presenceUsers, setPresenceUsers] = useState<PresenceUser[]>([]);
 
+  // DUEL STATES
+  const [activeDuel, setActiveDuel] = useState<Duel | null>(null);
+  const [incomingDuel, setIncomingDuel] = useState<Duel | null>(null);
+
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem('omnistudy_darkmode');
     return saved ? JSON.parse(saved) : false;
@@ -110,7 +120,7 @@ const App: React.FC = () => {
 
   const isExtremeFocus = timerIsActive && currentView === View.Timer && timerMode === 'work';
 
-  // --- Realtime Presence Logic ---
+  // --- Realtime Presence & Duel Listening ---
   useEffect(() => {
     if (!isAuthenticated || !session?.user) return;
 
@@ -153,8 +163,33 @@ const App: React.FC = () => {
         }
       });
 
+    // LISTEN FOR DUELS
+    const duelsChannel = supabase.channel('global_duels')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'duels'
+      }, (payload) => {
+        const duel = payload.new as Duel;
+        if (!duel) return;
+
+        // SE EU SOU O OPONENTE E ESTÁ PENDENTE: Mostra notificação
+        if (duel.opponent_id === session.user.id && duel.status === 'pending') {
+          setIncomingDuel(duel);
+        }
+
+        // SE O DUELO FICOU ATIVO: Entra na arena
+        if ((duel.challenger_id === session.user.id || duel.opponent_id === session.user.id) && duel.status === 'active') {
+          setIncomingDuel(null);
+          setActiveDuel(duel);
+          setCurrentView(View.Duel);
+        }
+      })
+      .subscribe();
+
     return () => {
       channel.unsubscribe();
+      supabase.removeChannel(duelsChannel);
     };
   }, [isAuthenticated, session, currentView, timerIsActive, timerSelectedSubjectId, subjects, currentRoomId, roomStartTime]);
 
@@ -326,13 +361,36 @@ const App: React.FC = () => {
     localStorage.setItem('omnistudy_darkmode', JSON.stringify(isDarkMode));
   }, [isDarkMode]);
 
+  const acceptDuel = async (duel: Duel) => {
+    try {
+      await supabase.from('duels').update({ status: 'active' }).eq('id', duel.id);
+      setIncomingDuel(null);
+    } catch (e) {
+      alert("Erro ao aceitar desafio.");
+    }
+  };
+
+  const declineDuel = async (duel: Duel) => {
+    try {
+      await supabase.from('duels').update({ status: 'declined' }).eq('id', duel.id);
+      setIncomingDuel(null);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const closeSidebar = () => setIsSidebarOpen(false);
 
   if (!isAuthenticated) return <Login onLogin={() => setIsAuthenticated(true)} />;
 
   const navItems = [
     { id: View.Dashboard, icon: LayoutDashboard, label: 'Painel', color: 'text-slate-600', bg: 'bg-slate-100' },
+    { id: View.OabCountdown, icon: Target, label: 'Foco OAB', color: 'text-sanfran-rubi', bg: 'bg-red-50' },
+    { id: View.TypingChallenge, icon: Keyboard, label: 'Datilografia', color: 'text-slate-700', bg: 'bg-slate-200' },
+    { id: View.Specialization, icon: Network, label: 'Árvore de Especialização', color: 'text-purple-600', bg: 'bg-purple-100' },
     { id: View.Office, icon: Armchair, label: 'Escritório', color: 'text-amber-600', bg: 'bg-amber-100' },
+    { id: View.Sebo, icon: ShoppingBag, label: 'O Sebo', color: 'text-stone-600', bg: 'bg-stone-100' },
+    { id: View.SumulaChallenge, icon: Gamepad2, label: 'Game Súmulas', color: 'text-orange-500', bg: 'bg-orange-50' },
     { id: View.JurisprudenceMural, icon: Scale, label: 'Jurisprudência', color: 'text-indigo-600', bg: 'bg-indigo-100' },
     { id: View.Timeline, icon: GitCommit, label: 'Timeline', color: 'text-pink-600', bg: 'bg-pink-100' },
     { id: View.Editais, icon: ClipboardList, label: 'Editais', color: 'text-blue-600', bg: 'bg-blue-100' },
@@ -359,6 +417,23 @@ const App: React.FC = () => {
     <div className={`flex h-screen overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#fcfcfc]'}`}>
       <Atmosphere isExtremeFocus={isExtremeFocus} />
       {session?.user && <Scratchpad userId={session.user.id} isExtremeFocus={isExtremeFocus} />}
+
+      {/* NOTIFICAÇÃO DE DUELO */}
+      {incomingDuel && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] w-full max-w-sm px-4 animate-in slide-in-from-top-10">
+           <div className="bg-white dark:bg-slate-900 rounded-[2rem] border-4 border-sanfran-rubi shadow-2xl p-6 flex flex-col items-center text-center">
+              <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-4 border-2 border-sanfran-rubi animate-pulse">
+                 <Sword className="text-sanfran-rubi w-8 h-8" />
+              </div>
+              <h4 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-1">Desafio Recebido!</h4>
+              <p className="text-xs text-slate-500 font-bold mb-6"><b>{incomingDuel.challenger_name}</b> convocou você para um Duelo de Jurisconsultos.</p>
+              <div className="grid grid-cols-2 gap-3 w-full">
+                 <button onClick={() => declineDuel(incomingDuel)} className="py-3 bg-slate-100 dark:bg-white/10 text-slate-500 rounded-xl font-black uppercase text-[10px] tracking-widest">Declinar</button>
+                 <button onClick={() => acceptDuel(incomingDuel)} className="py-3 bg-sanfran-rubi text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-red-900/20">Aceitar Lide</button>
+              </div>
+           </div>
+        </div>
+      )}
 
       {isSidebarOpen && !isExtremeFocus && (
         <div 
@@ -458,6 +533,9 @@ const App: React.FC = () => {
               />
             )}
             {currentView === View.Office && <VirtualOffice studySessions={studySessions} userName={session.user.user_metadata?.full_name} />}
+            {currentView === View.Sebo && <Sebo userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
+            {currentView === View.Specialization && <SpecializationTree subjects={subjects} studySessions={studySessions} />}
+            {currentView === View.SumulaChallenge && <SumulaChallenge userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
             {currentView === View.JurisprudenceMural && <JurisprudenceMural userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
             {currentView === View.Societies && <Societies userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
             {currentView === View.LeiSeca && <LeiSeca userId={session.user.id} />}
@@ -471,6 +549,15 @@ const App: React.FC = () => {
             {currentView === View.Mural && <Mural userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
             {currentView === View.Calculator && <GradeCalculator subjects={subjects} />}
             {currentView === View.DeadlineCalculator && <DeadlineCalculator />}
+            {currentView === View.OabCountdown && <OabCountdown userId={session.user.id} />}
+            {currentView === View.TypingChallenge && <TypingChallenge userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
+            {currentView === View.Duel && activeDuel && (
+              <DuelArena 
+                duel={activeDuel} 
+                userId={session.user.id} 
+                onFinished={() => { setActiveDuel(null); setCurrentView(View.Largo); }} 
+              />
+            )}
             
             {currentView === View.StudyRoom && (
               <StudyRooms 
