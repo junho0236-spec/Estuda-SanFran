@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2 } from 'lucide-react';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser } from './types';
 import Dashboard from './components/Dashboard';
 import Anki from './components/Anki';
@@ -13,6 +13,7 @@ import Library from './components/Library';
 import Largo from './components/Largo';
 import Mural from './components/Mural';
 import GradeCalculator from './components/GradeCalculator';
+import DeadlineCalculator from './components/DeadlineCalculator';
 import OralArgument from './components/OralArgument';
 import StudyRooms from './components/StudyRooms';
 import Login from './components/Login';
@@ -305,6 +306,7 @@ const App: React.FC = () => {
   const navItems = [
     { id: View.Dashboard, icon: LayoutDashboard, label: 'Painel', color: 'text-slate-600', bg: 'bg-slate-100' },
     { id: View.StudyRoom, icon: Building2, label: 'Salas de Estudos', color: 'text-indigo-600', bg: 'bg-indigo-100' },
+    { id: View.DeadlineCalculator, icon: CalendarClock, label: 'Calc. Prazos', color: 'text-orange-600', bg: 'bg-orange-100' },
     { id: View.Calculator, icon: CalculatorIcon, label: 'Médias USP', color: 'text-emerald-600', bg: 'bg-emerald-100' },
     { id: View.Anki, icon: BrainCircuit, label: 'Flashcards', color: 'text-usp-blue', bg: 'bg-cyan-100' },
     { id: View.Library, icon: LibraryIcon, label: 'Biblioteca', color: 'text-indigo-600', bg: 'bg-indigo-100' },
@@ -425,6 +427,7 @@ const App: React.FC = () => {
             {currentView === View.Largo && <Largo presenceUsers={presenceUsers} currentUserId={session.user.id} />}
             {currentView === View.Mural && <Mural userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
             {currentView === View.Calculator && <GradeCalculator subjects={subjects} />}
+            {currentView === View.DeadlineCalculator && <DeadlineCalculator />}
             
             {currentView === View.StudyRoom && (
               <StudyRooms 

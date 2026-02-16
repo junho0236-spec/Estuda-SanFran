@@ -11,6 +11,7 @@ export enum View {
   Largo = 'largo',
   Mural = 'mural',
   Calculator = 'calculator',
+  DeadlineCalculator = 'deadline_calculator',
   OralArgument = 'oral_argument',
   StudyRoom = 'study_room'
 }
