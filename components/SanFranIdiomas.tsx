@@ -418,7 +418,8 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
         completed_lessons: newCompleted,
         current_level_id: nextLessonId,
         total_xp: newXP,
-        streak_count: newStreak
+        streak_count: newStreak,
+        last_activity_date: today
       }) : null);
 
       setShowLessonModal(false);
