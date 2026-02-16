@@ -287,7 +287,25 @@ const App: React.FC = () => {
         id: t.id, title: t.title, completed: t.completed, subjectId: t.subject_id, dueDate: t.due_date, completedAt: t.completed_at,
         priority: t.priority || 'normal', category: t.category || 'geral'
       })));
-      if (resSessions.data) setStudySessions(resSessions.data);
+      
+      if (resSessions.data) {
+        let sessions = resSessions.data;
+        // Mock de 1500h para o usuário TESTE ACADÊMICO
+        if (session.user?.user_metadata?.full_name === 'TESTE ACADÊMICO') {
+          sessions = [
+            ...sessions, 
+            {
+              id: 'mock-1500-hours',
+              user_id: userId,
+              duration: 1500 * 3600, // 1500 horas convertidas para segundos
+              subject_id: 'mock-subject',
+              start_time: new Date().toISOString()
+            }
+          ];
+        }
+        setStudySessions(sessions);
+      }
+
       if (resReadings.data) setReadings(resReadings.data);
     } catch (err) {
       console.error("Erro crítico no carregamento do protocolo acadêmico:", err);
