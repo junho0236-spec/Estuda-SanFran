@@ -14,7 +14,8 @@ export enum View {
   DeadlineCalculator = 'deadline_calculator',
   OralArgument = 'oral_argument',
   StudyRoom = 'study_room',
-  Office = 'office'
+  Office = 'office',
+  Societies = 'societies'
 }
 
 export interface Folder {
@@ -112,5 +113,32 @@ export interface MuralMessage {
   user_name: string;
   content: string;
   color: 'yellow' | 'blue' | 'red' | 'green';
+  created_at: string;
+}
+
+export interface Society {
+  id: string;
+  name: string;
+  motto: string;
+  created_by: string;
+  created_at: string;
+  // Campos calculados no frontend
+  total_hours?: number;
+  member_count?: number;
+}
+
+export interface SocietyMember {
+  user_id: string;
+  name: string;
+  total_seconds: number;
+  role?: 'founder' | 'associate';
+}
+
+export interface SocietyMessage {
+  id: string;
+  society_id: string;
+  user_id: string;
+  user_name: string;
+  content: string;
   created_at: string;
 }
