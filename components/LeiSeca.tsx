@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Book, ChevronRight, CheckCircle2, Circle, ArrowLeft, BarChart3, Scale, Search, PenTool, Highlighter, Paperclip, X, Save, Trash2 } from 'lucide-react';
+import { Book, ChevronRight, CheckCircle2, Circle, ArrowLeft, BarChart3, Scale, Search, PenTool, Highlighter, Paperclip, X, Save, Trash2, Flame, Thermometer } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { ArticleAnnotation } from '../types';
 
@@ -122,6 +122,11 @@ const LeiSeca: React.FC<LeiSecaProps> = ({ userId }) => {
   const [annotations, setAnnotations] = useState<Record<string, ArticleAnnotation>>({});
   const [stats, setStats] = useState<Record<string, number>>({}); // lawId -> count
   
+  // Heatmap State
+  const [isHeatmapMode, setIsHeatmapMode] = useState(false);
+  const [heatmapData, setHeatmapData] = useState<Record<string, number>>({});
+  const [maxClicks, setMaxClicks] = useState(1); // Para normalizar a cor
+
   // UI State
   const [loading, setLoading] = useState(false);
   const [isAnnotationMode, setIsAnnotationMode] = useState(false);
@@ -142,6 +147,7 @@ const LeiSeca: React.FC<LeiSecaProps> = ({ userId }) => {
     if (selectedLaw) {
       fetchLawProgress(selectedLaw.id);
       fetchAnnotations(selectedLaw.id);
+      fetchHeatmap(selectedLaw.id);
     }
   }, [selectedLaw, userId]);
 
@@ -184,6 +190,62 @@ const LeiSeca: React.FC<LeiSecaProps> = ({ userId }) => {
       setAnnotations(annotMap);
     }
     setLoading(false);
+  };
+
+  const fetchHeatmap = async (lawId: string) => {
+    try {
+      const { data } = await supabase
+        .from('user_article_heatmap')
+        .select('article_id, click_count')
+        .eq('user_id', userId)
+        .eq('law_id', lawId);
+
+      if (data) {
+        const heatMap: Record<string, number> = {};
+        let max = 1;
+        data.forEach(row => {
+          heatMap[row.article_id] = row.click_count;
+          if (row.click_count > max) max = row.click_count;
+        });
+        setHeatmapData(heatMap);
+        setMaxClicks(max);
+      }
+    } catch (e) {
+      console.error("Erro ao carregar heatmap (tabela pode não existir ainda).");
+    }
+  };
+
+  const incrementHeatmap = async (articleId: string) => {
+    if (!selectedLaw) return;
+    
+    // Optimistic Update
+    const currentCount = heatmapData[articleId] || 0;
+    const newCount = currentCount + 1;
+    setHeatmapData(prev => ({ ...prev, [articleId]: newCount }));
+    if (newCount > maxClicks) setMaxClicks(newCount);
+
+    try {
+      // Upsert logic via Supabase
+      // First try to select to see if it exists
+      const { data: existing } = await supabase
+        .from('user_article_heatmap')
+        .select('id, click_count')
+        .match({ user_id: userId, law_id: selectedLaw.id, article_id: articleId })
+        .single();
+
+      if (existing) {
+        await supabase
+          .from('user_article_heatmap')
+          .update({ click_count: existing.click_count + 1 })
+          .eq('id', existing.id);
+      } else {
+        await supabase
+          .from('user_article_heatmap')
+          .insert({ user_id: userId, law_id: selectedLaw.id, article_id: articleId, click_count: 1 });
+      }
+    } catch (e) {
+      console.error("Erro ao salvar heatmap:", e);
+    }
   };
 
   const toggleArticleRead = async (articleId: string) => {
@@ -294,6 +356,9 @@ const LeiSeca: React.FC<LeiSecaProps> = ({ userId }) => {
   };
 
   const handleArticleClick = (articleId: string) => {
+    // Independente do modo, sempre conta como "consultado" para o heatmap
+    incrementHeatmap(articleId);
+
     if (isAnnotationMode) {
       openAnnotationModal(articleId);
     } else {
@@ -311,6 +376,17 @@ const LeiSeca: React.FC<LeiSecaProps> = ({ userId }) => {
     }
   };
 
+  const getHeatmapStyle = (count: number) => {
+    // Gradiente: Azul (Frio/Pouco) -> Roxo -> Vermelho (Quente/Muito)
+    if (count === 0) return 'bg-white dark:bg-white/5 text-slate-400 border-slate-200 dark:border-white/10';
+    
+    // Normalização simplificada para thresholds
+    if (count <= 2) return 'bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-900/40 dark:text-sky-200 dark:border-sky-800'; // Cold
+    if (count <= 5) return 'bg-indigo-200 text-indigo-800 border-indigo-300 dark:bg-indigo-900/50 dark:text-indigo-200 dark:border-indigo-700'; // Warm
+    if (count <= 10) return 'bg-orange-300 text-orange-900 border-orange-400 dark:bg-orange-800/60 dark:text-orange-100 dark:border-orange-700'; // Hot
+    return 'bg-red-500 text-white border-red-600 shadow-md shadow-red-500/30'; // Very Hot
+  };
+
   // Render Grid of Articles
   const renderGrid = (start: number, end: number) => {
     const articles = [];
@@ -319,29 +395,36 @@ const LeiSeca: React.FC<LeiSecaProps> = ({ userId }) => {
       const isRead = readArticles.has(id);
       const annotation = annotations[id];
       const hasNote = annotation && annotation.content && annotation.content.trim().length > 0;
-      const highlightClass = annotation && annotation.color !== 'none' ? getHighlightClass(annotation.color) : '';
+      
+      const clickCount = heatmapData[id] || 0;
+
+      let buttonClass = '';
+      if (isHeatmapMode) {
+        buttonClass = getHeatmapStyle(clickCount);
+      } else {
+        const highlightClass = annotation && annotation.color !== 'none' ? getHighlightClass(annotation.color) : '';
+        buttonClass = highlightClass ? highlightClass : 
+          isRead 
+            ? 'bg-slate-800 text-white border-slate-800 shadow-inner' 
+            : 'bg-white dark:bg-white/5 text-slate-400 border-slate-200 dark:border-white/10 hover:border-sanfran-rubi';
+      }
 
       articles.push(
         <button
           key={id}
           onClick={() => handleArticleClick(id)}
-          className={`relative w-10 h-10 rounded-xl text-[10px] font-black flex items-center justify-center transition-all border-2 ${
-            highlightClass ? highlightClass : 
-            isRead 
-              ? 'bg-slate-800 text-white border-slate-800 shadow-inner' 
-              : 'bg-white dark:bg-white/5 text-slate-400 border-slate-200 dark:border-white/10 hover:border-sanfran-rubi'
-          }`}
-          title={`Artigo ${id}º`}
+          className={`relative w-10 h-10 rounded-xl text-[10px] font-black flex items-center justify-center transition-all border-2 ${buttonClass}`}
+          title={isHeatmapMode ? `Art. ${id} - ${clickCount} consultas` : `Artigo ${id}º`}
         >
           {i}
           {/* Clip Icon if has note */}
-          {hasNote && (
+          {!isHeatmapMode && hasNote && (
             <div className="absolute -top-2 -right-2 bg-white dark:bg-black rounded-full p-0.5 border border-slate-200 dark:border-white/20 shadow-sm z-10">
                 <Paperclip size={10} className="text-sanfran-rubi" />
             </div>
           )}
           {/* Read Check if highlighted but also read */}
-          {isRead && highlightClass && (
+          {!isHeatmapMode && isRead && annotation && annotation.color !== 'none' && (
              <div className="absolute inset-0 flex items-center justify-center bg-black/10 rounded-xl">
                 <CheckCircle2 size={12} className="opacity-50" />
              </div>
@@ -369,17 +452,39 @@ const LeiSeca: React.FC<LeiSecaProps> = ({ userId }) => {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col items-end gap-2">
+             <div className="flex items-center gap-3">
+                {isHeatmapMode && (
+                   <div className="flex items-center gap-1 bg-white dark:bg-black/20 px-3 py-1 rounded-full border border-slate-100 dark:border-white/5 shadow-sm">
+                      <span className="w-2 h-2 rounded-full bg-sky-200"></span>
+                      <span className="w-2 h-2 rounded-full bg-indigo-300"></span>
+                      <span className="w-2 h-2 rounded-full bg-orange-400"></span>
+                      <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                      <span className="text-[9px] font-bold uppercase text-slate-400 ml-1">Intensidade</span>
+                   </div>
+                )}
+                
+                <button 
+                  onClick={() => setIsHeatmapMode(!isHeatmapMode)}
+                  className={`p-3 rounded-xl transition-all shadow-sm flex items-center gap-2 ${isHeatmapMode ? 'bg-orange-100 text-orange-600 border-2 border-orange-400' : 'bg-slate-100 dark:bg-white/5 text-slate-400 hover:text-orange-500'}`}
+                  title="Modo Mapa de Calor"
+                >
+                   <Flame size={18} fill={isHeatmapMode ? "currentColor" : "none"} />
+                </button>
+             </div>
+
              <div className="flex items-center gap-2 bg-slate-100 dark:bg-white/5 p-1 rounded-xl border border-slate-200 dark:border-white/10">
                 <button 
                   onClick={() => setIsAnnotationMode(false)}
-                  className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${!isAnnotationMode ? 'bg-white dark:bg-sanfran-rubi text-slate-900 dark:text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  disabled={isHeatmapMode}
+                  className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${!isAnnotationMode && !isHeatmapMode ? 'bg-white dark:bg-sanfran-rubi text-slate-900 dark:text-white shadow-sm' : 'text-slate-400 hover:text-slate-600 disabled:opacity-30'}`}
                 >
                    <CheckCircle2 size={14} /> Leitura
                 </button>
                 <button 
                   onClick={() => setIsAnnotationMode(true)}
-                  className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${isAnnotationMode ? 'bg-white dark:bg-sanfran-rubi text-slate-900 dark:text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  disabled={isHeatmapMode}
+                  className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${isAnnotationMode && !isHeatmapMode ? 'bg-white dark:bg-sanfran-rubi text-slate-900 dark:text-white shadow-sm' : 'text-slate-400 hover:text-slate-600 disabled:opacity-30'}`}
                 >
                    <PenTool size={14} /> Grifo & Notas
                 </button>
