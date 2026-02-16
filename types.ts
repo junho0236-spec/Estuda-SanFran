@@ -17,7 +17,8 @@ export enum View {
   Office = 'office',
   Societies = 'societies',
   LeiSeca = 'lei_seca',
-  Editais = 'editais'
+  Editais = 'editais',
+  Timeline = 'timeline'
 }
 
 export interface Folder {
