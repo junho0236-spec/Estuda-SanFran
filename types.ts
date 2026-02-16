@@ -29,7 +29,8 @@ export enum View {
   Specialization = 'specialization',
   TypingChallenge = 'typing_challenge',
   Petitum = 'petitum',
-  Dosimetria = 'dosimetria'
+  Dosimetria = 'dosimetria',
+  Debate = 'debate'
 }
 
 export interface Folder {

@@ -1,7 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { Calculator, Scale, AlertCircle, ArrowDown, ArrowUp, Info, Check, RotateCcw, Gavel } from 'lucide-react';
+import { Calculator, Scale, AlertCircle, ArrowDown, ArrowUp, Info, Check, RotateCcw, Gavel, Save, History, Trash2, Clock } from 'lucide-react';
+import { supabase } from '../services/supabaseClient';
 
-const Dosimetria: React.FC = () => {
+interface DosimetriaProps {
+  userId: string;
+}
+
+interface SavedCalculation {
+  id: string;
+  title: string;
+  min_years: number;
+  min_months: number;
+  max_years: number;
+  max_months: number;
+  circumstances: Record<string, boolean>;
+  agravantes: number;
+  atenuantes: number;
+  increase_fraction: string;
+  decrease_fraction: string;
+  final_result_months: number;
+  created_at: string;
+}
+
+const Dosimetria: React.FC<DosimetriaProps> = ({ userId }) => {
   // --- STATE DO CRIME E PENA BASE ---
   const [minYears, setMinYears] = useState<number>(0);
   const [minMonths, setMinMonths] = useState<number>(0);
@@ -33,6 +54,27 @@ const Dosimetria: React.FC = () => {
   const [penaBaseMonths, setPenaBaseMonths] = useState<number>(0);
   const [penaIntermediariaMonths, setPenaIntermediariaMonths] = useState<number>(0);
   const [penaFinalMonths, setPenaFinalMonths] = useState<number>(0);
+
+  // --- PERSISTÊNCIA ---
+  const [history, setHistory] = useState<SavedCalculation[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [caseTitle, setCaseTitle] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    fetchHistory();
+  }, [userId]);
+
+  const fetchHistory = async () => {
+    const { data } = await supabase
+      .from('dosimetria_logs')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    
+    if (data) setHistory(data);
+  };
 
   // Helper para converter meses em texto legível
   const formatSentence = (totalMonths: number) => {
@@ -90,9 +132,7 @@ const Dosimetria: React.FC = () => {
     // 3. FASE 3: Pena Definitiva
     // Aplicação de frações sobre a pena intermediária
     // Ordem: Aumento depois Diminuição (ou sucessiva, tanto faz matematicamente se for sobre a base anterior)
-    // Código Penal Art. 68 parágrafo único: No concurso de causas de aumento ou de diminuição previstas na parte especial, pode o juiz limitar-se a um só aumento ou a uma só diminuição, prevalecendo, todavia, a causa que mais aumente ou diminua.
-    // Aqui faremos o cálculo sequencial simples.
-
+    
     let final = intermediate;
 
     // Aplica Aumento
@@ -123,9 +163,65 @@ const Dosimetria: React.FC = () => {
     setIncreaseFraction("0"); setDecreaseFraction("0");
   };
 
-  return (
-    <div className="space-y-10 animate-in fade-in duration-500 pb-20 px-2 md:px-0">
+  const saveCalculation = async () => {
+    if (!caseTitle.trim()) return;
+    setIsLoading(true);
+
+    try {
+      const { data, error } = await supabase.from('dosimetria_logs').insert({
+        user_id: userId,
+        title: caseTitle,
+        min_years: minYears,
+        min_months: minMonths,
+        max_years: maxYears,
+        max_months: maxMonths,
+        circumstances: activeCircumstances,
+        agravantes: agravantesCount,
+        atenuantes: atenuantesCount,
+        increase_fraction: increaseFraction,
+        decrease_fraction: decreaseFraction,
+        final_result_months: penaFinalMonths
+      }).select().single();
+
+      if (error) throw error;
+      if (data) setHistory(prev => [data, ...prev]);
       
+      setSaveModalOpen(false);
+      setCaseTitle('');
+    } catch (e) {
+      console.error(e);
+      alert("Erro ao salvar cálculo.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadCalculation = (calc: SavedCalculation) => {
+    setMinYears(calc.min_years);
+    setMinMonths(calc.min_months);
+    setMaxYears(calc.max_years);
+    setMaxMonths(calc.max_months);
+    setActiveCircumstances(calc.circumstances);
+    setAgravantesCount(calc.agravantes);
+    setAtenuantesCount(calc.atenuantes);
+    setIncreaseFraction(calc.increase_fraction);
+    setDecreaseFraction(calc.decrease_fraction);
+    setShowHistory(false);
+  };
+
+  const deleteCalculation = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("Remover do histórico?")) return;
+    try {
+      await supabase.from('dosimetria_logs').delete().eq('id', id);
+      setHistory(prev => prev.filter(h => h.id !== id));
+    } catch (e) { console.error(e); }
+  };
+
+  return (
+    <div className="space-y-10 animate-in fade-in duration-500 pb-20 px-2 md:px-0 relative">
+      
+      {/* HEADER ACTIONS */}
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
            <div className="inline-flex items-center gap-2 bg-slate-100 dark:bg-white/10 px-4 py-2 rounded-full border border-slate-200 dark:border-white/20 mb-4">
@@ -135,13 +231,92 @@ const Dosimetria: React.FC = () => {
            <h2 className="text-3xl md:text-5xl font-black text-slate-950 dark:text-white uppercase tracking-tighter leading-none">Dosimetria Trifásica</h2>
            <p className="text-slate-500 font-bold italic text-lg mt-2">Cálculo da pena conforme o Art. 68 do Código Penal.</p>
         </div>
-        <button 
-          onClick={resetAll}
-          className="flex items-center gap-2 px-6 py-3 bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-red-500 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all"
-        >
-          <RotateCcw className="w-4 h-4" /> Reiniciar
-        </button>
+        
+        <div className="flex gap-2">
+           <button 
+             onClick={() => setSaveModalOpen(true)}
+             disabled={penaFinalMonths === 0}
+             className="flex items-center gap-2 px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all disabled:opacity-50 shadow-lg"
+           >
+             <Save className="w-4 h-4" /> Salvar
+           </button>
+           <button 
+             onClick={() => setShowHistory(true)}
+             className="flex items-center gap-2 px-6 py-3 bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-sanfran-rubi rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all"
+           >
+             <History className="w-4 h-4" /> Histórico
+           </button>
+           <button 
+             onClick={resetAll}
+             className="p-3 bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-red-500 rounded-2xl transition-all"
+             title="Reiniciar"
+           >
+             <RotateCcw className="w-5 h-5" />
+           </button>
+        </div>
       </header>
+
+      {/* MODAL HISTORY */}
+      {showHistory && (
+         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setShowHistory(false)}>
+            <div className="bg-white dark:bg-[#1a0505] w-full max-w-2xl max-h-[80vh] rounded-[2.5rem] p-8 shadow-2xl overflow-hidden flex flex-col relative" onClick={e => e.stopPropagation()}>
+               <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-2xl font-black uppercase text-slate-900 dark:text-white tracking-tight">Autos Arquivados</h3>
+                  <button onClick={() => setShowHistory(false)} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-white/10"><Check className="w-6 h-6" /></button>
+               </div>
+               
+               <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2">
+                  {history.length === 0 && <p className="text-center text-slate-400 py-10 font-bold uppercase text-xs">Nenhum cálculo salvo.</p>}
+                  {history.map(calc => (
+                     <div 
+                       key={calc.id} 
+                       onClick={() => loadCalculation(calc)}
+                       className="p-5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 hover:border-sanfran-rubi cursor-pointer transition-all group relative"
+                     >
+                        <div className="flex justify-between items-start mb-2">
+                           <h4 className="font-black text-sm uppercase text-slate-800 dark:text-white">{calc.title}</h4>
+                           <span className="text-[9px] font-bold text-slate-400 flex items-center gap-1">
+                              <Clock size={10} /> {new Date(calc.created_at).toLocaleDateString()}
+                           </span>
+                        </div>
+                        <div className="flex justify-between items-end">
+                           <p className="text-xs text-slate-500 line-clamp-1">Base: {calc.min_years}a - {calc.max_years}a</p>
+                           <p className="text-lg font-black text-sanfran-rubi">{formatSentence(calc.final_result_months)}</p>
+                        </div>
+                        <button 
+                           onClick={(e) => deleteCalculation(calc.id, e)}
+                           className="absolute top-4 right-4 p-2 bg-white dark:bg-black rounded-lg text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                        >
+                           <Trash2 size={14} />
+                        </button>
+                     </div>
+                  ))}
+               </div>
+            </div>
+         </div>
+      )}
+
+      {/* MODAL SAVE */}
+      {saveModalOpen && (
+         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in zoom-in-95 duration-200">
+            <div className="bg-white dark:bg-[#1a0505] w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl border-4 border-slate-900 dark:border-sanfran-rubi/30 relative">
+               <h3 className="text-xl font-black uppercase text-slate-900 dark:text-white mb-4">Salvar Cálculo</h3>
+               <input 
+                 value={caseTitle}
+                 onChange={e => setCaseTitle(e.target.value)}
+                 placeholder="Ex: Caso Furto Qualificado - Réu Primário"
+                 className="w-full p-4 bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-white/10 rounded-2xl font-bold outline-none focus:border-sanfran-rubi mb-6"
+                 autoFocus
+               />
+               <div className="flex gap-3">
+                  <button onClick={() => setSaveModalOpen(false)} className="flex-1 py-3 bg-slate-100 dark:bg-white/10 rounded-xl font-black uppercase text-xs">Cancelar</button>
+                  <button onClick={saveCalculation} disabled={isLoading} className="flex-1 py-3 bg-sanfran-rubi text-white rounded-xl font-black uppercase text-xs shadow-lg">
+                     {isLoading ? 'Salvando...' : 'Confirmar'}
+                  </button>
+               </div>
+            </div>
+         </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         

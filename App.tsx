@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator } from 'lucide-react';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel } from './types';
 import Dashboard from './components/Dashboard';
 import Anki from './components/Anki';
@@ -35,6 +35,7 @@ import SpecializationTree from './components/SpecializationTree';
 import TypingChallenge from './components/TypingChallenge';
 import Petitum from './components/Petitum';
 import Dosimetria from './components/Dosimetria';
+import Debate from './components/Debate';
 import { supabase } from './services/supabaseClient';
 
 export const getBrasiliaDate = () => {
@@ -387,6 +388,7 @@ const App: React.FC = () => {
 
   const navItems = [
     { id: View.Dashboard, icon: LayoutDashboard, label: 'Painel', color: 'text-slate-600', bg: 'bg-slate-100' },
+    { id: View.Debate, icon: Megaphone, label: 'Clube de Debates', color: 'text-yellow-600', bg: 'bg-yellow-50' },
     { id: View.Dosimetria, icon: Calculator, label: 'Dosimetria Penal', color: 'text-red-700', bg: 'bg-red-50' },
     { id: View.OabCountdown, icon: Target, label: 'Foco OAB', color: 'text-sanfran-rubi', bg: 'bg-red-50' },
     { id: View.Petitum, icon: FileSignature, label: 'Petitum (Modelos)', color: 'text-teal-600', bg: 'bg-teal-100' },
@@ -553,7 +555,8 @@ const App: React.FC = () => {
             {currentView === View.Mural && <Mural userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
             {currentView === View.Calculator && <GradeCalculator subjects={subjects} />}
             {currentView === View.DeadlineCalculator && <DeadlineCalculator />}
-            {currentView === View.Dosimetria && <Dosimetria />}
+            {currentView === View.Dosimetria && <Dosimetria userId={session.user.id} />}
+            {currentView === View.Debate && <Debate userId={session.user.id} />}
             {currentView === View.OabCountdown && <OabCountdown userId={session.user.id} />}
             {currentView === View.TypingChallenge && <TypingChallenge userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
             {currentView === View.Petitum && <Petitum userId={session.user.id} />}
