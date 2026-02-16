@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 export enum View {
@@ -39,7 +40,8 @@ export enum View {
   LatinGame = 'latin_game',
   SucessaoSimulator = 'sucessao_simulator',
   JurisTinder = 'juris_tinder',
-  InternRPG = 'intern_rpg'
+  InternRPG = 'intern_rpg',
+  PrescriptionCalculator = 'prescription_calculator'
 }
 
 export interface Folder {
