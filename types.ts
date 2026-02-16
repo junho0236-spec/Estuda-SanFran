@@ -28,7 +28,8 @@ export enum View {
   OabCountdown = 'oab_countdown',
   Specialization = 'specialization',
   TypingChallenge = 'typing_challenge',
-  Petitum = 'petitum'
+  Petitum = 'petitum',
+  Dosimetria = 'dosimetria'
 }
 
 export interface Folder {
