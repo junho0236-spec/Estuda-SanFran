@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive } from 'lucide-react';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser } from './types';
 import Dashboard from './components/Dashboard';
 import Anki from './components/Anki';
@@ -25,6 +25,8 @@ import LeiSeca from './components/LeiSeca';
 import Editais from './components/Editais';
 import TimelineBuilder from './components/TimelineBuilder';
 import DeadArchive from './components/DeadArchive';
+import CitationGenerator from './components/CitationGenerator';
+import JurisprudenceMural from './components/JurisprudenceMural';
 import { supabase } from './services/supabaseClient';
 
 export const getBrasiliaDate = () => {
@@ -68,7 +70,7 @@ const BrasiliaClock: React.FC = () => {
       <div className="flex items-center gap-2 text-[10px] font-black uppercase text-sanfran-rubi tracking-widest mb-1">
         <ClockIcon className="w-3 h-3" /> Brasília
       </div>
-      <div className="text-sm font-black text-slate-900 dark:text-white leading-none">{timeStr}</div>
+      <div className="text-sm font-black text-slate-950 dark:text-white leading-none">{timeStr}</div>
       <div className="text-[9px] font-bold text-slate-400 uppercase mt-1">{dateStr}</div>
     </div>
   );
@@ -331,10 +333,12 @@ const App: React.FC = () => {
   const navItems = [
     { id: View.Dashboard, icon: LayoutDashboard, label: 'Painel', color: 'text-slate-600', bg: 'bg-slate-100' },
     { id: View.Office, icon: Armchair, label: 'Escritório', color: 'text-amber-600', bg: 'bg-amber-100' },
+    { id: View.JurisprudenceMural, icon: Scale, label: 'Jurisprudência', color: 'text-indigo-600', bg: 'bg-indigo-100' },
     { id: View.Timeline, icon: GitCommit, label: 'Timeline', color: 'text-pink-600', bg: 'bg-pink-100' },
     { id: View.Editais, icon: ClipboardList, label: 'Editais', color: 'text-blue-600', bg: 'bg-blue-100' },
     { id: View.Societies, icon: Briefcase, label: 'Sociedades', color: 'text-emerald-600', bg: 'bg-emerald-100' },
     { id: View.LeiSeca, icon: Scroll, label: 'Lei Seca', color: 'text-rose-700', bg: 'bg-rose-100' },
+    { id: View.CitationGenerator, icon: Quote, label: 'Citações ABNT', color: 'text-gray-600', bg: 'bg-gray-100' },
     { id: View.StudyRoom, icon: Building2, label: 'Salas de Estudos', color: 'text-indigo-600', bg: 'bg-indigo-100' },
     { id: View.DeadlineCalculator, icon: CalendarClock, label: 'Calc. Prazos', color: 'text-orange-600', bg: 'bg-orange-100' },
     { id: View.Calculator, icon: CalculatorIcon, label: 'Médias USP', color: 'text-emerald-600', bg: 'bg-emerald-100' },
@@ -454,8 +458,10 @@ const App: React.FC = () => {
               />
             )}
             {currentView === View.Office && <VirtualOffice studySessions={studySessions} userName={session.user.user_metadata?.full_name} />}
+            {currentView === View.JurisprudenceMural && <JurisprudenceMural userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
             {currentView === View.Societies && <Societies userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
             {currentView === View.LeiSeca && <LeiSeca userId={session.user.id} />}
+            {currentView === View.CitationGenerator && <CitationGenerator />}
             {currentView === View.Editais && <Editais userId={session.user.id} />}
             {currentView === View.Timeline && <TimelineBuilder />}
             {currentView === View.DeadArchive && <DeadArchive userId={session.user.id} />}

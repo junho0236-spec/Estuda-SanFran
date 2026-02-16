@@ -19,7 +19,9 @@ export enum View {
   LeiSeca = 'lei_seca',
   Editais = 'editais',
   Timeline = 'timeline',
-  DeadArchive = 'dead_archive'
+  DeadArchive = 'dead_archive',
+  CitationGenerator = 'citation_generator',
+  JurisprudenceMural = 'jurisprudence_mural'
 }
 
 export interface Folder {
@@ -176,4 +178,24 @@ export interface ArticleAnnotation {
   article_id: string;
   content: string;
   color: 'yellow' | 'green' | 'pink' | 'blue' | 'none';
+}
+
+// New interfaces for Jurisprudence Mural
+export interface JurisCase {
+  id: string;
+  user_id: string;
+  user_name: string;
+  title: string;
+  content: string;
+  created_at: string;
+}
+
+export interface JurisVote {
+  id: string;
+  case_id: string;
+  user_id: string;
+  user_name: string;
+  vote: 'deferido' | 'indeferido';
+  foundation: string;
+  created_at: string;
 }
