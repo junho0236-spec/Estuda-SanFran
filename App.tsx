@@ -480,14 +480,15 @@ const App: React.FC = () => {
           <div className="flex items-center justify-between mb-4">
             <button
               onClick={() => { setCurrentView(View.Profile); closeSidebar(); }}
-              className="flex items-center gap-3 group text-left"
+              className="flex items-center gap-3 group text-left p-2 -m-2 rounded-xl transition-colors duration-200 hover:bg-slate-100/50 dark:hover:bg-white/5"
             >
               <div className="bg-sanfran-rubi p-2.5 rounded-2xl text-white shadow-lg shadow-red-900/20 group-hover:scale-105 transition-transform">
                 <BookOpen className="w-6 h-6" />
               </div>
               <div className="flex flex-col">
-                <span className="text-xl font-black dark:text-white leading-none tracking-tight">SanFran</span>
-                <span className="text-xl font-black dark:text-white leading-none tracking-tight">Academy</span>
+                <span className="text-xl font-black dark:text-white leading-tight tracking-tight">SanFran</span>
+                <span className="text-xl font-black dark:text-white leading-tight tracking-tight -mt-1">Academy</span>
+                <div className="w-full h-[1.5px] bg-sanfran-rubi my-2"></div>
                 <span className="text-xs font-black text-sanfran-rubi uppercase tracking-[0.2em]">XI de Agosto</span>
               </div>
             </button>
