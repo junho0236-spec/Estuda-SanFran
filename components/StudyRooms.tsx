@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Building2, User, Clock, ArrowLeft, Play, Pause, LogOut, BookOpen, Shield, Gavel, Scale, Globe, BrainCircuit, HeartPulse, Briefcase, Landmark, Mic, MicOff, Headphones, HeadphoneOff, Radio, Volume2, Signal } from 'lucide-react';
+import { Building2, User, Clock, ArrowLeft, Play, Pause, LogOut, BookOpen, Shield, Gavel, Scale, Globe, BrainCircuit, HeartPulse, Briefcase, Landmark, Mic, MicOff, Headphones, HeadphoneOff, Radio, Volume2, VolumeX, Signal, SkipForward } from 'lucide-react';
 import { PresenceUser } from '../types';
 import { supabase } from '../services/supabaseClient';
 
@@ -50,7 +50,7 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
   
   // Voice Chat State
   const [isMicOn, setIsMicOn] = useState(false);
-  const [isDeafened, setIsDeafened] = useState(false);
+  const [mutePeers, setMutePeers] = useState(false); // Substitui isDeafened para controlar APENAS voz
   
   // Refs para WebRTC (Estabilidade)
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -61,9 +61,12 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
   const [speakingUsers, setSpeakingUsers] = useState<Set<string>>(new Set());
 
-  // Radio State
-  const [isRadioPlaying, setIsRadioPlaying] = useState(false);
-  const [currentRadioIndex, setCurrentRadioIndex] = useState(0);
+  // Radio State (Sincronizado)
+  // Estado local de volume (se EU quero ouvir o rádio)
+  const [isRadioLocalMuted, setIsRadioLocalMuted] = useState(false); 
+  // Estado global da sala (o que está tocando para todos)
+  const [sharedRadioState, setSharedRadioState] = useState({ isPlaying: false, trackIndex: 0 });
+  
   const radioRef = useRef<HTMLAudioElement | null>(null);
 
   // Initial setup for room
@@ -87,7 +90,7 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
     return () => clearInterval(interval);
   }, [isActive]);
 
-  // --- WEBRTC SIGNALING ---
+  // --- WEBRTC SIGNALING & RADIO SYNC ---
   const rtcConfig = {
     iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
   };
@@ -102,6 +105,7 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
     channelRef.current = channel;
 
     channel
+      // WebRTC Events
       .on('broadcast', { event: 'offer' }, async ({ payload }) => {
         if (payload.target === currentUserId) {
           await handleReceiveOffer(payload.offer, payload.caller);
@@ -117,15 +121,33 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
           await handleReceiveIce(payload.candidate, payload.caller);
         }
       })
+      // Presence / Join Events
       .on('broadcast', { event: 'join-voice' }, async ({ payload }) => {
         if (payload.userId !== currentUserId) {
-          // Alguém entrou ou ligou o mic, vamos conectar
+          // 1. Conectar Voz
           await initiateCall(payload.userId);
+          
+          // 2. Sincronizar Rádio (Se eu souber o estado atual e estiver tocando, aviso quem entrou)
+          if (sharedRadioState.isPlaying) {
+             channel.send({
+                type: 'broadcast',
+                event: 'radio-sync',
+                payload: { state: sharedRadioState }
+             });
+          }
         }
+      })
+      // Radio Global Events
+      .on('broadcast', { event: 'radio-update' }, ({ payload }) => {
+         setSharedRadioState(payload.state);
+      })
+      .on('broadcast', { event: 'radio-sync' }, ({ payload }) => {
+         // Recebe estado atual ao entrar
+         setSharedRadioState(payload.state);
       })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
-          // Anuncia presença
+          // Anuncia presença e pede estado
           channel.send({
             type: 'broadcast',
             event: 'join-voice',
@@ -150,7 +172,6 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
   }, [currentRoomId, currentUserId]); 
 
   // --- WEBRTC HANDLERS ---
-
   const createPeerConnection = (targetUserId: string) => {
     const pc = new RTCPeerConnection(rtcConfig);
     
@@ -175,21 +196,15 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
   };
 
   const initiateCall = async (targetUserId: string) => {
-    // Fecha conexão anterior se existir para reiniciar limpo
     if (peersRef.current[targetUserId]) {
         peersRef.current[targetUserId].close();
     }
-
     const pc = createPeerConnection(targetUserId);
-    
-    // Adiciona tracks locais se existirem
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => pc.addTrack(track, localStreamRef.current!));
     }
-    
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-
     channelRef.current?.send({
       type: 'broadcast',
       event: 'offer',
@@ -198,28 +213,21 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
   };
 
   const handleReceiveOffer = async (offer: RTCSessionDescriptionInit, callerId: string) => {
-    // Se receber oferta, cria ou recupera PC (renegociação)
     let pc = peersRef.current[callerId];
     if (!pc || pc.signalingState === 'closed') {
         pc = createPeerConnection(callerId);
     }
-
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
-    
-    // Adiciona nosso áudio à resposta se o mic estiver ligado
     if (localStreamRef.current) {
        const senders = pc.getSenders();
        localStreamRef.current.getTracks().forEach(track => {
-           // Evita adicionar duplicado
            if (!senders.find(s => s.track?.id === track.id)) {
                pc.addTrack(track, localStreamRef.current!);
            }
        });
     }
-
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
-
     channelRef.current?.send({
       type: 'broadcast',
       event: 'answer',
@@ -229,145 +237,123 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
 
   const handleReceiveAnswer = async (answer: RTCSessionDescriptionInit, callerId: string) => {
     const pc = peersRef.current[callerId];
-    if (pc) {
-      await pc.setRemoteDescription(new RTCSessionDescription(answer));
-    }
+    if (pc) await pc.setRemoteDescription(new RTCSessionDescription(answer));
   };
 
   const handleReceiveIce = async (candidate: RTCIceCandidateInit, callerId: string) => {
     const pc = peersRef.current[callerId];
     if (pc) {
-      try {
-        await pc.addIceCandidate(new RTCIceCandidate(candidate));
-      } catch (e) {
-        console.error("Erro ao adicionar ICE candidate", e);
-      }
+      try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch (e) { console.error(e); }
     }
   };
 
   const toggleMic = async () => {
     if (isMicOn) {
-      // Desligar Mic
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(t => t.stop());
         localStreamRef.current = null;
       }
       setIsMicOn(false);
-      // Nota: Idealmente enviaríamos "pare de me ouvir", mas parar a track local já silencia.
     } else {
-      // Ligar Mic
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         localStreamRef.current = stream;
         setIsMicOn(true);
         setupAudioAnalysis(stream, currentUserId);
         
-        // Renegociação: Adiciona track a todos os peers existentes e envia nova oferta
         const peers = peersRef.current;
         const promises = Object.entries(peers).map(async ([targetId, pc]) => {
-             stream.getTracks().forEach(track => {
-                 pc.addTrack(track, stream);
-             });
-             
-             // Cria nova oferta para avisar o outro lado do novo áudio
+             stream.getTracks().forEach(track => pc.addTrack(track, stream));
              const offer = await pc.createOffer();
              await pc.setLocalDescription(offer);
-             
              channelRef.current?.send({
                  type: 'broadcast',
                  event: 'offer',
                  payload: { target: targetId, caller: currentUserId, offer }
              });
         });
-        
-        // Se não tiver ninguém conectado, avisa para conectarem
         if (Object.keys(peers).length === 0) {
-            channelRef.current?.send({
-                type: 'broadcast',
-                event: 'join-voice',
-                payload: { userId: currentUserId }
-            });
+            channelRef.current?.send({ type: 'broadcast', event: 'join-voice', payload: { userId: currentUserId } });
         }
-        
         await Promise.all(promises);
-
       } catch (err) {
         console.error("Error accessing mic:", err);
-        alert("Não foi possível acessar o microfone. Verifique as permissões do navegador.");
+        alert("Permissão de microfone negada.");
       }
     }
   };
 
   const setupAudioAnalysis = (stream: MediaStream, userId: string) => {
-    // Simples visualizador de áudio para saber quem está falando
     try {
         const audioContext = new AudioContext();
         const source = audioContext.createMediaStreamSource(stream);
         const analyser = audioContext.createAnalyser();
         analyser.fftSize = 256;
         source.connect(analyser);
-
         const dataArray = new Uint8Array(analyser.frequencyBinCount);
-        
         const checkAudio = () => {
-          if (!stream.active) {
-              audioContext.close();
-              return;
-          }
-          
+          if (!stream.active) { audioContext.close(); return; }
           analyser.getByteFrequencyData(dataArray);
           const sum = dataArray.reduce((a, b) => a + b, 0);
           const avg = sum / dataArray.length;
-          
-          if (avg > 15) { // Limiar de fala
-            setSpeakingUsers(prev => new Set(prev).add(userId));
-          } else {
-            setSpeakingUsers(prev => {
-              const next = new Set(prev);
-              next.delete(userId);
-              return next;
-            });
-          }
-          
+          if (avg > 15) setSpeakingUsers(prev => new Set(prev).add(userId));
+          else setSpeakingUsers(prev => { const next = new Set(prev); next.delete(userId); return next; });
           requestAnimationFrame(checkAudio);
         };
-        
         checkAudio();
-    } catch (e) {
-        console.error("Audio Analysis setup failed", e);
-    }
+    } catch (e) { console.error(e); }
   };
 
-  // --- RADIO LOGIC ---
+  // --- RADIO LOGIC (LOCAL & GLOBAL) ---
+  
+  // Atualiza o player de áudio baseado no estado compartilhado
   useEffect(() => {
     if (radioRef.current) {
-      if (isRadioPlaying) {
-        radioRef.current.play().catch(e => setIsRadioPlaying(false));
+      // Sincroniza URL se mudou
+      if (radioRef.current.src !== radioTracks[sharedRadioState.trackIndex].url) {
+         radioRef.current.src = radioTracks[sharedRadioState.trackIndex].url;
+      }
+
+      // Controla Play/Pause global
+      if (sharedRadioState.isPlaying) {
+        radioRef.current.play().catch(e => console.log("Autoplay bloqueado (Rádio):", e));
       } else {
         radioRef.current.pause();
       }
-      radioRef.current.volume = isDeafened ? 0 : 0.3; // Lower volume for radio
-    }
-  }, [isRadioPlaying, isDeafened, currentRadioIndex]);
 
-  const toggleRadio = () => setIsRadioPlaying(!isRadioPlaying);
-  const nextTrack = () => {
-    setCurrentRadioIndex((prev) => (prev + 1) % radioTracks.length);
+      // Controla Mute Local (Isolado do WebRTC)
+      radioRef.current.muted = isRadioLocalMuted;
+      radioRef.current.volume = 0.3; 
+    }
+  }, [sharedRadioState, isRadioLocalMuted]);
+
+  // Ações Globais (Afetam todos)
+  const toggleGlobalPlay = () => {
+    const newState = { ...sharedRadioState, isPlaying: !sharedRadioState.isPlaying };
+    setSharedRadioState(newState);
+    channelRef.current?.send({ type: 'broadcast', event: 'radio-update', payload: { state: newState } });
   };
+
+  const nextGlobalTrack = () => {
+    const nextIndex = (sharedRadioState.trackIndex + 1) % radioTracks.length;
+    const newState = { isPlaying: true, trackIndex: nextIndex };
+    setSharedRadioState(newState);
+    channelRef.current?.send({ type: 'broadcast', event: 'radio-update', payload: { state: newState } });
+  };
+
+  // Ação Local
+  const toggleLocalRadioMute = () => setIsRadioLocalMuted(!isRadioLocalMuted);
 
   // --- NAVIGATION ---
-  const joinRoom = (roomId: string) => {
-    setCurrentRoomId(roomId);
-  };
-
+  const joinRoom = (roomId: string) => setCurrentRoomId(roomId);
   const leaveRoom = () => {
     if (confirm("Deseja sair da sala de estudos?")) {
       setIsActive(false);
       setCurrentRoomId(null);
       setRoomStartTime(null);
       setSecondsElapsed(0);
-      setIsMicOn(false); // Cut mic on leave
-      setIsRadioPlaying(false);
+      setIsMicOn(false);
+      setSharedRadioState({ isPlaying: false, trackIndex: 0 }); // Reset local view of state
     }
   };
 
@@ -465,22 +451,23 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
   return (
     <div className="h-[calc(100vh-100px)] flex flex-col animate-in zoom-in-95 duration-500">
       
-      {/* Invisible Audio Elements for Remote Streams */}
+      {/* Invisible Audio Elements for Remote Streams (Voice) */}
       {Object.entries(remoteStreams).map(([userId, stream]) => (
          <audio 
             key={userId} 
             ref={ref => { 
                 if (ref && ref.srcObject !== stream) {
                     ref.srcObject = stream;
-                    // Ensure autoplay works
                     ref.play().catch(e => console.log("Autoplay prevented", e));
                 } 
             }} 
             autoPlay 
-            muted={isDeafened}
+            muted={mutePeers} // Muta APENAS os colegas, não o rádio
          />
       ))}
-      <audio ref={radioRef} src={radioTracks[currentRadioIndex].url} loop />
+      
+      {/* Elemento de Rádio (Separado) */}
+      <audio ref={radioRef} loop />
 
       {/* Header Sala */}
       <div className="flex items-center justify-between mb-8">
@@ -580,25 +567,34 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
                })}
             </div>
 
-            {/* Voice Control Bar (Bottom) */}
+            {/* Voice & Radio Control Bar (Bottom) */}
             <div className="bg-[#1e1e24] p-4 border-t border-black/20">
-               {/* Radio Control */}
-               {isRadioPlaying && (
+               
+               {/* Player de Rádio (Controle Global) */}
+               {sharedRadioState.isPlaying && (
                  <div className="mb-4 bg-black/20 rounded-xl p-3 flex items-center justify-between animate-in slide-in-from-bottom-2">
                     <div className="flex items-center gap-3 overflow-hidden">
                        <div className="bg-emerald-500/20 p-2 rounded-lg">
                           <Radio size={14} className="text-emerald-500 animate-pulse" />
                        </div>
                        <div className="min-w-0">
-                          <p className="text-[10px] font-black text-white uppercase tracking-wider truncate">Rádio SanFran</p>
-                          <p className="text-[9px] font-bold text-emerald-400 uppercase truncate">{radioTracks[currentRadioIndex].name}</p>
+                          <p className="text-[10px] font-black text-white uppercase tracking-wider truncate">Rádio SanFran {isRadioLocalMuted && "(Mutado)"}</p>
+                          <p className="text-[9px] font-bold text-emerald-400 uppercase truncate">{radioTracks[sharedRadioState.trackIndex].name}</p>
                        </div>
                     </div>
-                    <button onClick={nextTrack} className="text-slate-400 hover:text-white"><Play size={12} /></button>
+                    <div className="flex items-center gap-1">
+                       <button onClick={toggleGlobalPlay} className="p-2 text-slate-300 hover:text-white rounded-lg hover:bg-white/10" title="Pausar para todos">
+                          <Pause size={12} fill="currentColor" />
+                       </button>
+                       <button onClick={nextGlobalTrack} className="p-2 text-slate-300 hover:text-white rounded-lg hover:bg-white/10" title="Pular música para todos">
+                          <SkipForward size={12} fill="currentColor" />
+                       </button>
+                    </div>
                  </div>
                )}
 
                <div className="flex items-center justify-between gap-4">
+                  {/* Status do Usuário */}
                   <div className="flex items-center gap-3 overflow-hidden">
                      <div className="relative">
                         <div className="w-10 h-10 rounded-full bg-sanfran-rubi flex items-center justify-center text-white font-black text-xs">
@@ -612,6 +608,7 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
                      </div>
                   </div>
 
+                  {/* Controles Principais */}
                   <div className="flex items-center gap-2">
                      <button 
                         onClick={toggleMic}
@@ -622,19 +619,22 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
                      </button>
                      
                      <button 
-                        onClick={() => setIsDeafened(!isDeafened)}
-                        className={`p-3 rounded-xl transition-all ${!isDeafened ? 'bg-black/20 text-slate-300 hover:bg-black/40' : 'bg-red-500/20 text-red-500'}`}
-                        title={isDeafened ? "Ativar Áudio" : "Desativar Áudio (Deafen)"}
+                        onClick={() => setMutePeers(!mutePeers)}
+                        className={`p-3 rounded-xl transition-all ${!mutePeers ? 'bg-black/20 text-slate-300 hover:bg-black/40' : 'bg-red-500/20 text-red-500'}`}
+                        title={mutePeers ? "Ativar Áudio da Sala (Voz)" : "Mutar Áudio da Sala (Voz)"}
                      >
-                        {isDeafened ? <HeadphoneOff size={18} /> : <Headphones size={18} />}
+                        {mutePeers ? <HeadphoneOff size={18} /> : <Headphones size={18} />}
                      </button>
 
                      <button 
-                        onClick={toggleRadio}
-                        className={`p-3 rounded-xl transition-all ${isRadioPlaying ? 'bg-emerald-500 text-white' : 'bg-black/20 text-slate-300 hover:bg-black/40'}`}
-                        title="Rádio Lofi"
+                        onClick={() => {
+                           if (!sharedRadioState.isPlaying) toggleGlobalPlay(); // Se desligado, liga globalmente
+                           else toggleLocalRadioMute(); // Se ligado, muta localmente
+                        }}
+                        className={`p-3 rounded-xl transition-all ${sharedRadioState.isPlaying && !isRadioLocalMuted ? 'bg-emerald-500 text-white' : 'bg-black/20 text-slate-300 hover:bg-black/40'}`}
+                        title={sharedRadioState.isPlaying ? (isRadioLocalMuted ? "Desmutar Rádio (Local)" : "Mutar Rádio (Local)") : "Ligar Rádio (Global)"}
                      >
-                        {isRadioPlaying ? <Volume2 size={18} /> : <Radio size={18} />}
+                        {sharedRadioState.isPlaying ? (isRadioLocalMuted ? <VolumeX size={18} /> : <Volume2 size={18} />) : <Radio size={18} />}
                      </button>
                   </div>
                </div>
