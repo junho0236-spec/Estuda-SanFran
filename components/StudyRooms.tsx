@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Building2, User, Clock, ArrowLeft, Play, Pause, LogOut, BookOpen, Shield, Gavel, Scale, Globe, BrainCircuit, HeartPulse, Briefcase, Landmark, Mic, MicOff, Headphones, HeadphoneOff, Radio, Volume2, VolumeX, Signal, Music, Link as LinkIcon, Share2, Info, Youtube, Wifi, WifiOff, ExternalLink } from 'lucide-react';
+import { Building2, User, Clock, ArrowLeft, Play, Pause, LogOut, BookOpen, Shield, Gavel, Scale, Globe, BrainCircuit, HeartPulse, Briefcase, Landmark, Mic, MicOff, Headphones, HeadphoneOff, Radio, Volume2, VolumeX, Signal, Music, Link as LinkIcon, Share2, Info, Youtube, Wifi, WifiOff } from 'lucide-react';
 import { PresenceUser } from '../types';
 import { supabase } from '../services/supabaseClient';
 
@@ -32,7 +32,7 @@ const departments: Department[] = [
   { id: 'DFD', code: 'DFD', name: 'Filosofia do Direito', icon: BrainCircuit, color: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400' },
 ];
 
-type MediaType = 'spotify' | 'youtube';
+type MediaType = 'youtube';
 
 interface MediaPreset {
   name: string;
@@ -41,12 +41,12 @@ interface MediaPreset {
 }
 
 const presets: MediaPreset[] = [
-  { name: 'Lofi Girl (YT)', url: 'https://www.youtube.com/watch?v=jfKfPfyJRdk', type: 'youtube' },
-  { name: 'Jazz Relax (YT)', url: 'https://www.youtube.com/watch?v=Dx5qFachd3A', type: 'youtube' },
-  { name: 'Piano Focus (YT)', url: 'https://www.youtube.com/watch?v=WJ3-F02-F_Y', type: 'youtube' },
-  { name: 'Spotify Lofi', url: 'https://open.spotify.com/playlist/0vvXsWCC9xrXsKd4FyS8kM', type: 'spotify' },
-  { name: 'Spotify Clássica', url: 'https://open.spotify.com/playlist/37i9dQZF1DWWEJlAGA9gs0', type: 'spotify' },
-  { name: 'Spotify MPB', url: 'https://open.spotify.com/playlist/37i9dQZF1DX1h3082a939f', type: 'spotify' },
+  { name: 'Lofi Girl', url: 'https://www.youtube.com/watch?v=jfKfPfyJRdk', type: 'youtube' },
+  { name: 'Jazz Relax', url: 'https://www.youtube.com/watch?v=Dx5qFachd3A', type: 'youtube' },
+  { name: 'Piano Focus', url: 'https://www.youtube.com/watch?v=WJ3-F02-F_Y', type: 'youtube' },
+  { name: 'Clássica (24h)', url: 'https://www.youtube.com/watch?v=M0ZdXkw_ysI', type: 'youtube' },
+  { name: 'Bossa Nova', url: 'https://www.youtube.com/watch?v=g6bn6XrhYdc', type: 'youtube' },
+  { name: 'Synthwave', url: 'https://www.youtube.com/watch?v=4xDzrJKXOOY', type: 'youtube' },
 ];
 
 const StudyRooms: React.FC<StudyRoomsProps> = ({ 
@@ -83,10 +83,10 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
   const [lastDJName, setLastDJName] = useState<string>('');
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
 
-  // --- HELPERS DE URL (BLINDADO) ---
+  // --- HELPERS DE URL (YOUTUBE ONLY) ---
   
   const parseMediaUrl = (input: string): { url: string, type: MediaType } | null => {
-    // 1. YouTube
+    // YouTube
     if (input.match(/(youtube\.com|youtu\.be)/)) {
       let videoId = '';
       const vParam = input.match(/[?&]v=([^&]+)/);
@@ -101,20 +101,6 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
         return {
           type: 'youtube',
           url: `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&controls=1&origin=${window.location.origin}&playsinline=1&showinfo=0&rel=0&iv_load_policy=3&modestbranding=1`
-        };
-      }
-    }
-
-    // 2. Spotify
-    if (input.includes('spotify.com')) {
-      // Procura padrão type/id independente de ser embed ou link normal
-      // Ex: .../track/123... ou .../playlist/abc...
-      const match = input.match(/(track|album|playlist|artist|show|episode)\/([a-zA-Z0-9]+)/);
-      
-      if (match) {
-        return {
-          type: 'spotify',
-          url: `https://open.spotify.com/embed/${match[1]}/${match[2]}?utm_source=generator&theme=0`
         };
       }
     }
@@ -188,15 +174,15 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
          // Recebi uma troca de música
          if (isSynced) {
             setMediaUrl(payload.url);
-            setMediaType(payload.type);
+            setMediaType('youtube'); // Força youtube
             setLastDJName(payload.senderName || 'DJ da Sala');
          }
       })
       .on('broadcast', { event: 'media-sync' }, ({ payload }) => {
-         // Sincronização inicial ao entrar (se eu estiver com sync ligado)
+         // Sincronização inicial ao entrar
          if (isSynced) {
             setMediaUrl(payload.url);
-            setMediaType(payload.type);
+            setMediaType('youtube'); // Força youtube
             if (payload.senderName) setLastDJName(payload.senderName);
          }
       })
@@ -225,7 +211,7 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
       supabase.removeChannel(channel);
       channelRef.current = null;
     };
-  }, [currentRoomId, currentUserId]); // Dependências reduzidas para evitar re-subscribe loop
+  }, [currentRoomId, currentUserId]); 
 
   // --- WEBRTC HANDLERS (Standard) ---
   const createPeerConnection = (targetUserId: string) => {
@@ -373,15 +359,12 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
         updateMedia(parsed.url, parsed.type);
         setCustomLinkInput('');
     } else {
-        alert("Link não suportado. Tente link direto do YouTube ou Spotify.");
+        alert("Link não suportado. Use apenas links do YouTube.");
     }
   };
 
   const handlePreset = (preset: MediaPreset) => {
-     if (preset.type === 'spotify') {
-         const parsed = parseMediaUrl(preset.url);
-         if (parsed) updateMedia(parsed.url, 'spotify');
-     } else if (preset.type === 'youtube') {
+     if (preset.type === 'youtube') {
          const parsed = parseMediaUrl(preset.url);
          if (parsed) updateMedia(parsed.url, 'youtube');
      }
@@ -641,33 +624,14 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
                  </div>
                </div>
                
-               {/* Info sobre Play Manual e Limitação Spotify */}
+               {/* Info sobre Play Manual */}
                <div className="px-5 pt-2 flex items-center gap-2 text-slate-500 justify-between">
-                  {mediaType === 'spotify' ? (
-                    <div className="flex items-center justify-between w-full">
-                        <div className="flex items-center gap-2">
-                            <Info size={10} className="text-orange-500" />
-                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">
-                                Modo Prévia (30s)
-                            </p>
-                        </div>
-                        <a 
-                            href="https://open.spotify.com" 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-[8px] font-black uppercase text-sanfran-rubi hover:underline"
-                        >
-                            Login Premium <ExternalLink size={8} />
-                        </a>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                        <Youtube size={10} className="text-red-500" />
-                        <p className="text-[9px] font-bold uppercase tracking-wide">
-                            YouTube: Áudio completo disponível.
-                        </p>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <Info size={10} />
+                    <p className="text-[9px] font-bold uppercase tracking-wide">
+                        YouTube: Áudio completo disponível.
+                    </p>
+                  </div>
                </div>
 
                {/* Advanced Controls (Dropdowns, Links) */}
