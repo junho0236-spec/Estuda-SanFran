@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Globe, BookOpen, CheckCircle2, Lock, X, Flame, Trophy, Volume2, Star, Quote, Heart, ArrowRight, Flag, BrainCircuit, Ear, Mic, Search, GraduationCap } from 'lucide-react';
+import { Globe, BookOpen, CheckCircle2, Lock, X, Flame, Trophy, Volume2, Star, Quote, Heart, ArrowRight, Flag, BrainCircuit, Ear, Mic, Search, GraduationCap, Zap, Calendar, Shuffle } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { IdiomaLesson, IdiomaProgress } from '../types';
 import confetti from 'canvas-confetti';
@@ -211,7 +211,7 @@ const WORD_DATABASE: Record<string, { translation: string; definition: string; e
   "Whereas": { 
     translation: "Considerando que", 
     definition: "Usado em preâmbulos para introduzir fatos ou razões.", 
-    example: "Whereas the parties wish to cooperate..." 
+    example: "Whereas the parties desire to enter into an agreement..." 
   },
   "Provided that": { 
     translation: "Desde que / Ressalvado que", 
@@ -459,6 +459,7 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
   const [currentLesson, setCurrentLesson] = useState<IdiomaLesson | null>(null);
   const [activeTab, setActiveTab] = useState<'path' | 'glossary'>('path');
   const [selectedWord, setSelectedWord] = useState<string | null>(null);
+  const [todayXP, setTodayXP] = useState(0); // State local para XP da sessão
   
   // Estado da Lição
   const [showLessonModal, setShowLessonModal] = useState(false);
@@ -526,6 +527,107 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
     }
   };
 
+  const getUnlockedWords = () => {
+    if (!progress) return [];
+    const words: string[] = [];
+    LESSONS_DB.forEach(lesson => {
+      if (progress.completed_lessons.includes(lesson.id)) {
+        words.push(...lesson.words_unlocked);
+      }
+    });
+    return Array.from(new Set(words)).sort();
+  };
+
+  // --- FEATURES DE CONSISTÊNCIA ---
+  const getTermOfTheDay = () => {
+    const keys = Object.keys(WORD_DATABASE);
+    const dayOfYear = Math.floor((new Date().getTime() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 1000 / 60 / 60 / 24);
+    const index = dayOfYear % keys.length;
+    return keys[index];
+  };
+
+  const termOfTheDay = getTermOfTheDay();
+
+  const startFastReview = () => {
+    const unlocked = getUnlockedWords();
+    if (unlocked.length < 4) {
+      alert("Desbloqueie pelo menos 4 termos para iniciar a Revisão Relâmpago.");
+      return;
+    }
+
+    // Pick 4 random words
+    const shuffled = [...unlocked].sort(() => 0.5 - Math.random());
+    const selected = shuffled.slice(0, 4);
+    
+    // Create a dummy lesson
+    const reviewLesson: IdiomaLesson = {
+      id: 'review-session',
+      module: 'Daily Review',
+      title: 'Revisão Relâmpago',
+      description: 'Reforce seu vocabulário',
+      theory: 'A repetição espaçada é a chave para a memorização. Revisão rápida dos termos já aprendidos.',
+      example_sentence: "Consistency is key to mastering legal English.",
+      type: 'matching',
+      matching: {
+        pairs: selected.map(word => ({ term: word, translation: WORD_DATABASE[word].translation }))
+      },
+      xp_reward: 20,
+      words_unlocked: []
+    };
+
+    setCurrentLesson(reviewLesson);
+    setLessonStep('theory');
+    setSessionLives(3);
+    
+    // Setup Matching
+    const items = reviewLesson.matching!.pairs.flatMap((p, i) => [
+        { id: `t-${i}`, text: p.term, type: 'term', state: 'default' },
+        { id: `d-${i}`, text: p.translation, type: 'def', state: 'default' }
+    ]);
+    setMatchingItems(items.sort(() => Math.random() - 0.5) as any);
+    setSelectedMatchId(null);
+
+    setShowLessonModal(true);
+  };
+
+  const startLesson = (lessonId: string) => {
+    const lesson = LESSONS_DB.find(l => l.id === lessonId);
+    if (!lesson) return;
+
+    setCurrentLesson(lesson);
+    setLessonStep('theory');
+    setSessionLives(3);
+
+    // Reset Exercise States
+    setQuizSelected(null);
+    setIsQuizCorrect(null);
+    setScrambleWords([]);
+    setScrambleSolution([]);
+    setIsScrambleCorrect(null);
+    setMatchingItems([]);
+    setSelectedMatchId(null);
+    setFillSelected(null);
+    setIsFillCorrect(null);
+    setDictationInput('');
+    setIsDictationCorrect(null);
+
+    // Setup Specific Lesson Types
+    if (lesson.type === 'scramble' && lesson.scramble) {
+      const words = lesson.scramble.sentence.split(' ').sort(() => Math.random() - 0.5);
+      setScrambleWords(words);
+    } 
+    else if (lesson.type === 'matching' && lesson.matching) {
+      const items = lesson.matching.pairs.flatMap((p, i) => [
+        { id: `t-${i}`, text: p.term, type: 'term' as const, state: 'default' as const },
+        { id: `d-${i}`, text: p.translation, type: 'def' as const, state: 'default' as const }
+      ]);
+      setMatchingItems(items.sort(() => Math.random() - 0.5) as any);
+    }
+
+    setShowLessonModal(true);
+  };
+
+  // ... (RESTO DAS FUNÇÕES DE AULA: addToFlashcards, startLesson, checkAnswer, etc. - MANTIDAS IGUAIS)
   const addToFlashcards = async (front: string, back: string) => {
     try {
       await supabase.from('flashcards').insert({
@@ -541,59 +643,11 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
     }
   };
 
-  // --- AÇÕES DE AULA ---
-
-  const startLesson = (lessonId: string) => {
-    const lesson = LESSONS_DB.find(l => l.id === lessonId);
-    if (lesson) {
-      setCurrentLesson(lesson);
-      setLessonStep('theory');
-      setSessionLives(3);
-      
-      // Reset Quiz
-      setQuizSelected(null);
-      setIsQuizCorrect(null);
-
-      // Reset Fill
-      setFillSelected(null);
-      setIsFillCorrect(null);
-
-      // Reset Dictation
-      setDictationInput('');
-      setIsDictationCorrect(null);
-
-      // Reset Scramble
-      if (lesson.type === 'scramble' && lesson.scramble) {
-         const words = lesson.scramble.sentence.split(' ').sort(() => Math.random() - 0.5);
-         setScrambleWords(words);
-         setScrambleSolution([]);
-         setIsScrambleCorrect(null);
-      }
-
-      // Reset Matching
-      if (lesson.type === 'matching' && lesson.matching) {
-         const items = lesson.matching.pairs.flatMap((p, i) => [
-            { id: `t-${i}`, text: p.term, type: 'term', state: 'default' },
-            { id: `d-${i}`, text: p.translation, type: 'def', state: 'default' }
-         ]);
-         // Shuffle
-         setMatchingItems(items.sort(() => Math.random() - 0.5) as any);
-         setSelectedMatchId(null);
-      }
-
-      setShowLessonModal(true);
-    }
-  };
-
   const handleWrongAnswer = () => {
      setSessionLives(prev => prev - 1);
      const audio = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-wrong-answer-fail-notification-946.mp3');
      audio.volume = 0.3;
      audio.play().catch(() => {});
-     
-     if (sessionLives <= 1) {
-        // Game Over logic inside lesson could be added here
-     }
   };
 
   const playSuccessSound = () => {
@@ -611,14 +665,12 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
     }
   };
 
-  // --- EXERCISE LOGIC ---
+  // --- EXERCISE LOGIC (Mantida igual ao anterior, apenas resumida aqui para o diff) ---
   const checkAnswer = (idx: number) => {
     if (isQuizCorrect !== null || !currentLesson?.quiz) return;
-    
     const correct = idx === currentLesson.quiz.answer;
     setQuizSelected(idx);
     setIsQuizCorrect(correct);
-
     if (correct) {
       playSuccessSound();
       setTimeout(() => setLessonStep('success'), 1500);
@@ -630,11 +682,9 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
 
   const checkFillBlank = (word: string) => {
     if (isFillCorrect !== null || !currentLesson?.fill_blank) return;
-
     setFillSelected(word);
     const correct = word === currentLesson.fill_blank.correct_word;
     setIsFillCorrect(correct);
-
     if (correct) {
         playSuccessSound();
         setTimeout(() => setLessonStep('success'), 1500);
@@ -646,12 +696,9 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
 
   const checkDictation = () => {
     if (isDictationCorrect !== null || !currentLesson?.dictation) return;
-
     const normalize = (str: string) => str.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"").trim();
     const correct = normalize(dictationInput) === normalize(currentLesson.dictation.text);
-    
     setIsDictationCorrect(correct);
-
     if (correct) {
         playSuccessSound();
         setTimeout(() => setLessonStep('success'), 1500);
@@ -663,7 +710,6 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
 
   const handleScrambleClick = (word: string, index: number, source: 'pool' | 'solution') => {
      if (isScrambleCorrect === true) return;
-
      if (source === 'pool') {
         const newPool = [...scrambleWords];
         newPool.splice(index, 1);
@@ -682,7 +728,6 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
      const attempt = scrambleSolution.join(' ');
      const correct = attempt === currentLesson.scramble.sentence;
      setIsScrambleCorrect(correct);
-
      if (correct) {
         playSuccessSound();
         setTimeout(() => setLessonStep('success'), 1500);
@@ -696,47 +741,35 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
   const handleMatchClick = (id: string) => {
      const clickedItem = matchingItems.find(i => i.id === id);
      if (!clickedItem || clickedItem.state === 'matched') return;
-
-     // Se já tem um selecionado
      if (selectedMatchId) {
         const firstItem = matchingItems.find(i => i.id === selectedMatchId);
         if (!firstItem) return;
-
-        // Se clicou no mesmo
         if (selectedMatchId === id) {
            setSelectedMatchId(null);
            setMatchingItems(prev => prev.map(i => i.id === id ? { ...i, state: 'default' } : i));
            return;
         }
-
-        // Verifica match (index deve ser igual ex: t-0 e d-0)
         const firstIndex = firstItem.id.split('-')[1];
         const secondIndex = clickedItem.id.split('-')[1];
         const isMatch = firstIndex === secondIndex && firstItem.type !== clickedItem.type;
-
         if (isMatch) {
            playSuccessSound();
            setMatchingItems(prev => prev.map(i => (i.id === id || i.id === selectedMatchId) ? { ...i, state: 'matched' } : i));
            setSelectedMatchId(null);
-           
-           // Check if all matched
-           const allMatched = matchingItems.filter(i => i.state !== 'matched').length <= 2; // <=2 pq estamos atualizando state agora
+           const allMatched = matchingItems.filter(i => i.state !== 'matched').length <= 2;
            if (allMatched) {
               setTimeout(() => setLessonStep('success'), 1000);
               confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
            }
         } else {
            handleWrongAnswer();
-           // Show Error
            setMatchingItems(prev => prev.map(i => (i.id === id || i.id === selectedMatchId) ? { ...i, state: 'wrong' } : i));
            setTimeout(() => {
               setMatchingItems(prev => prev.map(i => (i.id === id || i.id === selectedMatchId) ? { ...i, state: 'default' } : i));
               setSelectedMatchId(null);
            }, 800);
         }
-
      } else {
-        // Primeiro clique
         setSelectedMatchId(id);
         setMatchingItems(prev => prev.map(i => i.id === id ? { ...i, state: 'selected' } : i));
      }
@@ -745,29 +778,29 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
   const completeLesson = async () => {
     if (!currentLesson || !progress) return;
 
-    // Lógica de atualização
     const newCompleted = [...(progress.completed_lessons || [])];
-    if (!newCompleted.includes(currentLesson.id)) {
+    if (!newCompleted.includes(currentLesson.id) && currentLesson.id !== 'review-session') {
       newCompleted.push(currentLesson.id);
     }
 
     const currentIndex = LESSONS_DB.findIndex(l => l.id === currentLesson.id);
-    const nextLessonId = LESSONS_DB[currentIndex + 1]?.id || currentLesson.id;
+    const nextLessonId = currentLesson.id === 'review-session' ? progress.current_level_id : (LESSONS_DB[currentIndex + 1]?.id || currentLesson.id);
 
-    // Atualizar Streak
     const today = new Date().toISOString().split('T')[0];
     let newStreak = progress.streak_count;
     if (progress.last_activity_date !== today) {
        newStreak += 1;
     }
 
-    const newXP = progress.total_xp + currentLesson.xp_reward;
+    const earnedXP = currentLesson.xp_reward;
+    setTodayXP(prev => prev + earnedXP);
+    const newTotalXP = progress.total_xp + earnedXP;
 
     try {
       await supabase.from('idiomas_progress').update({
         completed_lessons: newCompleted,
         current_level_id: nextLessonId,
-        total_xp: newXP,
+        total_xp: newTotalXP,
         streak_count: newStreak,
         last_activity_date: today
       }).eq('user_id', userId);
@@ -776,7 +809,7 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
         ...prev,
         completed_lessons: newCompleted,
         current_level_id: nextLessonId,
-        total_xp: newXP,
+        total_xp: newTotalXP,
         streak_count: newStreak,
         last_activity_date: today
       }) : null);
@@ -786,37 +819,6 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
     } catch (e) {
       console.error(e);
     }
-  };
-
-  const getUnlockedWords = () => {
-    if (!progress) return [];
-    const words: string[] = [];
-    LESSONS_DB.forEach(lesson => {
-      if (progress.completed_lessons.includes(lesson.id)) {
-        words.push(...lesson.words_unlocked);
-      }
-    });
-    return Array.from(new Set(words)).sort();
-  };
-
-  // --- RENDER MAP HELPER ---
-  // Função para desenhar a linha curva entre os botões
-  const renderMapPaths = () => {
-     // A lógica aqui é visual apenas, criando SVGs absolutos baseados no layout conhecido
-     // Simplificação: Desenhar curvas fixas assumindo a grid
-     // Em uma app real complexa, calcularíamos as posições dos refs.
-     return (
-        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-0" style={{ minHeight: '1000px' }}>
-           <path 
-             d="M 50% 100 Q 50% 200, 30% 300 T 50% 500 T 70% 700 T 50% 900" 
-             fill="none" 
-             stroke="#e2e8f0" 
-             strokeWidth="8" 
-             strokeDasharray="12 12"
-             className="dark:stroke-white/10"
-           />
-        </svg>
-     );
   };
 
   if (isLoading || !progress) return <div className="h-full flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-sanfran-rubi"></div></div>;
@@ -862,9 +864,55 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
       {/* --- ABA TRILHA (PATH) --- */}
       {activeTab === 'path' && (
          <div className="flex-1 overflow-y-auto custom-scrollbar relative px-4" ref={containerRef}>
+            
+            {/* --- PAINEL DE FOCO DIÁRIO --- */}
+            <div className="mb-12 bg-white dark:bg-sanfran-rubiDark/20 p-6 rounded-[2.5rem] border border-slate-200 dark:border-sanfran-rubi/30 shadow-lg relative overflow-hidden">
+               <div className="absolute top-0 right-0 p-6 opacity-5 pointer-events-none">
+                  <Calendar size={120} />
+               </div>
+               
+               <h3 className="text-xl font-black uppercase text-slate-900 dark:text-white mb-6 flex items-center gap-2 relative z-10">
+                  <Zap className="text-usp-gold fill-current" /> Today's Focus
+               </h3>
+
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
+                  {/* Term of the Day */}
+                  <div 
+                     onClick={() => setSelectedWord(termOfTheDay)}
+                     className="bg-indigo-50 dark:bg-indigo-900/20 p-5 rounded-3xl border border-indigo-100 dark:border-indigo-800 cursor-pointer hover:scale-[1.02] transition-transform group"
+                  >
+                     <div className="flex justify-between items-start mb-2">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Term of the Day</span>
+                        <BookOpen size={16} className="text-indigo-300 group-hover:text-indigo-500" />
+                     </div>
+                     <h4 className="text-2xl font-black text-slate-900 dark:text-white mb-1">{termOfTheDay}</h4>
+                     <p className="text-xs font-bold text-slate-500 line-clamp-1">{WORD_DATABASE[termOfTheDay].translation}</p>
+                  </div>
+
+                  {/* Daily Goal & Review */}
+                  <div className="space-y-4">
+                     <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-3xl border border-orange-100 dark:border-orange-800">
+                        <div className="flex justify-between items-center mb-2">
+                           <span className="text-[10px] font-black uppercase tracking-widest text-orange-400">Daily Goal</span>
+                           <span className="text-xs font-black text-orange-600">{todayXP}/50 XP</span>
+                        </div>
+                        <div className="h-2 bg-orange-200 dark:bg-orange-900/50 rounded-full overflow-hidden">
+                           <div className="h-full bg-orange-500 transition-all duration-1000" style={{ width: `${Math.min((todayXP / 50) * 100, 100)}%` }}></div>
+                        </div>
+                     </div>
+
+                     <button 
+                        onClick={startFastReview}
+                        className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95"
+                     >
+                        <Shuffle size={14} /> Lightning Review (20 XP)
+                     </button>
+                  </div>
+               </div>
+            </div>
+
             {/* Linha Decorativa SVG */}
-            {/* Como o layout é flex column com offsets, vamos usar uma linha central simples com CSS dash por enquanto para garantir responsividade sem cálculos complexos de SVG */}
-            <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-slate-200 dark:bg-white/5 -translate-x-1/2 rounded-full -z-10 border-l-2 border-dashed border-slate-300 dark:border-white/10" />
+            <div className="absolute left-1/2 top-[300px] bottom-0 w-1 bg-slate-200 dark:bg-white/5 -translate-x-1/2 rounded-full -z-10 border-l-2 border-dashed border-slate-300 dark:border-white/10" />
 
             <div className="space-y-24 pb-20 pt-8">
                {MODULES.map((module, modIdx) => (
