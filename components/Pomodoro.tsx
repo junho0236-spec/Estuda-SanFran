@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Play, Pause, RotateCcw, Clock, Settings2, ShieldCheck, Coffee, History, Trash2, ArrowLeft, Calendar, Gavel, Trash, Check, Book, Quote, Zap } from 'lucide-react';
 import { Subject, StudySession, Reading } from '../types';
 import { supabase } from '../services/supabaseClient';
+import { updateQuestProgress } from '../services/questService';
 
 interface PomodoroProps {
   subjects: Subject[];
@@ -117,6 +118,20 @@ const Pomodoro: React.FC<PomodoroProps> = ({
 
   const totalTime = mode === 'work' ? workMinutes * 60 : breakMinutes * 60;
   const progress = ((totalTime - secondsLeft) / totalTime) * 100;
+
+  // Wrapper para onManualFinalize que também atualiza a quest
+  const handleFinalizeWrapper = async () => {
+    // Calcula tempo decorrido
+    const initial = mode === 'work' ? workMinutes * 60 : breakMinutes * 60;
+    const elapsed = initial - secondsLeft;
+    
+    // Atualiza a quest se tiver passado pelo menos 1 minuto
+    if (elapsed > 60) {
+       await updateQuestProgress(userId, 'focus_time', Math.floor(elapsed / 60));
+    }
+
+    if (onManualFinalize) onManualFinalize();
+  };
 
   if (showHistory && !isExtremeFocus) {
     return (
@@ -306,7 +321,7 @@ const Pomodoro: React.FC<PomodoroProps> = ({
           
           {(isActive || secondsLeft < totalTime) && mode === 'work' && !isExtremeFocus && (
             <button 
-              onClick={onManualFinalize}
+              onClick={handleFinalizeWrapper}
               className="w-full md:w-auto px-8 py-5 md:py-6 bg-emerald-500 hover:bg-emerald-600 text-white rounded-3xl md:rounded-[2rem] flex items-center justify-center gap-3 font-black uppercase text-[10px] tracking-widest shadow-xl shadow-emerald-900/20 transition-all hover:scale-[1.03] active:scale-95 border-b-4 border-emerald-700 animate-in fade-in zoom-in duration-300"
             >
               <Check className="w-5 h-5" /> Protocolar

@@ -137,6 +137,7 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
   const [inventory, setInventory] = useState<string[]>([]);
   const [availableBoxes, setAvailableBoxes] = useState(0);
   const [boxesOpened, setBoxesOpened] = useState(0);
+  const [bonusBoxes, setBonusBoxes] = useState(0);
   const [isOpeningBox, setIsOpeningBox] = useState(false);
   const [wonItem, setWonItem] = useState<{item: OfficeItem, category: ItemCategory} | null>(null);
 
@@ -172,7 +173,8 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
               user_id: user.id,
               inventory: initialItems,
               config: DEFAULT_CONFIG,
-              boxes_opened: 0
+              boxes_opened: 0,
+              bonus_boxes: 0
             })
             .select()
             .single();
@@ -187,6 +189,7 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
           setInventory(data.inventory || []);
           setConfig(data.config || DEFAULT_CONFIG);
           setBoxesOpened(data.boxes_opened || 0);
+          setBonusBoxes(data.bonus_boxes || 0);
         }
       } catch (err) {
         console.error("Erro ao carregar escritório:", err);
@@ -203,15 +206,14 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
   }, [userName]);
 
   // Lógica de Ganhar Caixas (Cálculo Persistente)
-  // Total Ganhas = Horas Totais / 20 (arredondado para baixo)
-  // Caixas Disponíveis = Total Ganhas - Total Abertas
+  // Total Ganhas = (Horas Totais / 20) + BonusBoxes - BoxesOpened
   useEffect(() => {
     if (!isLoading) {
-        const boxesEarnedTotal = Math.floor(totalHours / 20);
-        const boxesToOpen = Math.max(0, boxesEarnedTotal - boxesOpened);
-        setAvailableBoxes(boxesToOpen);
+        const boxesEarnedFromHours = Math.floor(totalHours / 20);
+        const totalAvailable = (boxesEarnedFromHours + bonusBoxes) - boxesOpened;
+        setAvailableBoxes(Math.max(0, totalAvailable));
     }
-  }, [totalHours, boxesOpened, isLoading]);
+  }, [totalHours, boxesOpened, bonusBoxes, isLoading]);
 
 
   const handleSelect = async (category: ItemCategory, id: string) => {
@@ -315,9 +317,7 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
     }
   };
 
-  // --- RENDERERS DE CSS ART ---
-  // (Mantidos iguais, omitidos para brevidade se não houver mudança visual, mas incluídos para garantir funcionamento)
-  
+  // ... (RENDERERS MANTIDOS)
   const renderWall = () => {
     const style = config.wall;
     let bgClass = "bg-slate-200";
@@ -615,8 +615,6 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
       </div>
     );
   };
-
-  // --- UI RENDER ---
 
   const getRarityColor = (rarity: string) => {
     switch (rarity) {

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll } from 'lucide-react';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser } from './types';
 import Dashboard from './components/Dashboard';
 import Anki from './components/Anki';
@@ -22,6 +22,7 @@ import Scratchpad from './components/Scratchpad';
 import VirtualOffice from './components/VirtualOffice';
 import Societies from './components/Societies';
 import LeiSeca from './components/LeiSeca';
+import Editais from './components/Editais';
 import { supabase } from './services/supabaseClient';
 
 export const getBrasiliaDate = () => {
@@ -327,6 +328,7 @@ const App: React.FC = () => {
   const navItems = [
     { id: View.Dashboard, icon: LayoutDashboard, label: 'Painel', color: 'text-slate-600', bg: 'bg-slate-100' },
     { id: View.Office, icon: Armchair, label: 'Escritório', color: 'text-amber-600', bg: 'bg-amber-100' },
+    { id: View.Editais, icon: ClipboardList, label: 'Editais', color: 'text-blue-600', bg: 'bg-blue-100' },
     { id: View.Societies, icon: Briefcase, label: 'Sociedades', color: 'text-emerald-600', bg: 'bg-emerald-100' },
     { id: View.LeiSeca, icon: Scroll, label: 'Lei Seca', color: 'text-rose-700', bg: 'bg-rose-100' },
     { id: View.StudyRoom, icon: Building2, label: 'Salas de Estudos', color: 'text-indigo-600', bg: 'bg-indigo-100' },
@@ -449,6 +451,7 @@ const App: React.FC = () => {
             {currentView === View.Office && <VirtualOffice studySessions={studySessions} userName={session.user.user_metadata?.full_name} />}
             {currentView === View.Societies && <Societies userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
             {currentView === View.LeiSeca && <LeiSeca userId={session.user.id} />}
+            {currentView === View.Editais && <Editais userId={session.user.id} />}
             {currentView === View.Anki && <Anki subjects={subjects} flashcards={flashcards} setFlashcards={setFlashcards} folders={folders} setFolders={setFolders} userId={session.user.id} />}
             {currentView === View.Library && <Library readings={readings} setReadings={setReadings} subjects={subjects} userId={session.user.id} />}
             {currentView === View.Largo && <Largo presenceUsers={presenceUsers} currentUserId={session.user.id} />}

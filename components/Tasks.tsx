@@ -22,6 +22,7 @@ import {
 import { Task, Subject, TaskPriority, TaskCategory } from '../types';
 import { supabase } from '../services/supabaseClient';
 import { getBrasiliaDate, getBrasiliaISOString } from '../App';
+import { updateQuestProgress } from '../services/questService';
 
 interface TasksProps {
   subjects: Subject[];
@@ -107,6 +108,12 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
         .eq('user_id', userId);
       
       if (error) throw error;
+
+      // UPDATE QUEST
+      if (isNowCompleted) {
+        await updateQuestProgress(userId, 'complete_task', 1);
+      }
+
     } catch (err) {
       console.error("Erro na sentença:", err);
       setTasks(prev => prev.map(t => t.id === task.id ? task : t));

@@ -16,7 +16,8 @@ export enum View {
   StudyRoom = 'study_room',
   Office = 'office',
   Societies = 'societies',
-  LeiSeca = 'lei_seca'
+  LeiSeca = 'lei_seca',
+  Editais = 'editais'
 }
 
 export interface Folder {
@@ -142,4 +143,25 @@ export interface SocietyMessage {
   user_name: string;
   content: string;
   created_at: string;
+}
+
+export type QuestType = 'focus_time' | 'review_cards' | 'complete_task';
+
+export interface Quest {
+  id: string;
+  type: QuestType;
+  description: string; // Ex: "Cumpra 30 min de foco"
+  target: number; // Ex: 30 (minutos) ou 10 (cards)
+  current: number;
+  completed: boolean;
+  reward_type: 'box' | 'xp';
+  reward_amount: number;
+}
+
+export interface DailyQuestData {
+  id: string;
+  user_id: string;
+  date: string; // YYYY-MM-DD
+  quests: Quest[];
+  claimed: boolean;
 }

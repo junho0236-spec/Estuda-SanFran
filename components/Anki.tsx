@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Flashcard, Subject, Folder } from '../types';
 import { supabase } from '../services/supabaseClient';
+import { updateQuestProgress } from '../services/questService';
 
 interface AnkiProps {
   subjects: Subject[];
@@ -231,6 +232,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     const card = reviewQueue[currentIndex];
     const newInterval = quality === 0 ? 0 : (card.interval === 0 ? 1 : card.interval * 2);
     const nextReview = Date.now() + newInterval * 24 * 60 * 60 * 1000;
+    
     try {
       await supabase.from('flashcards').update({ 
         interval: newInterval, 
@@ -239,6 +241,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       
       setFlashcards(prev => prev.map(f => f.id === card.id ? { ...f, interval: newInterval, nextReview } : f));
       
+      // TRIGGER QUEST UPDATE
+      await updateQuestProgress(userId, 'review_cards', 1);
+
       if (currentIndex < reviewQueue.length - 1) { 
         setCurrentIndex(prev => prev + 1); 
         setIsFlipped(false); 
