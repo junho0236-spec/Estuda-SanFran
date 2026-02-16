@@ -91,9 +91,10 @@ const CompetenceRadar: React.FC<CompetenceRadarProps> = ({ subjects, studySessio
         <ResponsiveContainer width="100%" height="100%">
           <RadarChart cx="50%" cy="50%" outerRadius="65%" data={data}>
             <PolarGrid stroke="#e2e8f0" strokeOpacity={0.5} />
+            {/* Removed complex tick object to prevent React Error #31 in some environments */}
             <PolarAngleAxis 
               dataKey="subject" 
-              tick={{ fill: '#64748b', fontSize: 10, fontWeight: 900 }} 
+              tick={{ fontSize: 10, fill: '#64748b', fontWeight: 900 }}
             />
             <PolarRadiusAxis 
               angle={30} 
