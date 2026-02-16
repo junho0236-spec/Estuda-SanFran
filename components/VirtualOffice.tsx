@@ -1,19 +1,21 @@
-
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { StudySession } from '../types';
 import { 
-  Laptop, 
-  Leaf, 
-  Award, 
-  Library as LibraryIcon, 
+  Layout, 
+  Palette, 
   Armchair, 
-  Gavel, 
-  Scale, 
-  LampFloor, 
-  Sun, 
+  Monitor, 
+  Library, 
+  Trophy, 
+  Lock, 
+  CheckCircle2, 
+  Save, 
   Moon, 
-  Frame,
-  Lock
+  Sun,
+  MousePointer2,
+  Maximize2,
+  Scale,
+  Gavel
 } from 'lucide-react';
 
 interface VirtualOfficeProps {
@@ -21,247 +23,360 @@ interface VirtualOfficeProps {
   userName: string;
 }
 
-// Configuração dos Níveis e Itens
-const OFFICE_LEVELS = [
-  { id: 'bacharel', hours: 0, label: 'Bacharel', items: ['Mesa Simples', 'Cadeira Básica', 'Janela'] },
-  { id: 'junior', hours: 20, label: 'Advogado Júnior', items: ['Notebook', 'Planta'] },
-  { id: 'pleno', hours: 100, label: 'Advogado Pleno', items: ['Diploma', 'Tapete Persa'] },
-  { id: 'senior', hours: 300, label: 'Advogado Sênior', items: ['Biblioteca Completa'] },
-  { id: 'socio', hours: 700, label: 'Sócio-Diretor', items: ['Poltrona de Couro', 'Quadro a Óleo', 'Abajur Art Déco'] },
-  { id: 'magistrado', hours: 1500, label: 'Magistrado', items: ['Martelo de Juiz', 'Estátua da Justiça'] },
-];
+// --- TIPOS E CATÁLOGO ---
+
+type ItemCategory = 'wall' | 'floor' | 'desk' | 'chair' | 'decor' | 'window';
+
+interface OfficeItem {
+  id: string;
+  name: string;
+  hoursRequired: number;
+  category: ItemCategory;
+  // Propriedades visuais para renderização
+  cssClass?: string;
+  color?: string;
+  gradient?: string;
+  icon?: React.ElementType;
+}
+
+const CATALOG: Record<ItemCategory, OfficeItem[]> = {
+  wall: [
+    { id: 'paint_white', name: 'Pintura Básica', hoursRequired: 0, category: 'wall', cssClass: 'bg-slate-200 dark:bg-slate-800' },
+    { id: 'paint_blue', name: 'Azul Sereno', hoursRequired: 20, category: 'wall', cssClass: 'bg-[#e0f2fe] dark:bg-[#0f172a]' },
+    { id: 'wood_panel', name: 'Boiserie Clássica', hoursRequired: 300, category: 'wall', cssClass: 'bg-[#e2e8f0] dark:bg-[#1e293b] border-t-8 border-b-8 border-slate-300 dark:border-slate-700' },
+    { id: 'marble', name: 'Mármore Travertino', hoursRequired: 1500, category: 'wall', cssClass: 'bg-[url("https://www.transparenttextures.com/patterns/white-wall-3-2.png")] bg-stone-100 dark:bg-stone-900' },
+  ],
+  floor: [
+    { id: 'concrete', name: 'Concreto Queimado', hoursRequired: 0, category: 'floor', cssClass: 'bg-zinc-300 dark:bg-zinc-800' },
+    { id: 'wood_light', name: 'Parquet Carvalho', hoursRequired: 50, category: 'floor', cssClass: 'bg-[#d4b483] dark:bg-[#5d4037]' },
+    { id: 'carpet_red', name: 'Carpete SanFran', hoursRequired: 300, category: 'floor', cssClass: 'bg-[#9B111E] dark:bg-[#4a080f] opacity-90' },
+    { id: 'marble_floor', name: 'Piso de Mármore', hoursRequired: 1500, category: 'floor', cssClass: 'bg-slate-100 dark:bg-slate-900' },
+  ],
+  desk: [
+    { id: 'desk_basic', name: 'Mesa Cavalete', hoursRequired: 0, category: 'desk', cssClass: 'w-[50%] h-6 bg-slate-300 rounded top-0 shadow-lg' },
+    { id: 'desk_wood', name: 'Mesa Executiva', hoursRequired: 100, category: 'desk', cssClass: 'w-[60%] h-12 bg-[#5D4037] rounded-lg top-0 shadow-2xl border-t border-[#8D6E63]' },
+    { id: 'desk_glass', name: 'Vidro Moderno', hoursRequired: 500, category: 'desk', cssClass: 'w-[55%] h-4 bg-cyan-100/50 backdrop-blur-md rounded border border-white/50 top-0 shadow-xl' },
+    { id: 'desk_magistrate', name: 'Mesa da Corte', hoursRequired: 1500, category: 'desk', cssClass: 'w-[70%] h-16 bg-gradient-to-r from-[#3E2723] via-[#5D4037] to-[#3E2723] rounded-lg top-0 shadow-2xl border-2 border-[#FFD700]' },
+  ],
+  chair: [
+    { id: 'chair_basic', name: 'Cadeira Fixa', hoursRequired: 0, category: 'chair', cssClass: 'w-16 h-20 bg-slate-600 rounded-t-lg' },
+    { id: 'chair_mesh', name: 'Ergonômica Mesh', hoursRequired: 50, category: 'chair', cssClass: 'w-20 h-28 bg-slate-800 rounded-t-xl border-2 border-slate-600' },
+    { id: 'chair_leather', name: 'Poltrona Couro', hoursRequired: 700, category: 'chair', cssClass: 'w-24 h-32 bg-[#3E2723] rounded-t-[2rem] shadow-xl border-4 border-[#281815]' },
+    { id: 'chair_magistrate', name: 'Trono Jurídico', hoursRequired: 1500, category: 'chair', cssClass: 'w-28 h-40 bg-[#9B111E] rounded-t-[2.5rem] shadow-2xl border-4 border-[#FFD700]' },
+  ],
+  decor: [
+    { id: 'none', name: 'Vazio', hoursRequired: 0, category: 'decor', cssClass: 'hidden' },
+    { id: 'plant', name: 'Costela de Adão', hoursRequired: 20, category: 'decor', cssClass: 'w-16 h-32 bg-green-600 rounded-t-full' },
+    { id: 'bookshelf', name: 'Estante Doutrina', hoursRequired: 300, category: 'decor', cssClass: 'w-32 h-64 bg-[#4E342E] border-4 border-[#3E2723]' },
+    { id: 'painting', name: 'Quadro a Óleo', hoursRequired: 500, category: 'decor', cssClass: 'w-24 h-32 bg-slate-700 border-4 border-[#FFD700]' },
+    { id: 'statue', name: 'Themis (Justiça)', hoursRequired: 1500, category: 'decor', cssClass: 'w-20 h-48 bg-gradient-to-b from-yellow-200 to-yellow-600' },
+  ],
+  window: [
+    { id: 'win_small', name: 'Janela Basculante', hoursRequired: 0, category: 'window', cssClass: 'w-[20%] h-[30%] bg-sky-200 dark:bg-indigo-950 border-8 border-white' },
+    { id: 'win_large', name: 'Janela Panorâmica', hoursRequired: 200, category: 'window', cssClass: 'w-[40%] h-[50%] bg-sky-300 dark:bg-indigo-900 border-4 border-slate-800' },
+    { id: 'win_classic', name: 'Janela Vitoriana', hoursRequired: 1000, category: 'window', cssClass: 'w-[25%] h-[60%] bg-sky-200 dark:bg-indigo-950 border-8 border-[#5D4037] rounded-t-full' },
+  ]
+};
+
+// Configuração padrão
+const DEFAULT_CONFIG = {
+  wall: 'paint_white',
+  floor: 'concrete',
+  desk: 'desk_basic',
+  chair: 'chair_basic',
+  decor: 'none',
+  window: 'win_small'
+};
 
 const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }) => {
-  // Cálculo de horas totais
+  const [isEditing, setIsEditing] = useState(false);
+  const [activeTab, setActiveTab] = useState<ItemCategory>('desk');
+  const [config, setConfig] = useState(DEFAULT_CONFIG);
+  const [isNight, setIsNight] = useState(false);
+
+  // Carregar config salva
+  useEffect(() => {
+    const saved = localStorage.getItem(`sanfran_office_config_${userName}`);
+    if (saved) {
+      try {
+        setConfig({ ...DEFAULT_CONFIG, ...JSON.parse(saved) });
+      } catch (e) {
+        console.error("Erro ao carregar escritório salvo");
+      }
+    }
+  }, [userName]);
+
+  // Salvar config
+  const handleSelect = (category: ItemCategory, itemId: string) => {
+    const newConfig = { ...config, [category]: itemId };
+    setConfig(newConfig);
+    localStorage.setItem(`sanfran_office_config_${userName}`, JSON.stringify(newConfig));
+  };
+
   const totalSeconds = studySessions.reduce((acc, s) => acc + (Number(s.duration) || 0), 0);
   const totalHours = totalSeconds / 3600;
 
-  // Determinar nível atual e próximo
-  const currentLevelIndex = [...OFFICE_LEVELS].reverse().findIndex(l => totalHours >= l.hours);
-  const currentLevel = OFFICE_LEVELS[OFFICE_LEVELS.length - 1 - currentLevelIndex];
-  const nextLevel = OFFICE_LEVELS[OFFICE_LEVELS.length - currentLevelIndex];
-  
-  // Helpers para verificar desbloqueio
-  const hasUnlocked = (hoursNeeded: number) => totalHours >= hoursNeeded;
+  // Renderizadores de Itens
+  const getStyle = (category: ItemCategory) => {
+    const id = config[category];
+    return CATALOG[category].find(i => i.id === id) || CATALOG[category][0];
+  };
+
+  const WallItem = getStyle('wall');
+  const FloorItem = getStyle('floor');
+  const DeskItem = getStyle('desk');
+  const ChairItem = getStyle('chair');
+  const DecorItem = getStyle('decor');
+  const WindowItem = getStyle('window');
+
+  // --- COMPONENTES VISUAIS DA SALA ---
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-700 pb-20 px-2 md:px-0">
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+    <div className="h-full flex flex-col animate-in fade-in duration-700 relative pb-20 px-2 md:px-0">
+      
+      {/* Header */}
+      <div className="flex justify-between items-end mb-6">
         <div>
-           <div className="inline-flex items-center gap-2 bg-amber-100 dark:bg-amber-900/20 px-4 py-2 rounded-full border border-amber-200 dark:border-amber-800/30 mb-4">
-              <Armchair className="w-4 h-4 text-amber-700 dark:text-amber-500" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-500">Espaço Pessoal</span>
-           </div>
-           <h2 className="text-4xl md:text-5xl font-black text-slate-950 dark:text-white uppercase tracking-tighter leading-none">Escritório Virtual</h2>
-           <p className="text-slate-500 font-bold italic text-lg mt-2">Construa seu império jurídico hora após hora.</p>
+          <h2 className="text-3xl md:text-5xl font-black text-slate-950 dark:text-white uppercase tracking-tighter">Meu Gabinete</h2>
+          <p className="text-slate-500 font-bold italic text-sm md:text-lg">Personalize seu ambiente de alta performance.</p>
         </div>
-      </header>
-
-      {/* --- CENA DO ESCRITÓRIO --- */}
-      <div className="relative w-full aspect-[16/10] md:aspect-[21/9] bg-slate-200 dark:bg-slate-800 rounded-[2rem] border-8 border-slate-800 dark:border-slate-950 shadow-2xl overflow-hidden transition-colors duration-1000 group">
         
-        {/* 1. PAREDE (Fundo) */}
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-200 to-slate-300 dark:from-slate-800 dark:to-slate-900 transition-colors duration-1000"></div>
-
-        {/* 2. JANELA (Muda com Dark Mode) */}
-        <div className="absolute top-[10%] left-[10%] w-[20%] h-[35%] bg-sky-300 dark:bg-indigo-950 border-8 border-white dark:border-slate-700 rounded-lg overflow-hidden shadow-inner transition-colors duration-1000">
-           <div className="absolute w-full h-[2px] bg-white dark:bg-slate-700 top-1/2 left-0"></div>
-           <div className="absolute h-full w-[2px] bg-white dark:bg-slate-700 top-0 left-1/2"></div>
-           <div className="absolute top-2 right-2">
-              <Sun className="text-yellow-400 dark:hidden animate-pulse" />
-              <Moon className="text-slate-100 hidden dark:block" />
-           </div>
-           {/* Nuvens / Estrelas CSS */}
-           <div className="absolute bottom-2 left-2 w-8 h-8 bg-white/40 rounded-full blur-md dark:hidden"></div>
-           <div className="absolute top-4 left-4 w-1 h-1 bg-white rounded-full hidden dark:block animate-ping"></div>
+        <div className="flex gap-2">
+           <button 
+             onClick={() => setIsNight(!isNight)} 
+             className="p-3 rounded-xl bg-slate-100 dark:bg-white/10 text-slate-500 hover:text-sanfran-rubi transition-colors"
+           >
+             {isNight ? <Sun size={20} /> : <Moon size={20} />}
+           </button>
+           <button 
+             onClick={() => setIsEditing(!isEditing)} 
+             className={`flex items-center gap-2 px-6 py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-all shadow-lg ${isEditing ? 'bg-sanfran-rubi text-white' : 'bg-white dark:bg-sanfran-rubiDark/40 text-slate-900 dark:text-white border border-slate-200 dark:border-sanfran-rubi/30'}`}
+           >
+             {isEditing ? <CheckCircle2 size={16} /> : <Palette size={16} />}
+             {isEditing ? 'Concluir' : 'Decorar'}
+           </button>
         </div>
-
-        {/* 3. QUADRO / DIPLOMA (Nível Pleno - 100h) */}
-        {hasUnlocked(100) && (
-           <div className="absolute top-[15%] right-[35%] w-[12%] h-[15%] bg-white dark:bg-slate-200 border-4 border-amber-700 shadow-md flex flex-col items-center justify-center p-1 animate-in zoom-in duration-700">
-              <div className="w-full h-1 bg-slate-200 mb-1"></div>
-              <div className="w-2/3 h-1 bg-slate-200 mb-1"></div>
-              <div className="w-1/2 h-1 bg-red-800 rounded-full mt-1"></div>
-           </div>
-        )}
-
-        {/* 4. QUADRO A OLEO (Nível Sócio - 700h) */}
-        {hasUnlocked(700) && (
-           <div className="absolute top-[15%] left-[35%] w-[10%] h-[18%] bg-slate-700 border-4 border-yellow-600 shadow-xl overflow-hidden animate-in fade-in duration-700">
-              <div className="w-full h-full bg-gradient-to-tr from-slate-800 to-slate-600 opacity-80 flex items-center justify-center">
-                 <Frame className="text-yellow-600/50 w-8 h-8" />
-              </div>
-           </div>
-        )}
-
-        {/* 5. CHÃO */}
-        <div className="absolute bottom-0 w-full h-[35%] bg-[#D4B483] dark:bg-[#4E342E] border-t-4 border-[#C19A6B] dark:border-[#3E2723] transition-colors duration-1000"></div>
-
-        {/* 6. TAPETE (Nível Pleno - 100h) */}
-        {hasUnlocked(100) && (
-           <div className="absolute bottom-[5%] left-1/2 -translate-x-1/2 w-[40%] h-[20%] bg-red-900/80 rounded-full blur-[1px] transform scale-x-150 shadow-sm animate-in fade-in duration-700">
-              <div className="w-full h-full border-2 border-dashed border-yellow-500/30 rounded-full"></div>
-           </div>
-        )}
-
-        {/* 7. ESTANTE (Nível Senior - 300h) */}
-        {hasUnlocked(300) && (
-           <div className="absolute bottom-[25%] right-[5%] w-[18%] h-[55%] bg-amber-900 border-l-4 border-amber-950 shadow-2xl flex flex-col justify-around p-1 animate-in slide-in-from-right duration-700">
-              {/* Prateleiras com Livros */}
-              {[1, 2, 3, 4].map(i => (
-                 <div key={i} className="w-full h-[2px] bg-amber-950 relative">
-                    <div className="absolute bottom-0 left-1 flex gap-[2px]">
-                       <div className="w-2 h-6 bg-red-700"></div>
-                       <div className="w-2 h-7 bg-blue-800"></div>
-                       <div className="w-2 h-5 bg-green-800"></div>
-                       <div className="w-2 h-6 bg-yellow-900"></div>
-                    </div>
-                 </div>
-              ))}
-           </div>
-        )}
-
-        {/* 8. PLANTA (Nível Junior - 20h) */}
-        {hasUnlocked(20) && (
-           <div className="absolute bottom-[25%] left-[5%] w-[8%] h-[20%] flex flex-col items-center animate-in slide-in-from-left duration-700">
-              <Leaf className="text-emerald-600 w-12 h-12 -mb-2" fill="currentColor" />
-              <div className="w-8 h-8 bg-orange-700 rounded-b-lg shadow-lg"></div>
-           </div>
-        )}
-
-        {/* 9. ABAJUR (Nível Sócio - 700h) */}
-        {hasUnlocked(700) && (
-           <div className="absolute bottom-[35%] left-[15%] animate-in fade-in duration-700">
-              <LampFloor className="w-24 h-24 text-slate-800 dark:text-slate-400" />
-              <div className="absolute top-2 left-1/2 -translate-x-1/2 w-16 h-16 bg-yellow-200/20 blur-xl rounded-full"></div>
-           </div>
-        )}
-
-        {/* 10. CADEIRA */}
-        <div className="absolute bottom-[30%] left-1/2 -translate-x-1/2 flex flex-col items-center z-10">
-           {hasUnlocked(700) ? (
-              // Poltrona de Couro (Sócio)
-              <div className="relative animate-in zoom-in duration-500">
-                 <div className="w-24 h-32 bg-slate-800 dark:bg-black rounded-t-[2rem] shadow-xl border-4 border-slate-700"></div>
-                 <div className="w-32 h-4 bg-slate-900 absolute bottom-0 -left-4 rounded-full"></div>
-              </div>
-           ) : (
-              // Cadeira Simples (Bacharel)
-              <div className="relative">
-                 <div className="w-16 h-20 bg-slate-700 rounded-t-lg border-2 border-slate-600"></div>
-                 <div className="w-20 h-2 bg-slate-800 absolute bottom-0 -left-2"></div>
-              </div>
-           )}
-        </div>
-
-        {/* 11. MESA (Sempre presente, melhora visualmente) */}
-        <div className="absolute bottom-[10%] left-1/2 -translate-x-1/2 w-[50%] h-[25%] z-20">
-           {/* Tampo */}
-           <div className={`w-full h-8 ${hasUnlocked(700) ? 'bg-[#3E2723]' : 'bg-amber-800'} rounded-lg shadow-lg relative flex items-end justify-center px-4`}>
-              
-              {/* NOTEBOOK (Junior - 20h) */}
-              {hasUnlocked(20) && (
-                 <div className="absolute bottom-8 left-10">
-                    <Laptop className="w-12 h-12 text-slate-800 dark:text-slate-400" fill="currentColor" />
-                    {/* Tela brilhando */}
-                    <div className="absolute top-2 left-[5px] w-8 h-5 bg-sky-200/80 animate-pulse blur-[1px]"></div>
-                 </div>
-              )}
-
-              {/* MARTELO (Magistrado - 1500h) */}
-              {hasUnlocked(1500) && (
-                 <div className="absolute bottom-8 right-20">
-                    <Gavel className="w-12 h-12 text-amber-900 rotate-12" fill="currentColor" />
-                 </div>
-              )}
-
-              {/* ESTÁTUA (Magistrado - 1500h) */}
-              {hasUnlocked(1500) && (
-                 <div className="absolute bottom-8 right-4">
-                    <Scale className="w-16 h-16 text-yellow-600" fill="currentColor" />
-                 </div>
-              )}
-
-           </div>
-           {/* Pernas / Corpo da Mesa */}
-           <div className="flex justify-between w-[90%] mx-auto">
-              <div className={`w-4 h-24 ${hasUnlocked(700) ? 'bg-[#281815]' : 'bg-amber-900'}`}></div>
-              <div className={`w-4 h-24 ${hasUnlocked(700) ? 'bg-[#281815]' : 'bg-amber-900'}`}></div>
-           </div>
-        </div>
-
       </div>
 
-      {/* --- BARRA DE PROGRESSO & STATUS --- */}
-      <div className="bg-white dark:bg-sanfran-rubiDark/30 p-6 md:p-8 rounded-[2.5rem] border border-slate-200 dark:border-sanfran-rubi/30 shadow-xl">
-         <div className="flex items-center justify-between mb-4">
-            <div>
-               <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Nível Atual</p>
-               <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase">{currentLevel.label}</h3>
-            </div>
-            <div className="text-right">
-               <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Horas Acumuladas</p>
-               <p className="text-2xl font-black text-sanfran-rubi tabular-nums">{totalHours.toFixed(1)}h</p>
-            </div>
+      {/* --- PALCO DO ESCRITÓRIO --- */}
+      <div className={`relative w-full aspect-[16/10] md:aspect-[21/9] rounded-[2rem] border-[12px] border-slate-900 dark:border-black shadow-2xl overflow-hidden transition-all duration-700 group ${isEditing ? 'scale-[0.98] ring-4 ring-sanfran-rubi/50' : ''}`}>
+         
+         {/* 1. PAREDE */}
+         <div className={`absolute inset-0 ${WallItem.cssClass} transition-colors duration-500`}>
+            {/* Sombra interna para profundidade */}
+            <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-transparent pointer-events-none"></div>
          </div>
 
-         <div className="relative w-full h-4 bg-slate-100 dark:bg-black/40 rounded-full overflow-hidden mb-6">
-            {nextLevel ? (
-               <div 
-                  className="h-full bg-sanfran-rubi transition-all duration-1000"
-                  style={{ width: `${Math.min(100, (totalHours / nextLevel.hours) * 100)}%` }}
-               />
-            ) : (
-               <div className="h-full bg-gradient-to-r from-usp-gold to-sanfran-rubi w-full animate-pulse" />
+         {/* 2. JANELA */}
+         <div className={`absolute top-[10%] left-[10%] ${WindowItem.cssClass} shadow-inner transition-all duration-500 overflow-hidden`}>
+             {/* Cenário fora da janela */}
+             <div className={`w-full h-full transition-colors duration-1000 ${isNight ? 'bg-[#0f172a]' : 'bg-sky-300'}`}>
+                {isNight ? (
+                  <div className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 shadow-[0_0_20px_rgba(255,255,255,0.5)]"></div>
+                ) : (
+                  <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full bg-yellow-300 blur-xl opacity-80"></div>
+                )}
+                {/* Nuvens simples */}
+                {!isNight && <div className="absolute top-10 left-10 w-12 h-4 bg-white/40 rounded-full blur-sm"></div>}
+             </div>
+             {/* Reflexo no vidro */}
+             <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent pointer-events-none"></div>
+         </div>
+
+         {/* 3. QUADRO / DIPLOMA (Fixo se tiver horas) */}
+         {totalHours >= 100 && (
+            <div className="absolute top-[15%] right-[20%] w-[10%] h-[15%] bg-white dark:bg-slate-200 border-4 border-amber-700 shadow-md flex flex-col items-center justify-center p-1">
+               <div className="w-full h-1 bg-slate-200 mb-0.5"></div>
+               <div className="w-2/3 h-1 bg-slate-200 mb-0.5"></div>
+               <div className="w-1/2 h-1 bg-red-800 rounded-full mt-1"></div>
+            </div>
+         )}
+
+         {/* 4. CHÃO */}
+         <div className={`absolute bottom-0 w-full h-[35%] ${FloorItem.cssClass} border-t border-black/10 transition-colors duration-500`}>
+             {/* Sombra da parede no chão */}
+             <div className="absolute top-0 w-full h-4 bg-gradient-to-b from-black/20 to-transparent"></div>
+         </div>
+
+         {/* 5. TAPETE (Visual Only - Se o piso for madeira ou concreto) */}
+         {['wood_light', 'concrete'].includes(config.floor) && totalHours >= 100 && (
+           <div className="absolute bottom-[5%] left-1/2 -translate-x-1/2 w-[40%] h-[20%] bg-red-900/80 rounded-[50%] blur-[1px] transform scale-x-150 shadow-sm opacity-80 pointer-events-none"></div>
+         )}
+
+         {/* 6. DECORAÇÃO (Item Extra) */}
+         <div className={`absolute bottom-[25%] left-[5%] transition-all duration-500 z-10 ${DecorItem.cssClass} shadow-2xl`}>
+            {/* Detalhes específicos por tipo de decor */}
+            {DecorItem.id === 'bookshelf' && (
+               <div className="w-full h-full flex flex-col justify-around p-1">
+                  {[1,2,3,4].map(i => <div key={i} className="w-full h-1 bg-[#3E2723] shadow-sm"></div>)}
+               </div>
+            )}
+            {DecorItem.id === 'plant' && (
+               <div className="absolute -top-4 -left-4 w-24 h-24 bg-green-500 rounded-full opacity-50 blur-xl"></div>
+            )}
+            {DecorItem.id === 'statue' && (
+               <div className="w-full h-full flex items-center justify-center text-yellow-900/50">
+                  <Scale size={32} />
+               </div>
             )}
          </div>
 
-         {nextLevel ? (
-            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/10">
-               <div className="flex items-center gap-3">
-                  <div className="bg-slate-200 dark:bg-white/10 p-2 rounded-lg">
-                     <Lock className="w-4 h-4 text-slate-400" />
-                  </div>
-                  <div>
-                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Próximo Desbloqueio</p>
-                     <p className="text-sm font-black text-slate-700 dark:text-slate-300 uppercase">{nextLevel.label} ({nextLevel.hours}h)</p>
-                  </div>
-               </div>
-               <div className="text-right hidden sm:block">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Itens:</p>
-                  <p className="text-xs font-bold text-sanfran-rubi">{nextLevel.items.join(', ')}</p>
-               </div>
+         {/* 7. CADEIRA (Atrás da mesa) */}
+         <div className="absolute bottom-[30%] left-1/2 -translate-x-1/2 z-10 flex flex-col items-center">
+            <div className={`${ChairItem.cssClass} transition-all duration-500 relative`}>
+               {/* Detalhe do estofado */}
+               <div className="absolute inset-x-2 top-2 bottom-0 bg-black/10 rounded-t-md"></div>
             </div>
-         ) : (
-            <div className="text-center p-4 bg-usp-gold/10 rounded-2xl border border-usp-gold/20">
-               <Award className="w-6 h-6 text-usp-gold mx-auto mb-2" />
-               <p className="text-sm font-black text-usp-gold uppercase">Escritório Completo - Nível Máximo</p>
+            {/* Pé da cadeira */}
+            <div className="w-4 h-16 bg-slate-800"></div>
+            <div className="w-20 h-4 bg-slate-800 rounded-full -mt-2"></div>
+         </div>
+
+         {/* 8. MESA (Frente) */}
+         <div className="absolute bottom-[10%] left-1/2 -translate-x-1/2 z-20 flex flex-col items-center justify-end w-full h-[30%] pointer-events-none">
+             {/* Tampo */}
+             <div className={`${DeskItem.cssClass} relative flex items-center justify-center transition-all duration-500`}>
+                 
+                 {/* ITENS EM CIMA DA MESA */}
+                 {totalHours >= 20 && (
+                   <div className="absolute -top-12 left-10 w-16 h-10 bg-slate-800 rounded-t-lg border-b-4 border-slate-700 flex items-center justify-center">
+                      <Monitor size={20} className="text-slate-400" />
+                      {/* Tela Ligada */}
+                      <div className="absolute inset-x-1 top-1 bottom-1 bg-sky-200/80 animate-pulse rounded-sm"></div>
+                   </div>
+                 )}
+                 
+                 {totalHours >= 1500 && (
+                    <div className="absolute -top-6 right-10">
+                       <Gavel className="text-amber-900 w-10 h-10 -rotate-12 drop-shadow-lg" fill="currentColor" />
+                    </div>
+                 )}
+
+                 {/* Reflexo Mesa de Vidro */}
+                 {DeskItem.id === 'desk_glass' && (
+                    <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent pointer-events-none"></div>
+                 )}
+             </div>
+             
+             {/* Pernas da Mesa (Genérico, adaptável) */}
+             <div className="flex justify-between w-[50%] h-full -mt-1">
+                 {DeskItem.id === 'desk_glass' ? (
+                    <>
+                       <div className="w-2 h-full bg-slate-400/50"></div>
+                       <div className="w-2 h-full bg-slate-400/50"></div>
+                    </>
+                 ) : (
+                    <>
+                       <div className="w-4 h-full bg-black/20"></div>
+                       <div className="w-4 h-full bg-black/20"></div>
+                    </>
+                 )}
+             </div>
+         </div>
+
+         {/* Luz Ambiente (Overlay) */}
+         <div className={`absolute inset-0 pointer-events-none mix-blend-overlay transition-colors duration-1000 ${isNight ? 'bg-indigo-900/60' : 'bg-orange-100/10'}`}></div>
+
+         {/* Botão de Edição Rápida no Centro (Só aparece no hover se não estiver editando) */}
+         {!isEditing && (
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 backdrop-blur-[2px] cursor-pointer" onClick={() => setIsEditing(true)}>
+               <div className="bg-white text-slate-900 px-6 py-3 rounded-full font-black uppercase text-xs tracking-widest shadow-2xl transform scale-90 group-hover:scale-100 transition-transform">
+                  Clique para Decorar
+               </div>
             </div>
          )}
       </div>
 
-      {/* --- LEGENDA DE ITENS --- */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-         {OFFICE_LEVELS.map((level) => {
-            const unlocked = totalHours >= level.hours;
-            return (
-               <div key={level.id} className={`p-4 rounded-2xl border text-center transition-all ${unlocked ? 'bg-white dark:bg-white/5 border-emerald-500/30 shadow-md' : 'bg-slate-50 dark:bg-black/20 border-slate-100 dark:border-white/5 opacity-60 grayscale'}`}>
-                  <p className="text-[8px] font-black uppercase text-slate-400 tracking-widest mb-1">{level.hours}h</p>
-                  <p className={`text-[10px] font-bold uppercase mb-2 ${unlocked ? 'text-slate-900 dark:text-white' : 'text-slate-400'}`}>{level.label}</p>
-                  <div className="flex flex-wrap justify-center gap-1">
-                     {unlocked && <CheckCircleIcon className="w-4 h-4 text-emerald-500" />}
-                  </div>
+      {/* --- MENU DE PERSONALIZAÇÃO (DRAWER) --- */}
+      {isEditing && (
+        <div className="mt-6 bg-white dark:bg-sanfran-rubiDark/30 rounded-[2rem] border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl overflow-hidden animate-in slide-in-from-bottom-10">
+           
+           {/* Categorias */}
+           <div className="flex overflow-x-auto p-2 border-b border-slate-100 dark:border-white/10 no-scrollbar gap-2">
+              {[
+                { id: 'desk', label: 'Mesas', icon: Layout },
+                { id: 'chair', label: 'Cadeiras', icon: Armchair },
+                { id: 'floor', label: 'Pisos', icon: Maximize2 },
+                { id: 'wall', label: 'Paredes', icon: Palette },
+                { id: 'window', label: 'Janelas', icon: Sun },
+                { id: 'decor', label: 'Decoração', icon: Trophy },
+              ].map(cat => (
+                <button
+                  key={cat.id}
+                  onClick={() => setActiveTab(cat.id as ItemCategory)}
+                  className={`flex items-center gap-2 px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wide whitespace-nowrap transition-all ${activeTab === cat.id ? 'bg-sanfran-rubi text-white shadow-lg' : 'bg-slate-50 dark:bg-white/5 text-slate-500 hover:bg-slate-100'}`}
+                >
+                   <cat.icon size={14} /> {cat.label}
+                </button>
+              ))}
+           </div>
+
+           {/* Grid de Itens */}
+           <div className="p-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              {CATALOG[activeTab].map(item => {
+                 const isUnlocked = totalHours >= item.hoursRequired;
+                 const isSelected = config[activeTab] === item.id;
+
+                 return (
+                   <button
+                     key={item.id}
+                     disabled={!isUnlocked}
+                     onClick={() => handleSelect(activeTab, item.id)}
+                     className={`group relative p-4 rounded-2xl border-2 transition-all text-left flex flex-col justify-between h-32 ${
+                        isSelected 
+                          ? 'border-sanfran-rubi bg-sanfran-rubi/5 ring-2 ring-sanfran-rubi/20' 
+                          : isUnlocked 
+                             ? 'border-slate-200 dark:border-white/10 bg-white dark:bg-black/20 hover:border-slate-300' 
+                             : 'border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-white/5 opacity-60 cursor-not-allowed'
+                     }`}
+                   >
+                      <div className="flex justify-between items-start">
+                         {/* Miniatura Visual Simplificada */}
+                         <div className={`w-8 h-8 rounded-lg shadow-sm ${item.cssClass && item.cssClass.includes('bg-') ? item.cssClass.split(' ').find(c => c.startsWith('bg-')) : 'bg-slate-300'}`}></div>
+                         
+                         {isSelected && <div className="bg-sanfran-rubi text-white p-1 rounded-full"><CheckCircle2 size={12} /></div>}
+                         {!isUnlocked && <Lock size={14} className="text-slate-400" />}
+                      </div>
+
+                      <div>
+                         <p className={`font-black text-[10px] uppercase tracking-wide leading-tight ${isUnlocked ? 'text-slate-900 dark:text-white' : 'text-slate-400'}`}>
+                           {item.name}
+                         </p>
+                         {!isUnlocked && (
+                           <p className="text-[8px] font-bold text-sanfran-rubi mt-1">
+                             Requer {item.hoursRequired}h
+                           </p>
+                         )}
+                      </div>
+                   </button>
+                 );
+              })}
+           </div>
+
+           <div className="bg-slate-50 dark:bg-black/20 p-3 text-center border-t border-slate-100 dark:border-white/10">
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center justify-center gap-2">
+                 <Save size={12} /> As alterações são salvas automaticamente
+              </p>
+           </div>
+        </div>
+      )}
+
+      {/* Stats Footer */}
+      {!isEditing && (
+         <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white dark:bg-sanfran-rubiDark/30 p-4 rounded-2xl border border-slate-200 dark:border-sanfran-rubi/30 flex items-center gap-3">
+               <div className="p-2 bg-slate-100 dark:bg-white/10 rounded-lg"><Trophy className="w-5 h-5 text-usp-gold" /></div>
+               <div>
+                  <p className="text-[9px] font-black uppercase text-slate-400">Total Acumulado</p>
+                  <p className="text-lg font-black text-slate-900 dark:text-white">{totalHours.toFixed(1)}h</p>
                </div>
-            );
-         })}
-      </div>
+            </div>
+            {/* Mais stats podem vir aqui */}
+         </div>
+      )}
+
     </div>
   );
 };
-
-// Ícone auxiliar
-const CheckCircleIcon = (props: any) => (
-   <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-);
 
 export default VirtualOffice;
