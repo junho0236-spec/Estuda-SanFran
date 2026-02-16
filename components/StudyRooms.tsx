@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Building2, User, Clock, ArrowLeft, Play, Pause, LogOut, BookOpen, Shield, Gavel, Scale, Globe, BrainCircuit, HeartPulse, Briefcase, Landmark, Mic, MicOff, Headphones, HeadphoneOff, Radio, Volume2, VolumeX, Signal, SkipForward } from 'lucide-react';
+import { Building2, User, Clock, ArrowLeft, Play, Pause, LogOut, BookOpen, Shield, Gavel, Scale, Globe, BrainCircuit, HeartPulse, Briefcase, Landmark, Mic, MicOff, Headphones, HeadphoneOff, Radio, Volume2, VolumeX, Signal, Music, Link as LinkIcon, Share2 } from 'lucide-react';
 import { PresenceUser } from '../types';
 import { supabase } from '../services/supabaseClient';
 
@@ -32,10 +32,11 @@ const departments: Department[] = [
   { id: 'DFD', code: 'DFD', name: 'Filosofia do Direito', icon: BrainCircuit, color: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400' },
 ];
 
-const radioTracks = [
-  { name: 'Lofi SanFran', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3' },
-  { name: 'Chuva nas Arcadas', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3' },
-  { name: 'Café Acadêmico', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' }
+const spotifyPresets = [
+  { name: 'Lofi Girl', url: 'https://open.spotify.com/playlist/0vvXsWCC9xrXsKd4FyS8kM' },
+  { name: 'Classical Essentials', url: 'https://open.spotify.com/playlist/37i9dQZF1DWWEJlAGA9gs0' },
+  { name: 'Jazz Vibes', url: 'https://open.spotify.com/playlist/37i9dQZF1DXbITWG1ZJKYt' },
+  { name: 'Deep Focus', url: 'https://open.spotify.com/playlist/37i9dQZF1DWZeKCadgRdKQ' },
 ];
 
 const StudyRooms: React.FC<StudyRoomsProps> = ({ 
@@ -50,9 +51,9 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
   
   // Voice Chat State
   const [isMicOn, setIsMicOn] = useState(false);
-  const [mutePeers, setMutePeers] = useState(false); // Substitui isDeafened para controlar APENAS voz
+  const [mutePeers, setMutePeers] = useState(false);
   
-  // Refs para WebRTC (Estabilidade)
+  // Refs para WebRTC
   const localStreamRef = useRef<MediaStream | null>(null);
   const peersRef = useRef<Record<string, RTCPeerConnection>>({});
   const channelRef = useRef<any>(null);
@@ -61,15 +62,28 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
   const [speakingUsers, setSpeakingUsers] = useState<Set<string>>(new Set());
 
-  // Radio State (Sincronizado)
-  // Estado local de volume (se EU quero ouvir o rádio)
-  const [isRadioLocalMuted, setIsRadioLocalMuted] = useState(false); 
-  const [localRadioVolume, setLocalRadioVolume] = useState(0.3); // Volume inicial 30%
-
-  // Estado global da sala (o que está tocando para todos)
-  const [sharedRadioState, setSharedRadioState] = useState({ isPlaying: false, trackIndex: 0 });
+  // --- SPOTIFY STATE ---
+  // Default: Lofi Playlist
+  const DEFAULT_EMBED = "https://open.spotify.com/embed/playlist/0vvXsWCC9xrXsKd4FyS8kM?utm_source=generator&theme=0";
   
-  const radioRef = useRef<HTMLAudioElement | null>(null);
+  const [spotifyEmbedUrl, setSpotifyEmbedUrl] = useState(DEFAULT_EMBED);
+  const [customLinkInput, setCustomLinkInput] = useState('');
+  const [isBroadcastingMusic, setIsBroadcastingMusic] = useState(false); // "Transmitir para a sala"
+  const [showSpotifyControls, setShowSpotifyControls] = useState(false);
+
+  // Helper para converter link normal do Spotify para Embed
+  const getEmbedUrl = (url: string) => {
+    try {
+        const urlObj = new URL(url);
+        // Ex: open.spotify.com/playlist/ID -> open.spotify.com/embed/playlist/ID
+        if (url.includes('/embed/')) return url; // Já é embed
+        
+        const path = urlObj.pathname; // /playlist/ID
+        return `https://open.spotify.com/embed${path}?utm_source=generator&theme=0`;
+    } catch (e) {
+        return DEFAULT_EMBED;
+    }
+  };
 
   // Initial setup for room
   useEffect(() => {
@@ -92,7 +106,7 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
     return () => clearInterval(interval);
   }, [isActive]);
 
-  // --- WEBRTC SIGNALING & RADIO SYNC ---
+  // --- WEBRTC SIGNALING & SPOTIFY SYNC ---
   const rtcConfig = {
     iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
   };
@@ -100,7 +114,6 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
   useEffect(() => {
     if (!currentRoomId) return;
 
-    // Configura canal de sinalização
     const channel = supabase.channel(`room_voice_${currentRoomId}`, {
         config: { broadcast: { self: false } }
     });
@@ -109,47 +122,44 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
     channel
       // WebRTC Events
       .on('broadcast', { event: 'offer' }, async ({ payload }) => {
-        if (payload.target === currentUserId) {
-          await handleReceiveOffer(payload.offer, payload.caller);
-        }
+        if (payload.target === currentUserId) await handleReceiveOffer(payload.offer, payload.caller);
       })
       .on('broadcast', { event: 'answer' }, async ({ payload }) => {
-        if (payload.target === currentUserId) {
-          await handleReceiveAnswer(payload.answer, payload.caller);
-        }
+        if (payload.target === currentUserId) await handleReceiveAnswer(payload.answer, payload.caller);
       })
       .on('broadcast', { event: 'ice-candidate' }, async ({ payload }) => {
-        if (payload.target === currentUserId) {
-          await handleReceiveIce(payload.candidate, payload.caller);
-        }
+        if (payload.target === currentUserId) await handleReceiveIce(payload.candidate, payload.caller);
       })
       // Presence / Join Events
       .on('broadcast', { event: 'join-voice' }, async ({ payload }) => {
         if (payload.userId !== currentUserId) {
-          // 1. Conectar Voz
           await initiateCall(payload.userId);
           
-          // 2. Sincronizar Rádio (Se eu souber o estado atual e estiver tocando, aviso quem entrou)
-          if (sharedRadioState.isPlaying) {
+          // Se eu sou o "DJ" atual (estou transmitindo), sincronizo quem entrou
+          if (isBroadcastingMusic) {
              channel.send({
                 type: 'broadcast',
-                event: 'radio-sync',
-                payload: { state: sharedRadioState }
+                event: 'spotify-sync',
+                payload: { embedUrl: spotifyEmbedUrl }
              });
           }
         }
       })
-      // Radio Global Events
-      .on('broadcast', { event: 'radio-update' }, ({ payload }) => {
-         setSharedRadioState(payload.state);
+      // Spotify Global Events
+      .on('broadcast', { event: 'spotify-update' }, ({ payload }) => {
+         // Recebeu mudança de música da sala
+         // Só atualiza se o usuário NÃO estiver transmitindo sua própria música (evita conflito)
+         if (!isBroadcastingMusic) {
+            setSpotifyEmbedUrl(payload.embedUrl);
+         }
       })
-      .on('broadcast', { event: 'radio-sync' }, ({ payload }) => {
-         // Recebe estado atual ao entrar
-         setSharedRadioState(payload.state);
+      .on('broadcast', { event: 'spotify-sync' }, ({ payload }) => {
+         if (!isBroadcastingMusic) {
+            setSpotifyEmbedUrl(payload.embedUrl);
+         }
       })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
-          // Anuncia presença e pede estado
           channel.send({
             type: 'broadcast',
             event: 'join-voice',
@@ -159,7 +169,6 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
       });
 
     return () => {
-      // Cleanup completo ao sair da sala
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(track => track.stop());
         localStreamRef.current = null;
@@ -171,12 +180,11 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
       supabase.removeChannel(channel);
       channelRef.current = null;
     };
-  }, [currentRoomId, currentUserId]); 
+  }, [currentRoomId, currentUserId, isBroadcastingMusic, spotifyEmbedUrl]); 
 
-  // --- WEBRTC HANDLERS ---
+  // --- WEBRTC HANDLERS (Same as before) ---
   const createPeerConnection = (targetUserId: string) => {
     const pc = new RTCPeerConnection(rtcConfig);
-    
     pc.onicecandidate = (event) => {
       if (event.candidate && channelRef.current) {
         channelRef.current.send({
@@ -186,21 +194,17 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
         });
       }
     };
-
     pc.ontrack = (event) => {
       const stream = event.streams[0];
       setRemoteStreams(prev => ({ ...prev, [targetUserId]: stream }));
       setupAudioAnalysis(stream, targetUserId);
     };
-
     peersRef.current[targetUserId] = pc;
     return pc;
   };
 
   const initiateCall = async (targetUserId: string) => {
-    if (peersRef.current[targetUserId]) {
-        peersRef.current[targetUserId].close();
-    }
+    if (peersRef.current[targetUserId]) peersRef.current[targetUserId].close();
     const pc = createPeerConnection(targetUserId);
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => pc.addTrack(track, localStreamRef.current!));
@@ -216,16 +220,12 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
 
   const handleReceiveOffer = async (offer: RTCSessionDescriptionInit, callerId: string) => {
     let pc = peersRef.current[callerId];
-    if (!pc || pc.signalingState === 'closed') {
-        pc = createPeerConnection(callerId);
-    }
+    if (!pc || pc.signalingState === 'closed') pc = createPeerConnection(callerId);
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
     if (localStreamRef.current) {
        const senders = pc.getSenders();
        localStreamRef.current.getTracks().forEach(track => {
-           if (!senders.find(s => s.track?.id === track.id)) {
-               pc.addTrack(track, localStreamRef.current!);
-           }
+           if (!senders.find(s => s.track?.id === track.id)) pc.addTrack(track, localStreamRef.current!);
        });
     }
     const answer = await pc.createAnswer();
@@ -244,9 +244,7 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
 
   const handleReceiveIce = async (candidate: RTCIceCandidateInit, callerId: string) => {
     const pc = peersRef.current[callerId];
-    if (pc) {
-      try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch (e) { console.error(e); }
-    }
+    if (pc) { try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch (e) { console.error(e); } }
   };
 
   const toggleMic = async () => {
@@ -262,7 +260,6 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
         localStreamRef.current = stream;
         setIsMicOn(true);
         setupAudioAnalysis(stream, currentUserId);
-        
         const peers = peersRef.current;
         const promises = Object.entries(peers).map(async ([targetId, pc]) => {
              stream.getTracks().forEach(track => pc.addTrack(track, stream));
@@ -306,45 +303,38 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
     } catch (e) { console.error(e); }
   };
 
-  // --- RADIO LOGIC (LOCAL & GLOBAL) ---
-  
-  // Atualiza o player de áudio baseado no estado compartilhado
-  useEffect(() => {
-    if (radioRef.current) {
-      // Sincroniza URL se mudou
-      if (radioRef.current.src !== radioTracks[sharedRadioState.trackIndex].url) {
-         radioRef.current.src = radioTracks[sharedRadioState.trackIndex].url;
-      }
-
-      // Controla Play/Pause global
-      if (sharedRadioState.isPlaying) {
-        radioRef.current.play().catch(e => console.log("Autoplay bloqueado (Rádio):", e));
-      } else {
-        radioRef.current.pause();
-      }
-
-      // Controla Mute e Volume Locais (Isolado do WebRTC)
-      radioRef.current.muted = isRadioLocalMuted;
-      radioRef.current.volume = localRadioVolume;
+  // --- SPOTIFY ACTIONS ---
+  const changeStation = (url: string) => {
+    const embed = getEmbedUrl(url);
+    setSpotifyEmbedUrl(embed);
+    
+    // Se estiver transmitindo, manda pra todo mundo
+    if (isBroadcastingMusic) {
+        channelRef.current?.send({
+            type: 'broadcast',
+            event: 'spotify-update',
+            payload: { embedUrl: embed }
+        });
     }
-  }, [sharedRadioState, isRadioLocalMuted, localRadioVolume]);
-
-  // Ações Globais (Afetam todos)
-  const toggleGlobalPlay = () => {
-    const newState = { ...sharedRadioState, isPlaying: !sharedRadioState.isPlaying };
-    setSharedRadioState(newState);
-    channelRef.current?.send({ type: 'broadcast', event: 'radio-update', payload: { state: newState } });
   };
 
-  const nextGlobalTrack = () => {
-    const nextIndex = (sharedRadioState.trackIndex + 1) % radioTracks.length;
-    const newState = { isPlaying: true, trackIndex: nextIndex };
-    setSharedRadioState(newState);
-    channelRef.current?.send({ type: 'broadcast', event: 'radio-update', payload: { state: newState } });
+  const handleCustomLink = () => {
+    if (!customLinkInput) return;
+    changeStation(customLinkInput);
+    setCustomLinkInput('');
   };
 
-  // Ação Local
-  const toggleLocalRadioMute = () => setIsRadioLocalMuted(!isRadioLocalMuted);
+  const toggleBroadcast = () => {
+      setIsBroadcastingMusic(!isBroadcastingMusic);
+      // Se ligou o broadcast, força a sala a ouvir o que estou ouvindo agora
+      if (!isBroadcastingMusic) {
+          channelRef.current?.send({
+              type: 'broadcast',
+              event: 'spotify-update',
+              payload: { embedUrl: spotifyEmbedUrl }
+          });
+      }
+  };
 
   // --- NAVIGATION ---
   const joinRoom = (roomId: string) => setCurrentRoomId(roomId);
@@ -355,7 +345,8 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
       setRoomStartTime(null);
       setSecondsElapsed(0);
       setIsMicOn(false);
-      setSharedRadioState({ isPlaying: false, trackIndex: 0 }); // Reset local view of state
+      setSpotifyEmbedUrl(DEFAULT_EMBED);
+      setIsBroadcastingMusic(false);
     }
   };
 
@@ -389,7 +380,7 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
   const currentRoom = departments.find(d => d.id === currentRoomId);
   const usersInRoom = presenceUsers.filter(u => u.study_room_id === currentRoomId);
 
-  // --- LOBBY VIEW ---
+  // --- LOBBY VIEW (Unchanged) ---
   if (!currentRoomId) {
     return (
       <div className="space-y-10 animate-in fade-in duration-500 pb-20">
@@ -453,7 +444,7 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
   return (
     <div className="h-[calc(100vh-100px)] flex flex-col animate-in zoom-in-95 duration-500">
       
-      {/* Invisible Audio Elements for Remote Streams (Voice) */}
+      {/* Invisible Audio Elements for Voice */}
       {Object.entries(remoteStreams).map(([userId, stream]) => (
          <audio 
             key={userId} 
@@ -464,13 +455,10 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
                 } 
             }} 
             autoPlay 
-            muted={mutePeers} // Muta APENAS os colegas, não o rádio
+            muted={mutePeers}
          />
       ))}
       
-      {/* Elemento de Rádio (Separado) */}
-      <audio ref={radioRef} loop />
-
       {/* Header Sala */}
       <div className="flex items-center justify-between mb-8">
          <div className="flex items-center gap-4">
@@ -517,9 +505,9 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
             </div>
          </div>
 
-         {/* Users List (Discord Style) */}
+         {/* Users List & Player */}
          <div className="bg-slate-900 dark:bg-black/40 rounded-[3rem] p-0 border border-slate-800 shadow-2xl flex flex-col overflow-hidden">
-            <div className="p-8 pb-4 border-b border-white/10">
+            <div className="p-8 pb-4 border-b border-white/10 flex items-center justify-between">
                <div className="flex items-center gap-3">
                   <div className="bg-white/10 p-2 rounded-xl">
                      <User className="text-white w-5 h-5" />
@@ -529,13 +517,15 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{usersInRoom.length} Estudando</p>
                   </div>
                </div>
+               <button onClick={() => setShowSpotifyControls(!showSpotifyControls)} className={`p-2 rounded-xl transition-colors ${showSpotifyControls ? 'bg-white text-black' : 'bg-white/10 text-white'}`}>
+                  <Music size={18} />
+               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-2">
                {usersInRoom.map((user) => {
                   const isMe = user.user_id === currentUserId;
                   const isSpeaking = speakingUsers.has(user.user_id);
-                  
                   return (
                      <div key={user.user_id} className={`flex items-center justify-between p-3 rounded-2xl transition-all ${isMe ? 'bg-white/10' : 'hover:bg-white/5'}`}>
                         <div className="flex items-center gap-4">
@@ -551,11 +541,7 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
                               </p>
                               <div className="flex items-center gap-1">
                                 {isSpeaking && <Signal size={10} className="text-emerald-500 animate-pulse" />}
-                                {user.subject_name && (
-                                   <p className="text-[9px] font-bold text-slate-500 uppercase truncate max-w-[100px]">
-                                      {user.subject_name}
-                                   </p>
-                                )}
+                                {user.subject_name && <p className="text-[9px] font-bold text-slate-500 uppercase truncate max-w-[100px]">{user.subject_name}</p>}
                               </div>
                            </div>
                         </div>
@@ -569,50 +555,67 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
                })}
             </div>
 
-            {/* Voice & Radio Control Bar (Bottom) */}
-            <div className="bg-[#1e1e24] p-4 border-t border-black/20">
-               
-               {/* Player de Rádio (Controle Global) */}
-               {sharedRadioState.isPlaying && (
-                 <div className="mb-4 bg-black/20 rounded-xl p-3 animate-in slide-in-from-bottom-2">
-                    <div className="flex items-center justify-between mb-3">
-                       <div className="flex items-center gap-3 overflow-hidden">
-                          <div className="bg-emerald-500/20 p-2 rounded-lg">
-                             <Radio size={14} className="text-emerald-500 animate-pulse" />
-                          </div>
-                          <div className="min-w-0">
-                             <p className="text-[10px] font-black text-white uppercase tracking-wider truncate">Rádio SanFran {isRadioLocalMuted && "(Mutado)"}</p>
-                             <p className="text-[9px] font-bold text-emerald-400 uppercase truncate">{radioTracks[sharedRadioState.trackIndex].name}</p>
-                          </div>
-                       </div>
-                       <div className="flex items-center gap-1">
-                          <button onClick={toggleGlobalPlay} className="p-2 text-slate-300 hover:text-white rounded-lg hover:bg-white/10" title="Pausar para todos">
-                             <Pause size={12} fill="currentColor" />
+            {/* Spotify / Control Section */}
+            <div className="bg-[#1e1e24] border-t border-black/20">
+               {/* Spotify Embed */}
+               <div className="p-4 pb-0">
+                 <iframe 
+                    style={{borderRadius: '12px'}} 
+                    src={spotifyEmbedUrl} 
+                    width="100%" 
+                    height="80" 
+                    frameBorder="0" 
+                    allowFullScreen 
+                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
+                    loading="lazy" 
+                  />
+               </div>
+
+               {/* Advanced Controls (Dropdowns, Links) */}
+               {showSpotifyControls && (
+                 <div className="px-4 py-3 bg-black/20 animate-in slide-in-from-bottom-2 border-b border-white/5">
+                    <div className="space-y-3">
+                       <div className="flex gap-2">
+                          <input 
+                            value={customLinkInput}
+                            onChange={(e) => setCustomLinkInput(e.target.value)}
+                            placeholder="Cole link do Spotify (Playlist/Album)" 
+                            className="flex-1 bg-white/10 border border-white/10 rounded-xl px-3 py-2 text-[10px] text-white placeholder:text-slate-500 outline-none focus:border-sanfran-rubi"
+                          />
+                          <button onClick={handleCustomLink} className="p-2 bg-sanfran-rubi text-white rounded-xl">
+                            <LinkIcon size={14} />
                           </button>
-                          <button onClick={nextGlobalTrack} className="p-2 text-slate-300 hover:text-white rounded-lg hover:bg-white/10" title="Pular música para todos">
-                             <SkipForward size={12} fill="currentColor" />
+                       </div>
+                       
+                       <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+                          {spotifyPresets.map(preset => (
+                             <button 
+                               key={preset.name} 
+                               onClick={() => changeStation(preset.url)}
+                               className="whitespace-nowrap px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 rounded-lg text-[9px] font-black text-slate-300 uppercase tracking-wide transition-colors"
+                             >
+                               {preset.name}
+                             </button>
+                          ))}
+                       </div>
+
+                       <div className="flex items-center justify-between bg-emerald-900/20 p-2 rounded-xl border border-emerald-500/20">
+                          <span className="text-[9px] font-black uppercase text-emerald-500 tracking-widest ml-1">
+                             {isBroadcastingMusic ? "Transmitindo para a Sala (DJ)" : "Modo Pessoal (Só você ouve)"}
+                          </span>
+                          <button 
+                             onClick={toggleBroadcast}
+                             className={`w-8 h-4 rounded-full transition-colors relative ${isBroadcastingMusic ? 'bg-emerald-500' : 'bg-slate-600'}`}
+                          >
+                             <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform ${isBroadcastingMusic ? 'left-4.5' : 'left-0.5'}`} style={{ left: isBroadcastingMusic ? '18px' : '2px' }} />
                           </button>
                        </div>
-                    </div>
-                    {/* Volume Slider */}
-                    <div className="flex items-center gap-2 px-1">
-                       <Volume2 size={12} className="text-emerald-500/50" />
-                       <input 
-                          type="range" 
-                          min="0" 
-                          max="1" 
-                          step="0.05"
-                          value={localRadioVolume}
-                          onChange={(e) => setLocalRadioVolume(parseFloat(e.target.value))}
-                          className="w-full h-1 bg-black/20 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                          title="Volume Local da Música"
-                       />
                     </div>
                  </div>
                )}
 
-               <div className="flex items-center justify-between gap-4">
-                  {/* Status do Usuário */}
+               {/* Voice Controls */}
+               <div className="p-4 flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3 overflow-hidden">
                      <div className="relative">
                         <div className="w-10 h-10 rounded-full bg-sanfran-rubi flex items-center justify-center text-white font-black text-xs">
@@ -626,7 +629,6 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
                      </div>
                   </div>
 
-                  {/* Controles Principais */}
                   <div className="flex items-center gap-2">
                      <button 
                         onClick={toggleMic}
@@ -639,20 +641,9 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
                      <button 
                         onClick={() => setMutePeers(!mutePeers)}
                         className={`p-3 rounded-xl transition-all ${!mutePeers ? 'bg-black/20 text-slate-300 hover:bg-black/40' : 'bg-red-500/20 text-red-500'}`}
-                        title={mutePeers ? "Ativar Áudio da Sala (Voz)" : "Mutar Áudio da Sala (Voz)"}
+                        title={mutePeers ? "Ativar Áudio da Sala" : "Mutar Áudio da Sala"}
                      >
                         {mutePeers ? <HeadphoneOff size={18} /> : <Headphones size={18} />}
-                     </button>
-
-                     <button 
-                        onClick={() => {
-                           if (!sharedRadioState.isPlaying) toggleGlobalPlay(); // Se desligado, liga globalmente
-                           else toggleLocalRadioMute(); // Se ligado, muta localmente
-                        }}
-                        className={`p-3 rounded-xl transition-all ${sharedRadioState.isPlaying && !isRadioLocalMuted ? 'bg-emerald-500 text-white' : 'bg-black/20 text-slate-300 hover:bg-black/40'}`}
-                        title={sharedRadioState.isPlaying ? (isRadioLocalMuted ? "Desmutar Rádio (Local)" : "Mutar Rádio (Local)") : "Ligar Rádio (Global)"}
-                     >
-                        {sharedRadioState.isPlaying ? (isRadioLocalMuted ? <VolumeX size={18} /> : <Volume2 size={18} />) : <Radio size={18} />}
                      </button>
                   </div>
                </div>
