@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import { Building2, User, Clock, ArrowLeft, Play, Pause, LogOut, BookOpen, Shield, Gavel, Scale, Globe, BrainCircuit, HeartPulse, Briefcase, Landmark, Mic, MicOff, Headphones, HeadphoneOff, Radio, Volume2, VolumeX, Signal, Music, Link as LinkIcon, Share2, Info } from 'lucide-react';
+import { Building2, User, Clock, ArrowLeft, Play, Pause, LogOut, BookOpen, Shield, Gavel, Scale, Globe, BrainCircuit, HeartPulse, Briefcase, Landmark, Mic, MicOff, Headphones, HeadphoneOff, Radio, Volume2, VolumeX, Signal, Music, Link as LinkIcon, Share2, Info, Youtube } from 'lucide-react';
 import { PresenceUser } from '../types';
 import { supabase } from '../services/supabaseClient';
 
@@ -31,15 +32,21 @@ const departments: Department[] = [
   { id: 'DFD', code: 'DFD', name: 'Filosofia do Direito', icon: BrainCircuit, color: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400' },
 ];
 
-const spotifyPresets = [
-  { name: 'Lofi Girl', url: 'https://open.spotify.com/playlist/0vvXsWCC9xrXsKd4FyS8kM' },
-  { name: 'Clássica', url: 'https://open.spotify.com/playlist/37i9dQZF1DWWEJlAGA9gs0' },
-  { name: 'MPB Café', url: 'https://open.spotify.com/playlist/37i9dQZF1DX1h3082a939f' },
-  { name: 'Sertanejo', url: 'https://open.spotify.com/playlist/37i9dQZF1DX0cK9f4fE52l' },
-  { name: 'Top Brasil', url: 'https://open.spotify.com/playlist/37i9dQZF1DX0FOF1IUWK1W' },
-  { name: 'Rock Classics', url: 'https://open.spotify.com/playlist/37i9dQZF1DWXRqgorJj26U' },
-  { name: 'Jazz Vibes', url: 'https://open.spotify.com/playlist/37i9dQZF1DXbITWG1ZJKYt' },
-  { name: 'Funk Hits', url: 'https://open.spotify.com/playlist/37i9dQZF1DWWp1lU52862K' },
+type MediaType = 'spotify' | 'youtube';
+
+interface MediaPreset {
+  name: string;
+  url: string;
+  type: MediaType;
+}
+
+const presets: MediaPreset[] = [
+  { name: 'Lofi Girl (YT)', url: 'https://www.youtube.com/watch?v=jfKfPfyJRdk', type: 'youtube' },
+  { name: 'Jazz Relax (YT)', url: 'https://www.youtube.com/watch?v=Dx5qFachd3A', type: 'youtube' },
+  { name: 'Piano Focus (YT)', url: 'https://www.youtube.com/watch?v=WJ3-F02-F_Y', type: 'youtube' },
+  { name: 'Spotify Lofi', url: 'https://open.spotify.com/playlist/0vvXsWCC9xrXsKd4FyS8kM', type: 'spotify' },
+  { name: 'Spotify Clássica', url: 'https://open.spotify.com/playlist/37i9dQZF1DWWEJlAGA9gs0', type: 'spotify' },
+  { name: 'Spotify MPB', url: 'https://open.spotify.com/playlist/37i9dQZF1DX1h3082a939f', type: 'spotify' },
 ];
 
 const StudyRooms: React.FC<StudyRoomsProps> = ({ 
@@ -65,30 +72,50 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
   const [speakingUsers, setSpeakingUsers] = useState<Set<string>>(new Set());
 
-  // --- SPOTIFY STATE ---
-  // Default: Lofi Playlist
-  const DEFAULT_EMBED = "https://open.spotify.com/embed/playlist/0vvXsWCC9xrXsKd4FyS8kM?utm_source=generator&theme=0";
+  // --- MEDIA STATE ---
+  const DEFAULT_EMBED = "https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1&mute=0&controls=1&origin=https://estuda-san-fran.vercel.app&playsinline=1&showinfo=0&rel=0&iv_load_policy=3&modestbranding=1";
   
-  const [spotifyEmbedUrl, setSpotifyEmbedUrl] = useState(DEFAULT_EMBED);
+  const [mediaUrl, setMediaUrl] = useState(DEFAULT_EMBED);
+  const [mediaType, setMediaType] = useState<MediaType>('youtube');
   const [customLinkInput, setCustomLinkInput] = useState('');
-  const [isBroadcastingMusic, setIsBroadcastingMusic] = useState(true); // Padrão: Transmitir (Modo DJ Ativo)
+  const [isSynced, setIsSynced] = useState(true); // "Sincronizado com a Sala"
   const [showSpotifyControls, setShowSpotifyControls] = useState(false);
   const [lastDJName, setLastDJName] = useState<string>('');
 
-  // Helper para converter link normal do Spotify para Embed
-  const getEmbedUrl = (url: string) => {
-    try {
-        const urlObj = new URL(url);
-        // Suporta tracks, playlists, albums, artists
-        // Ex: open.spotify.com/track/ID -> open.spotify.com/embed/track/ID
-        
-        if (url.includes('/embed/')) return url; // Já é embed
-        
-        const path = urlObj.pathname; // /playlist/ID
-        return `https://open.spotify.com/embed${path}?utm_source=generator&theme=0`;
-    } catch (e) {
-        return DEFAULT_EMBED;
+  // --- HELPERS DE URL ---
+  
+  const parseMediaUrl = (input: string): { url: string, type: MediaType } | null => {
+    // 1. YouTube
+    if (input.includes('youtube.com') || input.includes('youtu.be')) {
+      let videoId = '';
+      if (input.includes('v=')) {
+        videoId = input.split('v=')[1]?.split('&')[0];
+      } else if (input.includes('youtu.be/')) {
+        videoId = input.split('youtu.be/')[1]?.split('?')[0];
+      }
+      
+      if (videoId) {
+        return {
+          type: 'youtube',
+          url: `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&controls=1&origin=${window.location.origin}&playsinline=1&showinfo=0&rel=0&iv_load_policy=3&modestbranding=1`
+        };
+      }
     }
+
+    // 2. Spotify
+    if (input.includes('spotify.com')) {
+      // Limpa URLs sujas (ex: intl-pt, query params)
+      // Regex captura: tipo (track/album/playlist) e o ID
+      const match = input.match(/open\.spotify\.com\/(?:intl-[a-z]{2}\/)?(track|album|playlist|artist)\/([a-zA-Z0-9]+)/);
+      if (match) {
+        return {
+          type: 'spotify',
+          url: `https://open.spotify.com/embed/${match[1]}/${match[2]}?utm_source=generator&theme=0`
+        };
+      }
+    }
+
+    return null;
   };
 
   // Initial setup for room
@@ -112,7 +139,7 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
     return () => clearInterval(interval);
   }, [isActive]);
 
-  // --- WEBRTC SIGNALING & SPOTIFY SYNC ---
+  // --- WEBRTC SIGNALING & MEDIA SYNC ---
   const rtcConfig = {
     iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
   };
@@ -141,28 +168,31 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
         if (payload.userId !== currentUserId) {
           await initiateCall(payload.userId);
           
-          // Se eu sou o "DJ" atual (estou transmitindo), sincronizo quem entrou
-          if (isBroadcastingMusic) {
+          // Se eu estou sincronizado, envio o estado atual para quem entrou
+          if (isSynced) {
              channel.send({
                 type: 'broadcast',
-                event: 'spotify-sync',
-                payload: { embedUrl: spotifyEmbedUrl }
+                event: 'media-sync',
+                payload: { url: mediaUrl, type: mediaType }
              });
           }
         }
       })
-      // Spotify Global Events
-      .on('broadcast', { event: 'spotify-update' }, ({ payload }) => {
-         // Recebeu mudança de música da sala
-         // Se eu NÃO estou no modo "DJ Pessoal" (transmitindo minha propria), eu obedeço a sala
-         if (isBroadcastingMusic) { // Se eu também estou em modo "Ouvir Sala/Transmitir"
-            setSpotifyEmbedUrl(payload.embedUrl);
+      // Media Global Events
+      .on('broadcast', { event: 'media-update' }, ({ payload }) => {
+         // Recebi uma troca de música
+         if (isSynced) {
+            setMediaUrl(payload.url);
+            setMediaType(payload.type);
             setLastDJName(payload.senderName || 'DJ da Sala');
          }
       })
-      .on('broadcast', { event: 'spotify-sync' }, ({ payload }) => {
-         // Ao entrar, sincroniza
-         setSpotifyEmbedUrl(payload.embedUrl);
+      .on('broadcast', { event: 'media-sync' }, ({ payload }) => {
+         // Sincronização inicial ao entrar (se eu estiver com sync ligado)
+         if (isSynced) {
+            setMediaUrl(payload.url);
+            setMediaType(payload.type);
+         }
       })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
@@ -179,16 +209,16 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
         localStreamRef.current.getTracks().forEach(track => track.stop());
         localStreamRef.current = null;
       }
-      Object.values(peersRef.current).forEach(p => p.close());
+      Object.values(peersRef.current).forEach((p) => (p as RTCPeerConnection).close());
       peersRef.current = {};
       setRemoteStreams({});
       setIsMicOn(false);
       supabase.removeChannel(channel);
       channelRef.current = null;
     };
-  }, [currentRoomId, currentUserId, isBroadcastingMusic, spotifyEmbedUrl]); 
+  }, [currentRoomId, currentUserId, isSynced, mediaUrl, mediaType]); 
 
-  // --- WEBRTC HANDLERS (Same as before) ---
+  // --- WEBRTC HANDLERS (Standard) ---
   const createPeerConnection = (targetUserId: string) => {
     const pc = new RTCPeerConnection(rtcConfig);
     pc.onicecandidate = (event) => {
@@ -268,9 +298,10 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
         setupAudioAnalysis(stream, currentUserId);
         const peers = peersRef.current;
         const promises = Object.entries(peers).map(async ([targetId, pc]) => {
-             stream.getTracks().forEach(track => pc.addTrack(track, stream));
-             const offer = await pc.createOffer();
-             await pc.setLocalDescription(offer);
+             const peerConnection = pc as RTCPeerConnection;
+             stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
+             const offer = await peerConnection.createOffer();
+             await peerConnection.setLocalDescription(offer);
              channelRef.current?.send({
                  type: 'broadcast',
                  event: 'offer',
@@ -309,31 +340,47 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
     } catch (e) { console.error(e); }
   };
 
-  const toggleBroadcast = () => {
-    setIsBroadcastingMusic(prev => !prev);
-  };
+  // --- MEDIA ACTIONS ---
+  
+  const updateMedia = (newUrl: string, type: MediaType) => {
+    setMediaUrl(newUrl);
+    setMediaType(type);
+    setLastDJName('Você');
 
-  // --- SPOTIFY ACTIONS ---
-  const changeStation = (url: string) => {
-    const embed = getEmbedUrl(url);
-    setSpotifyEmbedUrl(embed);
-    
-    // Se estiver transmitindo, manda pra todo mundo
-    if (isBroadcastingMusic) {
+    if (isSynced) {
         const myName = presenceUsers.find(u => u.user_id === currentUserId)?.name || 'Alguém';
         channelRef.current?.send({
             type: 'broadcast',
-            event: 'spotify-update',
-            payload: { embedUrl: embed, senderName: myName }
+            event: 'media-update',
+            payload: { url: newUrl, type: type, senderName: myName }
         });
-        setLastDJName('Você');
     }
   };
 
   const handleCustomLink = () => {
     if (!customLinkInput) return;
-    changeStation(customLinkInput);
-    setCustomLinkInput('');
+    const parsed = parseMediaUrl(customLinkInput);
+    if (parsed) {
+        updateMedia(parsed.url, parsed.type);
+        setCustomLinkInput('');
+    } else {
+        alert("Link não suportado. Use links do YouTube ou Spotify.");
+    }
+  };
+
+  const handlePreset = (preset: MediaPreset) => {
+     // Para presets, se for spotify precisamos garantir o formato embed
+     if (preset.type === 'spotify') {
+         const parsed = parseMediaUrl(preset.url);
+         if (parsed) updateMedia(parsed.url, 'spotify');
+     } else if (preset.type === 'youtube') {
+         const parsed = parseMediaUrl(preset.url);
+         if (parsed) updateMedia(parsed.url, 'youtube');
+     }
+  };
+
+  const toggleSync = () => {
+    setIsSynced(prev => !prev);
   };
 
   // --- NAVIGATION ---
@@ -345,7 +392,8 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
       setRoomStartTime(null);
       setSecondsElapsed(0);
       setIsMicOn(false);
-      setSpotifyEmbedUrl(DEFAULT_EMBED);
+      setMediaUrl(DEFAULT_EMBED);
+      setMediaType('youtube');
     }
   };
 
@@ -554,33 +602,40 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
                })}
             </div>
 
-            {/* Spotify / Control Section */}
+            {/* Spotify / YouTube / Control Section */}
             <div className="bg-[#1e1e24] border-t border-black/20">
-               {/* Spotify Embed */}
+               {/* Embed Player */}
                <div className="p-4 pb-0 relative">
-                 <iframe 
-                    style={{borderRadius: '12px'}} 
-                    src={spotifyEmbedUrl} 
-                    width="100%" 
-                    height="80" 
-                    frameBorder="0" 
-                    allowFullScreen 
-                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
-                    loading="lazy" 
-                  />
-                  {lastDJName && isBroadcastingMusic && (
-                    <div className="absolute top-2 right-6 bg-black/60 backdrop-blur-md px-2 py-1 rounded-md text-[9px] font-bold text-emerald-400 border border-emerald-500/20">
-                       DJ: {lastDJName}
+                 <div className="rounded-xl overflow-hidden bg-black aspect-[16/5] relative group">
+                    <iframe 
+                        className="w-full h-full"
+                        src={mediaUrl} 
+                        frameBorder="0" 
+                        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
+                        allowFullScreen
+                        loading="lazy" 
+                    />
+                    {/* Overlay para YouTube para bloquear cliques indesejados mas permitir controles se necessário */}
+                    {mediaType === 'youtube' && <div className="absolute inset-x-0 top-0 h-4 bg-transparent" />} 
+                 </div>
+
+                 {lastDJName && isSynced && (
+                    <div className="absolute top-6 right-6 bg-black/80 backdrop-blur-md px-3 py-1 rounded-full text-[9px] font-bold text-emerald-400 border border-emerald-500/20 shadow-lg z-10 flex items-center gap-1">
+                       <Signal size={8} className="animate-pulse" /> DJ: {lastDJName}
                     </div>
                   )}
                </div>
                
                {/* Info sobre Play Manual */}
-               <div className="px-5 pt-2 flex items-center gap-2 text-slate-500">
-                  <Info size={10} />
-                  <p className="text-[9px] font-bold uppercase tracking-wide">
-                     O DJ escolhe a música, mas você deve apertar o Play.
-                  </p>
+               <div className="px-5 pt-2 flex items-center gap-2 text-slate-500 justify-between">
+                  <div className="flex items-center gap-2">
+                    <Info size={10} />
+                    <p className="text-[9px] font-bold uppercase tracking-wide">
+                        {mediaType === 'spotify' 
+                            ? "Spotify: Requer login Premium para tocar a música inteira." 
+                            : "YouTube: Áudio completo disponível."}
+                    </p>
+                  </div>
                </div>
 
                {/* Advanced Controls (Dropdowns, Links) */}
@@ -591,7 +646,7 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
                           <input 
                             value={customLinkInput}
                             onChange={(e) => setCustomLinkInput(e.target.value)}
-                            placeholder="Cole qualquer link do Spotify (Música, Álbum, Artista...)" 
+                            placeholder="Cole link YouTube ou Spotify..." 
                             className="flex-1 bg-white/10 border border-white/10 rounded-xl px-3 py-2 text-[10px] text-white placeholder:text-slate-500 outline-none focus:border-sanfran-rubi"
                           />
                           <button onClick={handleCustomLink} className="p-2 bg-sanfran-rubi text-white rounded-xl">
@@ -600,12 +655,13 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
                        </div>
                        
                        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-                          {spotifyPresets.map(preset => (
+                          {presets.map(preset => (
                              <button 
                                key={preset.name} 
-                               onClick={() => changeStation(preset.url)}
-                               className="whitespace-nowrap px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 rounded-lg text-[9px] font-black text-slate-300 uppercase tracking-wide transition-colors"
+                               onClick={() => handlePreset(preset)}
+                               className={`whitespace-nowrap px-3 py-1.5 border rounded-lg text-[9px] font-black uppercase tracking-wide transition-colors flex items-center gap-1 ${preset.type === 'youtube' ? 'bg-red-600/10 border-red-600/30 text-red-400 hover:bg-red-600/20' : 'bg-green-600/10 border-green-600/30 text-green-400 hover:bg-green-600/20'}`}
                              >
+                               {preset.type === 'youtube' ? <Youtube size={10} /> : <Music size={10} />}
                                {preset.name}
                              </button>
                           ))}
@@ -613,14 +669,14 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
 
                        <div className="flex items-center justify-between bg-emerald-900/20 p-2 rounded-xl border border-emerald-500/20">
                           <span className="text-[9px] font-black uppercase text-emerald-500 tracking-widest ml-1">
-                             {isBroadcastingMusic ? "Modo DJ: Sincronizado com a Sala" : "Modo Pessoal: Só você ouve"}
+                             {isSynced ? "Sincronizado com a Sala (Todos Ouvem)" : "Modo Pessoal (Só Você Ouve)"}
                           </span>
                           <button 
-                             onClick={toggleBroadcast}
-                             className={`w-8 h-4 rounded-full transition-colors relative ${isBroadcastingMusic ? 'bg-emerald-500' : 'bg-slate-600'}`}
-                             title={isBroadcastingMusic ? "Desligar Sincronização" : "Ligar Sincronização (Ouvir a Sala)"}
+                             onClick={toggleSync}
+                             className={`w-8 h-4 rounded-full transition-colors relative ${isSynced ? 'bg-emerald-500' : 'bg-slate-600'}`}
+                             title={isSynced ? "Desligar Sincronização" : "Ligar Sincronização (Ouvir a Sala)"}
                           >
-                             <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform ${isBroadcastingMusic ? 'left-4.5' : 'left-0.5'}`} style={{ left: isBroadcastingMusic ? '18px' : '2px' }} />
+                             <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform ${isSynced ? 'left-4.5' : 'left-0.5'}`} style={{ left: isSynced ? '18px' : '2px' }} />
                           </button>
                        </div>
                     </div>
