@@ -13,7 +13,10 @@ import {
   X,
   Gavel,
   Check,
-  Archive
+  Archive,
+  Layers,
+  Calendar,
+  Play
 } from 'lucide-react';
 import { Flashcard, Subject, Folder } from '../types';
 import { supabase } from '../services/supabaseClient';
@@ -34,13 +37,20 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(subjects[0]?.id || '');
   const [bulkInput, setBulkInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Study Session State
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
+  const [studyQueue, setStudyQueue] = useState<Flashcard[]>([]);
+  const [showStudyOptions, setShowStudyOptions] = useState(false);
+
+  // Creation State
   const [manualFront, setManualFront] = useState('');
   const [manualBack, setManualBack] = useState('');
   const [newFolderName, setNewFolderName] = useState('');
   const [showFolderInput, setShowFolderInput] = useState(false);
   
+  // Selection State
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set());
 
@@ -56,7 +66,17 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     return ids;
   };
 
+  // Cards directly in the current folder (for browsing)
   const currentCards = activeFlashcards.filter(f => f.folderId === currentFolderId);
+  const currentFolders = folders.filter(f => f.parentId === currentFolderId);
+
+  // Cards in the current folder AND subfolders (for studying scope)
+  const currentContextIds = getSubfolderIds(currentFolderId);
+  const cardsInScope = activeFlashcards.filter(f => 
+    (currentFolderId === null ? true : currentContextIds.includes(f.folderId as string))
+  );
+  
+  const dueCards = cardsInScope.filter(f => f.nextReview <= Date.now());
 
   const toggleCardSelection = (id: string) => {
     const newSelection = new Set(selectedCardIds);
@@ -102,7 +122,6 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
   const archiveCard = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    // if (!confirm("Arquivar este card?")) return; // Optional confirmation
     try {
       const now = new Date().toISOString();
       const { error } = await supabase
@@ -243,15 +262,17 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     }
   };
 
-  const currentFolders = folders.filter(f => f.parentId === currentFolderId);
-  const currentContextIds = getSubfolderIds(currentFolderId);
-  const reviewQueue = activeFlashcards.filter(f => 
-    f.nextReview <= Date.now() && 
-    (currentFolderId === null ? true : currentContextIds.includes(f.folderId as string))
-  );
+  const startStudySession = (type: 'due' | 'all') => {
+    const queue = type === 'due' ? dueCards : cardsInScope;
+    setStudyQueue(queue);
+    setMode('study');
+    setCurrentIndex(0);
+    setIsFlipped(false);
+    setShowStudyOptions(false);
+  };
 
   const handleReview = async (quality: number) => {
-    const card = reviewQueue[currentIndex];
+    const card = studyQueue[currentIndex];
     const newInterval = quality === 0 ? 0 : (card.interval === 0 ? 1 : card.interval * 2);
     const nextReview = Date.now() + newInterval * 24 * 60 * 60 * 1000;
     
@@ -266,13 +287,14 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       // TRIGGER QUEST UPDATE
       await updateQuestProgress(userId, 'review_cards', 1);
 
-      if (currentIndex < reviewQueue.length - 1) { 
+      if (currentIndex < studyQueue.length - 1) { 
         setCurrentIndex(prev => prev + 1); 
         setIsFlipped(false); 
       } else { 
         setMode('browse'); 
         setCurrentIndex(0); 
         setIsFlipped(false); 
+        setStudyQueue([]);
       }
     } catch (err) { 
       alert("Erro ao atualizar revisão."); 
@@ -309,8 +331,12 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 </div>
               ) : (
                 <>
-                  <button onClick={() => { setMode('study'); setCurrentIndex(0); setIsFlipped(false); }} disabled={reviewQueue.length === 0} className="flex items-center gap-2 px-8 py-3.5 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest disabled:opacity-50 hover:bg-sanfran-rubiDark shadow-xl">
-                    <RotateCcw className="w-5 h-5" /> Estudar ({reviewQueue.length})
+                  <button 
+                    onClick={() => setShowStudyOptions(true)} 
+                    disabled={cardsInScope.length === 0} 
+                    className="flex items-center gap-2 px-8 py-3.5 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest disabled:opacity-50 hover:bg-sanfran-rubiDark shadow-xl"
+                  >
+                    <RotateCcw className="w-5 h-5" /> Estudar
                   </button>
                   <button onClick={() => {setMode('create');}} className="flex items-center gap-2 px-6 py-3.5 bg-white dark:bg-sanfran-rubiDark text-sanfran-rubi dark:text-white border-2 border-sanfran-rubi rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-50 shadow-xl">
                     <Plus className="w-5 h-5" /> Novo Card
@@ -339,6 +365,53 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
            />
            <button onClick={handleCreateFolder} className="p-4 bg-sanfran-rubi text-white rounded-2xl font-black"><Check className="w-6 h-6" /></button>
            <button onClick={() => setShowFolderInput(false)} className="p-4 bg-slate-200 text-slate-500 rounded-2xl font-black"><X className="w-6 h-6" /></button>
+        </div>
+      )}
+
+      {/* MODAL DE OPÇÕES DE ESTUDO */}
+      {showStudyOptions && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setShowStudyOptions(false)}>
+           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 w-full max-w-md shadow-2xl border-4 border-sanfran-rubi relative" onClick={e => e.stopPropagation()}>
+              <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase mb-6 text-center">Configurar Sessão</h3>
+              
+              <div className="space-y-4">
+                 <button 
+                   onClick={() => startStudySession('due')}
+                   disabled={dueCards.length === 0}
+                   className="w-full flex items-center justify-between p-5 bg-slate-50 dark:bg-white/5 border-2 border-slate-200 dark:border-white/10 rounded-2xl hover:border-sanfran-rubi transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
+                 >
+                    <div className="flex items-center gap-3">
+                       <div className="bg-red-100 dark:bg-red-900/20 p-2 rounded-lg text-red-600 dark:text-red-400">
+                          <Calendar size={20} />
+                       </div>
+                       <div className="text-left">
+                          <p className="font-bold text-slate-900 dark:text-white">Revisão Pendente</p>
+                          <p className="text-xs text-slate-500">Apenas o que venceu</p>
+                       </div>
+                    </div>
+                    <span className="text-2xl font-black text-sanfran-rubi">{dueCards.length}</span>
+                 </button>
+
+                 <button 
+                   onClick={() => startStudySession('all')}
+                   disabled={cardsInScope.length === 0}
+                   className="w-full flex items-center justify-between p-5 bg-slate-50 dark:bg-white/5 border-2 border-slate-200 dark:border-white/10 rounded-2xl hover:border-sanfran-rubi transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
+                 >
+                    <div className="flex items-center gap-3">
+                       <div className="bg-blue-100 dark:bg-blue-900/20 p-2 rounded-lg text-blue-600 dark:text-blue-400">
+                          <Layers size={20} />
+                       </div>
+                       <div className="text-left">
+                          <p className="font-bold text-slate-900 dark:text-white">Revisão Geral</p>
+                          <p className="text-xs text-slate-500">Todo o acervo atual</p>
+                       </div>
+                    </div>
+                    <span className="text-2xl font-black text-blue-600 dark:text-blue-400">{cardsInScope.length}</span>
+                 </button>
+              </div>
+
+              <button onClick={() => setShowStudyOptions(false)} className="w-full mt-6 py-4 text-slate-400 font-bold uppercase text-xs hover:text-slate-600">Cancelar</button>
+           </div>
         </div>
       )}
 
@@ -399,17 +472,18 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         </div>
       )}
 
-      {mode === 'study' && reviewQueue.length > 0 && (
+      {mode === 'study' && studyQueue.length > 0 && (
         <div className="flex flex-col items-center py-10 animate-in fade-in zoom-in">
           <div className="relative w-full max-w-2xl h-[400px] preserve-3d" onClick={() => setIsFlipped(!isFlipped)}>
             <div className={`absolute inset-0 w-full h-full cursor-pointer transition-transform duration-700 preserve-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
               <div className="absolute inset-0 w-full h-full bg-white dark:bg-sanfran-rubiDark border-[6px] border-slate-200 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden">
+                <div className="absolute top-6 left-6 text-xs font-black uppercase text-slate-300">{currentIndex + 1} / {studyQueue.length}</div>
                 <span className="text-xs font-black text-sanfran-rubi uppercase tracking-[0.3em] mb-8">Questão</span>
-                <p className="text-2xl font-black text-slate-950 dark:text-white leading-tight">{reviewQueue[currentIndex].front}</p>
+                <p className="text-2xl font-black text-slate-950 dark:text-white leading-tight">{studyQueue[currentIndex].front}</p>
               </div>
               <div className="absolute inset-0 w-full h-full bg-slate-50 dark:bg-black/80 border-[6px] border-usp-blue/40 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden rotate-y-180">
                 <span className="text-xs font-black text-usp-blue uppercase tracking-[0.3em] mb-8">Resposta</span>
-                <p className="text-2xl font-black text-slate-950 dark:text-white leading-tight">{reviewQueue[currentIndex].back}</p>
+                <p className="text-2xl font-black text-slate-950 dark:text-white leading-tight">{studyQueue[currentIndex].back}</p>
               </div>
             </div>
           </div>
