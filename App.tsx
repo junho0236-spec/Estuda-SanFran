@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic } from 'lucide-react';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2 } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser } from './types';
 import Dashboard from './components/Dashboard';
 import Anki from './components/Anki';
@@ -14,6 +14,7 @@ import Largo from './components/Largo';
 import Mural from './components/Mural';
 import GradeCalculator from './components/GradeCalculator';
 import OralArgument from './components/OralArgument';
+import StudyRooms from './components/StudyRooms';
 import Login from './components/Login';
 import Atmosphere from './components/Atmosphere';
 import Scratchpad from './components/Scratchpad';
@@ -85,7 +86,7 @@ const App: React.FC = () => {
   const [readings, setReadings] = useState<Reading[]>([]);
   const [studySessions, setStudySessions] = useState<StudySession[]>([]);
 
-  // --- Timer Global State ---
+  // --- Timer Global State (Pomodoro) ---
   const [timerIsActive, setTimerIsActive] = useState(false);
   const [timerSecondsLeft, setTimerSecondsLeft] = useState(25 * 60);
   const [timerMode, setTimerMode] = useState<'work' | 'break'>('work');
@@ -93,6 +94,10 @@ const App: React.FC = () => {
   const [timerSelectedReadingId, setTimerSelectedReadingId] = useState<string | null>(null);
   const [timerTotalInitial, setTimerTotalInitial] = useState(25 * 60);
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // --- Study Room State ---
+  const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
+  const [roomStartTime, setRoomStartTime] = useState<number | null>(null);
 
   const isExtremeFocus = timerIsActive && currentView === View.Timer && timerMode === 'work';
 
@@ -117,6 +122,8 @@ const App: React.FC = () => {
             subject_name: userState.subject_name,
             is_timer_active: userState.is_timer_active,
             last_seen: userState.last_seen,
+            study_room_id: userState.study_room_id,
+            study_start_time: userState.study_start_time
           });
         });
         setPresenceUsers(users);
@@ -131,6 +138,8 @@ const App: React.FC = () => {
             subject_name: timerIsActive ? (selectedSubject?.name || 'Geral') : undefined,
             is_timer_active: timerIsActive,
             last_seen: new Date().toISOString(),
+            study_room_id: currentView === View.StudyRoom ? currentRoomId : null,
+            study_start_time: currentView === View.StudyRoom ? roomStartTime : null
           });
         }
       });
@@ -138,8 +147,9 @@ const App: React.FC = () => {
     return () => {
       channel.unsubscribe();
     };
-  }, [isAuthenticated, session, currentView, timerIsActive, timerSelectedSubjectId, subjects]);
+  }, [isAuthenticated, session, currentView, timerIsActive, timerSelectedSubjectId, subjects, currentRoomId, roomStartTime]);
 
+  // Pomodoro Logic
   useEffect(() => {
     if (timerIsActive && timerSecondsLeft > 0) {
       timerIntervalRef.current = setInterval(() => {
@@ -294,6 +304,7 @@ const App: React.FC = () => {
 
   const navItems = [
     { id: View.Dashboard, icon: LayoutDashboard, label: 'Painel', color: 'text-slate-600', bg: 'bg-slate-100' },
+    { id: View.StudyRoom, icon: Building2, label: 'Salas de Estudos', color: 'text-indigo-600', bg: 'bg-indigo-100' },
     { id: View.Calculator, icon: CalculatorIcon, label: 'Médias USP', color: 'text-emerald-600', bg: 'bg-emerald-100' },
     { id: View.Anki, icon: BrainCircuit, label: 'Flashcards', color: 'text-usp-blue', bg: 'bg-cyan-100' },
     { id: View.Library, icon: LibraryIcon, label: 'Biblioteca', color: 'text-indigo-600', bg: 'bg-indigo-100' },
@@ -415,6 +426,16 @@ const App: React.FC = () => {
             {currentView === View.Mural && <Mural userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
             {currentView === View.Calculator && <GradeCalculator subjects={subjects} />}
             
+            {currentView === View.StudyRoom && (
+              <StudyRooms 
+                presenceUsers={presenceUsers} 
+                currentUserId={session.user.id}
+                currentRoomId={currentRoomId}
+                setCurrentRoomId={setCurrentRoomId}
+                setRoomStartTime={setRoomStartTime}
+              />
+            )}
+
             {currentView === View.Timer && (
               <Pomodoro 
                 subjects={subjects} 

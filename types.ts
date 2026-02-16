@@ -11,7 +11,8 @@ export enum View {
   Largo = 'largo',
   Mural = 'mural',
   Calculator = 'calculator',
-  OralArgument = 'oral_argument'
+  OralArgument = 'oral_argument',
+  StudyRoom = 'study_room'
 }
 
 export interface Folder {
@@ -98,6 +99,9 @@ export interface PresenceUser {
   subject_name?: string;
   is_timer_active: boolean;
   last_seen: string;
+  // New fields for Study Rooms
+  study_room_id?: string;
+  study_start_time?: number; // timestamp
 }
 
 export interface MuralMessage {
