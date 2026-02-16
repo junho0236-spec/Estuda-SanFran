@@ -64,6 +64,8 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
   // Radio State (Sincronizado)
   // Estado local de volume (se EU quero ouvir o rádio)
   const [isRadioLocalMuted, setIsRadioLocalMuted] = useState(false); 
+  const [localRadioVolume, setLocalRadioVolume] = useState(0.3); // Volume inicial 30%
+
   // Estado global da sala (o que está tocando para todos)
   const [sharedRadioState, setSharedRadioState] = useState({ isPlaying: false, trackIndex: 0 });
   
@@ -321,11 +323,11 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
         radioRef.current.pause();
       }
 
-      // Controla Mute Local (Isolado do WebRTC)
+      // Controla Mute e Volume Locais (Isolado do WebRTC)
       radioRef.current.muted = isRadioLocalMuted;
-      radioRef.current.volume = 0.3; 
+      radioRef.current.volume = localRadioVolume;
     }
-  }, [sharedRadioState, isRadioLocalMuted]);
+  }, [sharedRadioState, isRadioLocalMuted, localRadioVolume]);
 
   // Ações Globais (Afetam todos)
   const toggleGlobalPlay = () => {
@@ -572,23 +574,39 @@ const StudyRooms: React.FC<StudyRoomsProps> = ({
                
                {/* Player de Rádio (Controle Global) */}
                {sharedRadioState.isPlaying && (
-                 <div className="mb-4 bg-black/20 rounded-xl p-3 flex items-center justify-between animate-in slide-in-from-bottom-2">
-                    <div className="flex items-center gap-3 overflow-hidden">
-                       <div className="bg-emerald-500/20 p-2 rounded-lg">
-                          <Radio size={14} className="text-emerald-500 animate-pulse" />
+                 <div className="mb-4 bg-black/20 rounded-xl p-3 animate-in slide-in-from-bottom-2">
+                    <div className="flex items-center justify-between mb-3">
+                       <div className="flex items-center gap-3 overflow-hidden">
+                          <div className="bg-emerald-500/20 p-2 rounded-lg">
+                             <Radio size={14} className="text-emerald-500 animate-pulse" />
+                          </div>
+                          <div className="min-w-0">
+                             <p className="text-[10px] font-black text-white uppercase tracking-wider truncate">Rádio SanFran {isRadioLocalMuted && "(Mutado)"}</p>
+                             <p className="text-[9px] font-bold text-emerald-400 uppercase truncate">{radioTracks[sharedRadioState.trackIndex].name}</p>
+                          </div>
                        </div>
-                       <div className="min-w-0">
-                          <p className="text-[10px] font-black text-white uppercase tracking-wider truncate">Rádio SanFran {isRadioLocalMuted && "(Mutado)"}</p>
-                          <p className="text-[9px] font-bold text-emerald-400 uppercase truncate">{radioTracks[sharedRadioState.trackIndex].name}</p>
+                       <div className="flex items-center gap-1">
+                          <button onClick={toggleGlobalPlay} className="p-2 text-slate-300 hover:text-white rounded-lg hover:bg-white/10" title="Pausar para todos">
+                             <Pause size={12} fill="currentColor" />
+                          </button>
+                          <button onClick={nextGlobalTrack} className="p-2 text-slate-300 hover:text-white rounded-lg hover:bg-white/10" title="Pular música para todos">
+                             <SkipForward size={12} fill="currentColor" />
+                          </button>
                        </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                       <button onClick={toggleGlobalPlay} className="p-2 text-slate-300 hover:text-white rounded-lg hover:bg-white/10" title="Pausar para todos">
-                          <Pause size={12} fill="currentColor" />
-                       </button>
-                       <button onClick={nextGlobalTrack} className="p-2 text-slate-300 hover:text-white rounded-lg hover:bg-white/10" title="Pular música para todos">
-                          <SkipForward size={12} fill="currentColor" />
-                       </button>
+                    {/* Volume Slider */}
+                    <div className="flex items-center gap-2 px-1">
+                       <Volume2 size={12} className="text-emerald-500/50" />
+                       <input 
+                          type="range" 
+                          min="0" 
+                          max="1" 
+                          step="0.05"
+                          value={localRadioVolume}
+                          onChange={(e) => setLocalRadioVolume(parseFloat(e.target.value))}
+                          className="w-full h-1 bg-black/20 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                          title="Volume Local da Música"
+                       />
                     </div>
                  </div>
                )}
