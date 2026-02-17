@@ -7,7 +7,9 @@ import {
   BookOpen, 
   Gavel, 
   PenTool, 
-  Lock 
+  Lock,
+  PieChart,
+  Zap
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -83,26 +85,59 @@ const SanFranOAB: React.FC<SanFranOABProps> = ({ onNavigate }) => {
           </div>
         </button>
 
-        {/* CARD 2: SIMULADOS (Placeholder Vertical) */}
-        <div className="col-span-1 row-span-2 bg-slate-100 dark:bg-slate-900 rounded-[2.5rem] p-8 border-2 border-dashed border-slate-300 dark:border-slate-800 flex flex-col items-center justify-center text-center opacity-60">
-           <div className="w-20 h-20 bg-slate-200 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6">
-              <PenTool className="text-slate-400 w-10 h-10" />
+        {/* CARD 2: ÉTICA BLITZ (Tall) */}
+        <button
+          onClick={() => onNavigate(View.EticaBlitz)}
+          className="group relative col-span-1 row-span-2 bg-emerald-50 dark:bg-emerald-900/10 rounded-[2.5rem] p-8 border border-emerald-100 dark:border-emerald-800 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col items-center justify-between text-center overflow-hidden"
+        >
+           <div className="absolute inset-0 bg-gradient-to-b from-transparent to-emerald-100/50 dark:to-emerald-900/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+           
+           <div className="w-full flex justify-between items-start relative z-10">
+              <Zap size={20} className="text-emerald-500" />
+              <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
            </div>
-           <h4 className="text-lg font-black text-slate-500 dark:text-slate-400 uppercase tracking-tight">Em Breve: Simulados</h4>
-           <p className="text-xs font-bold text-slate-400 dark:text-slate-500 mt-2 max-w-[150px]">
-              Banco de questões da FGV com correção comentada.
-           </p>
-           <Lock size={16} className="text-slate-300 mt-4" />
-        </div>
 
-        {/* CARD 3: ÉTICA PROFISSIONAL (Placeholder Horizontal) */}
-        <div className="col-span-1 md:col-span-2 lg:col-span-4 bg-slate-100 dark:bg-slate-900 rounded-[2.5rem] p-6 border-2 border-dashed border-slate-300 dark:border-slate-800 flex items-center justify-center gap-4 opacity-60">
+           <div className="relative z-10 my-4">
+              <div className="w-20 h-20 rounded-2xl bg-white dark:bg-white/10 flex items-center justify-center shadow-lg transform rotate-3 group-hover:rotate-0 transition-transform duration-500">
+                 <ShieldCheck size={32} className="text-emerald-600 dark:text-emerald-300" />
+              </div>
+           </div>
+           
+           <div className="relative z-10 space-y-1">
+              <h3 className="text-xl font-black text-emerald-900 dark:text-white uppercase tracking-tight">Ética Blitz</h3>
+              <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-300 uppercase tracking-widest">Garanta 8 Pontos</p>
+           </div>
+           
+           <div className="w-full pt-4 border-t border-emerald-200 dark:border-emerald-800/50 mt-4 relative z-10">
+              <span className="text-[9px] font-black uppercase text-slate-400 group-hover:text-emerald-500 transition-colors">Iniciar Jogo Rápido</span>
+           </div>
+        </button>
+
+        {/* CARD 3: RAIO-X FGV (Standard) */}
+        <button
+          onClick={() => onNavigate(View.RaioXOAB)}
+          className="group col-span-1 md:col-span-2 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-indigo-400 transition-all flex flex-col justify-between h-full hover:shadow-indigo-500/10"
+        >
+           <div className="flex justify-between items-start">
+              <div className="p-3 bg-indigo-100 dark:bg-indigo-900/20 text-indigo-600 rounded-2xl">
+                 <PieChart size={20} />
+              </div>
+              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-indigo-500 transition-colors" />
+           </div>
+           <div className="text-left mt-4">
+              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Raio-X FGV</h4>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Mapa de Calor dos Assuntos</p>
+           </div>
+        </button>
+
+        {/* CARD 4: SIMULADOS (Placeholder Horizontal) */}
+        <div className="col-span-1 md:col-span-2 bg-slate-100 dark:bg-slate-900 rounded-[2.5rem] p-6 border-2 border-dashed border-slate-300 dark:border-slate-800 flex items-center justify-center gap-4 opacity-60">
            <div className="p-3 bg-slate-200 dark:bg-slate-800 rounded-full">
-              <BookOpen className="text-slate-400 w-6 h-6" />
+              <PenTool className="text-slate-400 w-6 h-6" />
            </div>
            <div>
-              <h4 className="text-sm font-black text-slate-500 dark:text-slate-400 uppercase tracking-tight">Em Breve: Ética Profissional</h4>
-              <p className="text-[10px] font-bold text-slate-400">O módulo essencial para garantir 8 pontos na prova.</p>
+              <h4 className="text-sm font-black text-slate-500 dark:text-slate-400 uppercase tracking-tight">Em Breve: Simulados</h4>
+              <p className="text-[10px] font-bold text-slate-400">Banco de questões comentadas.</p>
            </div>
         </div>
 
