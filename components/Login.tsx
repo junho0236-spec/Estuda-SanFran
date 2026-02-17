@@ -49,12 +49,12 @@ const Login: React.FC<AuthProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-6 bg-[#fcfcfc] dark:bg-sanfran-rubiBlack transition-colors duration-500 overflow-hidden relative">
+    <div className="min-h-screen w-full flex items-center justify-center p-6 bg-[#fcfcfc] dark:bg-[#050505] transition-colors duration-500 overflow-hidden relative">
       <div className="absolute top-[-10%] right-[-5%] w-96 h-96 bg-sanfran-rubi opacity-[0.03] rounded-full blur-3xl animate-pulse"></div>
       <div className="absolute bottom-[-10%] left-[-5%] w-80 h-80 bg-usp-blue opacity-[0.03] rounded-full blur-3xl animate-pulse delay-700"></div>
       
       <div className="w-full max-w-lg animate-in fade-in slide-in-from-bottom-8 duration-1000">
-        <div className="bg-white dark:bg-sanfran-rubiDark/20 backdrop-blur-sm border-[6px] border-slate-200 dark:border-sanfran-rubi/30 p-10 md:p-14 rounded-[3.5rem] shadow-2xl relative overflow-hidden">
+        <div className="bg-white/80 dark:bg-sanfran-rubiBlack/80 backdrop-blur-xl border border-slate-200/60 dark:border-white/5 p-10 md:p-14 rounded-[3.5rem] shadow-2xl relative overflow-hidden">
           
           <button 
             onClick={() => { setIsLoginMode(!isLoginMode); setError(null); }}
@@ -64,16 +64,16 @@ const Login: React.FC<AuthProps> = ({ onLogin }) => {
           </button>
 
           <div className="flex flex-col items-center mb-10">
-            <div className="bg-sanfran-rubi p-4 rounded-3xl shadow-2xl shadow-red-900/30 mb-6 scale-110">
+            <div className="bg-gradient-to-br from-sanfran-rubi to-red-800 p-4 rounded-3xl shadow-2xl shadow-red-900/30 mb-6 scale-110 border border-white/10">
               <BookOpen className="w-10 h-10 text-white" />
             </div>
-            <h1 className="text-4xl font-black tracking-tighter text-slate-950 dark:text-white mb-2">Estuda SanFran</h1>
+            <h1 className="text-4xl font-black font-serif tracking-tight text-slate-950 dark:text-white mb-2">SanFran Academy</h1>
             <div className="flex items-center gap-3">
-              <span className="h-[1px] w-8 bg-sanfran-rubi"></span>
+              <span className="h-[1px] w-8 bg-sanfran-rubi/50"></span>
               <span className="text-xs font-black text-sanfran-rubi uppercase tracking-[0.3em]">
-                {isLoginMode ? 'Acesso SanFran' : 'Matrícula SanFran'}
+                {isLoginMode ? 'Acesso' : 'Matrícula'}
               </span>
-              <span className="h-[1px] w-8 bg-sanfran-rubi"></span>
+              <span className="h-[1px] w-8 bg-sanfran-rubi/50"></span>
             </div>
           </div>
 
@@ -96,7 +96,7 @@ const Login: React.FC<AuthProps> = ({ onLogin }) => {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Seu nome acadêmico" 
-                    className="w-full pl-14 pr-6 py-4 bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-sanfran-rubi/20 rounded-2xl outline-none focus:border-sanfran-rubi focus:ring-4 focus:ring-sanfran-rubi/10 transition-all font-bold text-slate-950 dark:text-white"
+                    className="w-full pl-14 pr-6 py-4 bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-white/10 rounded-2xl outline-none focus:border-sanfran-rubi focus:ring-4 focus:ring-sanfran-rubi/10 transition-all font-bold text-slate-950 dark:text-white"
                   />
                 </div>
               </div>
@@ -112,7 +112,7 @@ const Login: React.FC<AuthProps> = ({ onLogin }) => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="doutor@sanfran.usp.br" 
-                  className="w-full pl-14 pr-6 py-4 bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-sanfran-rubi/20 rounded-2xl outline-none focus:border-sanfran-rubi focus:ring-4 focus:ring-sanfran-rubi/10 transition-all font-bold text-slate-950 dark:text-white"
+                  className="w-full pl-14 pr-6 py-4 bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-white/10 rounded-2xl outline-none focus:border-sanfran-rubi focus:ring-4 focus:ring-sanfran-rubi/10 transition-all font-bold text-slate-950 dark:text-white"
                 />
               </div>
             </div>
@@ -127,7 +127,7 @@ const Login: React.FC<AuthProps> = ({ onLogin }) => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••" 
-                  className="w-full pl-14 pr-6 py-4 bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-sanfran-rubi/20 rounded-2xl outline-none focus:border-sanfran-rubi focus:ring-4 focus:ring-sanfran-rubi/10 transition-all font-bold text-slate-950 dark:text-white"
+                  className="w-full pl-14 pr-6 py-4 bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-white/10 rounded-2xl outline-none focus:border-sanfran-rubi focus:ring-4 focus:ring-sanfran-rubi/10 transition-all font-bold text-slate-950 dark:text-white"
                 />
               </div>
             </div>
@@ -149,13 +149,7 @@ const Login: React.FC<AuthProps> = ({ onLogin }) => {
           </form>
 
           <div className="mt-10 flex flex-col items-center gap-4">
-            <button 
-              onClick={() => { setIsLoginMode(!isLoginMode); setError(null); }}
-              className="text-slate-400 dark:text-slate-500 text-[10px] font-black uppercase tracking-widest hover:text-sanfran-rubi transition-colors"
-            >
-              {isLoginMode ? 'Ainda não tem conta? Clique aqui' : 'Já possui matrícula? Voltar ao login'}
-            </button>
-            <p className="text-slate-500 dark:text-slate-600 font-bold italic text-sm">"Scientia Vinces"</p>
+            <p className="text-slate-500 dark:text-slate-600 font-bold italic text-sm font-serif">"Scientia Vinces"</p>
           </div>
         </div>
 

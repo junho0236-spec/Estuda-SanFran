@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck, ChevronRight } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel } from './types';
 import Dashboard from './components/Dashboard';
 import Profile from './components/Profile';
@@ -97,12 +97,12 @@ const BrasiliaClock: React.FC = () => {
   const timeStr = `${parts.find(p => p.type === 'hour')?.value}:${parts.find(p => p.type === 'minute')?.value}:${parts.find(p => p.type === 'second')?.value}`;
 
   return (
-    <div className="mt-4 px-4 py-3 bg-slate-50 dark:bg-sanfran-rubi/10 rounded-2xl border border-slate-100 dark:border-sanfran-rubi/20">
-      <div className="flex items-center gap-2 text-[10px] font-black uppercase text-sanfran-rubi tracking-widest mb-1">
+    <div className="mt-4 px-4 py-3 bg-white/50 dark:bg-white/5 backdrop-blur-md rounded-2xl border border-slate-200/50 dark:border-white/10 group hover:border-sanfran-rubi/30 transition-all cursor-default">
+      <div className="flex items-center gap-2 text-[10px] font-black uppercase text-sanfran-rubi tracking-widest mb-1 opacity-80 group-hover:opacity-100">
         <ClockIcon className="w-3 h-3" /> Brasília
       </div>
-      <div className="text-sm font-black text-slate-950 dark:text-white leading-none">{timeStr}</div>
-      <div className="text-[9px] font-bold text-slate-400 uppercase mt-1">{dateStr}</div>
+      <div className="text-sm font-black text-slate-900 dark:text-white leading-none font-mono tracking-tight">{timeStr}</div>
+      <div className="text-[9px] font-bold text-slate-400 uppercase mt-1 tracking-wide">{dateStr}</div>
     </div>
   );
 };
@@ -409,17 +409,17 @@ const App: React.FC = () => {
   if (!isAuthenticated) return <Login onLogin={() => setIsAuthenticated(true)} />;
 
   const navItems = [
-    { id: View.Dashboard, icon: LayoutDashboard, label: 'Painel', color: 'text-slate-600', bg: 'bg-slate-100' },
-    { id: View.SanFranEssential, icon: LayoutGrid, label: 'SanFran Essential', color: 'text-indigo-600', bg: 'bg-indigo-100' },
-    { id: View.SanFranCommunity, icon: Users, label: 'SanFran Community', color: 'text-cyan-600', bg: 'bg-cyan-100' },
-    { id: View.SanFranImprovement, icon: GraduationCap, label: 'SanFran Improvement', color: 'text-purple-600', bg: 'bg-purple-100' },
-    { id: View.SanFranLanguages, icon: Languages, label: 'SanFran Languages', color: 'text-sky-600', bg: 'bg-sky-100' },
-    { id: View.SanFranLife, icon: Leaf, label: 'SanFran Life', color: 'text-emerald-600', bg: 'bg-emerald-100' },
-    { id: View.SanFranGames, icon: Gamepad2, label: 'SanFran Games', color: 'text-orange-500', bg: 'bg-orange-100' },
-    { id: View.SanFranHelp, icon: Wrench, label: 'SanFran Help', color: 'text-slate-500', bg: 'bg-slate-100' },
-    { id: View.SanFranOAB, icon: ShieldCheck, label: 'SanFran OAB', color: 'text-red-600', bg: 'bg-red-100' },
-    { id: View.Editais, icon: ClipboardList, label: 'Editais', color: 'text-blue-600', bg: 'bg-blue-100' },
-    { id: View.DigitalID, icon: IdCard, label: 'Carteirinha Digital', color: 'text-yellow-600', bg: 'bg-yellow-100' },
+    { id: View.Dashboard, icon: LayoutDashboard, label: 'Painel', color: 'text-slate-600', bg: 'from-slate-100 to-slate-200' },
+    { id: View.SanFranEssential, icon: LayoutGrid, label: 'Essential', color: 'text-indigo-600', bg: 'from-indigo-50 to-indigo-100' },
+    { id: View.SanFranCommunity, icon: Users, label: 'Community', color: 'text-cyan-600', bg: 'from-cyan-50 to-cyan-100' },
+    { id: View.SanFranImprovement, icon: GraduationCap, label: 'Improvement', color: 'text-purple-600', bg: 'from-purple-50 to-purple-100' },
+    { id: View.SanFranLanguages, icon: Languages, label: 'Languages', color: 'text-sky-600', bg: 'from-sky-50 to-sky-100' },
+    { id: View.SanFranLife, icon: Leaf, label: 'Life', color: 'text-emerald-600', bg: 'from-emerald-50 to-emerald-100' },
+    { id: View.SanFranGames, icon: Gamepad2, label: 'Games', color: 'text-orange-500', bg: 'from-orange-50 to-orange-100' },
+    { id: View.SanFranHelp, icon: Wrench, label: 'Help', color: 'text-slate-500', bg: 'from-slate-100 to-slate-200' },
+    { id: View.SanFranOAB, icon: ShieldCheck, label: 'OAB', color: 'text-red-600', bg: 'from-red-50 to-red-100' },
+    { id: View.Editais, icon: ClipboardList, label: 'Editais', color: 'text-blue-600', bg: 'from-blue-50 to-blue-100' },
+    { id: View.DigitalID, icon: IdCard, label: 'ID Digital', color: 'text-yellow-600', bg: 'from-yellow-50 to-yellow-100' },
   ];
 
   // Helper to check if current view is a child of SanFran Essential
@@ -447,22 +447,22 @@ const App: React.FC = () => {
   const isOABChild = [View.OabCountdown].includes(currentView);
 
   return (
-    <div className={`flex h-screen overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#fcfcfc]'}`}>
+    <div className={`flex h-screen overflow-hidden transition-colors duration-700 ${isDarkMode ? 'dark bg-[#050505]' : 'bg-[#fcfcfc]'}`}>
       <Atmosphere isExtremeFocus={isExtremeFocus} />
       {session?.user && <Scratchpad userId={session.user.id} isExtremeFocus={isExtremeFocus} />}
 
-      {/* NOTIFICAÇÃO DE DUELO */}
+      {/* NOTIFICAÇÃO DE DUELO (Estilo Glass) */}
       {incomingDuel && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] w-full max-w-sm px-4 animate-in slide-in-from-top-10">
-           <div className="bg-white dark:bg-slate-900 rounded-[2rem] border-4 border-sanfran-rubi shadow-2xl p-6 flex flex-col items-center text-center">
-              <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-4 border-2 border-sanfran-rubi animate-pulse">
+           <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl rounded-[2rem] border border-sanfran-rubi shadow-2xl p-6 flex flex-col items-center text-center ring-4 ring-sanfran-rubi/20">
+              <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-4 border border-sanfran-rubi animate-pulse">
                  <Sword className="text-sanfran-rubi w-8 h-8" />
               </div>
-              <h4 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-1">Desafio Recebido!</h4>
+              <h4 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-1 font-serif">Desafio Recebido!</h4>
               <p className="text-xs text-slate-500 font-bold mb-6"><b>{incomingDuel.challenger_name}</b> convocou você para um Duelo de Jurisconsultos.</p>
               <div className="grid grid-cols-2 gap-3 w-full">
-                 <button onClick={() => declineDuel(incomingDuel)} className="py-3 bg-slate-100 dark:bg-white/10 text-slate-500 rounded-xl font-black uppercase text-[10px] tracking-widest">Declinar</button>
-                 <button onClick={() => acceptDuel(incomingDuel)} className="py-3 bg-sanfran-rubi text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-red-900/20">Aceitar Lide</button>
+                 <button onClick={() => declineDuel(incomingDuel)} className="py-3 bg-slate-100 dark:bg-white/10 text-slate-500 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-200 transition-colors">Declinar</button>
+                 <button onClick={() => acceptDuel(incomingDuel)} className="py-3 bg-sanfran-rubi text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-red-900/20 hover:bg-sanfran-rubiDark transition-colors">Aceitar Lide</button>
               </div>
            </div>
         </div>
@@ -470,33 +470,31 @@ const App: React.FC = () => {
 
       {isSidebarOpen && !isExtremeFocus && (
         <div 
-          className="fixed inset-0 bg-black/50 z-30 lg:hidden backdrop-blur-sm"
+          className="fixed inset-0 bg-black/60 z-30 lg:hidden backdrop-blur-sm transition-opacity"
           onClick={closeSidebar}
         />
       )}
 
-      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${isExtremeFocus ? '-translate-x-full lg:-translate-x-full lg:w-0' : 'lg:relative lg:translate-x-0 lg:w-72'} fixed inset-y-0 left-0 z-40 bg-white dark:bg-[#0d0303] border-r border-slate-200 dark:border-sanfran-rubi/30 transition-all duration-700 flex flex-col shadow-2xl lg:shadow-none`}>
-        <div className="p-6 border-b border-slate-100 dark:border-sanfran-rubi/20 flex flex-col">
-          <div className="flex items-center justify-between mb-4">
+      {/* SIDEBAR MODERNA */}
+      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${isExtremeFocus ? '-translate-x-full lg:-translate-x-full lg:w-0' : 'lg:relative lg:translate-x-0 lg:w-80'} fixed inset-y-0 left-0 z-40 bg-white/80 dark:bg-[#0a0a0a]/80 backdrop-blur-xl border-r border-slate-200/60 dark:border-white/5 transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] flex flex-col shadow-2xl lg:shadow-none`}>
+        <div className="p-6 md:p-8 flex flex-col">
+          <div className="flex items-center justify-between mb-8">
             <button
               onClick={() => { setCurrentView(View.Profile); closeSidebar(); }}
-              className="w-full group text-left p-2 -m-2 rounded-xl transition-all duration-200 hover:bg-slate-50 dark:hover:bg-white/5"
+              className="group text-left rounded-2xl transition-all duration-300 hover:opacity-80"
             >
               <div className="flex items-center gap-4">
-                {/* Ícone do Livro (Mantido e Restaurado) */}
-                <div className="w-14 h-14 bg-sanfran-rubi text-white rounded-2xl flex items-center justify-center shadow-lg shadow-red-900/20 group-hover:scale-105 transition-transform duration-300">
-                   <BookOpen size={28} />
+                {/* Ícone do Livro (Redesign) */}
+                <div className="w-12 h-12 bg-gradient-to-br from-sanfran-rubi to-red-800 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-red-900/20 group-hover:scale-105 transition-transform duration-300 border border-white/10">
+                   <BookOpen size={24} />
                 </div>
 
-                {/* Tipografia Corrigida */}
+                {/* Tipografia */}
                 <div className="flex flex-col">
-                   <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter leading-[0.9]">
-                     SanFran
-                     <br />
-                     Academy
+                   <h1 className="text-xl font-black font-serif text-slate-900 dark:text-white tracking-tight leading-none">
+                     SanFran<br/>Academy
                    </h1>
-                   <div className="h-0.5 w-full bg-sanfran-rubi/20 my-1 rounded-full group-hover:bg-sanfran-rubi transition-colors"></div>
-                   <span className="text-[9px] font-black text-sanfran-rubi uppercase tracking-[0.2em]">
+                   <span className="text-[10px] font-black text-sanfran-rubi uppercase tracking-[0.25em] mt-1">
                      XI de Agosto
                    </span>
                 </div>
@@ -509,7 +507,7 @@ const App: React.FC = () => {
           <BrasiliaClock />
         </div>
         
-        <nav className="p-4 space-y-1 flex-1 overflow-y-auto custom-scrollbar">
+        <nav className="px-4 pb-4 space-y-1 flex-1 overflow-y-auto custom-scrollbar">
           {navItems.map((item) => {
             const isActive = currentView === item.id || 
                              (item.id === View.SanFranEssential && isEssentialChild) ||
@@ -525,34 +523,34 @@ const App: React.FC = () => {
               <button 
                 key={item.id} 
                 onClick={() => { setCurrentView(item.id); closeSidebar(); }} 
-                className={`group w-full flex items-center gap-4 p-3 rounded-2xl transition-all duration-300 border ${
+                className={`group w-full flex items-center gap-3 p-3 rounded-2xl transition-all duration-300 relative overflow-hidden ${
                   isActive
-                    ? 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 shadow-xl scale-[1.02] z-10' 
-                    : 'border-transparent hover:bg-slate-50 dark:hover:bg-white/5 opacity-70 hover:opacity-100'
+                    ? 'bg-white dark:bg-white/10 shadow-lg ring-1 ring-black/5 dark:ring-white/10 z-10' 
+                    : 'hover:bg-slate-100/50 dark:hover:bg-white/5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm transition-all duration-300 ${
+                {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-sanfran-rubi rounded-r-full" />}
+                
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 ${
                   isActive
-                    ? `${item.bg} dark:bg-white/10` 
-                    : 'bg-slate-100 dark:bg-white/5 group-hover:bg-white dark:group-hover:bg-white/10'
+                    ? `bg-gradient-to-br ${item.bg} text-slate-900 dark:text-white shadow-sm` 
+                    : 'bg-white dark:bg-white/5 border border-slate-100 dark:border-white/5 group-hover:border-slate-200 dark:group-hover:border-white/10'
                 }`}>
-                  <item.icon className={`w-5 h-5 transition-colors ${
-                    isActive
-                      ? item.color + ' dark:text-white'
-                      : 'text-slate-400 dark:text-slate-500 group-hover:text-sanfran-rubi dark:group-hover:text-white'
-                  }`} />
+                  <item.icon className={`w-5 h-5 transition-colors ${isActive ? item.color.replace('text-', 'text-') : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200'}`} />
                 </div>
                 
-                <div className="flex-1 text-left">
-                   <span className={`block text-[10px] font-black uppercase tracking-widest transition-colors ${
-                     isActive ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-300'
+                <div className="flex-1 text-left pl-1">
+                   <span className={`block text-xs font-bold uppercase tracking-wide transition-colors ${
+                     isActive ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200'
                    }`}>
                      {item.label}
                    </span>
                 </div>
 
+                {isActive && <ChevronRight size={14} className="text-slate-300 dark:text-slate-500" />}
+
                 {item.id === View.SanFranCommunity && presenceUsers.length > 0 && (
-                  <span className="w-5 h-5 bg-cyan-500 text-[9px] font-black rounded-full flex items-center justify-center text-white shadow-md animate-pulse">
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 bg-cyan-500 text-[9px] font-black rounded-full flex items-center justify-center text-white shadow-md animate-pulse">
                     {presenceUsers.length}
                   </span>
                 )}
@@ -561,9 +559,9 @@ const App: React.FC = () => {
           })}
         </nav>
 
-        <div className="p-4 space-y-3 bg-slate-50 dark:bg-black/20 border-t border-slate-100 dark:border-sanfran-rubi/10">
-          <button onClick={() => setIsDarkMode(!isDarkMode)} className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-white dark:bg-sanfran-rubiDark border border-slate-200 dark:border-sanfran-rubi/30 text-[9px] font-black uppercase tracking-widest text-slate-900 dark:text-white shadow-sm hover:shadow-md transition-all">
-            {isDarkMode ? 'Modo Escuro' : 'Modo Claro'}
+        <div className="p-6 space-y-3 border-t border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/5 backdrop-blur-sm">
+          <button onClick={() => setIsDarkMode(!isDarkMode)} className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 text-[10px] font-black uppercase tracking-widest text-slate-900 dark:text-white shadow-sm hover:shadow-md transition-all group">
+            <span className="group-hover:text-sanfran-rubi transition-colors">{isDarkMode ? 'Modo Escuro' : 'Modo Claro'}</span>
             {isDarkMode ? <Moon className="w-4 h-4 text-usp-blue" /> : <Sun className="w-4 h-4 text-usp-gold" />}
           </button>
           <button onClick={() => supabase.auth.signOut()} className="w-full flex items-center justify-center gap-2 px-4 py-3 text-slate-400 hover:text-red-500 font-black uppercase text-[10px] tracking-widest transition-colors hover:bg-red-50 dark:hover:bg-red-900/10 rounded-2xl"><LogOut className="w-4 h-4" /> Encerrar Sessão</button>
@@ -571,19 +569,19 @@ const App: React.FC = () => {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0 relative">
-        <header className={`${isExtremeFocus ? 'hidden' : 'lg:hidden'} bg-white dark:bg-[#0d0303] border-b border-slate-200 dark:border-sanfran-rubi/30 p-4 flex items-center justify-between sticky top-0 z-20`}>
-          <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-slate-100 dark:bg-sanfran-rubi/10 rounded-xl text-slate-600 dark:text-white">
+        <header className={`${isExtremeFocus ? 'hidden' : 'lg:hidden'} bg-white/80 dark:bg-[#0d0303]/80 backdrop-blur-xl border-b border-slate-200 dark:border-white/5 p-4 flex items-center justify-between sticky top-0 z-20`}>
+          <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-slate-100 dark:bg-white/10 rounded-xl text-slate-600 dark:text-white">
             <Menu className="w-6 h-6" />
           </button>
-          <div className="flex items-center gap-2">
-            <div className="bg-sanfran-rubi p-1.5 rounded-lg text-white"><BookOpen className="w-4 h-4" /></div>
-            <span className="text-sm font-black dark:text-white uppercase tracking-tighter">SanFran</span>
+          <div className="flex items-center gap-3">
+            <div className="bg-sanfran-rubi p-1.5 rounded-lg text-white shadow-lg shadow-red-900/20"><BookOpen className="w-4 h-4" /></div>
+            <span className="text-sm font-black font-serif dark:text-white tracking-tight">SanFran Academy</span>
           </div>
           <div className="w-10"></div>
         </header>
 
-        <main className={`flex-1 overflow-y-auto ${isExtremeFocus ? 'p-0' : 'p-4 md:p-10'} relative transition-all duration-700`}>
-          <div className={`${isExtremeFocus ? 'max-w-none h-full flex items-center justify-center' : 'max-w-6xl mx-auto h-full'}`}>
+        <main className={`flex-1 overflow-y-auto ${isExtremeFocus ? 'p-0' : 'p-4 md:p-8 lg:p-12'} relative transition-all duration-700 custom-scrollbar`}>
+          <div className={`${isExtremeFocus ? 'max-w-none h-full flex items-center justify-center' : 'max-w-7xl mx-auto h-full'}`}>
             {currentView === View.Dashboard && (
               <Dashboard 
                 subjects={subjects} 
@@ -696,7 +694,7 @@ const App: React.FC = () => {
             onClick={() => setCurrentView(View.Timer)}
             className="fixed bottom-6 right-6 md:bottom-10 md:right-10 z-50 animate-in slide-in-from-bottom-10 duration-500 cursor-pointer group"
           >
-            <div className={`flex items-center gap-3 p-3 md:p-4 rounded-[2rem] border-2 shadow-2xl backdrop-blur-xl transition-all hover:scale-105 active:scale-95 ${timerMode === 'work' ? 'bg-white/90 dark:bg-sanfran-rubi/20 border-sanfran-rubi shadow-red-900/20' : 'bg-white/90 dark:bg-usp-blue/20 border-usp-blue shadow-cyan-900/20'}`}>
+            <div className={`flex items-center gap-3 p-3 md:p-4 rounded-[2rem] border shadow-2xl backdrop-blur-xl transition-all hover:scale-105 active:scale-95 ${timerMode === 'work' ? 'bg-white/90 dark:bg-sanfran-rubi/20 border-sanfran-rubi shadow-red-900/20' : 'bg-white/90 dark:bg-usp-blue/20 border-usp-blue shadow-cyan-900/20'}`}>
               <div className="relative w-10 h-10 md:w-12 md:h-12 flex items-center justify-center">
                  <svg className="absolute inset-0 w-full h-full transform -rotate-90">
                     <circle cx="50%" cy="50%" r="45%" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-slate-100 dark:text-white/5" />
