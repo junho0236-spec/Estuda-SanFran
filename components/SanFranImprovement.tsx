@@ -9,7 +9,9 @@ import {
   ArrowUpRight,
   TrendingUp,
   Brain,
-  Scale
+  Scale,
+  GitCommit,
+  Mic
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -159,6 +161,40 @@ const SanFranImprovement: React.FC<SanFranImprovementProps> = ({ onNavigate }) =
            <div className="text-left mt-4">
               <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Biblioteca</h4>
               <p className="text-[10px] font-bold text-slate-400 uppercase">Acervo de Doutrinas</p>
+           </div>
+        </button>
+
+        {/* CARD 6: TIMELINE (Wide) */}
+        <button
+          onClick={() => onNavigate(View.Timeline)}
+          className="group col-span-1 md:col-span-2 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-pink-400 transition-all flex flex-col justify-between h-full hover:shadow-pink-500/10"
+        >
+           <div className="flex justify-between items-start">
+              <div className="p-3 bg-pink-100 dark:bg-pink-900/20 text-pink-600 rounded-2xl">
+                 <GitCommit size={20} />
+              </div>
+              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-pink-500 transition-colors" />
+           </div>
+           <div className="text-left mt-4">
+              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Timeline</h4>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Fluxograma Processual</p>
+           </div>
+        </button>
+
+        {/* CARD 7: SUSTENTAÇÃO (Wide) */}
+        <button
+          onClick={() => onNavigate(View.OralArgument)}
+          className="group col-span-1 md:col-span-2 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-rose-400 transition-all flex flex-col justify-between h-full hover:shadow-rose-500/10"
+        >
+           <div className="flex justify-between items-start">
+              <div className="p-3 bg-rose-100 dark:bg-rose-900/20 text-rose-600 rounded-2xl">
+                 <Mic size={20} />
+              </div>
+              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-rose-500 transition-colors" />
+           </div>
+           <div className="text-left mt-4">
+              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Sustentação</h4>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Oratória & Tempo Regimental</p>
            </div>
         </button>
 

@@ -419,13 +419,10 @@ const App: React.FC = () => {
     { id: View.SanFranHelp, icon: Wrench, label: 'SanFran Help', color: 'text-slate-500', bg: 'bg-slate-100' },
     { id: View.SanFranOAB, icon: ShieldCheck, label: 'SanFran OAB', color: 'text-red-600', bg: 'bg-red-100' },
     { id: View.DigitalID, icon: IdCard, label: 'Carteirinha Digital', color: 'text-yellow-600', bg: 'bg-yellow-100' },
-    { id: View.Timeline, icon: GitCommit, label: 'Timeline', color: 'text-pink-600', bg: 'bg-pink-100' },
-    { id: View.Editais, icon: ClipboardList, label: 'Editais', color: 'text-blue-600', bg: 'bg-blue-100' },
-    { id: View.OralArgument, icon: Mic, label: 'Sustentação', color: 'text-rose-600', bg: 'bg-rose-100' },
   ];
 
   // Helper to check if current view is a child of SanFran Essential
-  const isEssentialChild = [View.Anki, View.Timer, View.Calendar, View.Ranking, View.Subjects, View.Tasks, View.DeadArchive, View.Calculator].includes(currentView);
+  const isEssentialChild = [View.Anki, View.Timer, View.Calendar, View.Ranking, View.Subjects, View.Tasks, View.DeadArchive, View.Calculator, View.Editais].includes(currentView);
   
   // Helper to check if current view is a child of SanFran Community
   const isCommunityChild = [View.Debate, View.ClassificadosPatio, View.JurisprudenceMural, View.Societies, View.Largo, View.StudyRoom, View.Mural].includes(currentView);
