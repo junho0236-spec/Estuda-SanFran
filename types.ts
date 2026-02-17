@@ -54,9 +54,7 @@ export enum View {
   PrescriptionCalculator = 'prescription_calculator',
   SanFranIdiomas = 'sanfran_idiomas',
   DigitalID = 'digital_id',
-  DominioJuridico = 'dominio_juridico',
-  EticaBlitz = 'etica_blitz',
-  RaioXOAB = 'raio_x_oab'
+  DominioJuridico = 'dominio_juridico'
 }
 
 export interface Folder {
