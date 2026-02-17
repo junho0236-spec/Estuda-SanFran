@@ -55,6 +55,7 @@ import SanFranCommunity from './components/SanFranCommunity';
 import SanFranImprovement from './components/SanFranImprovement';
 import SanFranLanguages from './components/SanFranLanguages';
 import SanFranLife from './components/SanFranLife';
+import SanFranGames from './components/SanFranGames';
 import { supabase } from './services/supabaseClient';
 
 export const getBrasiliaDate = () => {
@@ -412,31 +413,20 @@ const App: React.FC = () => {
     { id: View.SanFranImprovement, icon: GraduationCap, label: 'SanFran Improvement', color: 'text-purple-600', bg: 'bg-purple-100' },
     { id: View.SanFranLanguages, icon: Languages, label: 'SanFran Languages', color: 'text-sky-600', bg: 'bg-sky-100' },
     { id: View.SanFranLife, icon: Leaf, label: 'SanFran Life', color: 'text-emerald-600', bg: 'bg-emerald-100' },
+    { id: View.SanFranGames, icon: Gamepad2, label: 'SanFran Games', color: 'text-orange-500', bg: 'bg-orange-100' },
     { id: View.DigitalID, icon: IdCard, label: 'Carteirinha Digital', color: 'text-yellow-600', bg: 'bg-yellow-100' },
-    { id: View.InternRPG, icon: Map, label: 'Vida de Estagiário', color: 'text-blue-500', bg: 'bg-blue-100' },
     { id: View.PrescriptionCalculator, icon: Hourglass, label: 'Calc. Prescrição', color: 'text-red-600', bg: 'bg-red-50' },
-    { id: View.JurisTinder, icon: ThumbsUp, label: 'O Veredito', color: 'text-emerald-500', bg: 'bg-emerald-100' },
     { id: View.SucessaoSimulator, icon: Split, label: 'Partilha de Bens', color: 'text-pink-600', bg: 'bg-pink-100' },
     { id: View.InvestigationBoard, icon: ScanSearch, label: 'Lousa de Investigação', color: 'text-amber-700', bg: 'bg-amber-100' },
-    { id: View.LatinGame, icon: Languages, label: 'Latim Forense', color: 'text-rose-900', bg: 'bg-rose-50' },
     { id: View.Checklist, icon: ClipboardCheck, label: 'Checklist de Peças', color: 'text-blue-600', bg: 'bg-blue-100' },
     { id: View.Honorarios, icon: Banknote, label: 'Simulador de Honorários', color: 'text-emerald-700', bg: 'bg-emerald-100' },
-    { id: View.Trunfo, icon: Dna, label: 'Super Trunfo', color: 'text-purple-700', bg: 'bg-purple-100' },
     { id: View.Dosimetria, icon: Calculator, label: 'Dosimetria Penal', color: 'text-red-700', bg: 'bg-red-50' },
     { id: View.OabCountdown, icon: Target, label: 'Foco OAB', color: 'text-sanfran-rubi', bg: 'bg-red-50' },
     { id: View.Petitum, icon: FileSignature, label: 'Petitum (Modelos)', color: 'text-teal-600', bg: 'bg-teal-100' },
-    { id: View.TypingChallenge, icon: Keyboard, label: 'Datilografia', color: 'text-slate-700', bg: 'bg-slate-200' },
-    { id: View.Specialization, icon: Network, label: 'Árvore de Especialização', color: 'text-purple-600', bg: 'bg-purple-100' },
-    { id: View.Office, icon: Armchair, label: 'Escritório', color: 'text-amber-600', bg: 'bg-amber-100' },
-    { id: View.Sebo, icon: ShoppingBag, label: 'O Sebo', color: 'text-stone-600', bg: 'bg-stone-100' },
-    { id: View.SumulaChallenge, icon: Gamepad2, label: 'Game Súmulas', color: 'text-orange-500', bg: 'bg-orange-50' },
     { id: View.Timeline, icon: GitCommit, label: 'Timeline', color: 'text-pink-600', bg: 'bg-pink-100' },
     { id: View.Editais, icon: ClipboardList, label: 'Editais', color: 'text-blue-600', bg: 'bg-blue-100' },
-    { id: View.LeiSeca, icon: Scroll, label: 'Lei Seca', color: 'text-rose-700', bg: 'bg-rose-100' },
     { id: View.CitationGenerator, icon: Quote, label: 'Citações ABNT', color: 'text-gray-600', bg: 'bg-gray-100' },
     { id: View.DeadlineCalculator, icon: CalendarClock, label: 'Calc. Prazos', color: 'text-orange-600', bg: 'bg-orange-100' },
-    { id: View.Library, icon: LibraryIcon, label: 'Biblioteca', color: 'text-indigo-600', bg: 'bg-indigo-100' },
-    { id: View.OralArgument, icon: Mic, label: 'Sustentação', color: 'text-rose-600', bg: 'bg-rose-100' },
   ];
 
   // Helper to check if current view is a child of SanFran Essential
@@ -453,6 +443,9 @@ const App: React.FC = () => {
 
   // Helper to check if current view is a child of SanFran Life
   const isLifeChild = [View.Office, View.Sebo].includes(currentView);
+
+  // Helper to check if current view is a child of SanFran Games
+  const isGamesChild = [View.InternRPG, View.JurisTinder, View.LatinGame, View.Trunfo, View.SumulaChallenge].includes(currentView);
 
   return (
     <div className={`flex h-screen overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#fcfcfc]'}`}>
@@ -514,7 +507,8 @@ const App: React.FC = () => {
                              (item.id === View.SanFranCommunity && isCommunityChild) ||
                              (item.id === View.SanFranImprovement && isImprovementChild) ||
                              (item.id === View.SanFranLanguages && isLanguagesChild) ||
-                             (item.id === View.SanFranLife && isLifeChild);
+                             (item.id === View.SanFranLife && isLifeChild) ||
+                             (item.id === View.SanFranGames && isGamesChild);
             
             return (
               <button 
@@ -596,6 +590,7 @@ const App: React.FC = () => {
             {currentView === View.SanFranImprovement && <SanFranImprovement onNavigate={setCurrentView} />}
             {currentView === View.SanFranLanguages && <SanFranLanguages onNavigate={setCurrentView} />}
             {currentView === View.SanFranLife && <SanFranLife onNavigate={setCurrentView} />}
+            {currentView === View.SanFranGames && <SanFranGames onNavigate={setCurrentView} />}
 
             {currentView === View.Profile && <Profile />}
             {currentView === View.DominioJuridico && <DominioJuridico subjects={subjects} studySessions={studySessions} />}
