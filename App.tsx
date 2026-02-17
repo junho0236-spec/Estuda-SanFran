@@ -53,6 +53,7 @@ import DominioJuridico from './components/DominioJuridico';
 import SanFranEssential from './components/SanFranEssential';
 import SanFranCommunity from './components/SanFranCommunity';
 import SanFranImprovement from './components/SanFranImprovement';
+import SanFranLanguages from './components/SanFranLanguages';
 import { supabase } from './services/supabaseClient';
 
 export const getBrasiliaDate = () => {
@@ -408,8 +409,8 @@ const App: React.FC = () => {
     { id: View.SanFranEssential, icon: LayoutGrid, label: 'SanFran Essential', color: 'text-indigo-600', bg: 'bg-indigo-100' },
     { id: View.SanFranCommunity, icon: Users, label: 'SanFran Community', color: 'text-cyan-600', bg: 'bg-cyan-100' },
     { id: View.SanFranImprovement, icon: GraduationCap, label: 'SanFran Improvement', color: 'text-purple-600', bg: 'bg-purple-100' },
+    { id: View.SanFranLanguages, icon: Languages, label: 'SanFran Languages', color: 'text-sky-600', bg: 'bg-sky-100' },
     { id: View.DigitalID, icon: IdCard, label: 'Carteirinha Digital', color: 'text-yellow-600', bg: 'bg-yellow-100' },
-    { id: View.SanFranIdiomas, icon: Globe, label: 'Idiomas (Legal English)', color: 'text-sky-500', bg: 'bg-sky-100' },
     { id: View.InternRPG, icon: Map, label: 'Vida de Estagiário', color: 'text-blue-500', bg: 'bg-blue-100' },
     { id: View.PrescriptionCalculator, icon: Hourglass, label: 'Calc. Prescrição', color: 'text-red-600', bg: 'bg-red-50' },
     { id: View.JurisTinder, icon: ThumbsUp, label: 'O Veredito', color: 'text-emerald-500', bg: 'bg-emerald-100' },
@@ -444,6 +445,9 @@ const App: React.FC = () => {
 
   // Helper to check if current view is a child of SanFran Improvement
   const isImprovementChild = [View.Specialization, View.TypingChallenge, View.DominioJuridico, View.Timeline, View.LeiSeca, View.Library, View.OralArgument].includes(currentView);
+
+  // Helper to check if current view is a child of SanFran Languages
+  const isLanguagesChild = [View.SanFranIdiomas].includes(currentView);
 
   return (
     <div className={`flex h-screen overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#fcfcfc]'}`}>
@@ -503,7 +507,8 @@ const App: React.FC = () => {
             const isActive = currentView === item.id || 
                              (item.id === View.SanFranEssential && isEssentialChild) ||
                              (item.id === View.SanFranCommunity && isCommunityChild) ||
-                             (item.id === View.SanFranImprovement && isImprovementChild);
+                             (item.id === View.SanFranImprovement && isImprovementChild) ||
+                             (item.id === View.SanFranLanguages && isLanguagesChild);
             
             return (
               <button 
@@ -583,6 +588,7 @@ const App: React.FC = () => {
             {currentView === View.SanFranEssential && <SanFranEssential onNavigate={setCurrentView} />}
             {currentView === View.SanFranCommunity && <SanFranCommunity onNavigate={setCurrentView} />}
             {currentView === View.SanFranImprovement && <SanFranImprovement onNavigate={setCurrentView} />}
+            {currentView === View.SanFranLanguages && <SanFranLanguages onNavigate={setCurrentView} />}
 
             {currentView === View.Profile && <Profile />}
             {currentView === View.DominioJuridico && <DominioJuridico subjects={subjects} studySessions={studySessions} />}

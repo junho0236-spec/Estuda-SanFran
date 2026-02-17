@@ -5,7 +5,8 @@ export enum View {
   Dashboard = 'dashboard',
   SanFranEssential = 'sanfran_essential',
   SanFranCommunity = 'sanfran_community',
-  SanFranImprovement = 'sanfran_improvement', // Nova View
+  SanFranImprovement = 'sanfran_improvement',
+  SanFranLanguages = 'sanfran_languages', // Nova View
   Profile = 'profile',
   Anki = 'anki',
   Timer = 'timer',
