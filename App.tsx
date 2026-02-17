@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map, Hourglass, Globe, IdCard, Pin, Landmark } from 'lucide-react';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel } from './types';
 import Dashboard from './components/Dashboard';
 import Profile from './components/Profile';
@@ -50,6 +50,7 @@ import PrescriptionCalculator from './components/PrescriptionCalculator';
 import SanFranIdiomas from './components/SanFranIdiomas';
 import DigitalID from './components/DigitalID';
 import DominioJuridico from './components/DominioJuridico';
+import SanFranEssential from './components/SanFranEssential';
 import { supabase } from './services/supabaseClient';
 
 export const getBrasiliaDate = () => {
@@ -402,6 +403,7 @@ const App: React.FC = () => {
 
   const navItems = [
     { id: View.Dashboard, icon: LayoutDashboard, label: 'Painel', color: 'text-slate-600', bg: 'bg-slate-100' },
+    { id: View.SanFranEssential, icon: LayoutGrid, label: 'SanFran Essential', color: 'text-indigo-600', bg: 'bg-indigo-100' },
     { id: View.DominioJuridico, icon: Landmark, label: 'Domínio Jurídico', color: 'text-amber-600', bg: 'bg-amber-100' },
     { id: View.DigitalID, icon: IdCard, label: 'Carteirinha Digital', color: 'text-yellow-600', bg: 'bg-yellow-100' },
     { id: View.SanFranIdiomas, icon: Globe, label: 'Idiomas (Legal English)', color: 'text-sky-500', bg: 'bg-sky-100' },
@@ -432,19 +434,14 @@ const App: React.FC = () => {
     { id: View.CitationGenerator, icon: Quote, label: 'Citações ABNT', color: 'text-gray-600', bg: 'bg-gray-100' },
     { id: View.StudyRoom, icon: Building2, label: 'Salas de Estudos', color: 'text-indigo-600', bg: 'bg-indigo-100' },
     { id: View.DeadlineCalculator, icon: CalendarClock, label: 'Calc. Prazos', color: 'text-orange-600', bg: 'bg-orange-100' },
-    { id: View.Calculator, icon: CalculatorIcon, label: 'Médias USP', color: 'text-emerald-600', bg: 'bg-emerald-100' },
-    { id: View.Anki, icon: BrainCircuit, label: 'Flashcards', color: 'text-usp-blue', bg: 'bg-cyan-100' },
     { id: View.Library, icon: LibraryIcon, label: 'Biblioteca', color: 'text-indigo-600', bg: 'bg-indigo-100' },
-    { id: View.Timer, icon: TimerIcon, label: 'Timer', color: 'text-sanfran-rubi', bg: 'bg-red-100' },
     { id: View.OralArgument, icon: Mic, label: 'Sustentação', color: 'text-rose-600', bg: 'bg-rose-100' },
     { id: View.Largo, icon: Users, label: 'O Largo', color: 'text-cyan-600', bg: 'bg-cyan-100' },
     { id: View.Mural, icon: MessageSquare, label: 'Mural', color: 'text-orange-600', bg: 'bg-orange-100' },
-    { id: View.Calendar, icon: CalendarIcon, label: 'Agenda', color: 'text-violet-600', bg: 'bg-violet-100' },
-    { id: View.Ranking, icon: Trophy, label: 'Ranking', color: 'text-usp-gold', bg: 'bg-yellow-100' },
-    { id: View.Subjects, icon: BookOpen, label: 'Cadeiras', color: 'text-pink-600', bg: 'bg-pink-100' },
-    { id: View.Tasks, icon: CheckSquare, label: 'Pauta', color: 'text-slate-800', bg: 'bg-slate-200' },
-    { id: View.DeadArchive, icon: Archive, label: 'Arquivo Morto', color: 'text-stone-500', bg: 'bg-stone-200' },
   ];
+
+  // Helper to check if current view is a child of SanFran Essential
+  const isEssentialChild = [View.Anki, View.Timer, View.Calendar, View.Ranking, View.Subjects, View.Tasks, View.DeadArchive, View.Calculator].includes(currentView);
 
   return (
     <div className={`flex h-screen overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#fcfcfc]'}`}>
@@ -480,14 +477,15 @@ const App: React.FC = () => {
           <div className="flex items-center justify-between mb-4">
             <button
               onClick={() => { setCurrentView(View.Profile); closeSidebar(); }}
-              className="flex items-center gap-3 group text-left"
+              className="flex items-center gap-3 group text-left p-2 -m-2 rounded-xl transition-colors duration-200 hover:bg-slate-100/50 dark:hover:bg-white/5"
             >
               <div className="bg-sanfran-rubi p-2.5 rounded-2xl text-white shadow-lg shadow-red-900/20 group-hover:scale-105 transition-transform">
                 <BookOpen className="w-6 h-6" />
               </div>
               <div className="flex flex-col">
-                <span className="text-xl font-black dark:text-white leading-none tracking-tight">SanFran</span>
-                <span className="text-xl font-black dark:text-white leading-none tracking-tight">Academy</span>
+                <span className="text-xl font-black dark:text-white leading-tight tracking-tight">SanFran</span>
+                <span className="text-xl font-black dark:text-white leading-tight tracking-tight -mt-1">Academy</span>
+                <div className="w-full h-[1.5px] bg-sanfran-rubi my-2"></div>
                 <span className="text-xs font-black text-sanfran-rubi uppercase tracking-[0.2em]">XI de Agosto</span>
               </div>
             </button>
@@ -499,43 +497,47 @@ const App: React.FC = () => {
         </div>
         
         <nav className="p-4 space-y-1 flex-1 overflow-y-auto custom-scrollbar">
-          {navItems.map((item) => (
-            <button 
-              key={item.id} 
-              onClick={() => { setCurrentView(item.id); closeSidebar(); }} 
-              className={`group w-full flex items-center gap-4 p-3 rounded-2xl transition-all duration-300 border ${
-                currentView === item.id 
-                  ? 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 shadow-xl scale-[1.02] z-10' 
-                  : 'border-transparent hover:bg-slate-50 dark:hover:bg-white/5 opacity-70 hover:opacity-100'
-              }`}
-            >
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm transition-all duration-300 ${
-                currentView === item.id 
-                  ? `${item.bg} dark:bg-white/10` 
-                  : 'bg-slate-100 dark:bg-white/5 group-hover:bg-white dark:group-hover:bg-white/10'
-              }`}>
-                <item.icon className={`w-5 h-5 transition-colors ${
-                  currentView === item.id 
-                    ? item.color + ' dark:text-white'
-                    : 'text-slate-400 dark:text-slate-500 group-hover:text-sanfran-rubi dark:group-hover:text-white'
-                }`} />
-              </div>
-              
-              <div className="flex-1 text-left">
-                 <span className={`block text-[10px] font-black uppercase tracking-widest transition-colors ${
-                   currentView === item.id ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-300'
-                 }`}>
-                   {item.label}
-                 </span>
-              </div>
+          {navItems.map((item) => {
+            const isActive = currentView === item.id || (item.id === View.SanFranEssential && isEssentialChild);
+            
+            return (
+              <button 
+                key={item.id} 
+                onClick={() => { setCurrentView(item.id); closeSidebar(); }} 
+                className={`group w-full flex items-center gap-4 p-3 rounded-2xl transition-all duration-300 border ${
+                  isActive
+                    ? 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 shadow-xl scale-[1.02] z-10' 
+                    : 'border-transparent hover:bg-slate-50 dark:hover:bg-white/5 opacity-70 hover:opacity-100'
+                }`}
+              >
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm transition-all duration-300 ${
+                  isActive
+                    ? `${item.bg} dark:bg-white/10` 
+                    : 'bg-slate-100 dark:bg-white/5 group-hover:bg-white dark:group-hover:bg-white/10'
+                }`}>
+                  <item.icon className={`w-5 h-5 transition-colors ${
+                    isActive
+                      ? item.color + ' dark:text-white'
+                      : 'text-slate-400 dark:text-slate-500 group-hover:text-sanfran-rubi dark:group-hover:text-white'
+                  }`} />
+                </div>
+                
+                <div className="flex-1 text-left">
+                   <span className={`block text-[10px] font-black uppercase tracking-widest transition-colors ${
+                     isActive ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-300'
+                   }`}>
+                     {item.label}
+                   </span>
+                </div>
 
-              {item.id === View.Largo && presenceUsers.length > 0 && (
-                <span className="w-5 h-5 bg-usp-blue text-[9px] font-black rounded-full flex items-center justify-center text-white shadow-md animate-pulse">
-                  {presenceUsers.length}
-                </span>
-              )}
-            </button>
-          ))}
+                {item.id === View.Largo && presenceUsers.length > 0 && (
+                  <span className="w-5 h-5 bg-usp-blue text-[9px] font-black rounded-full flex items-center justify-center text-white shadow-md animate-pulse">
+                    {presenceUsers.length}
+                  </span>
+                )}
+              </button>
+            )
+          })}
         </nav>
 
         <div className="p-4 space-y-3 bg-slate-50 dark:bg-black/20 border-t border-slate-100 dark:border-sanfran-rubi/10">
@@ -571,6 +573,10 @@ const App: React.FC = () => {
                 onNavigate={setCurrentView}
               />
             )}
+            
+            {/* SanFran Essential Hub */}
+            {currentView === View.SanFranEssential && <SanFranEssential onNavigate={setCurrentView} />}
+
             {currentView === View.Profile && <Profile />}
             {currentView === View.DominioJuridico && <DominioJuridico subjects={subjects} studySessions={studySessions} />}
             {currentView === View.DigitalID && <DigitalID userId={session.user.id} userName={session.user.user_metadata?.full_name} studySessions={studySessions} tasks={tasks} />}
