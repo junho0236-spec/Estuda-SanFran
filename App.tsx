@@ -484,16 +484,24 @@ const App: React.FC = () => {
               onClick={() => { setCurrentView(View.Profile); closeSidebar(); }}
               className="w-full group text-left p-2 -m-2 rounded-xl transition-all duration-200 hover:bg-slate-50 dark:hover:bg-white/5"
             >
-              <div className="flex flex-col">
-                <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter leading-[0.85]">
-                  SanFran
-                  <br />
-                  Academy
-                </h1>
-                <div className="w-16 h-1 bg-sanfran-rubi rounded-full my-3 group-hover:w-full transition-all duration-500"></div>
-                <span className="text-[10px] font-black text-sanfran-rubi uppercase tracking-[0.3em]">
-                  XI de Agosto
-                </span>
+              <div className="flex items-center gap-4">
+                {/* Ícone do Livro (Mantido e Restaurado) */}
+                <div className="w-14 h-14 bg-sanfran-rubi text-white rounded-2xl flex items-center justify-center shadow-lg shadow-red-900/20 group-hover:scale-105 transition-transform duration-300">
+                   <BookOpen size={28} />
+                </div>
+
+                {/* Tipografia Corrigida */}
+                <div className="flex flex-col">
+                   <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter leading-[0.9]">
+                     SanFran
+                     <br />
+                     Academy
+                   </h1>
+                   <div className="h-0.5 w-full bg-sanfran-rubi/20 my-1 rounded-full group-hover:bg-sanfran-rubi transition-colors"></div>
+                   <span className="text-[9px] font-black text-sanfran-rubi uppercase tracking-[0.2em]">
+                     XI de Agosto
+                   </span>
+                </div>
               </div>
             </button>
             <button onClick={closeSidebar} className="lg:hidden p-2 text-slate-400 hover:text-sanfran-rubi transition-colors self-start">
