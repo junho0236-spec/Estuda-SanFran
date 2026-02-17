@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench } from 'lucide-react';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel } from './types';
 import Dashboard from './components/Dashboard';
 import Profile from './components/Profile';
@@ -57,6 +57,7 @@ import SanFranLanguages from './components/SanFranLanguages';
 import SanFranLife from './components/SanFranLife';
 import SanFranGames from './components/SanFranGames';
 import SanFranHelp from './components/SanFranHelp';
+import SanFranOAB from './components/SanFranOAB';
 import { supabase } from './services/supabaseClient';
 
 export const getBrasiliaDate = () => {
@@ -416,8 +417,8 @@ const App: React.FC = () => {
     { id: View.SanFranLife, icon: Leaf, label: 'SanFran Life', color: 'text-emerald-600', bg: 'bg-emerald-100' },
     { id: View.SanFranGames, icon: Gamepad2, label: 'SanFran Games', color: 'text-orange-500', bg: 'bg-orange-100' },
     { id: View.SanFranHelp, icon: Wrench, label: 'SanFran Help', color: 'text-slate-500', bg: 'bg-slate-100' },
+    { id: View.SanFranOAB, icon: ShieldCheck, label: 'SanFran OAB', color: 'text-red-600', bg: 'bg-red-100' },
     { id: View.DigitalID, icon: IdCard, label: 'Carteirinha Digital', color: 'text-yellow-600', bg: 'bg-yellow-100' },
-    { id: View.OabCountdown, icon: Target, label: 'Foco OAB', color: 'text-sanfran-rubi', bg: 'bg-red-50' },
     { id: View.Timeline, icon: GitCommit, label: 'Timeline', color: 'text-pink-600', bg: 'bg-pink-100' },
     { id: View.Editais, icon: ClipboardList, label: 'Editais', color: 'text-blue-600', bg: 'bg-blue-100' },
     { id: View.OralArgument, icon: Mic, label: 'Sustentação', color: 'text-rose-600', bg: 'bg-rose-100' },
@@ -443,6 +444,9 @@ const App: React.FC = () => {
 
   // Helper to check if current view is a child of SanFran Help
   const isHelpChild = [View.PrescriptionCalculator, View.SucessaoSimulator, View.InvestigationBoard, View.Checklist, View.Honorarios, View.Dosimetria, View.Petitum, View.CitationGenerator, View.DeadlineCalculator].includes(currentView);
+
+  // Helper to check if current view is a child of SanFran OAB
+  const isOABChild = [View.OabCountdown].includes(currentView);
 
   return (
     <div className={`flex h-screen overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#fcfcfc]'}`}>
@@ -506,7 +510,8 @@ const App: React.FC = () => {
                              (item.id === View.SanFranLanguages && isLanguagesChild) ||
                              (item.id === View.SanFranLife && isLifeChild) ||
                              (item.id === View.SanFranGames && isGamesChild) ||
-                             (item.id === View.SanFranHelp && isHelpChild);
+                             (item.id === View.SanFranHelp && isHelpChild) ||
+                             (item.id === View.SanFranOAB && isOABChild);
             
             return (
               <button 
@@ -590,6 +595,7 @@ const App: React.FC = () => {
             {currentView === View.SanFranLife && <SanFranLife onNavigate={setCurrentView} />}
             {currentView === View.SanFranGames && <SanFranGames onNavigate={setCurrentView} />}
             {currentView === View.SanFranHelp && <SanFranHelp onNavigate={setCurrentView} />}
+            {currentView === View.SanFranOAB && <SanFranOAB onNavigate={setCurrentView} />}
 
             {currentView === View.Profile && <Profile />}
             {currentView === View.DominioJuridico && <DominioJuridico subjects={subjects} studySessions={studySessions} />}
