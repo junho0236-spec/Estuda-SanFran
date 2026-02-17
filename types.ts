@@ -60,7 +60,8 @@ export enum View {
   IracMethod = 'irac_method',
   SpacedRepetition = 'spaced_repetition',
   AttendanceCalculator = 'attendance_calculator',
-  SyllabusTracker = 'syllabus_tracker' // Nova View
+  SyllabusTracker = 'syllabus_tracker',
+  DeadlinePlanner = 'deadline_planner' // Nova View
 }
 
 export interface Folder {
@@ -508,5 +509,16 @@ export interface SyllabusTopic {
   title: string;
   is_completed: boolean;
   confidence_level: ConfidenceLevel;
+  created_at: string;
+}
+
+// Deadline Planner Types
+export interface DeadlineItem {
+  id: string;
+  user_id: string;
+  title: string;
+  due_date: string;
+  difficulty: number; // 1 to 5
+  is_completed: boolean;
   created_at: string;
 }

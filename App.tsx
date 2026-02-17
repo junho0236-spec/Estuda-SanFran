@@ -55,7 +55,8 @@ import CodeTracker from './components/CodeTracker';
 import IracMethod from './components/IracMethod'; 
 import SpacedRepetition from './components/SpacedRepetition';
 import AttendanceCalculator from './components/AttendanceCalculator';
-import SyllabusTracker from './components/SyllabusTracker'; // Import
+import SyllabusTracker from './components/SyllabusTracker'; 
+import DeadlinePlanner from './components/DeadlinePlanner'; // Import
 import SanFranEssential from './components/SanFranEssential';
 import SanFranCommunity from './components/SanFranCommunity';
 import SanFranImprovement from './components/SanFranImprovement';
@@ -429,7 +430,7 @@ const App: React.FC = () => {
   ];
 
   // Helper to check if current view is a child of SanFran Essential
-  const isEssentialChild = [View.Anki, View.Timer, View.Calendar, View.Ranking, View.Subjects, View.Tasks, View.DeadArchive, View.Calculator, View.ErrorLog, View.CodeTracker, View.IracMethod, View.SpacedRepetition, View.AttendanceCalculator, View.SyllabusTracker].includes(currentView);
+  const isEssentialChild = [View.Anki, View.Timer, View.Calendar, View.Ranking, View.Subjects, View.Tasks, View.DeadArchive, View.Calculator, View.ErrorLog, View.CodeTracker, View.IracMethod, View.SpacedRepetition, View.AttendanceCalculator, View.SyllabusTracker, View.DeadlinePlanner].includes(currentView);
   
   // Helper to check if current view is a child of SanFran Community
   const isCommunityChild = [View.Debate, View.ClassificadosPatio, View.JurisprudenceMural, View.Societies, View.Largo, View.StudyRoom, View.Mural].includes(currentView);
@@ -653,6 +654,7 @@ const App: React.FC = () => {
             {currentView === View.SpacedRepetition && <SpacedRepetition userId={session.user.id} />}
             {currentView === View.AttendanceCalculator && <AttendanceCalculator userId={session.user.id} />}
             {currentView === View.SyllabusTracker && <SyllabusTracker userId={session.user.id} />}
+            {currentView === View.DeadlinePlanner && <DeadlinePlanner userId={session.user.id} />}
             
             {currentView === View.Duel && activeDuel && (
               <DuelArena 

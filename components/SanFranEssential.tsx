@@ -15,7 +15,8 @@ import {
   FileText,
   Repeat,
   UserX,
-  ListTodo
+  ListTodo,
+  Hourglass
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -101,7 +102,25 @@ const SanFranEssential: React.FC<SanFranEssentialProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD: RASTREADOR DE EDITAL (Novo) */}
+        {/* CARD: CALCULADORA DE PRAZOS REAIS (Novo) */}
+        <button
+          onClick={() => onNavigate(View.DeadlinePlanner)}
+          className="group col-span-1 bg-[#ea580c] text-white rounded-[2.5rem] p-6 border border-orange-700 shadow-lg hover:shadow-orange-500/30 hover:scale-[1.02] transition-all flex flex-col justify-between relative overflow-hidden"
+        >
+           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/black-scales.png')] opacity-10"></div>
+           <div className="flex justify-between items-start relative z-10">
+              <div className="p-3 bg-white/20 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20">
+                 <Hourglass size={20} className="text-white" />
+              </div>
+              <ArrowUpRight size={16} className="text-orange-200 group-hover:text-white transition-colors" />
+           </div>
+           <div className="text-left mt-4 relative z-10">
+              <h4 className="text-lg font-black uppercase tracking-tight text-white">Calculadora de Prazos</h4>
+              <p className="text-[10px] font-bold text-orange-100 uppercase">Matriz de Urgência</p>
+           </div>
+        </button>
+
+        {/* CARD: RASTREADOR DE EDITAL */}
         <button
           onClick={() => onNavigate(View.SyllabusTracker)}
           className="group col-span-1 bg-[#4f46e5] text-white rounded-[2.5rem] p-6 border border-indigo-700 shadow-lg hover:shadow-indigo-500/30 hover:scale-[1.02] transition-all flex flex-col justify-between relative overflow-hidden"
