@@ -67,7 +67,7 @@ const Login: React.FC<AuthProps> = ({ onLogin }) => {
             <div className="bg-sanfran-rubi p-4 rounded-3xl shadow-2xl shadow-red-900/30 mb-6 scale-110">
               <BookOpen className="w-10 h-10 text-white" />
             </div>
-            <h1 className="text-4xl font-black tracking-tighter text-slate-950 dark:text-white mb-2">Estuda SanFran</h1>
+            <h1 className="text-4xl font-black tracking-tighter text-slate-950 dark:text-white mb-2">SanFran Academy</h1>
             <div className="flex items-center gap-3">
               <span className="h-[1px] w-8 bg-sanfran-rubi"></span>
               <span className="text-xs font-black text-sanfran-rubi uppercase tracking-[0.3em]">

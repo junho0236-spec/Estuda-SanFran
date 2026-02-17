@@ -577,7 +577,7 @@ const App: React.FC = () => {
           </button>
           <div className="flex items-center gap-2">
             <div className="bg-sanfran-rubi p-1.5 rounded-lg text-white"><BookOpen className="w-4 h-4" /></div>
-            <span className="text-sm font-black dark:text-white uppercase tracking-tighter">SanFran</span>
+            <span className="text-sm font-black dark:text-white uppercase tracking-tighter">SanFran Academy</span>
           </div>
           <div className="w-10"></div>
         </header>
