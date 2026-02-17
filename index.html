@@ -4,11 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SanFran Academy</title>
+    <title>Estuda SanFran</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,300;1,400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script>
       // Shim para process.env
       window.process = window.process || { env: {} };
@@ -20,10 +20,6 @@
         darkMode: 'class',
         theme: {
           extend: {
-            fontFamily: {
-              sans: ['Inter', 'sans-serif'],
-              serif: ['Merriweather', 'serif'],
-            },
             colors: {
               sanfran: {
                 rubi: '#9B111E',
@@ -35,9 +31,6 @@
                 gold: '#fcb421',
               }
             },
-            backgroundImage: {
-              'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-            },
             keyframes: {
               shake: {
                 '0%, 100%': { transform: 'translateX(0)' },
@@ -47,75 +40,34 @@
               flicker: {
                 '0%, 100%': { opacity: '1' },
                 '50%': { opacity: '0.8' },
-              },
-              float: {
-                '0%, 100%': { transform: 'translateY(0)' },
-                '50%': { transform: 'translateY(-5px)' },
               }
             },
             animation: {
               'bounce-slow': 'bounce 3s infinite',
               'shake': 'shake 0.4s ease-in-out',
               'flicker': 'flicker 0.2s infinite',
-              'float': 'float 3s ease-in-out infinite',
             }
           }
         }
       }
     </script>
     <style>
-        body { font-family: 'Inter', sans-serif; transition: background-color 0.5s ease, color 0.5s ease; }
-        .font-serif { font-family: 'Merriweather', serif; }
-        .font-handwriting { font-family: 'Merriweather', serif; font-style: italic; }
+        body { font-family: 'Inter', sans-serif; transition: background-color 0.3s ease, color 0.3s ease; }
         .preserve-3d { transform-style: preserve-3d; }
         .backface-hidden { backface-visibility: hidden; }
         .rotate-y-180 { transform: rotateY(180deg); }
-        .perspective-1000 { perspective: 1000px; }
-        .rotate-y-6 { transform: rotateY(6deg); }
-        .rotate-x-6 { transform: rotateX(6deg); }
-        
-        /* Scrollbar Premium */
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(155, 17, 30, 0.2); border-radius: 10px; }
-        .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: rgba(155, 17, 30, 0.5); }
-        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); }
-        .dark .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.3); }
-
-        /* Noise Texture */
-        .bg-noise::after {
-          content: "";
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100vw;
-          height: 100vh;
-          pointer-events: none;
-          z-index: -1;
-          opacity: 0.03;
-          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-        }
-        .dark .bg-noise::after { opacity: 0.05; }
-        
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-        .animate-spin-slow { animation: spin 3s linear infinite; }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-
-        .clip-path-polygon { clip-path: polygon(0 0, 100% 0, 80% 100%, 20% 100%); }
-
-        /* Animations */
-        .animate-in { animation-duration: 0.6s; animation-fill-mode: both; animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
+        .dark ::-webkit-scrollbar { width: 8px; }
+        .dark ::-webkit-scrollbar-track { background: #1a0505; }
+        .dark ::-webkit-scrollbar-thumb { background: #9B111E; border-radius: 10px; }
+        /* Utilitários extras para animações de entrada */
+        .animate-in { animation-duration: 0.5s; animation-fill-mode: both; }
         .fade-in { animation-name: fadeIn; }
-        .slide-in-from-bottom-8 { animation-name: slideInBottom8; }
-        .slide-in-from-bottom-10 { animation-name: slideInBottom10; }
+        .slide-in-from-bottom-10 { animation-name: slideInBottom; }
         .slide-in-from-top-4 { animation-name: slideInTop; }
         .zoom-in-95 { animation-name: zoomIn; }
         
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideInBottom8 { from { transform: translateY(2rem); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        @keyframes slideInBottom10 { from { transform: translateY(2.5rem); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes slideInBottom { from { transform: translateY(2.5rem); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         @keyframes slideInTop { from { transform: translateY(-1rem); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         @keyframes zoomIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
     </style>
@@ -137,7 +89,7 @@
 </script>
 <script type="module" src="index.tsx"></script>
 </head>
-<body class="bg-[#fcfcfc] dark:bg-[#050505] text-slate-900 dark:text-slate-100 overflow-hidden bg-noise">
+<body class="bg-[#fcfcfc] dark:bg-sanfran-rubiBlack text-slate-950 dark:text-white">
     <div id="root"></div>
 </body>
 </html>

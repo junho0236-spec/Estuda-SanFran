@@ -186,63 +186,63 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
   return (
     <div className="space-y-8 md:space-y-12 animate-in fade-in duration-500 pb-20">
       
-      {/* Widget OAB Countdown no Topo - High Tech Style */}
+      {/* Widget OAB Countdown no Topo */}
       <div 
         onClick={() => onNavigate(View.OabCountdown)}
-        className={`group cursor-pointer rounded-[2.5rem] p-8 flex flex-col md:flex-row items-center justify-between gap-8 border transition-all hover:scale-[1.01] active:scale-[0.99] shadow-2xl relative overflow-hidden bg-gradient-to-br ${
-          daysToOab < 15 ? 'from-sanfran-rubi to-red-900 border-red-500/30' : 
-          daysToOab < 45 ? 'from-orange-500 to-orange-700 border-orange-500/30' : 
-          'from-usp-blue to-cyan-900 border-cyan-500/30'
+        className={`group cursor-pointer rounded-[2rem] p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 border-b-[8px] transition-all hover:scale-[1.01] active:scale-[0.99] shadow-2xl relative overflow-hidden ${
+          daysToOab < 15 ? 'bg-sanfran-rubi border-sanfran-rubiDark text-white' : 
+          daysToOab < 45 ? 'bg-orange-500 border-orange-700 text-white' : 
+          'bg-usp-blue border-[#0b6a7a] text-white'
         }`}
       >
-        <div className="absolute inset-0 bg-noise opacity-20 mix-blend-overlay"></div>
-        <div className="absolute -left-20 -top-20 w-96 h-96 bg-white/10 rounded-full blur-3xl pointer-events-none group-hover:bg-white/20 transition-colors"></div>
+        <div className="absolute top-0 left-0 p-10 opacity-10 pointer-events-none group-hover:scale-110 transition-transform">
+           <Target size={180} />
+        </div>
         
-        <div className="flex items-center gap-6 relative z-10 text-center md:text-left text-white">
-           <div className="w-16 h-16 md:w-20 md:h-20 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/20 shadow-inner">
-              <Target size={32} className="text-white drop-shadow-md" />
+        <div className="flex items-center gap-6 relative z-10 text-center md:text-left">
+           <div className="w-16 h-16 md:w-20 md:h-20 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-md border border-white/30">
+              <Target size={32} className="text-white" />
            </div>
            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-70 mb-2">Objetivo Primário</p>
-              <h3 className="text-3xl md:text-4xl font-black uppercase tracking-tight font-serif leading-none">Aprovação OAB</h3>
-              <p className="text-xs font-bold opacity-80 flex items-center gap-2 justify-center md:justify-start mt-2">
-                 <Calendar size={12} /> Exame em {new Date(oabDate).toLocaleDateString('pt-BR')}
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-80 mb-1">Missão Principal</p>
+              <h3 className="text-2xl md:text-3xl font-black uppercase tracking-tighter">Aprovação na OAB</h3>
+              <p className="text-xs font-bold opacity-70 flex items-center gap-2 justify-center md:justify-start">
+                 <Calendar size={12} /> {new Date(oabDate).toLocaleDateString('pt-BR')}
               </p>
            </div>
         </div>
 
-        <div className="flex flex-col items-center md:items-end relative z-10 text-white">
-           <span className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">Countdown</span>
+        <div className="flex flex-col items-center md:items-end relative z-10">
+           <span className="text-[10px] font-black uppercase tracking-widest opacity-80 mb-1">Contagem de Urgência</span>
            <div className="flex items-baseline gap-2">
-              <span className="text-6xl md:text-8xl font-black tabular-nums leading-none tracking-tighter drop-shadow-xl">{daysToOab > 0 ? daysToOab : '0'}</span>
-              <span className="text-xl font-bold uppercase tracking-widest opacity-80">Dias</span>
+              <span className="text-5xl md:text-7xl font-black tabular-nums">{daysToOab > 0 ? daysToOab : '0'}</span>
+              <span className="text-xl font-black uppercase tracking-tighter">Dias</span>
            </div>
         </div>
       </div>
 
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="text-center md:text-left">
-          <h2 className="text-4xl md:text-5xl font-black font-serif text-slate-950 dark:text-white tracking-tight">Salve, Doutor(a).</h2>
-          <p className="text-slate-600 dark:text-slate-400 mt-2 font-medium text-lg">As Arcadas aguardam sua excelência hoje.</p>
+          <h2 className="text-3xl md:text-5xl font-black text-slate-950 dark:text-white tracking-tight">Salve, Doutor(a)! 🏛️</h2>
+          <p className="text-slate-700 dark:text-slate-300 mt-2 font-bold text-base md:text-lg">Pronto para dominar as leis hoje?</p>
         </div>
       </header>
 
       {/* --- Seção de Carreira (Patentes) --- */}
-      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-xl rounded-[2.5rem] p-8 md:p-10 border border-slate-200/60 dark:border-white/10 shadow-xl relative overflow-hidden group">
+      <div className="bg-white dark:bg-sanfran-rubiDark/30 rounded-[2.5rem] p-6 md:p-10 border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl relative overflow-hidden group">
         <div className="absolute top-0 right-0 p-10 opacity-5 group-hover:opacity-10 transition-opacity">
-           <currentRank.icon size={250} />
+           <currentRank.icon size={200} />
         </div>
         
         <div className="flex flex-col md:flex-row md:items-center gap-8 relative z-10">
-          <div className={`w-28 h-28 md:w-36 md:h-36 rounded-[2rem] ${currentRank.bg} dark:bg-white/5 border-4 ${currentRank.border} dark:border-white/10 flex items-center justify-center shadow-2xl relative`}>
-             <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-transparent rounded-[1.8rem]"></div>
-             <currentRank.icon className={`w-14 h-14 md:w-16 md:h-16 ${currentRank.color} drop-shadow-sm`} />
+          <div className={`w-24 h-24 md:w-32 md:h-32 rounded-[2.5rem] ${currentRank.bg} dark:bg-white/5 border-4 ${currentRank.border} dark:border-white/10 flex items-center justify-center shadow-xl`}>
+             <currentRank.icon className={`w-12 h-12 md:w-16 md:h-16 ${currentRank.color}`} />
           </div>
           
-          <div className="flex-1 space-y-5">
+          <div className="flex-1 space-y-4">
             <div>
-              <p className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] mb-2">Status na Ordem</p>
-              <h3 className={`text-3xl md:text-5xl font-black uppercase tracking-tighter ${currentRank.color} dark:text-white font-serif`}>
+              <p className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] mb-1">Status na Ordem</p>
+              <h3 className={`text-3xl md:text-4xl font-black uppercase tracking-tighter ${currentRank.color} dark:text-white`}>
                 {currentRank.name}
               </h3>
             </div>
@@ -252,109 +252,110 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
                 <span className="text-slate-400">Progresso de Carreira</span>
                 <span className="text-slate-900 dark:text-white">{nextRank ? `Próximo: ${nextRank.name}` : 'Nível Máximo'}</span>
               </div>
-              <div className="h-3 bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden shadow-inner">
+              <div className="h-4 bg-slate-100 dark:bg-black/40 rounded-full overflow-hidden p-1 shadow-inner">
                 <div 
-                  className={`h-full rounded-full transition-all duration-1000 ease-out relative ${currentRank.color.replace('text', 'bg')}`}
+                  className={`h-full rounded-full transition-all duration-1000 ease-out ${currentRank.color.replace('text', 'bg')}`}
                   style={{ width: `${progressToNext}%` }}
-                >
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
-                </div>
+                />
               </div>
               {nextRank && (
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">
-                  { (nextRank.hours - totalHours).toFixed(1) }h restantes
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                  Faltam {(nextRank.hours - totalHours).toFixed(1)} horas para a próxima promoção.
                 </p>
               )}
             </div>
+          </div>
+          
+          <div className="hidden lg:block border-l border-slate-100 dark:border-white/10 pl-8 space-y-2">
+             <div className="flex items-center gap-3 text-slate-900 dark:text-white">
+                <Medal className="w-5 h-5 text-usp-gold" />
+                <span className="text-sm font-black uppercase">Honrarias USP</span>
+             </div>
+             <p className="text-[10px] text-slate-400 font-bold max-w-[150px] leading-relaxed">
+               Sua dedicação acadêmica reflete o espírito do XI de Agosto. Continue a labuta.
+             </p>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         <StatCard 
-          icon={<Brain className="text-sanfran-rubi dark:text-red-400" />} 
+          icon={<Brain className="text-sanfran-rubi dark:text-white" />} 
           label="Para Revisar" 
           value={cardsToReview} 
-          subtext="Flashcards"
-          color="border-red-200 dark:border-red-900/30"
+          subtext="Flashcards pendentes"
+          bgColor="bg-red-50 dark:bg-sanfran-rubi"
         />
         <StatCard 
-          icon={<CheckCircle2 className="text-usp-blue dark:text-cyan-400" />} 
-          label="Processos" 
+          icon={<CheckCircle2 className="text-usp-blue dark:text-white" />} 
+          label="Tarefas" 
           value={pendingTasks} 
-          subtext="Pendentes na Pauta"
-          color="border-cyan-200 dark:border-cyan-900/30"
+          subtext="Processos em pauta"
+          bgColor="bg-cyan-50 dark:bg-usp-blue"
         />
         <StatCard 
-          icon={<Clock className="text-usp-gold dark:text-yellow-400" />} 
+          icon={<Clock className="text-usp-gold dark:text-white" />} 
           label="Tempo Total" 
           value={displayTime.value} 
           unit={displayTime.unit}
           subtext={`${sessionsToday} sessões hoje`}
-          color="border-yellow-200 dark:border-yellow-900/30"
+          bgColor="bg-yellow-50 dark:bg-usp-gold"
         />
         <StatCard 
-          icon={<Zap className={streak > 0 ? "text-orange-500 dark:text-orange-400" : "text-slate-400"} />} 
+          icon={<Zap className={streak > 0 ? "text-orange-500 dark:text-white" : "text-slate-400"} />} 
           label="Ofensiva" 
           value={streak} 
-          subtext="Dias Consecutivos"
-          color="border-orange-200 dark:border-orange-900/30"
+          subtext={streak === 1 ? "Dia de labuta" : "Dias seguidos"}
+          bgColor={streak > 0 ? "bg-orange-50 dark:bg-orange-600" : "bg-slate-100 dark:bg-slate-600"}
           highlight={streak > 0}
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-10">
         <div className="lg:col-span-1">
            <CompetenceRadar subjects={subjects} studySessions={studySessions} />
         </div>
 
-        <div className="lg:col-span-2 flex flex-col gap-6 md:gap-8">
+        <div className="lg:col-span-2 flex flex-col gap-6 md:gap-10">
           <BadgeGallery badges={badges} />
 
-          <div className="bg-white/60 dark:bg-white/5 backdrop-blur-md rounded-[2.5rem] p-8 md:p-10 border border-slate-200 dark:border-white/10 shadow-lg relative overflow-hidden">
-            <div className="absolute -right-10 -bottom-10 opacity-5">
-               <Quote size={150} />
+          <div className="bg-white dark:bg-sanfran-rubiDark/30 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl border-t-[10px] md:border-t-[12px] border-t-sanfran-rubi">
+            <div className="flex items-center justify-between mb-6 md:mb-8">
+              <h3 className="text-xl md:text-3xl font-black flex items-center gap-4 text-slate-950 dark:text-white uppercase tracking-tight">
+                <Quote className="w-6 h-6 md:w-8 md:h-8 text-sanfran-rubi dark:text-white" />
+                Doutrina Acadêmica
+              </h3>
             </div>
-            <h3 className="text-sm font-black uppercase tracking-[0.2em] text-sanfran-rubi mb-6 flex items-center gap-2">
-               Doutrina Diária
-            </h3>
-            <div className="relative z-10">
-              <p className="font-serif text-2xl md:text-3xl text-slate-800 dark:text-slate-200 leading-snug tracking-tight italic">
-                "{motivation}"
-              </p>
+            <div className="bg-slate-50 dark:bg-black/40 rounded-[1.5rem] md:rounded-[2rem] p-6 md:p-8 border border-slate-200 dark:border-sanfran-rubi/20 italic text-slate-900 dark:text-slate-100 text-lg md:text-xl leading-relaxed relative overflow-hidden shadow-inner flex items-center">
+              <div className="absolute top-0 right-0 w-32 h-32 md:w-48 md:h-48 bg-sanfran-rubi opacity-[0.05] -mr-16 md:-mr-24 -mt-16 md:-mt-24 rounded-full" />
+              <span className="relative z-10 font-bold leading-relaxed text-center md:text-left w-full">"{motivation}"</span>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-md rounded-[2.5rem] p-8 md:p-10 border border-slate-200 dark:border-white/10 shadow-lg">
-        <h3 className="text-xl md:text-2xl font-black mb-8 text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-3">
-           <BookOpen className="text-slate-400" /> Cadeiras Matriculadas
-        </h3>
+      <div className="bg-white dark:bg-sanfran-rubiDark/30 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl border-t-[10px] md:border-t-[12px] border-t-usp-blue">
+        <h3 className="text-xl md:text-3xl font-black mb-6 md:mb-10 text-slate-950 dark:text-white uppercase tracking-tight">Cadeiras Matriculadas</h3>
         <div className="space-y-4 md:space-y-6">
           {subjects.length === 0 ? (
-            <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-3xl">
-               <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Nenhuma cadeira matriculada.</p>
-            </div>
+            <p className="text-center text-xs text-slate-400 font-bold uppercase italic py-8 md:py-10">Nenhuma cadeira matriculada.</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {subjects.slice(0, 6).map(s => (
-                <div key={s.id} className="group relative flex items-center justify-between p-4 rounded-2xl bg-white dark:bg-black/20 border border-slate-100 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/20 transition-all shadow-sm hover:shadow-md cursor-default overflow-hidden">
-                  <div className="absolute left-0 top-0 bottom-0 w-1 transition-all group-hover:w-2" style={{ backgroundColor: s.color }} />
-                  <span className="font-bold text-slate-700 dark:text-slate-200 text-xs md:text-sm uppercase tracking-wide truncate pl-2">{s.name}</span>
-                  <span className="text-[10px] font-black text-slate-400 bg-slate-100 dark:bg-white/10 px-2 py-1 rounded-lg">
-                    {flashcards.filter(f => f.subjectId === s.id).length} Cards
+                <div key={s.id} className="flex items-center justify-between p-3 md:p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 hover:scale-[1.02] transition-transform">
+                  <div className="flex items-center gap-3 md:gap-4 overflow-hidden">
+                    <div className="w-4 h-4 md:w-5 md:h-5 rounded-full shadow-lg shrink-0" style={{ backgroundColor: s.color }} />
+                    <span className="font-black text-slate-900 dark:text-white uppercase text-xs md:text-sm tracking-wide truncate">{s.name}</span>
+                  </div>
+                  <span className="text-[10px] md:text-[11px] font-black text-white bg-slate-950 dark:bg-sanfran-rubi px-3 py-1.5 rounded-full shadow-md shrink-0">
+                    {flashcards.filter(f => f.subjectId === s.id).length}
                   </span>
                 </div>
               ))}
             </div>
           )}
           {subjects.length > 6 && (
-            <div className="flex justify-center">
-               <span className="px-4 py-2 bg-slate-100 dark:bg-white/10 rounded-full text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                  + {subjects.length - 6} outras cadeiras
-               </span>
-            </div>
+            <p className="text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">+ {subjects.length - 6} outras cadeiras</p>
           )}
         </div>
       </div>
@@ -362,20 +363,20 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
   );
 };
 
-const StatCard: React.FC<{ icon: React.ReactNode, label: string, value: string | number, unit?: string, subtext: string, color: string, highlight?: boolean }> = ({ icon, label, value, unit, subtext, color, highlight }) => (
-  <div className={`bg-white/60 dark:bg-white/5 backdrop-blur-md p-6 md:p-8 rounded-[2.5rem] border ${color} shadow-lg hover:shadow-xl transition-all group relative overflow-hidden`}>
-    <div className={`w-14 h-14 rounded-2xl bg-white dark:bg-white/10 flex items-center justify-center mb-6 shadow-sm group-hover:scale-110 transition-transform duration-300`}>
-      {React.cloneElement(icon as React.ReactElement<any>, { size: 28 })}
+const StatCard: React.FC<{ icon: React.ReactNode, label: string, value: string | number, unit?: string, subtext: string, bgColor: string, highlight?: boolean }> = ({ icon, label, value, unit, subtext, bgColor, highlight }) => (
+  <div className={`bg-white dark:bg-sanfran-rubiDark/40 p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border-2 shadow-xl hover:shadow-2xl md:hover:-translate-y-2 transition-all group overflow-hidden relative ${highlight ? 'border-orange-200 dark:border-orange-500/30 shadow-orange-900/10' : 'border-slate-200 dark:border-sanfran-rubi/30'}`}>
+    {highlight && <div className="absolute top-0 right-0 w-20 md:w-24 h-20 md:h-24 bg-orange-500/5 rounded-full -mr-10 md:-mr-12 -mt-10 md:-mt-12 animate-pulse" />}
+    <div className={`w-12 h-12 md:w-16 md:h-16 rounded-2xl ${bgColor} flex items-center justify-center mb-4 md:mb-6 group-hover:scale-110 transition-transform shadow-lg`}>
+      {React.cloneElement(icon as React.ReactElement<any>, { size: 24 })}
     </div>
-    <div className="space-y-1 relative z-10">
-      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
+    <div className="space-y-0 md:space-y-1">
+      <p className="text-[10px] md:text-xs font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest">{label}</p>
       <div className="flex items-baseline gap-1">
-        <h4 className="text-4xl font-black text-slate-900 dark:text-white tabular-nums tracking-tighter">{value}</h4>
-        {unit && <span className="text-xs font-bold text-slate-400 uppercase">{unit}</span>}
+        <h4 className="text-3xl md:text-4xl font-black text-slate-950 dark:text-white tabular-nums">{value}</h4>
+        {unit && <span className="text-xs font-black text-slate-400 uppercase">{unit}</span>}
       </div>
-      <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wide opacity-80">{subtext}</p>
+      <p className="text-[10px] text-slate-700 dark:text-slate-300 font-black uppercase tracking-wide opacity-80 truncate">{subtext}</p>
     </div>
-    {highlight && <div className="absolute -right-4 -top-4 w-24 h-24 bg-gradient-to-br from-orange-400/20 to-transparent rounded-full blur-xl animate-pulse"></div>}
   </div>
 );
 
