@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio } from 'lucide-react';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel } from './types';
 import Dashboard from './components/Dashboard';
 import Profile from './components/Profile';
@@ -52,6 +52,7 @@ import DigitalID from './components/DigitalID';
 import DominioJuridico from './components/DominioJuridico';
 import SanFranEssential from './components/SanFranEssential';
 import SanFranCommunity from './components/SanFranCommunity';
+import SanFranImprovement from './components/SanFranImprovement';
 import { supabase } from './services/supabaseClient';
 
 export const getBrasiliaDate = () => {
@@ -406,7 +407,7 @@ const App: React.FC = () => {
     { id: View.Dashboard, icon: LayoutDashboard, label: 'Painel', color: 'text-slate-600', bg: 'bg-slate-100' },
     { id: View.SanFranEssential, icon: LayoutGrid, label: 'SanFran Essential', color: 'text-indigo-600', bg: 'bg-indigo-100' },
     { id: View.SanFranCommunity, icon: Users, label: 'SanFran Community', color: 'text-cyan-600', bg: 'bg-cyan-100' },
-    { id: View.DominioJuridico, icon: Landmark, label: 'Domínio Jurídico', color: 'text-amber-600', bg: 'bg-amber-100' },
+    { id: View.SanFranImprovement, icon: GraduationCap, label: 'SanFran Improvement', color: 'text-purple-600', bg: 'bg-purple-100' },
     { id: View.DigitalID, icon: IdCard, label: 'Carteirinha Digital', color: 'text-yellow-600', bg: 'bg-yellow-100' },
     { id: View.SanFranIdiomas, icon: Globe, label: 'Idiomas (Legal English)', color: 'text-sky-500', bg: 'bg-sky-100' },
     { id: View.InternRPG, icon: Map, label: 'Vida de Estagiário', color: 'text-blue-500', bg: 'bg-blue-100' },
@@ -440,6 +441,9 @@ const App: React.FC = () => {
   
   // Helper to check if current view is a child of SanFran Community
   const isCommunityChild = [View.Debate, View.ClassificadosPatio, View.JurisprudenceMural, View.Societies, View.Largo, View.StudyRoom, View.Mural].includes(currentView);
+
+  // Helper to check if current view is a child of SanFran Improvement
+  const isImprovementChild = [View.Specialization, View.TypingChallenge, View.DominioJuridico, View.Timeline, View.LeiSeca, View.Library, View.OralArgument].includes(currentView);
 
   return (
     <div className={`flex h-screen overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#fcfcfc]'}`}>
@@ -498,7 +502,8 @@ const App: React.FC = () => {
           {navItems.map((item) => {
             const isActive = currentView === item.id || 
                              (item.id === View.SanFranEssential && isEssentialChild) ||
-                             (item.id === View.SanFranCommunity && isCommunityChild);
+                             (item.id === View.SanFranCommunity && isCommunityChild) ||
+                             (item.id === View.SanFranImprovement && isImprovementChild);
             
             return (
               <button 
@@ -577,6 +582,7 @@ const App: React.FC = () => {
             {/* HUBs */}
             {currentView === View.SanFranEssential && <SanFranEssential onNavigate={setCurrentView} />}
             {currentView === View.SanFranCommunity && <SanFranCommunity onNavigate={setCurrentView} />}
+            {currentView === View.SanFranImprovement && <SanFranImprovement onNavigate={setCurrentView} />}
 
             {currentView === View.Profile && <Profile />}
             {currentView === View.DominioJuridico && <DominioJuridico subjects={subjects} studySessions={studySessions} />}
