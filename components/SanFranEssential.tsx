@@ -10,7 +10,8 @@ import {
   Archive, 
   Calculator, 
   ArrowUpRight,
-  Zap
+  Zap,
+  BookX
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -96,20 +97,21 @@ const SanFranEssential: React.FC<SanFranEssentialProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 3: AGENDA (Compact) */}
+        {/* CARD 3: CADERNO DE ERROS (New) */}
         <button
-          onClick={() => onNavigate(View.Calendar)}
-          className="group col-span-1 bg-[#f8f7f2] dark:bg-[#1a1a1a] rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/5 shadow-lg hover:border-violet-300 dark:hover:border-violet-700 transition-all flex flex-col justify-between h-full"
+          onClick={() => onNavigate(View.ErrorLog)}
+          className="group col-span-1 bg-[#1a1a1a] text-white rounded-[2.5rem] p-6 border border-slate-800 shadow-lg hover:shadow-red-900/20 hover:scale-[1.02] transition-all flex flex-col justify-between h-full relative overflow-hidden"
         >
-           <div className="flex justify-between items-start">
-              <div className="p-3 bg-violet-100 dark:bg-violet-900/20 text-violet-600 rounded-2xl">
-                 <Calendar size={20} />
+           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
+           <div className="flex justify-between items-start relative z-10">
+              <div className="p-3 bg-red-600 rounded-2xl shadow-lg">
+                 <BookX size={20} className="text-white" />
               </div>
-              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-violet-500 transition-colors" />
+              <ArrowUpRight size={16} className="text-slate-500 group-hover:text-red-500 transition-colors" />
            </div>
-           <div className="text-left mt-4">
-              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Agenda</h4>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Prazos & Provas</p>
+           <div className="text-left mt-4 relative z-10">
+              <h4 className="text-lg font-black uppercase tracking-tight text-white">Caderno de Erros</h4>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Black Book de Revisão</p>
            </div>
         </button>
 
@@ -165,7 +167,24 @@ const SanFranEssential: React.FC<SanFranEssentialProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 7: MÉDIAS (Compact) */}
+        {/* CARD 7: AGENDA (Compact) */}
+        <button
+          onClick={() => onNavigate(View.Calendar)}
+          className="group col-span-1 bg-[#f8f7f2] dark:bg-[#1a1a1a] rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/5 shadow-lg hover:border-violet-300 dark:hover:border-violet-700 transition-all flex flex-col justify-between h-full"
+        >
+           <div className="flex justify-between items-start">
+              <div className="p-3 bg-violet-100 dark:bg-violet-900/20 text-violet-600 rounded-2xl">
+                 <Calendar size={20} />
+              </div>
+              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-violet-500 transition-colors" />
+           </div>
+           <div className="text-left mt-4">
+              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Agenda</h4>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Prazos & Provas</p>
+           </div>
+        </button>
+
+        {/* CARD 8: MÉDIAS (Compact) */}
         <button
           onClick={() => onNavigate(View.Calculator)}
           className="group col-span-1 bg-white dark:bg-sanfran-rubiDark/20 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/5 shadow-lg hover:border-indigo-400 transition-all flex flex-col justify-between"
@@ -181,10 +200,10 @@ const SanFranEssential: React.FC<SanFranEssentialProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 8: ARQUIVO MORTO (Wide Footer) */}
+        {/* CARD 9: ARQUIVO MORTO (Wide Footer) */}
         <button
           onClick={() => onNavigate(View.DeadArchive)}
-          className="group col-span-1 md:col-span-2 lg:col-span-2 bg-slate-100 dark:bg-[#0d0303] rounded-[2rem] p-4 flex items-center justify-center gap-3 border border-transparent hover:border-slate-300 dark:hover:border-white/10 transition-all opacity-60 hover:opacity-100"
+          className="group col-span-1 md:col-span-2 lg:col-span-4 bg-slate-100 dark:bg-[#0d0303] rounded-[2rem] p-4 flex items-center justify-center gap-3 border border-transparent hover:border-slate-300 dark:hover:border-white/10 transition-all opacity-60 hover:opacity-100"
         >
            <Archive size={16} className="text-slate-500" />
            <span className="text-xs font-black uppercase text-slate-500 tracking-widest">Acessar Arquivo Morto (Histórico)</span>

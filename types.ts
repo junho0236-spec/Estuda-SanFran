@@ -54,7 +54,8 @@ export enum View {
   PrescriptionCalculator = 'prescription_calculator',
   SanFranIdiomas = 'sanfran_idiomas',
   DigitalID = 'digital_id',
-  DominioJuridico = 'dominio_juridico'
+  DominioJuridico = 'dominio_juridico',
+  ErrorLog = 'error_log'
 }
 
 export interface Folder {
@@ -352,13 +353,6 @@ export interface JurisTinderCard {
 }
 
 // InternRPG Types
-export interface RPGStat {
-  label: string;
-  value: number;
-  max: number;
-  color: string;
-}
-
 export interface RPGChoice {
   text: string;
   nextId: string;
@@ -374,31 +368,31 @@ export interface RPGScenario {
   id: string;
   title: string;
   text: string;
+  image?: React.ElementType;
   choices: RPGChoice[];
-  image?: React.ElementType; // Icon
 }
 
-// --- SANFRAN IDIOMAS TYPES ---
+export interface RPGStat {
+  label: string;
+  value: number;
+  max: number;
+  color: string;
+}
+
+// Idiomas Types
 export interface IdiomaLesson {
   id: string;
-  module: string; // "Foundations", "Contracts", "Courtroom", etc
+  module: string;
   title: string;
   description: string;
+  type: 'quiz' | 'fill_blank' | 'matching' | 'scramble' | 'dictation';
   theory: string;
   example_sentence: string;
-  type?: 'quiz' | 'scramble' | 'matching' | 'fill_blank' | 'dictation'; // Adicionado dictation
-  scramble?: {
-    sentence: string;
-    translation: string;
-  };
   quiz?: {
     question: string;
     options: string[];
     answer: number;
     explanation: string;
-  };
-  matching?: {
-    pairs: { term: string; translation: string }[];
   };
   fill_blank?: {
     sentence_start: string;
@@ -407,19 +401,39 @@ export interface IdiomaLesson {
     options: string[];
     translation: string;
   };
+  matching?: {
+    pairs: { term: string, translation: string }[];
+  };
+  scramble?: {
+    sentence: string;
+    translation: string;
+  };
   dictation?: {
     text: string;
     translation: string;
   };
   xp_reward: number;
-  words_unlocked: string[]; // Termos chave aprendidos na lição para o glossário
+  words_unlocked: string[];
 }
 
 export interface IdiomaProgress {
+  user_id: string;
   current_level_id: string;
   streak_count: number;
   total_xp: number;
   lives: number;
   completed_lessons: string[];
-  last_activity_date?: string | null;
+  last_activity_date: string | null;
+}
+
+// Error Log Types
+export type ErrorReason = 'falta_de_atencao' | 'lacuna_teorica' | 'interpretacao' | 'pegadinha' | 'esquecimento';
+
+export interface ErrorLogEntry {
+  id: string;
+  discipline: string;
+  topic: string;
+  reason: ErrorReason;
+  justification: string;
+  created_at: string;
 }
