@@ -4,14 +4,11 @@ import {
   Network, 
   Keyboard, 
   Landmark, 
-  GitCommit, 
   Scroll, 
   Library, 
-  Mic, 
   ArrowUpRight,
   TrendingUp,
   Brain,
-  GraduationCap,
   Scale
 } from 'lucide-react';
 import { View } from '../types';
@@ -131,10 +128,10 @@ const SanFranImprovement: React.FC<SanFranImprovementProps> = ({ onNavigate }) =
            </div>
         </button>
 
-        {/* CARD 4: DATILOGRAFIA (Standard) */}
+        {/* CARD 4: DATILOGRAFIA (Wide) */}
         <button
           onClick={() => onNavigate(View.TypingChallenge)}
-          className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-teal-400 transition-all flex flex-col justify-between h-full hover:shadow-teal-500/10"
+          className="group col-span-1 md:col-span-2 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-teal-400 transition-all flex flex-col justify-between h-full hover:shadow-teal-500/10"
         >
            <div className="flex justify-between items-start">
               <div className="p-3 bg-teal-100 dark:bg-teal-900/20 text-teal-600 rounded-2xl">
@@ -148,44 +145,10 @@ const SanFranImprovement: React.FC<SanFranImprovementProps> = ({ onNavigate }) =
            </div>
         </button>
 
-        {/* CARD 5: TIMELINE (Standard) */}
-        <button
-          onClick={() => onNavigate(View.Timeline)}
-          className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-pink-400 transition-all flex flex-col justify-between h-full hover:shadow-pink-500/10"
-        >
-           <div className="flex justify-between items-start">
-              <div className="p-3 bg-pink-100 dark:bg-pink-900/20 text-pink-600 rounded-2xl">
-                 <GitCommit size={20} />
-              </div>
-              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-pink-500 transition-colors" />
-           </div>
-           <div className="text-left mt-4">
-              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Timeline</h4>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Linha do Tempo Processual</p>
-           </div>
-        </button>
-
-        {/* CARD 6: SUSTENTAÇÃO ORAL (Standard) */}
-        <button
-          onClick={() => onNavigate(View.OralArgument)}
-          className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-rose-400 transition-all flex flex-col justify-between h-full hover:shadow-rose-500/10"
-        >
-           <div className="flex justify-between items-start">
-              <div className="p-3 bg-rose-100 dark:bg-rose-900/20 text-rose-600 rounded-2xl">
-                 <Mic size={20} />
-              </div>
-              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-rose-500 transition-colors" />
-           </div>
-           <div className="text-left mt-4">
-              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Sustentação</h4>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Treino de Oratória</p>
-           </div>
-        </button>
-
-        {/* CARD 7: BIBLIOTECA (Standard) */}
+        {/* CARD 5: BIBLIOTECA (Wide) */}
         <button
           onClick={() => onNavigate(View.Library)}
-          className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-indigo-400 transition-all flex flex-col justify-between h-full hover:shadow-indigo-500/10"
+          className="group col-span-1 md:col-span-2 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-indigo-400 transition-all flex flex-col justify-between h-full hover:shadow-indigo-500/10"
         >
            <div className="flex justify-between items-start">
               <div className="p-3 bg-indigo-100 dark:bg-indigo-900/20 text-indigo-600 rounded-2xl">
