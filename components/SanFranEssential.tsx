@@ -11,7 +11,8 @@ import {
   Calculator, 
   ArrowUpRight,
   Zap,
-  BookX
+  BookX,
+  ScrollText
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -97,10 +98,10 @@ const SanFranEssential: React.FC<SanFranEssentialProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 3: CADERNO DE ERROS (New) */}
+        {/* CARD 3: CADERNO DE ERROS */}
         <button
           onClick={() => onNavigate(View.ErrorLog)}
-          className="group col-span-1 bg-[#1a1a1a] text-white rounded-[2.5rem] p-6 border border-slate-800 shadow-lg hover:shadow-red-900/20 hover:scale-[1.02] transition-all flex flex-col justify-between h-full relative overflow-hidden"
+          className="group col-span-1 bg-[#1a1a1a] text-white rounded-[2.5rem] p-6 border border-slate-800 shadow-lg hover:shadow-red-900/20 hover:scale-[1.02] transition-all flex flex-col justify-between relative overflow-hidden"
         >
            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
            <div className="flex justify-between items-start relative z-10">
@@ -115,7 +116,25 @@ const SanFranEssential: React.FC<SanFranEssentialProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 4: RANKING (Compact) */}
+        {/* CARD 4: CODE TRACKER (Nova Feature - Rastreador Lei Seca) */}
+        <button
+          onClick={() => onNavigate(View.CodeTracker)}
+          className="group col-span-1 bg-gradient-to-br from-emerald-500 to-teal-700 text-white rounded-[2.5rem] p-6 border border-teal-600 shadow-lg hover:shadow-teal-900/30 hover:scale-[1.02] transition-all flex flex-col justify-between relative overflow-hidden"
+        >
+           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/lined-paper.png')] opacity-10"></div>
+           <div className="flex justify-between items-start relative z-10">
+              <div className="p-3 bg-white/20 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20">
+                 <ScrollText size={20} className="text-white" />
+              </div>
+              <ArrowUpRight size={16} className="text-teal-200 group-hover:text-white transition-colors" />
+           </div>
+           <div className="text-left mt-4 relative z-10">
+              <h4 className="text-lg font-black uppercase tracking-tight text-white">Rastreador de Código</h4>
+              <p className="text-[10px] font-bold text-teal-100 uppercase">Leitura de Lei Seca</p>
+           </div>
+        </button>
+
+        {/* CARD 5: RANKING (Compact) */}
         <button
           onClick={() => onNavigate(View.Ranking)}
           className="group col-span-1 bg-[#f8f7f2] dark:bg-[#1a1a1a] rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/5 shadow-lg hover:border-yellow-300 dark:hover:border-yellow-700 transition-all flex flex-col justify-between h-full"
@@ -132,7 +151,7 @@ const SanFranEssential: React.FC<SanFranEssentialProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 5: CADEIRAS (Medium) */}
+        {/* CARD 6: CADEIRAS (Medium) */}
         <button
           onClick={() => onNavigate(View.Subjects)}
           className="group col-span-1 md:col-span-2 bg-gradient-to-r from-pink-50 to-white dark:from-pink-900/10 dark:to-slate-900 rounded-[2.5rem] p-6 border border-pink-100 dark:border-pink-900/30 shadow-lg hover:shadow-pink-100 dark:hover:shadow-none transition-all flex items-center gap-6"
@@ -151,7 +170,7 @@ const SanFranEssential: React.FC<SanFranEssentialProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 6: PAUTA (Compact) */}
+        {/* CARD 7: PAUTA (Compact) */}
         <button
           onClick={() => onNavigate(View.Tasks)}
           className="group col-span-1 bg-white dark:bg-sanfran-rubiDark/20 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/5 shadow-lg hover:border-emerald-400 transition-all flex flex-col justify-between"
@@ -167,7 +186,7 @@ const SanFranEssential: React.FC<SanFranEssentialProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 7: AGENDA (Compact) */}
+        {/* CARD 8: AGENDA (Compact) */}
         <button
           onClick={() => onNavigate(View.Calendar)}
           className="group col-span-1 bg-[#f8f7f2] dark:bg-[#1a1a1a] rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/5 shadow-lg hover:border-violet-300 dark:hover:border-violet-700 transition-all flex flex-col justify-between h-full"
@@ -181,22 +200,6 @@ const SanFranEssential: React.FC<SanFranEssentialProps> = ({ onNavigate }) => {
            <div className="text-left mt-4">
               <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Agenda</h4>
               <p className="text-[10px] font-bold text-slate-400 uppercase">Prazos & Provas</p>
-           </div>
-        </button>
-
-        {/* CARD 8: MÉDIAS (Compact) */}
-        <button
-          onClick={() => onNavigate(View.Calculator)}
-          className="group col-span-1 bg-white dark:bg-sanfran-rubiDark/20 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/5 shadow-lg hover:border-indigo-400 transition-all flex flex-col justify-between"
-        >
-           <div className="flex justify-between items-start">
-              <div className="p-3 bg-indigo-100 dark:bg-indigo-900/20 text-indigo-600 rounded-2xl">
-                 <Calculator size={20} />
-              </div>
-           </div>
-           <div className="text-left mt-2">
-              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Médias</h4>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Simulador USP</p>
            </div>
         </button>
 

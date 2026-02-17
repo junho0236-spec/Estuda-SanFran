@@ -10,7 +10,7 @@ export enum View {
   SanFranLife = 'sanfran_life',
   SanFranGames = 'sanfran_games',
   SanFranHelp = 'sanfran_help',
-  SanFranOAB = 'sanfran_oab', // Nova View
+  SanFranOAB = 'sanfran_oab',
   Profile = 'profile',
   Anki = 'anki',
   Timer = 'timer',
@@ -55,7 +55,8 @@ export enum View {
   SanFranIdiomas = 'sanfran_idiomas',
   DigitalID = 'digital_id',
   DominioJuridico = 'dominio_juridico',
-  ErrorLog = 'error_log'
+  ErrorLog = 'error_log',
+  CodeTracker = 'code_tracker' // Nova View
 }
 
 export interface Folder {
@@ -436,4 +437,16 @@ export interface ErrorLogEntry {
   reason: ErrorReason;
   justification: string;
   created_at: string;
+}
+
+// Code Tracker Types
+export interface CodeReadingPlan {
+  id: string;
+  code_id: string;
+  code_name: string;
+  total_articles: number;
+  target_days: number;
+  articles_per_day: number;
+  start_date: string;
+  completed_days: number[]; // Array of indexes (e.g. [1, 2, 5])
 }
