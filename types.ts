@@ -56,7 +56,8 @@ export enum View {
   DigitalID = 'digital_id',
   DominioJuridico = 'dominio_juridico',
   ErrorLog = 'error_log',
-  CodeTracker = 'code_tracker' // Nova View
+  CodeTracker = 'code_tracker',
+  IracMethod = 'irac_method' // Nova View
 }
 
 export interface Folder {
@@ -449,4 +450,17 @@ export interface CodeReadingPlan {
   articles_per_day: number;
   start_date: string;
   completed_days: number[]; // Array of indexes (e.g. [1, 2, 5])
+}
+
+// IRAC Method Types
+export interface IracEntry {
+  id: string;
+  case_title: string;
+  facts: string;
+  issue: string;
+  rule: string;
+  analysis: string;
+  conclusion: string;
+  tags?: string;
+  created_at: string;
 }

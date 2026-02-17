@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck, BookX, ScrollText } from 'lucide-react';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck, BookX, ScrollText, FileText } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel } from './types';
 import Dashboard from './components/Dashboard';
 import Profile from './components/Profile';
@@ -51,7 +51,8 @@ import SanFranIdiomas from './components/SanFranIdiomas';
 import DigitalID from './components/DigitalID';
 import DominioJuridico from './components/DominioJuridico';
 import ErrorLog from './components/ErrorLog';
-import CodeTracker from './components/CodeTracker'; // Importação
+import CodeTracker from './components/CodeTracker';
+import IracMethod from './components/IracMethod'; // Importação
 import SanFranEssential from './components/SanFranEssential';
 import SanFranCommunity from './components/SanFranCommunity';
 import SanFranImprovement from './components/SanFranImprovement';
@@ -425,7 +426,7 @@ const App: React.FC = () => {
   ];
 
   // Helper to check if current view is a child of SanFran Essential
-  const isEssentialChild = [View.Anki, View.Timer, View.Calendar, View.Ranking, View.Subjects, View.Tasks, View.DeadArchive, View.Calculator, View.ErrorLog, View.CodeTracker].includes(currentView);
+  const isEssentialChild = [View.Anki, View.Timer, View.Calendar, View.Ranking, View.Subjects, View.Tasks, View.DeadArchive, View.Calculator, View.ErrorLog, View.CodeTracker, View.IracMethod].includes(currentView);
   
   // Helper to check if current view is a child of SanFran Community
   const isCommunityChild = [View.Debate, View.ClassificadosPatio, View.JurisprudenceMural, View.Societies, View.Largo, View.StudyRoom, View.Mural].includes(currentView);
@@ -645,6 +646,7 @@ const App: React.FC = () => {
             {currentView === View.SanFranIdiomas && <SanFranIdiomas userId={session.user.id} />}
             {currentView === View.ErrorLog && <ErrorLog userId={session.user.id} />}
             {currentView === View.CodeTracker && <CodeTracker userId={session.user.id} />}
+            {currentView === View.IracMethod && <IracMethod userId={session.user.id} />}
             
             {currentView === View.Duel && activeDuel && (
               <DuelArena 

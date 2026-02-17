@@ -12,7 +12,8 @@ import {
   ArrowUpRight,
   Zap,
   BookX,
-  ScrollText
+  ScrollText,
+  FileText
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -116,7 +117,7 @@ const SanFranEssential: React.FC<SanFranEssentialProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 4: CODE TRACKER (Nova Feature - Rastreador Lei Seca) */}
+        {/* CARD 4: CODE TRACKER */}
         <button
           onClick={() => onNavigate(View.CodeTracker)}
           className="group col-span-1 bg-gradient-to-br from-emerald-500 to-teal-700 text-white rounded-[2.5rem] p-6 border border-teal-600 shadow-lg hover:shadow-teal-900/30 hover:scale-[1.02] transition-all flex flex-col justify-between relative overflow-hidden"
@@ -134,7 +135,27 @@ const SanFranEssential: React.FC<SanFranEssentialProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 5: RANKING (Compact) */}
+        {/* CARD 5: FICHAMENTO IRAC (Novo) */}
+        <button
+          onClick={() => onNavigate(View.IracMethod)}
+          className="group col-span-1 bg-[#fdfbf7] dark:bg-[#292524] rounded-[2.5rem] p-6 border-2 border-[#e7e5e4] dark:border-[#44403c] shadow-lg hover:border-amber-400 dark:hover:border-amber-600 transition-all flex flex-col justify-between relative overflow-hidden"
+        >
+           {/* Textura de Papel Antigo */}
+           <div className="absolute inset-0 opacity-40 bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')]"></div>
+           
+           <div className="flex justify-between items-start relative z-10">
+              <div className="p-3 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-2xl">
+                 <FileText size={20} />
+              </div>
+              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-amber-500 transition-colors" />
+           </div>
+           <div className="text-left mt-4 relative z-10">
+              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Fichamento IRAC</h4>
+              <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">Método de Estudo de Caso</p>
+           </div>
+        </button>
+
+        {/* CARD 6: RANKING (Compact) */}
         <button
           onClick={() => onNavigate(View.Ranking)}
           className="group col-span-1 bg-[#f8f7f2] dark:bg-[#1a1a1a] rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/5 shadow-lg hover:border-yellow-300 dark:hover:border-yellow-700 transition-all flex flex-col justify-between h-full"
@@ -151,7 +172,7 @@ const SanFranEssential: React.FC<SanFranEssentialProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 6: CADEIRAS (Medium) */}
+        {/* CARD 7: CADEIRAS (Medium) */}
         <button
           onClick={() => onNavigate(View.Subjects)}
           className="group col-span-1 md:col-span-2 bg-gradient-to-r from-pink-50 to-white dark:from-pink-900/10 dark:to-slate-900 rounded-[2.5rem] p-6 border border-pink-100 dark:border-pink-900/30 shadow-lg hover:shadow-pink-100 dark:hover:shadow-none transition-all flex items-center gap-6"
@@ -170,7 +191,7 @@ const SanFranEssential: React.FC<SanFranEssentialProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 7: PAUTA (Compact) */}
+        {/* CARD 8: PAUTA (Compact) */}
         <button
           onClick={() => onNavigate(View.Tasks)}
           className="group col-span-1 bg-white dark:bg-sanfran-rubiDark/20 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/5 shadow-lg hover:border-emerald-400 transition-all flex flex-col justify-between"
@@ -186,7 +207,7 @@ const SanFranEssential: React.FC<SanFranEssentialProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 8: AGENDA (Compact) */}
+        {/* CARD 9: AGENDA (Compact) */}
         <button
           onClick={() => onNavigate(View.Calendar)}
           className="group col-span-1 bg-[#f8f7f2] dark:bg-[#1a1a1a] rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/5 shadow-lg hover:border-violet-300 dark:hover:border-violet-700 transition-all flex flex-col justify-between h-full"
@@ -203,7 +224,7 @@ const SanFranEssential: React.FC<SanFranEssentialProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 9: ARQUIVO MORTO (Wide Footer) */}
+        {/* CARD 10: ARQUIVO MORTO (Wide Footer) */}
         <button
           onClick={() => onNavigate(View.DeadArchive)}
           className="group col-span-1 md:col-span-2 lg:col-span-4 bg-slate-100 dark:bg-[#0d0303] rounded-[2rem] p-4 flex items-center justify-center gap-3 border border-transparent hover:border-slate-300 dark:hover:border-white/10 transition-all opacity-60 hover:opacity-100"
