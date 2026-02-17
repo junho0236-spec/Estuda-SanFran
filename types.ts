@@ -3,7 +3,8 @@ import React from 'react';
 
 export enum View {
   Dashboard = 'dashboard',
-  SanFranEssential = 'sanfran_essential', // Nova View
+  SanFranEssential = 'sanfran_essential',
+  SanFranCommunity = 'sanfran_community', // Nova View
   Profile = 'profile',
   Anki = 'anki',
   Timer = 'timer',

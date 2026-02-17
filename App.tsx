@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid } from 'lucide-react';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel } from './types';
 import Dashboard from './components/Dashboard';
 import Profile from './components/Profile';
@@ -51,6 +51,7 @@ import SanFranIdiomas from './components/SanFranIdiomas';
 import DigitalID from './components/DigitalID';
 import DominioJuridico from './components/DominioJuridico';
 import SanFranEssential from './components/SanFranEssential';
+import SanFranCommunity from './components/SanFranCommunity';
 import { supabase } from './services/supabaseClient';
 
 export const getBrasiliaDate = () => {
@@ -404,6 +405,7 @@ const App: React.FC = () => {
   const navItems = [
     { id: View.Dashboard, icon: LayoutDashboard, label: 'Painel', color: 'text-slate-600', bg: 'bg-slate-100' },
     { id: View.SanFranEssential, icon: LayoutGrid, label: 'SanFran Essential', color: 'text-indigo-600', bg: 'bg-indigo-100' },
+    { id: View.SanFranCommunity, icon: Users, label: 'SanFran Community', color: 'text-cyan-600', bg: 'bg-cyan-100' },
     { id: View.DominioJuridico, icon: Landmark, label: 'Domínio Jurídico', color: 'text-amber-600', bg: 'bg-amber-100' },
     { id: View.DigitalID, icon: IdCard, label: 'Carteirinha Digital', color: 'text-yellow-600', bg: 'bg-yellow-100' },
     { id: View.SanFranIdiomas, icon: Globe, label: 'Idiomas (Legal English)', color: 'text-sky-500', bg: 'bg-sky-100' },
@@ -416,7 +418,6 @@ const App: React.FC = () => {
     { id: View.Checklist, icon: ClipboardCheck, label: 'Checklist de Peças', color: 'text-blue-600', bg: 'bg-blue-100' },
     { id: View.Honorarios, icon: Banknote, label: 'Simulador de Honorários', color: 'text-emerald-700', bg: 'bg-emerald-100' },
     { id: View.Trunfo, icon: Dna, label: 'Super Trunfo', color: 'text-purple-700', bg: 'bg-purple-100' },
-    { id: View.Debate, icon: Megaphone, label: 'Clube de Debates', color: 'text-yellow-600', bg: 'bg-yellow-50' },
     { id: View.Dosimetria, icon: Calculator, label: 'Dosimetria Penal', color: 'text-red-700', bg: 'bg-red-50' },
     { id: View.OabCountdown, icon: Target, label: 'Foco OAB', color: 'text-sanfran-rubi', bg: 'bg-red-50' },
     { id: View.Petitum, icon: FileSignature, label: 'Petitum (Modelos)', color: 'text-teal-600', bg: 'bg-teal-100' },
@@ -424,24 +425,21 @@ const App: React.FC = () => {
     { id: View.Specialization, icon: Network, label: 'Árvore de Especialização', color: 'text-purple-600', bg: 'bg-purple-100' },
     { id: View.Office, icon: Armchair, label: 'Escritório', color: 'text-amber-600', bg: 'bg-amber-100' },
     { id: View.Sebo, icon: ShoppingBag, label: 'O Sebo', color: 'text-stone-600', bg: 'bg-stone-100' },
-    { id: View.ClassificadosPatio, icon: Megaphone, label: 'Classificados Pátio', color: 'text-yellow-600', bg: 'bg-yellow-100' },
     { id: View.SumulaChallenge, icon: Gamepad2, label: 'Game Súmulas', color: 'text-orange-500', bg: 'bg-orange-50' },
-    { id: View.JurisprudenceMural, icon: Scale, label: 'Jurisprudência', color: 'text-indigo-600', bg: 'bg-indigo-100' },
     { id: View.Timeline, icon: GitCommit, label: 'Timeline', color: 'text-pink-600', bg: 'bg-pink-100' },
     { id: View.Editais, icon: ClipboardList, label: 'Editais', color: 'text-blue-600', bg: 'bg-blue-100' },
-    { id: View.Societies, icon: Briefcase, label: 'Sociedades', color: 'text-emerald-600', bg: 'bg-emerald-100' },
     { id: View.LeiSeca, icon: Scroll, label: 'Lei Seca', color: 'text-rose-700', bg: 'bg-rose-100' },
     { id: View.CitationGenerator, icon: Quote, label: 'Citações ABNT', color: 'text-gray-600', bg: 'bg-gray-100' },
-    { id: View.StudyRoom, icon: Building2, label: 'Salas de Estudos', color: 'text-indigo-600', bg: 'bg-indigo-100' },
     { id: View.DeadlineCalculator, icon: CalendarClock, label: 'Calc. Prazos', color: 'text-orange-600', bg: 'bg-orange-100' },
     { id: View.Library, icon: LibraryIcon, label: 'Biblioteca', color: 'text-indigo-600', bg: 'bg-indigo-100' },
     { id: View.OralArgument, icon: Mic, label: 'Sustentação', color: 'text-rose-600', bg: 'bg-rose-100' },
-    { id: View.Largo, icon: Users, label: 'O Largo', color: 'text-cyan-600', bg: 'bg-cyan-100' },
-    { id: View.Mural, icon: MessageSquare, label: 'Mural', color: 'text-orange-600', bg: 'bg-orange-100' },
   ];
 
   // Helper to check if current view is a child of SanFran Essential
   const isEssentialChild = [View.Anki, View.Timer, View.Calendar, View.Ranking, View.Subjects, View.Tasks, View.DeadArchive, View.Calculator].includes(currentView);
+  
+  // Helper to check if current view is a child of SanFran Community
+  const isCommunityChild = [View.Debate, View.ClassificadosPatio, View.JurisprudenceMural, View.Societies, View.Largo, View.StudyRoom, View.Mural].includes(currentView);
 
   return (
     <div className={`flex h-screen overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#fcfcfc]'}`}>
@@ -498,7 +496,9 @@ const App: React.FC = () => {
         
         <nav className="p-4 space-y-1 flex-1 overflow-y-auto custom-scrollbar">
           {navItems.map((item) => {
-            const isActive = currentView === item.id || (item.id === View.SanFranEssential && isEssentialChild);
+            const isActive = currentView === item.id || 
+                             (item.id === View.SanFranEssential && isEssentialChild) ||
+                             (item.id === View.SanFranCommunity && isCommunityChild);
             
             return (
               <button 
@@ -530,8 +530,8 @@ const App: React.FC = () => {
                    </span>
                 </div>
 
-                {item.id === View.Largo && presenceUsers.length > 0 && (
-                  <span className="w-5 h-5 bg-usp-blue text-[9px] font-black rounded-full flex items-center justify-center text-white shadow-md animate-pulse">
+                {item.id === View.SanFranCommunity && presenceUsers.length > 0 && (
+                  <span className="w-5 h-5 bg-cyan-500 text-[9px] font-black rounded-full flex items-center justify-center text-white shadow-md animate-pulse">
                     {presenceUsers.length}
                   </span>
                 )}
@@ -574,8 +574,9 @@ const App: React.FC = () => {
               />
             )}
             
-            {/* SanFran Essential Hub */}
+            {/* HUBs */}
             {currentView === View.SanFranEssential && <SanFranEssential onNavigate={setCurrentView} />}
+            {currentView === View.SanFranCommunity && <SanFranCommunity onNavigate={setCurrentView} />}
 
             {currentView === View.Profile && <Profile />}
             {currentView === View.DominioJuridico && <DominioJuridico subjects={subjects} studySessions={studySessions} />}
