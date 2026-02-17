@@ -58,7 +58,8 @@ export enum View {
   ErrorLog = 'error_log',
   CodeTracker = 'code_tracker',
   IracMethod = 'irac_method',
-  SpacedRepetition = 'spaced_repetition' // Nova View
+  SpacedRepetition = 'spaced_repetition',
+  AttendanceCalculator = 'attendance_calculator' // Nova View
 }
 
 export interface Folder {
@@ -474,5 +475,15 @@ export interface SpacedTopic {
   topic: string;
   study_date: string; // YYYY-MM-DD
   reviews_completed: number[]; // Array of intervals done [1, 7, 15, 30]
+  created_at: string;
+}
+
+// Attendance Types
+export interface AttendanceRecord {
+  id: string;
+  user_id: string;
+  subject_name: string;
+  total_hours: number;
+  absences: number;
   created_at: string;
 }

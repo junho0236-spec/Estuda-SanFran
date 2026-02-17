@@ -8,13 +8,13 @@ import {
   BookOpen, 
   CheckSquare, 
   Archive, 
-  Calculator, 
   ArrowUpRight,
   Zap,
   BookX,
   ScrollText,
   FileText,
-  Repeat
+  Repeat,
+  UserX
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -100,7 +100,7 @@ const SanFranEssential: React.FC<SanFranEssentialProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD: REVISÃO ESPAÇADA (Novo) */}
+        {/* CARD: REVISÃO ESPAÇADA */}
         <button
           onClick={() => onNavigate(View.SpacedRepetition)}
           className="group col-span-1 bg-[#0284c7] text-white rounded-[2.5rem] p-6 border border-sky-600 shadow-lg hover:shadow-sky-500/30 hover:scale-[1.02] transition-all flex flex-col justify-between relative overflow-hidden"
@@ -115,6 +115,24 @@ const SanFranEssential: React.FC<SanFranEssentialProps> = ({ onNavigate }) => {
            <div className="text-left mt-4 relative z-10">
               <h4 className="text-lg font-black uppercase tracking-tight text-white">Revisão Espaçada</h4>
               <p className="text-[10px] font-bold text-sky-100 uppercase">Algoritmo Ebbinghaus</p>
+           </div>
+        </button>
+
+        {/* CARD: CALCULADORA DE FALTAS (Novo) */}
+        <button
+          onClick={() => onNavigate(View.AttendanceCalculator)}
+          className="group col-span-1 bg-[#dc2626] text-white rounded-[2.5rem] p-6 border border-red-700 shadow-lg hover:shadow-red-500/30 hover:scale-[1.02] transition-all flex flex-col justify-between relative overflow-hidden"
+        >
+           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')] opacity-10"></div>
+           <div className="flex justify-between items-start relative z-10">
+              <div className="p-3 bg-white/20 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20">
+                 <UserX size={20} className="text-white" />
+              </div>
+              <ArrowUpRight size={16} className="text-red-200 group-hover:text-white transition-colors" />
+           </div>
+           <div className="text-left mt-4 relative z-10">
+              <h4 className="text-lg font-black uppercase tracking-tight text-white">Controle de Faltas</h4>
+              <p className="text-[10px] font-bold text-red-100 uppercase">Limite dos 75%</p>
            </div>
         </button>
 
