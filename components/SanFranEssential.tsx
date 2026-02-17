@@ -13,7 +13,8 @@ import {
   Zap,
   BookX,
   ScrollText,
-  FileText
+  FileText,
+  Repeat
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -96,6 +97,24 @@ const SanFranEssential: React.FC<SanFranEssentialProps> = ({ onNavigate }) => {
            
            <div className="mt-8 flex items-center gap-2 text-sanfran-rubi font-black text-xs uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0">
               <Zap size={14} fill="currentColor" /> Iniciar Sessão
+           </div>
+        </button>
+
+        {/* CARD: REVISÃO ESPAÇADA (Novo) */}
+        <button
+          onClick={() => onNavigate(View.SpacedRepetition)}
+          className="group col-span-1 bg-[#0284c7] text-white rounded-[2.5rem] p-6 border border-sky-600 shadow-lg hover:shadow-sky-500/30 hover:scale-[1.02] transition-all flex flex-col justify-between relative overflow-hidden"
+        >
+           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+           <div className="flex justify-between items-start relative z-10">
+              <div className="p-3 bg-white/20 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20">
+                 <Repeat size={20} className="text-white" />
+              </div>
+              <ArrowUpRight size={16} className="text-sky-200 group-hover:text-white transition-colors" />
+           </div>
+           <div className="text-left mt-4 relative z-10">
+              <h4 className="text-lg font-black uppercase tracking-tight text-white">Revisão Espaçada</h4>
+              <p className="text-[10px] font-bold text-sky-100 uppercase">Algoritmo Ebbinghaus</p>
            </div>
         </button>
 

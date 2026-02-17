@@ -57,7 +57,8 @@ export enum View {
   DominioJuridico = 'dominio_juridico',
   ErrorLog = 'error_log',
   CodeTracker = 'code_tracker',
-  IracMethod = 'irac_method' // Nova View
+  IracMethod = 'irac_method',
+  SpacedRepetition = 'spaced_repetition' // Nova View
 }
 
 export interface Folder {
@@ -462,5 +463,16 @@ export interface IracEntry {
   analysis: string;
   conclusion: string;
   tags?: string;
+  created_at: string;
+}
+
+// Spaced Repetition Types
+export interface SpacedTopic {
+  id: string;
+  user_id: string;
+  subject: string;
+  topic: string;
+  study_date: string; // YYYY-MM-DD
+  reviews_completed: number[]; // Array of intervals done [1, 7, 15, 30]
   created_at: string;
 }
