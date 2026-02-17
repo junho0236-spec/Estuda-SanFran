@@ -8,7 +8,8 @@ export enum View {
   SanFranImprovement = 'sanfran_improvement',
   SanFranLanguages = 'sanfran_languages',
   SanFranLife = 'sanfran_life',
-  SanFranGames = 'sanfran_games', // Nova View
+  SanFranGames = 'sanfran_games',
+  SanFranHelp = 'sanfran_help', // Nova View
   Profile = 'profile',
   Anki = 'anki',
   Timer = 'timer',
