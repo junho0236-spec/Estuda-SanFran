@@ -10,7 +10,6 @@ import {
   Archive, 
   Calculator, 
   ArrowUpRight,
-  ClipboardList,
   Zap
 } from 'lucide-react';
 import { View } from '../types';
@@ -150,26 +149,7 @@ const SanFranEssential: React.FC<SanFranEssentialProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 6: EDITAIS (Medium) */}
-        <button
-          onClick={() => onNavigate(View.Editais)}
-          className="group col-span-1 md:col-span-2 bg-gradient-to-r from-blue-50 to-white dark:from-blue-900/10 dark:to-slate-900 rounded-[2.5rem] p-6 border border-blue-100 dark:border-blue-900/30 shadow-lg hover:shadow-blue-100 dark:hover:shadow-none transition-all flex items-center gap-6"
-        >
-           <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center text-blue-600 shrink-0 group-hover:rotate-12 transition-transform">
-              <ClipboardList size={28} />
-           </div>
-           <div className="text-left">
-              <h4 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Editais</h4>
-              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 leading-snug max-w-xs">
-                 Mandados do Dia e missões diárias para acumular recompensas.
-              </p>
-           </div>
-           <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
-              <ArrowUpRight className="text-blue-500" />
-           </div>
-        </button>
-
-        {/* CARD 7: PAUTA (Compact) */}
+        {/* CARD 6: PAUTA (Compact) */}
         <button
           onClick={() => onNavigate(View.Tasks)}
           className="group col-span-1 bg-white dark:bg-sanfran-rubiDark/20 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/5 shadow-lg hover:border-emerald-400 transition-all flex flex-col justify-between"
@@ -185,7 +165,7 @@ const SanFranEssential: React.FC<SanFranEssentialProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 8: MÉDIAS (Compact) */}
+        {/* CARD 7: MÉDIAS (Compact) */}
         <button
           onClick={() => onNavigate(View.Calculator)}
           className="group col-span-1 bg-white dark:bg-sanfran-rubiDark/20 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/5 shadow-lg hover:border-indigo-400 transition-all flex flex-col justify-between"
@@ -201,7 +181,7 @@ const SanFranEssential: React.FC<SanFranEssentialProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 9: ARQUIVO MORTO (Wide Footer) */}
+        {/* CARD 8: ARQUIVO MORTO (Wide Footer) */}
         <button
           onClick={() => onNavigate(View.DeadArchive)}
           className="group col-span-1 md:col-span-2 lg:col-span-2 bg-slate-100 dark:bg-[#0d0303] rounded-[2rem] p-4 flex items-center justify-center gap-3 border border-transparent hover:border-slate-300 dark:hover:border-white/10 transition-all opacity-60 hover:opacity-100"
