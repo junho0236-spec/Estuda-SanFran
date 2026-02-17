@@ -482,19 +482,21 @@ const App: React.FC = () => {
           <div className="flex items-center justify-between mb-4">
             <button
               onClick={() => { setCurrentView(View.Profile); closeSidebar(); }}
-              className="flex items-center gap-3 group text-left p-2 -m-2 rounded-xl transition-colors duration-200 hover:bg-slate-100/50 dark:hover:bg-white/5"
+              className="w-full group text-left p-2 -m-2 rounded-xl transition-all duration-200 hover:bg-slate-50 dark:hover:bg-white/5"
             >
-              <div className="bg-sanfran-rubi p-2.5 rounded-2xl text-white shadow-lg shadow-red-900/20 group-hover:scale-105 transition-transform">
-                <BookOpen className="w-6 h-6" />
-              </div>
               <div className="flex flex-col">
-                <span className="text-xl font-black dark:text-white leading-tight tracking-tight">SanFran</span>
-                <span className="text-xl font-black dark:text-white leading-tight tracking-tight -mt-1">Academy</span>
-                <div className="w-full h-[1.5px] bg-sanfran-rubi my-2"></div>
-                <span className="text-xs font-black text-sanfran-rubi uppercase tracking-[0.2em]">XI de Agosto</span>
+                <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter leading-[0.85]">
+                  SanFran
+                  <br />
+                  Academy
+                </h1>
+                <div className="w-16 h-1 bg-sanfran-rubi rounded-full my-3 group-hover:w-full transition-all duration-500"></div>
+                <span className="text-[10px] font-black text-sanfran-rubi uppercase tracking-[0.3em]">
+                  XI de Agosto
+                </span>
               </div>
             </button>
-            <button onClick={closeSidebar} className="lg:hidden p-2 text-slate-400 hover:text-sanfran-rubi transition-colors">
+            <button onClick={closeSidebar} className="lg:hidden p-2 text-slate-400 hover:text-sanfran-rubi transition-colors self-start">
               <X className="w-6 h-6" />
             </button>
           </div>
