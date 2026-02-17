@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck, BookX, ScrollText, FileText, Repeat, UserX } from 'lucide-react';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck, BookX, ScrollText, FileText, Repeat, UserX, ListTodo } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel } from './types';
 import Dashboard from './components/Dashboard';
 import Profile from './components/Profile';
@@ -54,7 +54,8 @@ import ErrorLog from './components/ErrorLog';
 import CodeTracker from './components/CodeTracker';
 import IracMethod from './components/IracMethod'; 
 import SpacedRepetition from './components/SpacedRepetition';
-import AttendanceCalculator from './components/AttendanceCalculator'; // Import
+import AttendanceCalculator from './components/AttendanceCalculator';
+import SyllabusTracker from './components/SyllabusTracker'; // Import
 import SanFranEssential from './components/SanFranEssential';
 import SanFranCommunity from './components/SanFranCommunity';
 import SanFranImprovement from './components/SanFranImprovement';
@@ -428,7 +429,7 @@ const App: React.FC = () => {
   ];
 
   // Helper to check if current view is a child of SanFran Essential
-  const isEssentialChild = [View.Anki, View.Timer, View.Calendar, View.Ranking, View.Subjects, View.Tasks, View.DeadArchive, View.Calculator, View.ErrorLog, View.CodeTracker, View.IracMethod, View.SpacedRepetition, View.AttendanceCalculator].includes(currentView);
+  const isEssentialChild = [View.Anki, View.Timer, View.Calendar, View.Ranking, View.Subjects, View.Tasks, View.DeadArchive, View.Calculator, View.ErrorLog, View.CodeTracker, View.IracMethod, View.SpacedRepetition, View.AttendanceCalculator, View.SyllabusTracker].includes(currentView);
   
   // Helper to check if current view is a child of SanFran Community
   const isCommunityChild = [View.Debate, View.ClassificadosPatio, View.JurisprudenceMural, View.Societies, View.Largo, View.StudyRoom, View.Mural].includes(currentView);
@@ -651,6 +652,7 @@ const App: React.FC = () => {
             {currentView === View.IracMethod && <IracMethod userId={session.user.id} />}
             {currentView === View.SpacedRepetition && <SpacedRepetition userId={session.user.id} />}
             {currentView === View.AttendanceCalculator && <AttendanceCalculator userId={session.user.id} />}
+            {currentView === View.SyllabusTracker && <SyllabusTracker userId={session.user.id} />}
             
             {currentView === View.Duel && activeDuel && (
               <DuelArena 

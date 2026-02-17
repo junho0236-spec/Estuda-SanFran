@@ -59,7 +59,8 @@ export enum View {
   CodeTracker = 'code_tracker',
   IracMethod = 'irac_method',
   SpacedRepetition = 'spaced_repetition',
-  AttendanceCalculator = 'attendance_calculator' // Nova View
+  AttendanceCalculator = 'attendance_calculator',
+  SyllabusTracker = 'syllabus_tracker' // Nova View
 }
 
 export interface Folder {
@@ -485,5 +486,27 @@ export interface AttendanceRecord {
   subject_name: string;
   total_hours: number;
   absences: number;
+  created_at: string;
+}
+
+// Syllabus Types
+export interface SyllabusTracker {
+  id: string;
+  user_id: string;
+  subject_id: string | null;
+  subject_name: string;
+  title: string;
+  created_at: string;
+}
+
+export type ConfidenceLevel = 'none' | 'low' | 'medium' | 'high';
+
+export interface SyllabusTopic {
+  id: string;
+  tracker_id: string;
+  user_id: string;
+  title: string;
+  is_completed: boolean;
+  confidence_level: ConfidenceLevel;
   created_at: string;
 }
