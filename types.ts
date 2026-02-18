@@ -70,7 +70,8 @@ export enum View {
   SocialEvents = 'social_events',
   TheVault = 'the_vault',
   CaronasRepublicas = 'caronas_republicas',
-  BalcaoEstagios = 'balcao_estagios' // Nova View
+  BalcaoEstagios = 'balcao_estagios',
+  TribunalOpiniao = 'tribunal_opiniao' // Nova View
 }
 
 export interface Folder {
@@ -685,5 +686,28 @@ export interface InternshipPost {
   contact_info: string;
   user_id: string;
   user_name: string;
+  created_at: string;
+}
+
+// Poll Types
+export interface Poll {
+  id: string;
+  question: string;
+  option_a: string;
+  option_b: string;
+  category: string;
+  date: string;
+  votes_a: number;
+  votes_b: number;
+  created_at: string;
+}
+
+export interface PollComment {
+  id: string;
+  poll_id: string;
+  user_id: string;
+  user_name: string;
+  content: string;
+  vote_choice?: 'A' | 'B';
   created_at: string;
 }
