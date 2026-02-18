@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Play, CheckCircle2, XCircle, Clapperboard, Film, ArrowLeft, Tv, HelpCircle } from 'lucide-react';
+import { Play, CheckCircle2, XCircle, Clapperboard, Film, ArrowLeft, Tv, HelpCircle, ExternalLink } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { CinemaClip } from '../types';
 import confetti from 'canvas-confetti';
@@ -9,28 +9,28 @@ interface LegalCinemaProps {
   userId: string;
 }
 
-// Mock Data com IDs verificados para Embed
+// Mock Data com IDs alternativos e mais estáveis
 const MOCK_CLIPS: CinemaClip[] = [
   {
     id: '1',
     title: 'Interrogatório Agressivo',
     source_name: 'Suits (Mike Ross)',
-    youtube_id: 'ir8tHl6y_Qo', 
-    start_time: 10,
-    end_time: 50,
+    youtube_id: 'cL3d-lD9-38', // Mock Trial Scene
+    start_time: 40,
+    end_time: 100,
     difficulty: 'medium',
     question: "Qual a estratégia usada por Harvey nesta cena?",
     options: ["Intimidação direta", "Apelo emocional", "Acordo judicial"],
     correct_option: 0,
-    explanation: "Harvey usa a intimidação e o blefe ('I play the man, not the odds') para desestabilizar o oponente sem precisar ir a julgamento."
+    explanation: "Harvey usa a intimidação e o blefe para desestabilizar a testemunha/oponente."
   },
   {
     id: '2',
     title: 'You Cant Handle the Truth',
     source_name: 'A Few Good Men',
-    youtube_id: '9FnO3igOkOk', 
-    start_time: 147,
-    end_time: 185,
+    youtube_id: 'hopNAI8Pefg', // Clip Clássico
+    start_time: 140,
+    end_time: 200,
     difficulty: 'hard',
     question: "O que o Coronel Jessup admite sob pressão?",
     options: ["Que mentiu no relatório", "Que ordenou o 'Code Red'", "Que não estava na base"],
@@ -41,9 +41,9 @@ const MOCK_CLIPS: CinemaClip[] = [
     id: '3',
     title: 'Oferta de Acordo',
     source_name: 'Erin Brockovich',
-    youtube_id: '21R8s88d6p8', 
-    start_time: 40,
-    end_time: 100,
+    youtube_id: 'lXg5u-4q7qA', // Water Scene
+    start_time: 30,
+    end_time: 90,
     difficulty: 'easy',
     question: "Por que Erin recusa a oferta da empresa?",
     options: ["O valor era insultuoso", "Não havia garantia escrita", "A empresa não assumiu a culpa"],
@@ -54,22 +54,22 @@ const MOCK_CLIPS: CinemaClip[] = [
     id: '4',
     title: 'Testemunha Perita',
     source_name: 'My Cousin Vinny',
-    youtube_id: 'HVjbf-tMCHo',
+    youtube_id: '6qg66Q2dJsg', // Expert Witness Scene
     start_time: 60,
     end_time: 120,
     difficulty: 'medium',
     question: "Como Vinny qualifica a testemunha como 'Expert'?",
     options: ["Mostrando seu diploma", "Testando seu conhecimento técnico", "Citando sua experiência"],
     correct_option: 1,
-    explanation: "Ele faz perguntas técnicas extremamente específicas sobre mecânica automotiva para provar à corte que ela possui conhecimento notório (Expertise)."
+    explanation: "Ele faz perguntas técnicas extremamente específicas sobre mecânica automotiva para provar à corte que ela possui conhecimento notório."
   },
   {
     id: '5',
     title: 'Quebra de Álibi',
     source_name: 'Legally Blonde',
-    youtube_id: 'v1c2OfUgCv8',
-    start_time: 100,
-    end_time: 160,
+    youtube_id: 'y1o_iY99eeA', // Perm Scene
+    start_time: 155,
+    end_time: 215,
     difficulty: 'easy',
     question: "Qual o erro lógico apontado por Elle Woods?",
     options: ["O tempo de viagem", "A regra de manutenção do permanente", "A cor do sapato"],
@@ -80,7 +80,7 @@ const MOCK_CLIPS: CinemaClip[] = [
     id: '6',
     title: 'Depoimento Hostil',
     source_name: 'The Social Network',
-    youtube_id: '-3RtOCnpMxE',
+    youtube_id: 'lB95KLmpLR4', // Deposition
     start_time: 10,
     end_time: 60,
     difficulty: 'hard',
@@ -183,7 +183,6 @@ const LegalCinema: React.FC<LegalCinemaProps> = ({ userId }) => {
                    {/* Thumbnail Placeholder with Icon */}
                    <div className="h-48 bg-slate-900 flex items-center justify-center relative overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent z-10"></div>
-                      {/* Using high quality thumbnail if available or fallback icon */}
                       <img 
                         src={`https://img.youtube.com/vi/${clip.youtube_id}/hqdefault.jpg`} 
                         alt="Thumbnail" 
@@ -238,12 +237,12 @@ const LegalCinema: React.FC<LegalCinemaProps> = ({ userId }) => {
           
           {/* Video Column */}
           <div className="lg:col-span-2 flex flex-col gap-6">
-             {/* Container do vídeo com largura máxima restrita para não ficar gigante */}
-             <div className="w-full max-w-3xl mx-auto aspect-video bg-black rounded-[2rem] overflow-hidden shadow-2xl border-4 border-slate-900 dark:border-white/10 relative">
+             {/* Container do vídeo */}
+             <div className="w-full max-w-3xl mx-auto aspect-video bg-black rounded-[2rem] overflow-hidden shadow-2xl border-4 border-slate-900 dark:border-white/10 relative z-10">
                 <iframe 
                   width="100%" 
                   height="100%" 
-                  src={`https://www.youtube.com/embed/${selectedClip.youtube_id}?start=${selectedClip.start_time}&end=${selectedClip.end_time}&rel=0&modestbranding=1&controls=1`} 
+                  src={`https://www.youtube.com/embed/${selectedClip.youtube_id}?start=${selectedClip.start_time}&end=${selectedClip.end_time}&rel=0&modestbranding=1&controls=1&origin=${window.location.origin}`} 
                   title="YouTube video player" 
                   frameBorder="0" 
                   allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
@@ -252,14 +251,25 @@ const LegalCinema: React.FC<LegalCinemaProps> = ({ userId }) => {
                 ></iframe>
              </div>
              
-             <div className="bg-sky-50 dark:bg-sky-900/10 p-4 rounded-2xl border border-sky-100 dark:border-sky-800/30 flex items-start gap-3 max-w-3xl mx-auto w-full">
-                <HelpCircle className="text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" />
-                <div>
-                   <p className="text-sm font-bold text-sky-800 dark:text-sky-200">Instrução:</p>
-                   <p className="text-xs text-sky-700 dark:text-sky-300 mt-1">
-                     Clique no vídeo para iniciar. Ele deve tocar o trecho selecionado automaticamente. Se não funcionar, tente atualizar a página ou verificar sua conexão.
-                   </p>
-                </div>
+             <div className="flex flex-col gap-3 max-w-3xl mx-auto w-full">
+               <div className="bg-sky-50 dark:bg-sky-900/10 p-4 rounded-2xl border border-sky-100 dark:border-sky-800/30 flex items-start gap-3">
+                  <HelpCircle className="text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" />
+                  <div>
+                     <p className="text-sm font-bold text-sky-800 dark:text-sky-200">Instrução:</p>
+                     <p className="text-xs text-sky-700 dark:text-sky-300 mt-1">
+                       Clique no play. Se o vídeo não carregar devido a restrições do YouTube, use o link abaixo.
+                     </p>
+                  </div>
+               </div>
+               
+               <a 
+                 href={`https://www.youtube.com/watch?v=${selectedClip.youtube_id}&t=${selectedClip.start_time}s`} 
+                 target="_blank" 
+                 rel="noopener noreferrer"
+                 className="flex items-center justify-center gap-2 p-3 bg-red-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-700 transition-colors shadow-lg"
+               >
+                 <ExternalLink size={14} /> Vídeo indisponível? Assistir no YouTube
+               </a>
              </div>
           </div>
 
