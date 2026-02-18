@@ -74,7 +74,8 @@ export enum View {
   TribunalOpiniao = 'tribunal_opiniao',
   BussolaOptativas = 'bussola_optativas',
   AchadosPerdidos = 'achados_perdidos',
-  PerolasTribuna = 'perolas_tribuna' // Nova View
+  PerolasTribuna = 'perolas_tribuna',
+  GuiaSobrevivencia = 'guia_sobrevivencia' // Nova View
 }
 
 export interface Folder {
@@ -755,5 +756,25 @@ export interface Quote {
   quote: string;
   likes_funny: number;
   likes_shock: number;
+  created_at: string;
+}
+
+// Guia de Sobrevivência
+export interface Place {
+  id: string;
+  name: string;
+  category: 'cafe' | 'almoco' | 'happy_hour' | 'xerox' | 'livraria';
+  address: string;
+  created_at: string;
+}
+
+export interface PlaceReview {
+  id: string;
+  place_id: string;
+  user_name: string;
+  rating_price: number;
+  rating_distance: number;
+  rating_wifi: number;
+  veteran_tip: string;
   created_at: string;
 }
