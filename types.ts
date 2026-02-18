@@ -68,7 +68,8 @@ export enum View {
   StudyPact = 'study_pact',
   LargoAuction = 'largo_auction',
   SocialEvents = 'social_events',
-  TheVault = 'the_vault' // Nova View
+  TheVault = 'the_vault',
+  CaronasRepublicas = 'caronas_republicas' // Nova View
 }
 
 export interface Folder {
@@ -652,5 +653,21 @@ export interface VaultItem {
   uploader_name: string;
   upvotes: number;
   downloads: number;
+  created_at: string;
+}
+
+// Mobility & Housing Types
+export interface MobilityPost {
+  id: string;
+  type: 'carona' | 'republica';
+  title: string;
+  description: string;
+  location: string;
+  time?: string;
+  price?: string;
+  contact_info: string;
+  available_spots: number;
+  user_id: string;
+  user_name: string;
   created_at: string;
 }

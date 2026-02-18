@@ -17,7 +17,8 @@ import {
   Handshake,
   DollarSign,
   CalendarHeart,
-  Archive
+  Archive,
+  Car
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -199,23 +200,23 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 7: WIKI DE PEÇAS (Wide) */}
+        {/* CARD 7: CARONAS E REPÚBLICAS (Wide) - NOVO */}
         <button
-          onClick={() => onNavigate(View.PetitionWiki)}
-          className="group relative col-span-1 md:col-span-2 bg-[#0e7490] dark:bg-cyan-950/40 rounded-[2.5rem] p-8 border border-cyan-500/30 shadow-xl hover:shadow-cyan-500/20 transition-all flex flex-col justify-between overflow-hidden"
+          onClick={() => onNavigate(View.CaronasRepublicas)}
+          className="group relative col-span-1 md:col-span-2 bg-[#0d504b] dark:bg-teal-950/40 rounded-[2.5rem] p-8 border border-teal-500/30 shadow-xl hover:shadow-teal-500/20 transition-all flex flex-col justify-between overflow-hidden"
         >
-           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/lined-paper.png')] opacity-10"></div>
-           <div className="absolute -right-10 -top-10 w-40 h-40 bg-cyan-400/20 rounded-full blur-2xl"></div>
+           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/asfalt-dark.png')] opacity-20"></div>
+           <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-teal-400/20 rounded-full blur-2xl"></div>
 
            <div className="flex justify-between items-start relative z-10">
-              <div className="p-3 bg-cyan-500/20 text-cyan-300 rounded-2xl border border-cyan-500/30 backdrop-blur-sm">
-                 <ScrollText size={24} />
+              <div className="p-3 bg-teal-500/20 text-teal-300 rounded-2xl border border-teal-500/30 backdrop-blur-sm">
+                 <Car size={24} />
               </div>
-              <ArrowUpRight size={20} className="text-cyan-200 group-hover:text-white transition-colors" />
+              <ArrowUpRight size={20} className="text-teal-200 group-hover:text-white transition-colors" />
            </div>
            <div className="text-left mt-8 relative z-10">
-              <h4 className="text-2xl font-black text-white uppercase tracking-tight">Wiki de Peças</h4>
-              <p className="text-xs font-bold text-cyan-200 uppercase tracking-widest mt-1">Banco Colaborativo • Validação por Pares</p>
+              <h4 className="text-2xl font-black text-white uppercase tracking-tight">SanFran Move</h4>
+              <p className="text-xs font-bold text-teal-200 uppercase tracking-widest mt-1">Caronas Solidárias & Vagas em Repúblicas</p>
            </div>
         </button>
 
@@ -239,7 +240,27 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 9: LEILÃO DO LARGO (Wide) */}
+        {/* CARD 9: WIKI DE PEÇAS (Wide) */}
+        <button
+          onClick={() => onNavigate(View.PetitionWiki)}
+          className="group relative col-span-1 md:col-span-2 bg-[#0e7490] dark:bg-cyan-950/40 rounded-[2.5rem] p-8 border border-cyan-500/30 shadow-xl hover:shadow-cyan-500/20 transition-all flex flex-col justify-between overflow-hidden"
+        >
+           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/lined-paper.png')] opacity-10"></div>
+           <div className="absolute -right-10 -top-10 w-40 h-40 bg-cyan-400/20 rounded-full blur-2xl"></div>
+
+           <div className="flex justify-between items-start relative z-10">
+              <div className="p-3 bg-cyan-500/20 text-cyan-300 rounded-2xl border border-cyan-500/30 backdrop-blur-sm">
+                 <ScrollText size={24} />
+              </div>
+              <ArrowUpRight size={20} className="text-cyan-200 group-hover:text-white transition-colors" />
+           </div>
+           <div className="text-left mt-8 relative z-10">
+              <h4 className="text-2xl font-black text-white uppercase tracking-tight">Wiki de Peças</h4>
+              <p className="text-xs font-bold text-cyan-200 uppercase tracking-widest mt-1">Banco Colaborativo • Validação por Pares</p>
+           </div>
+        </button>
+
+        {/* CARD 10: LEILÃO DO LARGO (Wide) */}
         <button
           onClick={() => onNavigate(View.LargoAuction)}
           className="group relative col-span-1 md:col-span-2 bg-[#450a0a] dark:bg-red-950/50 rounded-[2.5rem] p-8 border border-yellow-500/30 shadow-xl hover:shadow-yellow-500/20 transition-all flex flex-col justify-between overflow-hidden"
@@ -259,7 +280,7 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 10: JURISPRUDÊNCIA (Standard) */}
+        {/* CARD 11: JURISPRUDÊNCIA (Standard) */}
         <button
           onClick={() => onNavigate(View.JurisprudenceMural)}
           className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-violet-400 transition-all flex flex-col justify-between h-full hover:shadow-violet-500/10"
@@ -276,7 +297,7 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 11: CLASSIFICADOS (Standard) */}
+        {/* CARD 12: CLASSIFICADOS (Standard) */}
         <button
           onClick={() => onNavigate(View.ClassificadosPatio)}
           className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-rose-400 transition-all flex flex-col justify-between h-full hover:shadow-rose-500/10"
@@ -293,7 +314,7 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 12: SOCIEDADES (Repetido/Atalho) */}
+        {/* CARD 13: SOCIEDADES (Repetido/Atalho) */}
         <button
           onClick={() => onNavigate(View.Societies)}
           className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-emerald-400 transition-all flex flex-col justify-between h-full hover:shadow-emerald-500/10"

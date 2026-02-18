@@ -63,7 +63,8 @@ import PetitionWiki from './components/PetitionWiki';
 import StudyPact from './components/StudyPact';
 import LargoAuction from './components/LargoAuction';
 import SocialEvents from './components/SocialEvents';
-import TheVault from './components/TheVault'; // Import
+import TheVault from './components/TheVault'; 
+import CaronasRepublicas from './components/CaronasRepublicas'; // Import
 import SanFranEssential from './components/SanFranEssential';
 import SanFranCommunity from './components/SanFranCommunity';
 import SanFranImprovement from './components/SanFranImprovement';
@@ -440,7 +441,7 @@ const App: React.FC = () => {
   const isEssentialChild = [View.Anki, View.Timer, View.Calendar, View.Ranking, View.Subjects, View.Tasks, View.DeadArchive, View.Calculator, View.ErrorLog, View.CodeTracker, View.IracMethod, View.SpacedRepetition, View.AttendanceCalculator, View.SyllabusTracker, View.DeadlinePlanner].includes(currentView);
   
   // Helper to check if current view is a child of SanFran Community
-  const isCommunityChild = [View.Debate, View.ClassificadosPatio, View.JurisprudenceMural, View.Societies, View.Largo, View.StudyRoom, View.Mural, View.Mentorship, View.MockJury, View.PetitionWiki, View.StudyPact, View.LargoAuction, View.SocialEvents, View.TheVault].includes(currentView);
+  const isCommunityChild = [View.Debate, View.ClassificadosPatio, View.JurisprudenceMural, View.Societies, View.Largo, View.StudyRoom, View.Mural, View.Mentorship, View.MockJury, View.PetitionWiki, View.StudyPact, View.LargoAuction, View.SocialEvents, View.TheVault, View.CaronasRepublicas].includes(currentView);
 
   // Helper to check if current view is a child of SanFran Improvement
   const isImprovementChild = [View.Specialization, View.TypingChallenge, View.DominioJuridico, View.Timeline, View.LeiSeca, View.Library, View.OralArgument].includes(currentView);
@@ -669,6 +670,7 @@ const App: React.FC = () => {
             {currentView === View.LargoAuction && <LargoAuction userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
             {currentView === View.SocialEvents && <SocialEvents userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
             {currentView === View.TheVault && <TheVault userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
+            {currentView === View.CaronasRepublicas && <CaronasRepublicas userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
             
             {currentView === View.Duel && activeDuel && (
               <DuelArena 
