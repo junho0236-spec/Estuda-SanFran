@@ -75,7 +75,8 @@ export enum View {
   BussolaOptativas = 'bussola_optativas',
   AchadosPerdidos = 'achados_perdidos',
   PerolasTribuna = 'perolas_tribuna',
-  GuiaSobrevivencia = 'guia_sobrevivencia' // Nova View
+  GuiaSobrevivencia = 'guia_sobrevivencia',
+  ClubeLivro = 'clube_livro' // Nova View
 }
 
 export interface Folder {
@@ -776,5 +777,23 @@ export interface PlaceReview {
   rating_distance: number;
   rating_wifi: number;
   veteran_tip: string;
+  created_at: string;
+}
+
+// Clube do Livro
+export interface BookCycle {
+  id: string;
+  status: 'voting' | 'reading' | 'finished';
+  candidates: { title: string; author: string; cover_url?: string }[];
+  selected_book: { title: string; author: string; cover_url?: string } | null;
+  current_week: number;
+}
+
+export interface BookChatMessage {
+  id: string;
+  cycle_id: string;
+  user_id: string;
+  user_name: string;
+  message: string;
   created_at: string;
 }
