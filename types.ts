@@ -71,7 +71,8 @@ export enum View {
   TheVault = 'the_vault',
   CaronasRepublicas = 'caronas_republicas',
   BalcaoEstagios = 'balcao_estagios',
-  TribunalOpiniao = 'tribunal_opiniao' // Nova View
+  TribunalOpiniao = 'tribunal_opiniao',
+  BussolaOptativas = 'bussola_optativas' // Nova View
 }
 
 export interface Folder {
@@ -709,5 +710,21 @@ export interface PollComment {
   user_name: string;
   content: string;
   vote_choice?: 'A' | 'B';
+  created_at: string;
+}
+
+// Review Types
+export interface SubjectReview {
+  id: string;
+  user_id: string;
+  user_name: string | null;
+  subject_name: string;
+  professor_name: string;
+  rating_didactics: number;
+  rating_attendance: number;
+  rating_difficulty: number;
+  rating_relevance: number;
+  comment: string;
+  is_anonymous: boolean;
   created_at: string;
 }
