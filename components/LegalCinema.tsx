@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Play, CheckCircle2, XCircle, Clapperboard, ArrowLeft, Tv, ExternalLink, BookOpen, Ear, FileText, Languages, BrainCircuit, RefreshCw, ChevronRight, MousePointer2 } from 'lucide-react';
+import { Play, CheckCircle2, XCircle, Clapperboard, ArrowLeft, Tv, Ear, RefreshCw, ChevronRight, MousePointer2, Clock, Trophy, X, Info } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import confetti from 'canvas-confetti';
 
@@ -12,6 +12,7 @@ interface InteractiveWord {
   word: string;
   translation: string;
   definition: string;
+  example: string;
 }
 
 interface VideoSegment {
@@ -49,9 +50,9 @@ const SUITS_DEEP_DIVE: DeepDiveClip = {
       endTime: 23,
       transcript: "They're all gonna be walking in here in their fancy suits. I'm not looking for another associate. I'm looking for another me.",
       interactiveWords: [
-        { word: "associate", translation: "Associado", definition: "A junior member of a law firm who is not yet a partner." },
-        { word: "fancy", translation: "Chique / Elegante", definition: "Expensive and high-quality." },
-        { word: "looking", translation: "Procurando", definition: "To search for something or someone." }
+        { word: "associate", translation: "Associado", definition: "A junior member of a law firm who is not yet a partner.", example: "She was hired as a junior associate." },
+        { word: "fancy", translation: "Chique / Elegante", definition: "Expensive and high-quality.", example: "He wore a fancy suit to the hearing." },
+        { word: "looking", translation: "Procurando", definition: "To search for something or someone.", example: "Harvey is looking for a new genius." }
       ],
       question: "No trecho [10s-23s], qual é o critério de Harvey para o novo cargo?",
       options: ["Ele quer alguém que use ternos caros.", "Ele não busca um subordinado comum, mas alguém com seu próprio perfil.", "Ele quer contratar um sócio sênior."],
@@ -64,9 +65,9 @@ const SUITS_DEEP_DIVE: DeepDiveClip = {
       endTime: 38,
       transcript: "I can do this. I know the law better than anyone you've ever met. You didn't go to Harvard Law. You haven't even passed the Bar exam. I passed the bar.",
       interactiveWords: [
-        { word: "Harvard", translation: "Harvard", definition: "A prestigious Ivy League university. In Suits, the firm only hires from its law school." },
-        { word: "Bar", translation: "Ordem (OAB)", definition: "The 'Bar Exam' is the test lawyers must pass to be licensed." },
-        { word: "met", translation: "Conheceu", definition: "Past tense of 'meet' (to come into the presence of)." }
+        { word: "Harvard", translation: "Harvard", definition: "A prestigious Ivy League university. In Suits, the firm only hires from its law school.", example: "Only Harvard Law graduates are hired here." },
+        { word: "Bar", translation: "Ordem (OAB)", definition: "The 'Bar Exam' is the test lawyers must pass to be licensed.", example: "Studying for the bar exam is stressful." },
+        { word: "met", translation: "Conheceu", definition: "Past tense of 'meet' (to come into the presence of).", example: "It's the most brilliant person I've ever met." }
       ],
       question: "De acordo com o diálogo [24s-38s], qual a principal barreira formal para Mike?",
       options: ["Ele não tem experiência em tribunais.", "Ele não frequentou Harvard e supostamente não passou no exame da Ordem.", "Ele não sabe nada sobre as leis de Nova York."],
@@ -79,9 +80,9 @@ const SUITS_DEEP_DIVE: DeepDiveClip = {
       endTime: 53,
       transcript: "I have a photographic memory... Okay, now tell me what it says... 'The legislative history of the Civil Rights Act of 1964 shows that...'",
       interactiveWords: [
-        { word: "photographic", translation: "Fotográfica", definition: "Relating to the ability to remember things with extreme detail, like a photo." },
-        { word: "legislative", translation: "Legislativo", definition: "Relating to the process of making laws." },
-        { word: "Act", translation: "Lei / Decreto", definition: "A law passed by a legislative body." }
+        { word: "photographic", translation: "Fotográfica", definition: "Relating to the ability to remember things with extreme detail, like a photo.", example: "His photographic memory helps him recite codes." },
+        { word: "legislative", translation: "Legislativo", definition: "Relating to the process of making laws.", example: "We must check the legislative history." },
+        { word: "Act", translation: "Lei / Decreto", definition: "A law passed by a legislative body.", example: "The Patriot Act changed many things." }
       ],
       question: "No trecho [40s-53s], Mike prova seu conhecimento recitando o quê?",
       options: ["Uma súmula vinculante do STF americano.", "A história legislativa do Civil Rights Act de 1964.", "A Constituição dos Estados Unidos."],
@@ -94,9 +95,9 @@ const SUITS_DEEP_DIVE: DeepDiveClip = {
       endTime: 78,
       transcript: "JESSICA: He's a fraud. HARVEY: He's a genius. JESSICA: You hired a fraud. I'm not going to let you put the firm at risk.",
       interactiveWords: [
-        { word: "fraud", translation: "Fraude / Impostor", definition: "A person who intends to deceive others by claiming to be someone they are not." },
-        { word: "firm", translation: "Firma / Escritório", definition: "A law office or legal partnership." },
-        { word: "risk", translation: "Risco", definition: "The possibility of something bad happening." }
+        { word: "fraud", translation: "Fraude / Impostor", definition: "A person who intends to deceive others by claiming to be someone they are not.", example: "Mike Ross is technically a fraud." },
+        { word: "firm", translation: "Firma / Escritório", definition: "A law office or legal partnership.", example: "The firm is known for its high standards." },
+        { word: "risk", translation: "Risco", definition: "The possibility of something bad happening.", example: "Don't put the firm at risk." }
       ],
       question: "Qual é o veredito final de Jessica sobre Mike neste trecho [65s-78s]?",
       options: ["Ela concorda com Harvey que ele é um gênio.", "Ela o vê como uma fraude que coloca o escritório em perigo.", "Ela quer promovê-lo a associado sênior."],
@@ -116,6 +117,9 @@ const LegalCinema: React.FC<LegalCinemaProps> = ({ userId }) => {
   const [showFeedback, setShowFeedback] = useState(false);
   const [completed, setCompleted] = useState(false);
 
+  // Interaction State
+  const [selectedWordInfo, setSelectedWordInfo] = useState<InteractiveWord | null>(null);
+
   // Player Control
   const [playerKey, setPlayerKey] = useState(0);
 
@@ -130,6 +134,7 @@ const LegalCinema: React.FC<LegalCinemaProps> = ({ userId }) => {
     setSelectedOption(null);
     setIsCorrect(null);
     setShowFeedback(false);
+    setSelectedWordInfo(null);
     setPlayerKey(prev => prev + 1); 
   };
 
@@ -149,6 +154,11 @@ const LegalCinema: React.FC<LegalCinemaProps> = ({ userId }) => {
 
     if (correct) {
       confetti({ particleCount: 60, spread: 70, origin: { y: 0.7 } });
+    } else {
+      // Reinicia o trecho automaticamente para reforço se errar
+      setTimeout(() => {
+        setPlayerKey(prev => prev + 1);
+      }, 1000);
     }
   };
 
@@ -165,11 +175,11 @@ const LegalCinema: React.FC<LegalCinemaProps> = ({ userId }) => {
 
   const replaySegment = () => {
     setPlayerKey(prev => prev + 1);
+    setSelectedWordInfo(null);
   };
 
   // --- RENDERIZADOR DE TRANSCRIÇÃO INTERATIVA ---
   const renderTranscript = (segment: VideoSegment) => {
-    // Dividir mantendo a pontuação básica
     const words = segment.transcript.split(' ');
 
     return (
@@ -180,20 +190,13 @@ const LegalCinema: React.FC<LegalCinemaProps> = ({ userId }) => {
 
           if (interactive) {
             return (
-              <div key={i} className="group relative inline-block">
-                <span className="text-sanfran-rubi font-black border-b-2 border-dotted border-sanfran-rubi/40 group-hover:bg-sanfran-rubi/10 px-0.5 rounded cursor-help transition-all">
-                  {rawWord}
-                </span>
-                {/* Tooltip Popup */}
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-56 bg-slate-900 text-white p-4 rounded-2xl text-xs shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                  <p className="font-black text-sky-400 uppercase tracking-widest mb-1">{interactive.translation}</p>
-                  <p className="text-slate-300 leading-relaxed">{interactive.definition}</p>
-                  <div className="mt-2 pt-2 border-t border-white/10 italic text-[10px] text-slate-400">
-                    "{interactive.example}"
-                  </div>
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-900"></div>
-                </div>
-              </div>
+              <button
+                key={i}
+                onClick={() => setSelectedWordInfo(interactive)}
+                className={`text-sanfran-rubi font-black border-b-2 border-dotted border-sanfran-rubi/40 hover:bg-sanfran-rubi/10 px-0.5 rounded transition-all outline-none focus:ring-2 focus:ring-sanfran-rubi/20 ${selectedWordInfo?.word === interactive.word ? 'bg-sanfran-rubi/10 border-sanfran-rubi' : ''}`}
+              >
+                {rawWord}
+              </button>
             );
           }
           
@@ -332,13 +335,41 @@ const LegalCinema: React.FC<LegalCinemaProps> = ({ userId }) => {
                      </div>
                      <div>
                         <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Transcript Sincronizado</p>
-                        <p className="text-xs font-bold text-slate-500 italic">Passe o mouse nos termos destacados.</p>
+                        <p className="text-xs font-bold text-slate-500 italic">Clique nos termos destacados para detalhes.</p>
                      </div>
                   </div>
                   
                   <div className="text-2xl md:text-3xl font-serif font-medium leading-relaxed text-slate-800 dark:text-slate-100">
                      “{renderTranscript(segment)}”
                   </div>
+
+                  {/* Word Details Popover (Persistent upon click) */}
+                  {selectedWordInfo && (
+                    <div className="mt-8 p-6 bg-slate-900 text-white rounded-[2rem] shadow-2xl animate-in slide-in-from-bottom-4 duration-300 relative border border-white/10">
+                      <button 
+                        onClick={() => setSelectedWordInfo(null)}
+                        className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors"
+                      >
+                        <X size={20} />
+                      </button>
+                      <div className="flex items-start gap-4">
+                        <div className="p-3 bg-white/10 rounded-2xl text-sanfran-rubi">
+                          <Info size={24} />
+                        </div>
+                        <div>
+                          <div className="flex items-baseline gap-3 mb-1">
+                            <h4 className="text-2xl font-black uppercase tracking-tight">{selectedWordInfo.word}</h4>
+                            <span className="text-sky-400 font-black uppercase text-[10px] tracking-widest">{selectedWordInfo.translation}</span>
+                          </div>
+                          <p className="text-slate-300 text-sm leading-relaxed mb-4">{selectedWordInfo.definition}</p>
+                          <div className="pt-3 border-t border-white/5">
+                            <p className="text-[10px] font-black text-slate-500 uppercase mb-1">Example</p>
+                            <p className="text-xs italic text-slate-400">"{selectedWordInfo.example}"</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                </div>
              )}
           </div>
@@ -364,7 +395,7 @@ const LegalCinema: React.FC<LegalCinemaProps> = ({ userId }) => {
                             
                             if (showFeedback) {
                                if (idx === segment.correctAnswer) btnClass = "bg-emerald-500 border-emerald-600 text-white ring-8 ring-emerald-500/10 shadow-2xl";
-                               else if (idx === selectedOption) btnClass = "bg-red-500 border-red-600 text-white opacity-50";
+                               else if (idx === selectedOption) btnClass = "bg-red-600 border-red-700 text-white opacity-100 ring-8 ring-red-500/10";
                                else btnClass = "opacity-30 grayscale pointer-events-none";
                             }
 
@@ -405,9 +436,9 @@ const LegalCinema: React.FC<LegalCinemaProps> = ({ userId }) => {
                       {!isCorrect && (
                          <button 
                            onClick={resetSegmentState}
-                           className="w-full mt-6 py-5 bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300 rounded-[2rem] font-black uppercase text-xs tracking-[0.2em] hover:bg-slate-300 transition-colors"
+                           className="w-full mt-6 py-5 bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300 rounded-[2rem] font-black uppercase text-xs tracking-[0.2em] hover:bg-slate-300 transition-colors flex items-center justify-center gap-2"
                          >
-                            Tentar Novamente
+                            <RefreshCw size={14} /> Ouvir Novamente e Tentar
                          </button>
                       )}
                    </div>

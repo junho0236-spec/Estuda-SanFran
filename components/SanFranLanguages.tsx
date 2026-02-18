@@ -39,7 +39,7 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
       {/* BENTO GRID LAYOUT */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 auto-rows-[minmax(180px,auto)]">
         
-        {/* CARD 1: LEGAL ENGLISH (Hero - Main Focus) */}
+        {/* CARD 1: LEGAL LANGUAGES (Hero - Main Focus) */}
         <button
           onClick={() => onNavigate(View.SanFranIdiomas)}
           className="group relative col-span-1 md:col-span-2 lg:col-span-3 row-span-2 bg-[#0c4a6e] text-white rounded-[2.5rem] p-8 md:p-12 flex flex-col justify-between overflow-hidden shadow-2xl hover:shadow-sky-500/20 hover:scale-[1.01] transition-all duration-500"
@@ -51,29 +51,29 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
           <div className="relative z-10 flex justify-between items-start">
             <div className="flex gap-4">
                 <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
-                   <Globe className="w-8 h-8 md:w-10 md:h-10 text-sky-300" />
+                   <Languages className="w-8 h-8 md:w-10 md:h-10 text-sky-300" />
                 </div>
                 <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10 hidden md:block">
-                   <BookA className="w-8 h-8 md:w-10 md:h-10 text-sky-200" />
+                   <Globe className="w-8 h-8 md:w-10 md:h-10 text-sky-200" />
                 </div>
             </div>
             <div className="bg-sky-500/20 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md text-sky-100 border border-sky-500/30 flex items-center gap-2">
-               <Mic2 size={12} /> Curso Completo
+               <Mic2 size={12} /> Laboratório Multilíngue
             </div>
           </div>
 
           <div className="relative z-10 space-y-4 text-left mt-16 md:mt-24">
              <div>
-                <h3 className="text-4xl md:text-6xl font-black tracking-tight leading-none text-white mb-2">Legal English</h3>
+                <h3 className="text-4xl md:text-6xl font-black tracking-tight leading-none text-white mb-2">Legal Languages</h3>
                 <p className="text-base md:text-xl font-medium text-sky-100 max-w-lg leading-relaxed opacity-90">
-                  Contratos Internacionais, Vocabulário de Corte e Business Law.
+                  Inglês, Espanhol, Francês, Alemão e Italiano Jurídico. Domine os termos de cada jurisdição.
                 </p>
              </div>
              
              <div className="flex flex-wrap gap-2 pt-2">
-                <span className="px-3 py-1 bg-white/10 rounded-lg text-[10px] font-bold uppercase tracking-wider text-sky-200 border border-white/5">Glossário</span>
-                <span className="px-3 py-1 bg-white/10 rounded-lg text-[10px] font-bold uppercase tracking-wider text-sky-200 border border-white/5">Listening</span>
-                <span className="px-3 py-1 bg-white/10 rounded-lg text-[10px] font-bold uppercase tracking-wider text-sky-200 border border-white/5">Briefings Diários</span>
+                <span className="px-3 py-1 bg-white/10 rounded-lg text-[10px] font-bold uppercase tracking-wider text-sky-200 border border-white/5">5 Idiomas</span>
+                <span className="px-3 py-1 bg-white/10 rounded-lg text-[10px] font-bold uppercase tracking-wider text-sky-200 border border-white/5">Terminologia</span>
+                <span className="px-3 py-1 bg-white/10 rounded-lg text-[10px] font-bold uppercase tracking-wider text-sky-200 border border-white/5">Cortes Internacionais</span>
              </div>
           </div>
 
@@ -84,7 +84,7 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
           </div>
         </button>
 
-        {/* CARD 2: CINEMA JURÍDICO (NOVO) */}
+        {/* CARD 2: CINEMA JURÍDICO */}
         <button
           onClick={() => onNavigate(View.LegalCinema)}
           className="group relative col-span-1 row-span-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2.5rem] p-8 border border-slate-700 dark:border-slate-200 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between overflow-hidden"
