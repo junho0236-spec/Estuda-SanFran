@@ -45,6 +45,7 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
           onClick={() => onNavigate(View.SanFranIdiomas)}
           className="group relative col-span-1 md:col-span-2 lg:col-span-2 row-span-2 bg-[#0c4a6e] text-white rounded-[2.5rem] p-8 md:p-10 flex flex-col justify-between overflow-hidden shadow-2xl hover:shadow-sky-500/20 hover:scale-[1.01] transition-all duration-500"
         >
+          {/* Abstract Background Decoration */}
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/shattered-island.png')] opacity-10"></div>
           <div className="absolute -right-20 -top-20 w-96 h-96 bg-gradient-to-bl from-sky-400/30 to-transparent rounded-full blur-3xl group-hover:scale-125 transition-transform duration-700"></div>
 
@@ -73,7 +74,7 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
           </div>
         </button>
 
-        {/* CARD 2: GENERAL LANGUAGES (Indigo Card - Refined to match image) */}
+        {/* CARD 2: IDIOMAS GERAIS (New Hero) */}
         <button
           onClick={() => onNavigate(View.GeneralLanguages)}
           className="group relative col-span-1 md:col-span-2 lg:col-span-2 row-span-2 bg-[#4338ca] text-white rounded-[2.5rem] p-8 md:p-10 flex flex-col justify-between overflow-hidden shadow-2xl hover:shadow-indigo-500/20 hover:scale-[1.01] transition-all duration-500"
@@ -82,33 +83,33 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
           <div className="absolute -left-20 -bottom-20 w-96 h-96 bg-gradient-to-tr from-indigo-400/30 to-transparent rounded-full blur-3xl group-hover:scale-125 transition-transform duration-700"></div>
 
           <div className="relative z-10 flex justify-between items-start">
-            <div className="bg-white/10 backdrop-blur-md p-5 rounded-[1.5rem] border border-white/20 shadow-xl">
-               <Languages className="w-8 h-8 md:w-10 md:h-10 text-white" />
+            <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+               <Languages className="w-8 h-8 text-indigo-200" />
             </div>
-            <div className="bg-white/10 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.2em] backdrop-blur-md text-white border border-white/20 flex items-center gap-2 shadow-sm">
+            <div className="bg-indigo-400/20 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md text-indigo-100 border border-indigo-500/30 flex items-center gap-2">
                <Globe size={12} /> Idiomas Gerais
             </div>
           </div>
 
           <div className="relative z-10 space-y-4 text-left mt-8">
              <div>
-                <h3 className="text-4xl md:text-6xl font-black tracking-tight leading-none text-white mb-3">General Languages</h3>
-                <p className="text-sm md:text-lg font-medium text-indigo-100 opacity-90 max-w-sm leading-relaxed">
+                <h3 className="text-3xl md:text-4xl font-black tracking-tight leading-none text-white mb-2">General App</h3>
+                <p className="text-sm md:text-base font-medium text-indigo-100 opacity-90">
                   Do básico ao avançado. Gramática e conversação cotidiana.
                 </p>
              </div>
-             <div className="flex gap-2 pt-2">
-                {['EN', 'ES', 'FR', 'DE', 'IT'].map(lang => (
-                   <span key={lang} className="px-3 py-1 bg-white/10 rounded-lg text-[10px] font-black uppercase tracking-widest text-white border border-white/10 backdrop-blur-sm">
-                      {lang}
-                   </span>
-                ))}
+             <div className="flex gap-2">
+                <span className="px-2 py-1 bg-white/10 rounded-lg text-[9px] font-bold uppercase">EN</span>
+                <span className="px-2 py-1 bg-white/10 rounded-lg text-[9px] font-bold uppercase">ES</span>
+                <span className="px-2 py-1 bg-white/10 rounded-lg text-[9px] font-bold uppercase">FR</span>
+                <span className="px-2 py-1 bg-white/10 rounded-lg text-[9px] font-bold uppercase">DE</span>
+                <span className="px-2 py-1 bg-white/10 rounded-lg text-[9px] font-bold uppercase">IT</span>
              </div>
           </div>
 
           <div className="absolute bottom-8 right-8 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-4 group-hover:translate-x-0">
-             <div className="bg-white text-indigo-600 p-4 rounded-full shadow-2xl">
-                <ArrowUpRight size={28} />
+             <div className="bg-white text-indigo-600 p-3 rounded-full shadow-lg">
+                <ArrowUpRight size={24} />
              </div>
           </div>
         </button>
