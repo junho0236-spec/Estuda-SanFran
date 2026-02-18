@@ -4,29 +4,24 @@ import { GoogleGenAI, Type } from "@google/genai";
 // Inicializa o cliente Google GenAI de forma preguiçosa (lazy)
 let aiInstance: GoogleGenAI | null = null;
 
-const getApiKey = () => {
-  // Tenta acessar diretamente a variável do Vite. 
-  // O bundler substitui import.meta.env.VITE_GEMINI_API_KEY pelo valor em tempo de build.
-  // Verificação explícita para evitar problemas com 'undefined'.
-  const meta = import.meta as any;
-  if (typeof meta !== 'undefined' && meta.env && meta.env.VITE_GEMINI_API_KEY) {
-    return meta.env.VITE_GEMINI_API_KEY;
-  }
+const getApiKey = (): string => {
+  // Obtém a chave de API exclusivamente de process.env.API_KEY conforme diretrizes.
+  const key = process.env.API_KEY;
   
-  // Fallback para process.env (compatibilidade com configs manuais ou outros environments)
-  if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-    return process.env.API_KEY;
+  // Log discreto para debug em produção (não revela a chave inteira)
+  if (!key) {
+    console.warn("Gemini Service: API_KEY está vazia ou indefinida.");
+  } else {
+    console.log("Gemini Service: API Key carregada com sucesso (tamanho: " + key.length + ")");
   }
 
-  return "";
+  return key || "";
 };
 
 const getAiClient = () => {
   if (!aiInstance) {
     const apiKey = getApiKey();
-    
-    // Se não tiver chave, inicializa com string vazia para não quebrar o app imediatamente,
-    // mas a chamada de API falhará com erro claro.
+    // Inicializa mesmo sem chave para não quebrar o app no load, o erro será pego na chamada
     aiInstance = new GoogleGenAI({ apiKey: apiKey || "missing_key" });
   }
   return aiInstance;
@@ -49,7 +44,7 @@ export const generateFlashcards = async (text: string, subjectName: string, quan
     const apiKey = getApiKey();
     
     if (!apiKey) {
-        throw new Error("Chave de API não encontrada. Verifique se 'VITE_GEMINI_API_KEY' está configurada na Vercel e faça um Redeploy.");
+        throw new Error("A chave de API (API_KEY) não foi detectada no código. Se você acabou de adicioná-la na Vercel, é OBRIGATÓRIO ir em 'Deployments' e clicar em 'Redeploy' para que a chave seja embutida no site.");
     }
 
     const response = await ai.models.generateContent({
@@ -105,18 +100,17 @@ export const generateFlashcards = async (text: string, subjectName: string, quan
   } catch (error: any) {
     console.error("Erro detalhado ao gerar flashcards:", error);
     
-    // Tratamento de erros específicos da API para mensagem mais amigável
     if (error.status === 403 || (error.message && error.message.includes("API key"))) {
-        throw new Error("Erro de Permissão (403): Verifique sua VITE_GEMINI_API_KEY.");
+        throw new Error("Erro de Permissão (403): Verifique se a API_KEY na Vercel é válida e corresponde a um projeto Google AI Studio ativo.");
     }
     if (error.status === 400) {
         throw new Error("Erro na Requisição (400): O texto pode ser muito longo ou inválido.");
     }
     if (error.status === 429) {
-        throw new Error("Muitas requisições. Aguarde um momento.");
+        throw new Error("Muitas requisições. O modelo está sobrecarregado. Aguarde um momento.");
     }
     
-    throw error; // Propaga o erro original para o componente
+    throw error;
   }
 };
 
@@ -145,6 +139,12 @@ export const getStudyMotivation = async (subjects: string[]) => {
 export const simplifyLegalText = async (complexText: string) => {
   try {
     const ai = getAiClient();
+    const apiKey = getApiKey();
+
+    if (!apiKey) {
+      return "Erro: Chave de API não configurada. Verifique as variáveis de ambiente.";
+    }
+
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview', 
       contents: `Você é um professor assistente da Faculdade de Direito do Largo São Francisco. 
