@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 
 // Inicializa o cliente Google GenAI de forma preguiçosa (lazy)
@@ -8,11 +7,10 @@ const getApiKey = (): string => {
   // Obtém a chave de API exclusivamente de process.env.API_KEY conforme diretrizes.
   const key = process.env.API_KEY;
   
-  // Log discreto para debug em produção (não revela a chave inteira)
   if (!key) {
-    console.warn("Gemini Service: API_KEY está vazia ou indefinida.");
+    console.warn("Gemini Service: API_KEY não encontrada. Verifique suas variáveis de ambiente.");
   } else {
-    console.log("Gemini Service: API Key carregada com sucesso (tamanho: " + key.length + ")");
+    console.log("Gemini Service: API Key carregada");
   }
 
   return key || "";
@@ -44,7 +42,7 @@ export const generateFlashcards = async (text: string, subjectName: string, quan
     const apiKey = getApiKey();
     
     if (!apiKey) {
-        throw new Error("A chave de API (API_KEY) não foi detectada no código. Se você acabou de adicioná-la na Vercel, é OBRIGATÓRIO ir em 'Deployments' e clicar em 'Redeploy' para que a chave seja embutida no site.");
+        throw new Error("A chave de API (API_KEY) não foi detectada. Por favor, verifique se a variável está configurada.");
     }
 
     const response = await ai.models.generateContent({
@@ -101,7 +99,7 @@ export const generateFlashcards = async (text: string, subjectName: string, quan
     console.error("Erro detalhado ao gerar flashcards:", error);
     
     if (error.status === 403 || (error.message && error.message.includes("API key"))) {
-        throw new Error("Erro de Permissão (403): Verifique se a API_KEY na Vercel é válida e corresponde a um projeto Google AI Studio ativo.");
+        throw new Error("Erro de Permissão (403): Verifique se a API_KEY é válida.");
     }
     if (error.status === 400) {
         throw new Error("Erro na Requisição (400): O texto pode ser muito longo ou inválido.");
@@ -142,7 +140,7 @@ export const simplifyLegalText = async (complexText: string) => {
     const apiKey = getApiKey();
 
     if (!apiKey) {
-      return "Erro: Chave de API não configurada. Verifique as variáveis de ambiente.";
+      return "Erro: Chave de API (API_KEY) não configurada.";
     }
 
     const response = await ai.models.generateContent({

@@ -18,7 +18,7 @@ const showError = (message: any) => {
   rootElement.innerHTML = `
     <div style="padding: 40px; color: #9B111E; font-family: sans-serif; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background-color: #fcfcfc;">
       <h1 style="font-weight: 900; font-size: 2rem; margin-bottom: 10px;">Ops! Erro no Sistema.</h1>
-      <p style="color: #666; max-width: 500px;">Ocorreu uma falha inesperada. Se o erro persistir, verifique a configuração da <strong>API_KEY</strong> na Vercel.</p>
+      <p style="color: #666; max-width: 500px;">Ocorreu uma falha inesperada. Se o erro persistir, verifique a configuração da <strong>VITE_GEMINI_API_KEY</strong> na Vercel.</p>
       <div style="background: #f8f8f8; padding: 20px; border-radius: 15px; margin-top: 30px; font-size: 13px; text-align: left; border: 1px solid #eee; font-family: monospace; color: #444; max-width: 80%; overflow: auto;">
         <code>${errorMsg}</code>
       </div>
