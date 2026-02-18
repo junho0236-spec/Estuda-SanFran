@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   Globe, 
@@ -14,7 +15,6 @@ import {
   MessageSquare,
   Sparkles,
   Search,
-  // FIX: Import missing X icon for modal close buttons
   X
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
@@ -65,6 +65,39 @@ const LESSONS_DATABASE: Record<LangCode, Lesson[]> = {
   ]
 };
 
+const WORD_DATABASE: Record<LangCode, Record<string, { translation: string; definition: string; example: string }>> = {
+  en: {
+    "Lawyer": { translation: "Advogado / Jurista", definition: "Termo genérico para qualquer profissional qualificado em Direito.", example: "She is a lawyer, but she works in academia." },
+    "Court": { translation: "Tribunal / Corte", definition: "O órgão ou local onde a justiça é administrada.", example: "The court will recess for lunch." },
+    "Judge": { translation: "Juiz", definition: "O oficial público que decide casos em uma corte de lei.", example: "The judge overruled the objection." },
+    "Plaintiff": { translation: "Autor / Requerente", definition: "A parte que inicia uma ação civil.", example: "The plaintiff is seeking damages." }
+  },
+  es: {
+    "Abogado": { translation: "Advogado", definition: "Persona legalmente autorizada para defender en juicio los derechos de los litigantes.", example: "El abogado presentó la apelación a tiempo." },
+    "Juez": { translation: "Juiz", definition: "Miembro de un jurado o tribunal que tiene autoridad para juzgar y sentenciar.", example: "El juez dictó sentencia definitiva." },
+    "Tribunal": { translation: "Tribunal", definition: "Lugar donde jueces o magistrados administran justicia.", example: "El caso será resuelto en el tribunal civil." },
+    "Sentencia": { translation: "Sentença", definition: "Resolución de un juez o un tribunal con la que se concluye un juicio.", example: "La sentencia fue favorable para el demandante." }
+  },
+  fr: {
+    "Avocat": { translation: "Advogado", definition: "Personne dont la profession est de conseiller en matière juridique ou de défendre ses clients devant la justice.", example: "L'avocat de la défense a pris la parole." },
+    "Juge": { translation: "Juiz", definition: "Magistrat chargé de rendre la justice en appliquant les lois.", example: "Le juge a ordonné une enquête complémentaire." },
+    "Cour": { translation: "Corte / Tribunal", definition: "Organe chargé de rendre la justice, souvent de degré supérieur.", example: "L'affaire a été portée devant la Cour de cassation." },
+    "Procès": { translation: "Processo / Julgamento", definition: "Litige porté devant un tribunal.", example: "Le procès a duré trois semaines." }
+  },
+  de: {
+    "Anwalt": { translation: "Advogado", definition: "Person, die beruflich andere Personen in Rechtsangelegenheiten berät.", example: "Der Anwalt prüft den Vertrag." },
+    "Richter": { translation: "Juiz", definition: "Person, die beruflich an einem Gericht Urteile fällt.", example: "Der Richter verkündete das Urteil." },
+    "Gericht": { translation: "Tribunal", definition: "Staatliches Organ der Rechtsprechung.", example: "Das Gericht hat die Klage abgewiesen." },
+    "Urteil": { translation: "Sentença / Veredito", definition: "Die am Ende eines Prozesses stehende Entscheidung des Gerichts.", example: "Das Urteil ist rechtskräftig." }
+  },
+  it: {
+    "Avvocato": { translation: "Advogado", definition: "Professionista che assiste e rappresenta le parti in un processo.", example: "L'avvocato ha preparato la memoria difensiva." },
+    "Giudice": { translation: "Juiz", definition: "Persona investita della funzione di giudicare in un processo.", example: "Il giudice ha accolto il ricorso." },
+    "Tribunale": { translation: "Tribunal", definition: "Organo che esercita la funzione giurisdizionale.", example: "L'udienza si terrà in tribunale domani." },
+    "Sentenza": { translation: "Sentença", definition: "Provvedimento del giudice che definisce la causa.", example: "La sentenza di primo grado è stata appellata." }
+  }
+};
+
 const GeneralLanguages: React.FC<GeneralLanguagesProps> = ({ userId }) => {
   const [currentLang, setCurrentLang] = useState<LangCode>('en');
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
@@ -73,6 +106,7 @@ const GeneralLanguages: React.FC<GeneralLanguagesProps> = ({ userId }) => {
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [totalXP, setTotalXP] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [selectedWord, setSelectedWord] = useState<string | null>(null);
 
   useEffect(() => {
     loadProgress();
@@ -368,8 +402,8 @@ const GeneralLanguages: React.FC<GeneralLanguagesProps> = ({ userId }) => {
                   <h2 className="text-3xl font-black text-white tracking-tight">{selectedWord}</h2>
                </div>
                <div className="p-6 space-y-4">
-                  <p className="text-lg font-bold text-slate-800 dark:text-slate-200">Termo não encontrado</p>
-                  <p className="text-sm font-serif italic text-slate-600 dark:text-slate-400">"Desculpe, a tradução detalhada para este termo ainda está sendo redigida."</p>
+                  <p className="text-lg font-bold text-slate-800 dark:text-slate-200">{WORD_DATABASE[currentLang][selectedWord]?.translation}</p>
+                  <p className="text-sm font-serif italic text-slate-600 dark:text-slate-400">"{WORD_DATABASE[currentLang][selectedWord]?.example}"</p>
                   <button onClick={() => playAudio(selectedWord)} className="w-full py-3 bg-slate-100 dark:bg-slate-800 rounded-xl font-bold uppercase text-xs">Ouvir Pronúncia</button>
                </div>
             </div>

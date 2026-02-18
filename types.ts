@@ -82,7 +82,8 @@ export enum View {
   Mnemonics = 'mnemonics',
   ReverseSchedule = 'reverse_schedule',
   LegalCinema = 'legal_cinema',
-  GeneralLanguages = 'general_languages'
+  GeneralLanguages = 'general_languages',
+  LegalSimplifier = 'legal_simplifier'
 }
 
 export interface Folder {

@@ -12,7 +12,8 @@ import {
   CalendarClock, 
   ArrowUpRight,
   Wrench,
-  AlertCircle
+  AlertCircle,
+  Sparkles
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -43,36 +44,64 @@ const SanFranHelp: React.FC<SanFranHelpProps> = ({ onNavigate }) => {
       {/* BENTO GRID LAYOUT */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 auto-rows-[minmax(180px,auto)]">
         
-        {/* CARD 1: DOSIMETRIA PENAL (Hero - Wide & Tall) */}
+        {/* CARD 0: SIMPLIFICADOR JURÍDICO (New Hero - AI) */}
         <button
-          onClick={() => onNavigate(View.Dosimetria)}
-          className="group relative col-span-1 md:col-span-2 row-span-2 bg-[#7f1d1d] text-white rounded-[2.5rem] p-8 md:p-10 flex flex-col justify-between overflow-hidden shadow-2xl hover:shadow-red-500/20 hover:scale-[1.01] transition-all duration-500"
+          onClick={() => onNavigate(View.LegalSimplifier)}
+          className="group relative col-span-1 md:col-span-2 row-span-2 bg-[#4c1d95] text-white rounded-[2.5rem] p-8 md:p-10 flex flex-col justify-between overflow-hidden shadow-2xl hover:shadow-purple-500/20 hover:scale-[1.01] transition-all duration-500"
         >
           {/* Abstract Background Decoration */}
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
-          <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-bl from-red-500/30 to-transparent rounded-full blur-3xl -mr-20 -mt-20 group-hover:scale-125 transition-transform duration-700"></div>
+          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')] opacity-20"></div>
+          <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-bl from-purple-500/30 to-transparent rounded-full blur-3xl -mr-20 -mt-20 group-hover:scale-125 transition-transform duration-700"></div>
 
           <div className="relative z-10 flex justify-between items-start">
             <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
-               <Calculator className="w-8 h-8 md:w-10 md:h-10 text-red-200" />
+               <Sparkles className="w-8 h-8 md:w-10 md:h-10 text-purple-200" />
             </div>
-            <div className="bg-red-500/20 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md text-red-100 border border-red-500/30 flex items-center gap-2">
-               <AlertCircle size={12} /> Cálculo Trifásico
+            <div className="bg-purple-500/20 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md text-purple-100 border border-purple-500/30 flex items-center gap-2">
+               <Wrench size={12} /> IA Assistant
             </div>
           </div>
 
           <div className="relative z-10 space-y-2 text-left mt-12">
-             <h3 className="text-3xl md:text-5xl font-black tracking-tight leading-none text-white">Dosimetria Penal</h3>
-             <p className="text-sm md:text-base font-medium text-red-100 max-w-sm leading-relaxed">
-               Calcule a pena base, agravantes, atenuantes e causas de aumento/diminuição conforme o Código Penal.
+             <h3 className="text-3xl md:text-5xl font-black tracking-tight leading-none text-white">Tradutor de Juridiquês</h3>
+             <p className="text-sm md:text-base font-medium text-purple-100 max-w-sm leading-relaxed">
+               Simplifique textos complexos instantaneamente usando Inteligência Artificial.
              </p>
           </div>
 
           <div className="absolute bottom-8 right-8 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-4 group-hover:translate-x-0">
-             <div className="bg-red-500 text-white p-3 rounded-full shadow-lg">
+             <div className="bg-purple-500 text-white p-3 rounded-full shadow-lg">
                 <ArrowUpRight size={24} />
              </div>
           </div>
+        </button>
+
+        {/* CARD 1: DOSIMETRIA PENAL (Tall) */}
+        <button
+          onClick={() => onNavigate(View.Dosimetria)}
+          className="group relative col-span-1 md:col-span-1 row-span-2 bg-[#7f1d1d] text-white rounded-[2.5rem] p-8 border border-red-800 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col items-center justify-between text-center overflow-hidden"
+        >
+           <div className="absolute inset-0 bg-gradient-to-b from-transparent to-red-900/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+           
+           <div className="w-full flex justify-between items-start relative z-10">
+              <Calculator size={20} className="text-red-300" />
+              <div className="w-2 h-2 rounded-full bg-red-500"></div>
+           </div>
+
+           <div className="relative z-10 my-4">
+              <div className="w-20 h-20 rounded-2xl bg-white/10 flex items-center justify-center shadow-lg transform -rotate-3 group-hover:rotate-0 transition-transform duration-500">
+                 <AlertCircle size={32} className="text-red-200" />
+              </div>
+           </div>
+           
+           <div className="relative z-10 space-y-1">
+              <h3 className="text-xl font-black text-white uppercase tracking-tight">Dosimetria</h3>
+              <p className="text-[10px] font-bold text-red-200 uppercase tracking-widest">Cálculo Trifásico</p>
+           </div>
+           
+           <div className="w-full pt-4 border-t border-red-800/50 mt-4 relative z-10">
+              <span className="text-[9px] font-black uppercase text-red-300 group-hover:text-white transition-colors">Calcular Pena</span>
+           </div>
         </button>
 
         {/* CARD 2: SIMULADOR DE HONORÁRIOS (Tall) */}
@@ -103,31 +132,20 @@ const SanFranHelp: React.FC<SanFranHelpProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 3: CALC. PRAZOS (Tall) */}
+        {/* CARD 3: CALC. PRAZOS (Standard) */}
         <button
           onClick={() => onNavigate(View.DeadlineCalculator)}
-          className="group relative col-span-1 md:col-span-1 row-span-2 bg-orange-50 dark:bg-orange-900/10 rounded-[2.5rem] p-8 border border-orange-100 dark:border-orange-800 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col items-center justify-between text-center overflow-hidden"
+          className="group col-span-1 bg-orange-50 dark:bg-orange-900/10 rounded-[2.5rem] p-6 border border-orange-100 dark:border-orange-800 shadow-xl hover:border-orange-400 transition-all flex flex-col justify-between h-full hover:shadow-orange-500/10"
         >
-           <div className="absolute inset-0 bg-gradient-to-b from-transparent to-orange-100/50 dark:to-orange-900/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-           
-           <div className="w-full flex justify-between items-start relative z-10">
-              <CalendarClock size={20} className="text-orange-500" />
-              <div className="w-2 h-2 rounded-full bg-orange-500"></div>
-           </div>
-
-           <div className="relative z-10 my-4">
-              <div className="w-20 h-20 rounded-2xl bg-white dark:bg-white/10 flex items-center justify-center shadow-lg transform -rotate-3 group-hover:rotate-0 transition-transform duration-500">
-                 <CalendarClock size={32} className="text-orange-600 dark:text-orange-300" />
+           <div className="flex justify-between items-start">
+              <div className="p-3 bg-orange-100 dark:bg-orange-900/20 text-orange-600 rounded-2xl">
+                 <CalendarClock size={20} />
               </div>
+              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-orange-500 transition-colors" />
            </div>
-           
-           <div className="relative z-10 space-y-1">
-              <h3 className="text-xl font-black text-orange-900 dark:text-white uppercase tracking-tight">Prazos</h3>
-              <p className="text-[10px] font-bold text-orange-600 dark:text-orange-300 uppercase tracking-widest">CPC & CPP</p>
-           </div>
-           
-           <div className="w-full pt-4 border-t border-orange-200 dark:border-orange-800/50 mt-4 relative z-10">
-              <span className="text-[9px] font-black uppercase text-slate-400 group-hover:text-orange-500 transition-colors">Contar Dias Úteis</span>
+           <div className="text-left mt-4">
+              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Prazos</h4>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Contagem Processual</p>
            </div>
         </button>
 

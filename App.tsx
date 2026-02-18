@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck, BookX, ScrollText, FileText, Repeat, UserX, ListTodo, Handshake, Eye, Key, CalendarCheck } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel } from './types';
@@ -84,7 +85,8 @@ import SanFranGames from './components/SanFranGames';
 import SanFranHelp from './components/SanFranHelp';
 import SanFranOAB from './components/SanFranOAB';
 import LegalCinema from './components/LegalCinema';
-import GeneralLanguages from './components/GeneralLanguages'; // New
+import GeneralLanguages from './components/GeneralLanguages'; 
+import LegalSimplifier from './components/LegalSimplifier';
 import { supabase } from './services/supabaseClient';
 
 export const getBrasiliaDate = () => {
@@ -469,7 +471,7 @@ const App: React.FC = () => {
   const isGamesChild = [View.InternRPG, View.JurisTinder, View.LatinGame, View.Trunfo, View.SumulaChallenge].includes(currentView);
 
   // Helper to check if current view is a child of SanFran Help
-  const isHelpChild = [View.PrescriptionCalculator, View.SucessaoSimulator, View.InvestigationBoard, View.Checklist, View.Honorarios, View.Dosimetria, View.Petitum, View.CitationGenerator, View.DeadlineCalculator].includes(currentView);
+  const isHelpChild = [View.PrescriptionCalculator, View.SucessaoSimulator, View.InvestigationBoard, View.Checklist, View.Honorarios, View.Dosimetria, View.Petitum, View.CitationGenerator, View.DeadlineCalculator, View.LegalSimplifier].includes(currentView);
 
   // Helper to check if current view is a child of SanFran OAB
   const isOABChild = [View.OabCountdown].includes(currentView);
@@ -671,6 +673,7 @@ const App: React.FC = () => {
             {currentView === View.SanFranIdiomas && <SanFranIdiomas userId={session.user.id} />}
             {currentView === View.LegalCinema && <LegalCinema userId={session.user.id} />}
             {currentView === View.GeneralLanguages && <GeneralLanguages userId={session.user.id} />}
+            {currentView === View.LegalSimplifier && <LegalSimplifier />}
             {currentView === View.ErrorLog && <ErrorLog userId={session.user.id} />}
             {currentView === View.CodeTracker && <CodeTracker userId={session.user.id} />}
             {currentView === View.IracMethod && <IracMethod userId={session.user.id} />}
