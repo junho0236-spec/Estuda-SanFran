@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Gavel, Clock, Coins, Plus, AlertCircle, TrendingUp, CheckCircle2, X } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
