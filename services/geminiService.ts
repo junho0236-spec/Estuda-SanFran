@@ -1,9 +1,12 @@
-import { GoogleGenAI, SchemaType } from "@google/generative-ai";
+import * as GoogleAI from "@google/generative-ai";
 
 // 1. Sua chave paga de US$ 300
 const API_KEY = "AIzaSyD73fUpmZa7ixffTb7cswoLpdzzMdbKQZE";
 
-// 2. Inicialização direta (padrão da versão 0.11.1)
+// Esta linha abaixo é o segredo: ela detecta onde a biblioteca se escondeu
+const GoogleGenAI = (GoogleAI as any).GoogleGenAI || (GoogleAI as any).default?.GoogleGenAI;
+const SchemaType = (GoogleAI as any).SchemaType || (GoogleAI as any).default?.SchemaType;
+
 const genAI = new GoogleGenAI(API_KEY);
 
 export const getSafeApiKey = () => API_KEY;
