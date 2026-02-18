@@ -69,7 +69,8 @@ export enum View {
   LargoAuction = 'largo_auction',
   SocialEvents = 'social_events',
   TheVault = 'the_vault',
-  CaronasRepublicas = 'caronas_republicas' // Nova View
+  CaronasRepublicas = 'caronas_republicas',
+  BalcaoEstagios = 'balcao_estagios' // Nova View
 }
 
 export interface Folder {
@@ -667,6 +668,21 @@ export interface MobilityPost {
   price?: string;
   contact_info: string;
   available_spots: number;
+  user_id: string;
+  user_name: string;
+  created_at: string;
+}
+
+// Internship Counter Types
+export interface InternshipPost {
+  id: string;
+  role_title: string;
+  office_name?: string;
+  area: string;
+  stipend?: string;
+  requirements: string;
+  insider_tip?: string;
+  contact_info: string;
   user_id: string;
   user_name: string;
   created_at: string;

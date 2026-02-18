@@ -109,31 +109,23 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 3: THE VAULT (Banco de Provas) - (Tall) */}
+        {/* CARD 3: BALCÃO DE ESTÁGIOS (Wide) - NOVO */}
         <button
-          onClick={() => onNavigate(View.TheVault)}
-          className="group relative col-span-1 md:col-span-1 row-span-2 bg-slate-100 dark:bg-slate-900/50 rounded-[2.5rem] p-8 border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col items-center justify-between text-center overflow-hidden hover:border-sanfran-rubi"
+          onClick={() => onNavigate(View.BalcaoEstagios)}
+          className="group relative col-span-1 md:col-span-2 bg-[#0f172a] dark:bg-slate-900/40 rounded-[2.5rem] p-8 border border-slate-800 shadow-xl hover:shadow-emerald-500/20 transition-all flex flex-col justify-between overflow-hidden"
         >
-           <div className="absolute inset-0 bg-gradient-to-b from-transparent to-slate-200/50 dark:to-slate-800/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-           
-           <div className="w-full flex justify-between items-start relative z-10">
-              <Archive size={20} className="text-slate-500" />
-              <div className="w-2 h-2 rounded-full bg-slate-400"></div>
-           </div>
+           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
+           <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:scale-125 transition-transform"></div>
 
-           <div className="relative z-10 my-4">
-              <div className="w-20 h-20 rounded-2xl bg-white dark:bg-white/10 flex items-center justify-center shadow-lg transform -rotate-3 group-hover:rotate-0 transition-transform duration-500">
-                 <ScrollText size={32} className="text-slate-600 dark:text-slate-300" />
+           <div className="flex justify-between items-start relative z-10">
+              <div className="p-3 bg-emerald-500/20 text-emerald-300 rounded-2xl border border-emerald-500/30 backdrop-blur-sm">
+                 <Briefcase size={24} />
               </div>
+              <ArrowUpRight size={20} className="text-emerald-200 group-hover:text-white transition-colors" />
            </div>
-           
-           <div className="relative z-10 space-y-1">
-              <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">O Banco de Provas</h3>
-              <p className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest">Resumos & Testes</p>
-           </div>
-           
-           <div className="w-full pt-4 border-t border-slate-200 dark:border-slate-800/50 mt-4 relative z-10">
-              <span className="text-[9px] font-black uppercase text-slate-400 group-hover:text-sanfran-rubi transition-colors">Acessar Arquivos</span>
+           <div className="text-left mt-8 relative z-10">
+              <h4 className="text-2xl font-black text-white uppercase tracking-tight">Balcão de Estágios</h4>
+              <p className="text-xs font-bold text-emerald-200 uppercase tracking-widest mt-1">Vagas exclusivas • Curadoria da Comunidade</p>
            </div>
         </button>
 
@@ -200,7 +192,7 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 7: CARONAS E REPÚBLICAS (Wide) - NOVO */}
+        {/* CARD 7: CARONAS E REPÚBLICAS (Wide) */}
         <button
           onClick={() => onNavigate(View.CaronasRepublicas)}
           className="group relative col-span-1 md:col-span-2 bg-[#0d504b] dark:bg-teal-950/40 rounded-[2.5rem] p-8 border border-teal-500/30 shadow-xl hover:shadow-teal-500/20 transition-all flex flex-col justify-between overflow-hidden"
@@ -260,7 +252,35 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 10: LEILÃO DO LARGO (Wide) */}
+        {/* CARD 10: THE VAULT (Banco de Provas) - (Tall) */}
+        <button
+          onClick={() => onNavigate(View.TheVault)}
+          className="group relative col-span-1 md:col-span-1 row-span-2 bg-slate-100 dark:bg-slate-900/50 rounded-[2.5rem] p-8 border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col items-center justify-between text-center overflow-hidden hover:border-sanfran-rubi"
+        >
+           <div className="absolute inset-0 bg-gradient-to-b from-transparent to-slate-200/50 dark:to-slate-800/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+           
+           <div className="w-full flex justify-between items-start relative z-10">
+              <Archive size={20} className="text-slate-500" />
+              <div className="w-2 h-2 rounded-full bg-slate-400"></div>
+           </div>
+
+           <div className="relative z-10 my-4">
+              <div className="w-20 h-20 rounded-2xl bg-white dark:bg-white/10 flex items-center justify-center shadow-lg transform -rotate-3 group-hover:rotate-0 transition-transform duration-500">
+                 <ScrollText size={32} className="text-slate-600 dark:text-slate-300" />
+              </div>
+           </div>
+           
+           <div className="relative z-10 space-y-1">
+              <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">O Banco de Provas</h3>
+              <p className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest">Resumos & Testes</p>
+           </div>
+           
+           <div className="w-full pt-4 border-t border-slate-200 dark:border-slate-800/50 mt-4 relative z-10">
+              <span className="text-[9px] font-black uppercase text-slate-400 group-hover:text-sanfran-rubi transition-colors">Acessar Arquivos</span>
+           </div>
+        </button>
+
+        {/* CARD 11: LEILÃO DO LARGO (Wide) */}
         <button
           onClick={() => onNavigate(View.LargoAuction)}
           className="group relative col-span-1 md:col-span-2 bg-[#450a0a] dark:bg-red-950/50 rounded-[2.5rem] p-8 border border-yellow-500/30 shadow-xl hover:shadow-yellow-500/20 transition-all flex flex-col justify-between overflow-hidden"
@@ -280,7 +300,7 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 11: JURISPRUDÊNCIA (Standard) */}
+        {/* CARD 12: JURISPRUDÊNCIA (Standard) */}
         <button
           onClick={() => onNavigate(View.JurisprudenceMural)}
           className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-violet-400 transition-all flex flex-col justify-between h-full hover:shadow-violet-500/10"
@@ -297,7 +317,7 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 12: CLASSIFICADOS (Standard) */}
+        {/* CARD 13: CLASSIFICADOS (Standard) */}
         <button
           onClick={() => onNavigate(View.ClassificadosPatio)}
           className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-rose-400 transition-all flex flex-col justify-between h-full hover:shadow-rose-500/10"
@@ -314,7 +334,7 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 13: SOCIEDADES (Repetido/Atalho) */}
+        {/* CARD 14: SOCIEDADES (Repetido/Atalho) */}
         <button
           onClick={() => onNavigate(View.Societies)}
           className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-emerald-400 transition-all flex flex-col justify-between h-full hover:shadow-emerald-500/10"
