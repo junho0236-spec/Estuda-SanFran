@@ -65,7 +65,8 @@ export enum View {
   Mentorship = 'mentorship',
   MockJury = 'mock_jury',
   PetitionWiki = 'petition_wiki',
-  StudyPact = 'study_pact' // Nova View
+  StudyPact = 'study_pact',
+  LargoAuction = 'largo_auction' // Nova View
 }
 
 export interface Folder {
@@ -596,5 +597,21 @@ export interface StudyPact {
   stake_amount: number;
   status: 'open' | 'active' | 'completed' | 'failed';
   start_date?: string;
+  created_at: string;
+}
+
+// Auction Types
+export interface Auction {
+  id: string;
+  creator_id: string;
+  creator_name: string;
+  item_title: string;
+  item_description: string;
+  start_price: number;
+  current_price: number;
+  highest_bidder_id?: string;
+  highest_bidder_name?: string;
+  ends_at: string; // ISO String
+  status: 'active' | 'ended';
   created_at: string;
 }

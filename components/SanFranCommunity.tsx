@@ -14,7 +14,8 @@ import {
   UserPlus,
   Gavel,
   ScrollText,
-  Handshake
+  Handshake,
+  DollarSign
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -196,7 +197,7 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 7: PACTO DE ESTUDO (Novo - Wide) */}
+        {/* CARD 7: PACTO DE ESTUDO (Wide) */}
         <button
           onClick={() => onNavigate(View.StudyPact)}
           className="group relative col-span-1 md:col-span-2 bg-[#020617] dark:bg-blue-950/40 rounded-[2.5rem] p-8 border border-blue-500/30 shadow-xl hover:shadow-blue-500/20 transition-all flex flex-col justify-between overflow-hidden"
@@ -216,7 +217,27 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 8: JURISPRUDÊNCIA (Standard) */}
+        {/* CARD 8: LEILÃO DO LARGO (Novo - Wide) */}
+        <button
+          onClick={() => onNavigate(View.LargoAuction)}
+          className="group relative col-span-1 md:col-span-2 bg-[#450a0a] dark:bg-red-950/50 rounded-[2.5rem] p-8 border border-yellow-500/30 shadow-xl hover:shadow-yellow-500/20 transition-all flex flex-col justify-between overflow-hidden"
+        >
+           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/gold-scale.png')] opacity-10"></div>
+           <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-yellow-600/20 rounded-full blur-2xl animate-pulse"></div>
+
+           <div className="flex justify-between items-start relative z-10">
+              <div className="p-3 bg-yellow-500/20 text-yellow-400 rounded-2xl border border-yellow-500/30 backdrop-blur-sm">
+                 <Gavel size={24} />
+              </div>
+              <ArrowUpRight size={20} className="text-yellow-200 group-hover:text-white transition-colors" />
+           </div>
+           <div className="text-left mt-8 relative z-10">
+              <h4 className="text-2xl font-black text-white uppercase tracking-tight">Leilão do Largo</h4>
+              <p className="text-xs font-bold text-yellow-200 uppercase tracking-widest mt-1">Pregão em Tempo Real • Use SanCoins</p>
+           </div>
+        </button>
+
+        {/* CARD 9: JURISPRUDÊNCIA (Standard) */}
         <button
           onClick={() => onNavigate(View.JurisprudenceMural)}
           className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-violet-400 transition-all flex flex-col justify-between h-full hover:shadow-violet-500/10"
@@ -233,7 +254,7 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 9: CLASSIFICADOS (Standard) */}
+        {/* CARD 10: CLASSIFICADOS (Standard) */}
         <button
           onClick={() => onNavigate(View.ClassificadosPatio)}
           className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-rose-400 transition-all flex flex-col justify-between h-full hover:shadow-rose-500/10"
