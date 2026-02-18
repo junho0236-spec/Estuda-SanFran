@@ -76,7 +76,8 @@ export enum View {
   AchadosPerdidos = 'achados_perdidos',
   PerolasTribuna = 'perolas_tribuna',
   GuiaSobrevivencia = 'guia_sobrevivencia',
-  ClubeLivro = 'clube_livro' // Nova View
+  ClubeLivro = 'clube_livro',
+  GuerraTurmas = 'guerra_turmas' // Nova View
 }
 
 export interface Folder {
@@ -796,4 +797,12 @@ export interface BookChatMessage {
   user_name: string;
   message: string;
   created_at: string;
+}
+
+// Guerra das Turmas
+export interface ClassWarStats {
+  class_year: number;
+  student_count: number;
+  total_seconds: number;
+  total_tasks: number;
 }
