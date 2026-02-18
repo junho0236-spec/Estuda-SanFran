@@ -9,26 +9,26 @@ interface LegalCinemaProps {
   userId: string;
 }
 
-// Mock Data para Fallback
+// Mock Data para Fallback com IDs funcionais e tempos ajustados
 const MOCK_CLIPS: CinemaClip[] = [
   {
     id: '1',
     title: 'Objection! Hearsay',
     source_name: 'Suits S01E01',
-    youtube_id: '1v9l_s5g3wA', // Exemplo genérico de vídeo
-    start_time: 120,
-    end_time: 150,
+    youtube_id: 'u0Qj8a8a_Yk', // Cena de treinamento
+    start_time: 20,
+    end_time: 60,
     difficulty: 'medium',
     question: "Qual foi o fundamento da objeção apresentada?",
     options: ["Hearsay (Testemunho indireto)", "Speculation (Especulação)", "Leading the witness (Induzir a testemunha)"],
-    correct_option: 0,
-    explanation: "'Hearsay' refere-se a uma declaração feita fora do tribunal oferecida como prova da verdade do que é afirmado, geralmente inadmissível."
+    correct_option: 2,
+    explanation: "No clipe, a objeção é 'Leading', pois o advogado está colocando a resposta na boca da testemunha, o que é proibido no exame direto."
   },
   {
     id: '2',
     title: 'The Burden of Proof',
     source_name: 'A Few Good Men',
-    youtube_id: '9FnO3igOkOk', // You cant handle the truth
+    youtube_id: '9FnO3igOkOk', // You can't handle the truth
     start_time: 140,
     end_time: 180,
     difficulty: 'hard',
@@ -41,53 +41,53 @@ const MOCK_CLIPS: CinemaClip[] = [
     id: '3',
     title: 'Settlement Negotiation',
     source_name: 'Erin Brockovich',
-    youtube_id: 'qK2YqH0_g_g', // Placeholder
-    start_time: 60,
+    youtube_id: 'lXg5u-4q7qA', // Cena da negociação da água
+    start_time: 30,
     end_time: 90,
     difficulty: 'easy',
-    question: "Qual termo é usado para 'Acordo Extrajudicial'?",
-    options: ["Verdict", "Settlement", "Sentencing"],
-    correct_option: 1,
-    explanation: "Um 'Settlement' é um acordo alcançado entre as partes para resolver o litígio sem a necessidade de um julgamento final."
+    question: "Qual o argumento de Erin para recusar a oferta?",
+    options: ["O valor era muito baixo", "A água estava contaminada", "Não havia contrato escrito"],
+    correct_option: 0,
+    explanation: "Erin rejeita a oferta de 'Settlement' (acordo) por considerá-la insultuosa dado o dano à saúde dos clientes."
   },
   {
     id: '4',
     title: 'Expert Witness Qualification',
     source_name: 'My Cousin Vinny',
-    youtube_id: 'W-Q2t1K1G1M',
-    start_time: 200,
-    end_time: 260,
+    youtube_id: '6qg66Q2dJsg', // Mona Lisa Vito Testimony
+    start_time: 60,
+    end_time: 120,
     difficulty: 'medium',
     question: "O que permitiu que a testemunha fosse qualificada como 'Expert'?",
-    options: ["Diploma universitário", "Experiência prática comprovada", "Ser mecânica certificada"],
+    options: ["Diploma universitário", "Conhecimento técnico específico", "Ser mecânica certificada"],
     correct_option: 1,
-    explanation: "Nos EUA (e BR), um 'Expert Witness' pode ser qualificado por conhecimento, habilidade, experiência, treinamento ou educação (FRE 702)."
+    explanation: "Ela demonstrou conhecimento técnico profundo sobre carros ('Positraction'), qualificando-a como perita (Expert Witness)."
   },
   {
     id: '5',
     title: 'Impeaching the Witness',
     source_name: 'Legally Blonde',
-    youtube_id: 'y1o_iY99eeA',
-    start_time: 155,
-    end_time: 205,
+    youtube_id: 'Kq-rD8P-a_o', // Cena do permanente
+    start_time: 120,
+    end_time: 180,
     difficulty: 'easy',
     question: "Qual técnica Elle Woods usou para derrubar o álibi?",
     options: ["Hearsay", "Leading Questions", "Impeachment by Contradiction"],
     correct_option: 2,
-    explanation: "Ela demonstrou uma contradição fática (o cuidado com o permanente) que provou que a testemunha estava mentindo sobre estar no chuveiro (Impeachment)."
+    explanation: "Ela demonstrou uma contradição fática (o cuidado com o permanente) que provou que a testemunha estava mentindo (Impeachment)."
   },
   {
     id: '6',
     title: 'Intellectual Property',
     source_name: 'The Social Network',
-    youtube_id: 'lB95KLmpLR4',
-    start_time: 20,
-    end_time: 60,
+    youtube_id: 'I2zW84s0sPI', // Deposition scene
+    start_time: 0,
+    end_time: 50,
     difficulty: 'hard',
-    question: "Qual o argumento central da defesa sobre a 'ideia' do Facebook?",
-    options: ["A ideia foi roubada", "Ideias não são protegíveis, execução sim", "Houve quebra de contrato verbal"],
+    question: "Qual a postura do advogado durante o depoimento?",
+    options: ["Colaborativa", "Hostil e desinteressada", "Confusa"],
     correct_option: 1,
-    explanation: "A defesa argumenta que ter uma ideia não confere propriedade sobre o produto final se a execução (código/engenharia) foi distinta."
+    explanation: "Mark demonstra desdém pelo processo legal, argumentando que sua atenção vale mais que o depoimento ('Deposition')."
   }
 ];
 
@@ -238,7 +238,8 @@ const LegalCinema: React.FC<LegalCinemaProps> = ({ userId }) => {
           
           {/* Video Column */}
           <div className="lg:col-span-2 flex flex-col gap-6">
-             <div className="w-full aspect-video bg-black rounded-[2rem] overflow-hidden shadow-2xl border-4 border-slate-900 dark:border-white/10 relative">
+             {/* Container do vídeo com largura máxima restrita para não ficar gigante */}
+             <div className="w-full max-w-3xl mx-auto aspect-video bg-black rounded-[2rem] overflow-hidden shadow-2xl border-4 border-slate-900 dark:border-white/10 relative">
                 <iframe 
                   width="100%" 
                   height="100%" 
@@ -251,7 +252,7 @@ const LegalCinema: React.FC<LegalCinemaProps> = ({ userId }) => {
                 ></iframe>
              </div>
              
-             <div className="bg-sky-50 dark:bg-sky-900/10 p-4 rounded-2xl border border-sky-100 dark:border-sky-800/30 flex items-start gap-3">
+             <div className="bg-sky-50 dark:bg-sky-900/10 p-4 rounded-2xl border border-sky-100 dark:border-sky-800/30 flex items-start gap-3 max-w-3xl mx-auto w-full">
                 <HelpCircle className="text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" />
                 <div>
                    <p className="text-sm font-bold text-sky-800 dark:text-sky-200">Instrução:</p>
