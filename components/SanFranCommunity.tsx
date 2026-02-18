@@ -20,7 +20,8 @@ import {
   Archive,
   Car,
   Vote,
-  Compass
+  Compass,
+  Search
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -111,7 +112,27 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 3: BÚSSOLA DE OPTATIVAS (Wide) - NOVO */}
+        {/* CARD 3: ACHADOS E PERDIDOS (Wide) - NOVO */}
+        <button
+          onClick={() => onNavigate(View.AchadosPerdidos)}
+          className="group relative col-span-1 md:col-span-2 bg-[#ea580c] dark:bg-orange-950/40 rounded-[2.5rem] p-8 border border-orange-700 shadow-xl hover:shadow-orange-500/20 transition-all flex flex-col justify-between overflow-hidden"
+        >
+           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cork-board.png')] opacity-10"></div>
+           <div className="absolute top-0 left-0 w-64 h-64 bg-orange-400/20 rounded-full blur-3xl -ml-16 -mt-16 group-hover:scale-125 transition-transform"></div>
+
+           <div className="flex justify-between items-start relative z-10">
+              <div className="p-3 bg-orange-500/20 text-orange-200 rounded-2xl border border-orange-500/30 backdrop-blur-sm">
+                 <Search size={24} />
+              </div>
+              <ArrowUpRight size={20} className="text-orange-200 group-hover:text-white transition-colors" />
+           </div>
+           <div className="text-left mt-8 relative z-10">
+              <h4 className="text-2xl font-black text-white uppercase tracking-tight">Achados e Perdidos</h4>
+              <p className="text-xs font-bold text-orange-200 uppercase tracking-widest mt-1">Mural Digital • Recuperação de Objetos</p>
+           </div>
+        </button>
+
+        {/* CARD 4: BÚSSOLA DE OPTATIVAS (Wide) */}
         <button
           onClick={() => onNavigate(View.BussolaOptativas)}
           className="group relative col-span-1 md:col-span-2 bg-[#115e59] dark:bg-teal-950/40 rounded-[2.5rem] p-8 border border-teal-700 shadow-xl hover:shadow-teal-500/20 transition-all flex flex-col justify-between overflow-hidden"
@@ -131,7 +152,7 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 4: BALCÃO DE ESTÁGIOS (Wide) */}
+        {/* CARD 5: BALCÃO DE ESTÁGIOS (Wide) */}
         <button
           onClick={() => onNavigate(View.BalcaoEstagios)}
           className="group relative col-span-1 md:col-span-2 bg-[#0f172a] dark:bg-slate-900/40 rounded-[2.5rem] p-8 border border-slate-800 shadow-xl hover:shadow-emerald-500/20 transition-all flex flex-col justify-between overflow-hidden"
@@ -151,7 +172,7 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 5: TRIBUNAL DA OPINIÃO (Wide) */}
+        {/* CARD 6: TRIBUNAL DA OPINIÃO (Wide) */}
         <button
           onClick={() => onNavigate(View.TribunalOpiniao)}
           className="group relative col-span-1 md:col-span-2 bg-[#4338ca] dark:bg-indigo-900/40 rounded-[2.5rem] p-8 border border-indigo-700 shadow-xl hover:shadow-indigo-500/20 transition-all flex flex-col justify-between overflow-hidden"
@@ -171,7 +192,7 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 6: EVENTOS E ROLEZINHOS (Wide) */}
+        {/* CARD 7: EVENTOS E ROLEZINHOS (Wide) */}
         <button
           onClick={() => onNavigate(View.SocialEvents)}
           className="group relative col-span-1 md:col-span-2 bg-[#4c1d95] dark:bg-violet-950/40 rounded-[2.5rem] p-8 border border-violet-500/30 shadow-xl hover:shadow-violet-500/20 transition-all flex flex-col justify-between overflow-hidden"
@@ -191,7 +212,7 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 7: MENTORSHIP (Wide) */}
+        {/* CARD 8: MENTORSHIP (Wide) */}
         <button
           onClick={() => onNavigate(View.Mentorship)}
           className="group relative col-span-1 md:col-span-2 bg-[#1c1917] dark:bg-amber-950/30 rounded-[2.5rem] p-8 border border-amber-500/30 shadow-xl hover:shadow-amber-500/20 transition-all flex flex-col justify-between overflow-hidden"
@@ -211,7 +232,7 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 8: JÚRI SIMULADO (Wide) */}
+        {/* CARD 9: JÚRI SIMULADO (Wide) */}
         <button
           onClick={() => onNavigate(View.MockJury)}
           className="group relative col-span-1 md:col-span-2 bg-[#270d0d] dark:bg-red-950/40 rounded-[2.5rem] p-8 border border-red-500/30 shadow-xl hover:shadow-red-500/20 transition-all flex flex-col justify-between overflow-hidden"
@@ -234,7 +255,7 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 9: CARONAS E REPÚBLICAS (Wide) */}
+        {/* CARD 10: CARONAS E REPÚBLICAS (Wide) */}
         <button
           onClick={() => onNavigate(View.CaronasRepublicas)}
           className="group relative col-span-1 md:col-span-2 bg-[#0d504b] dark:bg-teal-950/40 rounded-[2.5rem] p-8 border border-teal-500/30 shadow-xl hover:shadow-teal-500/20 transition-all flex flex-col justify-between overflow-hidden"
@@ -254,7 +275,7 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 10: PACTO DE ESTUDO (Wide) */}
+        {/* CARD 11: PACTO DE ESTUDO (Wide) */}
         <button
           onClick={() => onNavigate(View.StudyPact)}
           className="group relative col-span-1 md:col-span-2 bg-[#020617] dark:bg-blue-950/40 rounded-[2.5rem] p-8 border border-blue-500/30 shadow-xl hover:shadow-blue-500/20 transition-all flex flex-col justify-between overflow-hidden"
@@ -274,7 +295,7 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 11: WIKI DE PEÇAS (Wide) */}
+        {/* CARD 12: WIKI DE PEÇAS (Wide) */}
         <button
           onClick={() => onNavigate(View.PetitionWiki)}
           className="group relative col-span-1 md:col-span-2 bg-[#0e7490] dark:bg-cyan-950/40 rounded-[2.5rem] p-8 border border-cyan-500/30 shadow-xl hover:shadow-cyan-500/20 transition-all flex flex-col justify-between overflow-hidden"
@@ -294,7 +315,7 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 12: THE VAULT (Banco de Provas) - (Tall) */}
+        {/* CARD 13: THE VAULT (Banco de Provas) - (Tall) */}
         <button
           onClick={() => onNavigate(View.TheVault)}
           className="group relative col-span-1 md:col-span-1 row-span-2 bg-slate-100 dark:bg-slate-900/50 rounded-[2.5rem] p-8 border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col items-center justify-between text-center overflow-hidden hover:border-sanfran-rubi"
@@ -322,7 +343,7 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 13: LEILÃO DO LARGO (Wide) */}
+        {/* CARD 14: LEILÃO DO LARGO (Wide) */}
         <button
           onClick={() => onNavigate(View.LargoAuction)}
           className="group relative col-span-1 md:col-span-2 bg-[#450a0a] dark:bg-red-950/50 rounded-[2.5rem] p-8 border border-yellow-500/30 shadow-xl hover:shadow-yellow-500/20 transition-all flex flex-col justify-between overflow-hidden"
@@ -342,7 +363,7 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 14: JURISPRUDÊNCIA (Standard) */}
+        {/* CARD 15: JURISPRUDÊNCIA (Standard) */}
         <button
           onClick={() => onNavigate(View.JurisprudenceMural)}
           className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-violet-400 transition-all flex flex-col justify-between h-full hover:shadow-violet-500/10"
@@ -359,7 +380,7 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 15: CLASSIFICADOS (Standard) */}
+        {/* CARD 16: CLASSIFICADOS (Standard) */}
         <button
           onClick={() => onNavigate(View.ClassificadosPatio)}
           className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-rose-400 transition-all flex flex-col justify-between h-full hover:shadow-rose-500/10"

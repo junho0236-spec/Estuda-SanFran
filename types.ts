@@ -72,7 +72,8 @@ export enum View {
   CaronasRepublicas = 'caronas_republicas',
   BalcaoEstagios = 'balcao_estagios',
   TribunalOpiniao = 'tribunal_opiniao',
-  BussolaOptativas = 'bussola_optativas' // Nova View
+  BussolaOptativas = 'bussola_optativas',
+  AchadosPerdidos = 'achados_perdidos' // Nova View
 }
 
 export interface Folder {
@@ -726,5 +727,19 @@ export interface SubjectReview {
   rating_relevance: number;
   comment: string;
   is_anonymous: boolean;
+  created_at: string;
+}
+
+// Lost & Found Types
+export interface LostFoundItem {
+  id: string;
+  user_id: string;
+  user_name: string;
+  title: string;
+  description: string;
+  location: string;
+  image_url?: string;
+  status: 'lost' | 'found';
+  contact_info: string;
   created_at: string;
 }
