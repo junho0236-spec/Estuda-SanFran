@@ -17,7 +17,8 @@ import {
   UserX,
   ListTodo,
   Hourglass,
-  Eye
+  Eye,
+  Key
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -103,7 +104,25 @@ const SanFranEssential: React.FC<SanFranEssentialProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD: SPEED READER (Leitura Dinâmica) - NOVO */}
+        {/* CARD: MNEMONICA VAULT - NOVO */}
+        <button
+          onClick={() => onNavigate(View.Mnemonics)}
+          className="group col-span-1 bg-[#1e293b] text-white rounded-[2.5rem] p-6 border border-slate-600 shadow-lg hover:shadow-amber-500/30 hover:scale-[1.02] transition-all flex flex-col justify-between relative overflow-hidden"
+        >
+           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')] opacity-10"></div>
+           <div className="flex justify-between items-start relative z-10">
+              <div className="p-3 bg-white/10 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20">
+                 <Key size={20} className="text-amber-500" />
+              </div>
+              <ArrowUpRight size={16} className="text-amber-200 group-hover:text-white transition-colors" />
+           </div>
+           <div className="text-left mt-4 relative z-10">
+              <h4 className="text-lg font-black uppercase tracking-tight text-white">Mnemônica Vault</h4>
+              <p className="text-[10px] font-bold text-amber-200 uppercase">Banco de Macetes</p>
+           </div>
+        </button>
+
+        {/* CARD: SPEED READER (Leitura Dinâmica) */}
         <button
           onClick={() => onNavigate(View.SpeedReader)}
           className="group col-span-1 bg-[#f59e0b] text-white rounded-[2.5rem] p-6 border border-amber-600 shadow-lg hover:shadow-amber-500/30 hover:scale-[1.02] transition-all flex flex-col justify-between relative overflow-hidden"

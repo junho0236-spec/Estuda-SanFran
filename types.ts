@@ -78,7 +78,8 @@ export enum View {
   GuiaSobrevivencia = 'guia_sobrevivencia',
   ClubeLivro = 'clube_livro',
   GuerraTurmas = 'guerra_turmas',
-  SpeedReader = 'speed_reader' // Nova View
+  SpeedReader = 'speed_reader',
+  Mnemonics = 'mnemonics' // Nova View
 }
 
 export interface Folder {
@@ -806,4 +807,19 @@ export interface ClassWarStats {
   student_count: number;
   total_seconds: number;
   total_tasks: number;
+}
+
+// Mnemônica Types
+export interface MnemonicLetter {
+  letter: string;
+  meaning: string;
+}
+
+export interface Mnemonic {
+  id: string;
+  acronym: string;
+  title: string;
+  subject: string;
+  expansion: MnemonicLetter[];
+  description?: string;
 }
