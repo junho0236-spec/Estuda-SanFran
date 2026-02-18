@@ -2,17 +2,52 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 // Inicializa o cliente Google GenAI de forma preguiçosa (lazy)
-// Isso evita que a aplicação quebre (tela branca) se a chave não estiver presente no carregamento inicial
 let aiInstance: GoogleGenAI | null = null;
+
+const getApiKey = () => {
+  let key = "";
+
+  // 1. Tenta acessar via Vite (import.meta.env) - Prioridade para VITE_GEMINI_API_KEY
+  try {
+    const meta = import.meta as any;
+    if (meta && meta.env) {
+      if (meta.env.VITE_GEMINI_API_KEY) {
+        key = meta.env.VITE_GEMINI_API_KEY;
+      } else if (meta.env.API_KEY) {
+        // Fallback legado
+        key = meta.env.API_KEY;
+      }
+    }
+  } catch (e) {
+    // Ignora erro se import.meta não estiver disponível
+  }
+  
+  // 2. Tenta acessar via process.env (Vercel/Node fallback) se ainda não encontrou
+  if (!key && typeof process !== 'undefined' && process.env) {
+    if (process.env.VITE_GEMINI_API_KEY) {
+      key = process.env.VITE_GEMINI_API_KEY;
+    } else if (process.env.API_KEY) {
+      key = process.env.API_KEY;
+    }
+  }
+
+  // 3. Fallback manual (se injetado via script window)
+  if (!key && typeof window !== 'undefined' && (window as any).__API_KEY__) {
+    key = (window as any).__API_KEY__;
+  }
+
+  return key;
+};
 
 const getAiClient = () => {
   if (!aiInstance) {
-    const apiKey = process.env.API_KEY;
+    const apiKey = getApiKey();
+    
     if (!apiKey) {
-      console.warn("Gemini API Key is missing. Check process.env.API_KEY");
-      // Inicializa com string vazia para não quebrar o construtor,
-      // mas as chamadas falharão graciosamente com erro de auth depois.
-      aiInstance = new GoogleGenAI({ apiKey: "" });
+      console.warn("Gemini API Key is missing. Ensure VITE_GEMINI_API_KEY is set in Vercel Environment Variables.");
+      // Inicializa com string placeholder para não quebrar a aplicação imediatamente, 
+      // o erro real aparecerá quando tentar fazer uma requisição.
+      aiInstance = new GoogleGenAI({ apiKey: "missing-key" });
     } else {
       aiInstance = new GoogleGenAI({ apiKey });
     }
@@ -21,21 +56,20 @@ const getAiClient = () => {
 };
 
 /**
- * Retorna a chave de API configurada no ambiente.
+ * Retorna a chave de API configurada no ambiente (para debug se necessário).
  */
 export const getSafeApiKey = (): string | null => {
-  return process.env.API_KEY || null;
+  return getApiKey() || null;
 };
 
 /**
  * Gera flashcards a partir de um texto jurídico ou acadêmico utilizando Gemini.
- * Ideal para tarefas complexas de estruturação de conhecimento.
  */
 export const generateFlashcards = async (text: string, subjectName: string, quantity: number = 5) => {
   try {
     const ai = getAiClient();
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview', // Modelo atualizado para melhor performance em texto
+      model: 'gemini-3-flash-preview', 
       contents: `Você é um professor de Direito da USP. Sua tarefa é criar materiais de estudo ativo.
       
       Analise o seguinte texto jurídico sobre "${subjectName}":
@@ -73,13 +107,12 @@ export const generateFlashcards = async (text: string, subjectName: string, quan
     return JSON.parse(resultText);
   } catch (error) {
     console.error("Erro ao gerar flashcards com IA:", error);
-    // Retorna array vazio em vez de lançar erro para não quebrar a UI
     return [];
   }
 };
 
 /**
- * Retorna uma frase de motivação em latim com tradução, baseada no contexto das disciplinas estudadas.
+ * Retorna uma frase de motivação em latim com tradução.
  */
 export const getStudyMotivation = async (subjects: string[]) => {
   const list = subjects.length > 0 ? subjects.join(", ") : "Direito";
@@ -98,7 +131,7 @@ export const getStudyMotivation = async (subjects: string[]) => {
 };
 
 /**
- * Simplifica textos jurídicos complexos usando o modelo Flash.
+ * Simplifica textos jurídicos complexos.
  */
 export const simplifyLegalText = async (complexText: string) => {
   try {

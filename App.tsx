@@ -192,7 +192,6 @@ const App: React.FC = () => {
             user_id: userState.user_id,
             name: userState.name,
             view: userState.view,
-            // FIX: Use subject_name, study_room_id and study_start_time from tracked userState instead of local scope variables
             subject_name: userState.subject_name,
             is_timer_active: userState.is_timer_active,
             last_seen: userState.last_seen,
@@ -438,22 +437,29 @@ const App: React.FC = () => {
 
   if (!isAuthenticated) return <Login onLogin={() => setIsAuthenticated(true)} />;
 
+  // ATUALIZAÇÃO DA NAV BAR - PROMOVENDO OS RAMOS ESSENCIAIS
   const navItems = [
     { id: View.Dashboard, icon: LayoutDashboard, label: 'Painel', color: 'text-slate-600', bg: 'bg-slate-100' },
-    { id: View.SanFranEssential, icon: LayoutGrid, label: 'SanFran Essential', color: 'text-indigo-600', bg: 'bg-indigo-100' },
-    { id: View.SanFranCommunity, icon: Users, label: 'SanFran Community', color: 'text-cyan-600', bg: 'bg-cyan-100' },
-    { id: View.SanFranImprovement, icon: GraduationCap, label: 'SanFran Improvement', color: 'text-purple-600', bg: 'bg-purple-100' },
-    { id: View.SanFranLanguages, icon: Languages, label: 'SanFran Languages', color: 'text-sky-600', bg: 'bg-sky-100' },
+    
+    // RAMOS PRINCIPAIS AGORA NO NÍVEL SUPERIOR
+    { id: View.Subjects, icon: BookOpen, label: 'Disciplinas', color: 'text-pink-600', bg: 'bg-pink-100' },
+    { id: View.Tasks, icon: CheckSquare, label: 'Tarefas', color: 'text-emerald-600', bg: 'bg-emerald-100' },
+    { id: View.Anki, icon: BrainCircuit, label: 'Anki Flashcards', color: 'text-slate-900', bg: 'bg-slate-200' },
+    { id: View.Timer, icon: TimerIcon, label: 'Controle de Tempo', color: 'text-red-600', bg: 'bg-red-100' },
+
+    // HUBS
+    { id: View.SanFranCommunity, icon: Users, label: 'Comunidade', color: 'text-cyan-600', bg: 'bg-cyan-100' },
+    { id: View.SanFranImprovement, icon: GraduationCap, label: 'Improvement', color: 'text-purple-600', bg: 'bg-purple-100' },
+    { id: View.SanFranEssential, icon: LayoutGrid, label: 'Mais Ferramentas', color: 'text-indigo-600', bg: 'bg-indigo-100' }, // Renomeado
+    { id: View.SanFranLanguages, icon: Languages, label: 'Languages', color: 'text-sky-600', bg: 'bg-sky-100' },
     { id: View.SanFranLife, icon: Leaf, label: 'SanFran Life', color: 'text-emerald-600', bg: 'bg-emerald-100' },
-    { id: View.SanFranGames, icon: Gamepad2, label: 'SanFran Games', color: 'text-orange-500', bg: 'bg-orange-100' },
-    { id: View.SanFranHelp, icon: Wrench, label: 'SanFran Help', color: 'text-slate-500', bg: 'bg-slate-100' },
-    { id: View.SanFranOAB, icon: ShieldCheck, label: 'SanFran OAB', color: 'text-red-600', bg: 'bg-red-100' },
-    { id: View.Editais, icon: ClipboardList, label: 'Editais', color: 'text-blue-600', bg: 'bg-blue-100' },
-    { id: View.DigitalID, icon: IdCard, label: 'Carteirinha Digital', color: 'text-yellow-600', bg: 'bg-yellow-100' },
+    { id: View.SanFranGames, icon: Gamepad2, label: 'Games', color: 'text-orange-500', bg: 'bg-orange-100' },
+    { id: View.SanFranHelp, icon: Wrench, label: 'Help Jurídico', color: 'text-slate-500', bg: 'bg-slate-100' },
+    { id: View.SanFranOAB, icon: ShieldCheck, label: 'OAB Foco', color: 'text-red-600', bg: 'bg-red-100' },
   ];
 
-  // Helper to check if current view is a child of SanFran Essential
-  const isEssentialChild = [View.Anki, View.Timer, View.Calendar, View.Ranking, View.Subjects, View.Tasks, View.DeadArchive, View.Calculator, View.ErrorLog, View.CodeTracker, View.IracMethod, View.SpacedRepetition, View.AttendanceCalculator, View.SyllabusTracker, View.DeadlinePlanner, View.SpeedReader, View.Mnemonics, View.ReverseSchedule].includes(currentView);
+  // Helper to check if current view is a child of SanFran Essential (Updated List)
+  const isEssentialChild = [View.Calendar, View.Ranking, View.DeadArchive, View.Calculator, View.ErrorLog, View.CodeTracker, View.IracMethod, View.SpacedRepetition, View.AttendanceCalculator, View.SyllabusTracker, View.DeadlinePlanner, View.SpeedReader, View.Mnemonics, View.ReverseSchedule].includes(currentView);
   
   // Helper to check if current view is a child of SanFran Community
   const isCommunityChild = [View.Debate, View.ClassificadosPatio, View.JurisprudenceMural, View.Societies, View.Largo, View.StudyRoom, View.Mural, View.Mentorship, View.MockJury, View.PetitionWiki, View.StudyPact, View.LargoAuction, View.SocialEvents, View.TheVault, View.CaronasRepublicas, View.BalcaoEstagios, View.TribunalOpiniao, View.BussolaOptativas, View.AchadosPerdidos, View.PerolasTribuna, View.GuiaSobrevivencia, View.ClubeLivro, View.GuerraTurmas].includes(currentView);
@@ -625,7 +631,7 @@ const App: React.FC = () => {
               />
             )}
             
-            {/* HUBs */}
+            {/* HUBS */}
             {currentView === View.SanFranEssential && <SanFranEssential onNavigate={setCurrentView} />}
             {currentView === View.SanFranCommunity && <SanFranCommunity onNavigate={setCurrentView} />}
             {currentView === View.SanFranImprovement && <SanFranImprovement onNavigate={setCurrentView} />}

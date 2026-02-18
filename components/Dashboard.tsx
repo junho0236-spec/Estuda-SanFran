@@ -229,7 +229,10 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
       </header>
 
       {/* --- Seção de Carreira (Patentes) --- */}
-      <div className="bg-white dark:bg-sanfran-rubiDark/30 rounded-[2.5rem] p-6 md:p-10 border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl relative overflow-hidden group">
+      <div 
+        onClick={() => onNavigate(View.Ranking)}
+        className="bg-white dark:bg-sanfran-rubiDark/30 rounded-[2.5rem] p-6 md:p-10 border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl relative overflow-hidden group cursor-pointer hover:border-usp-gold/50 transition-colors"
+      >
         <div className="absolute top-0 right-0 p-10 opacity-5 group-hover:opacity-10 transition-opacity">
            <currentRank.icon size={200} />
         </div>
@@ -285,6 +288,7 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
           value={cardsToReview} 
           subtext="Flashcards pendentes"
           bgColor="bg-red-50 dark:bg-sanfran-rubi"
+          onClick={() => onNavigate(View.Anki)}
         />
         <StatCard 
           icon={<CheckCircle2 className="text-usp-blue dark:text-white" />} 
@@ -292,6 +296,7 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
           value={pendingTasks} 
           subtext="Processos em pauta"
           bgColor="bg-cyan-50 dark:bg-usp-blue"
+          onClick={() => onNavigate(View.Tasks)}
         />
         <StatCard 
           icon={<Clock className="text-usp-gold dark:text-white" />} 
@@ -300,6 +305,7 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
           unit={displayTime.unit}
           subtext={`${sessionsToday} sessões hoje`}
           bgColor="bg-yellow-50 dark:bg-usp-gold"
+          onClick={() => onNavigate(View.Timer)}
         />
         <StatCard 
           icon={<Zap className={streak > 0 ? "text-orange-500 dark:text-white" : "text-slate-400"} />} 
@@ -308,11 +314,12 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
           subtext={streak === 1 ? "Dia de labuta" : "Dias seguidos"}
           bgColor={streak > 0 ? "bg-orange-50 dark:bg-orange-600" : "bg-slate-100 dark:bg-slate-600"}
           highlight={streak > 0}
+          onClick={() => onNavigate(View.Ranking)} // Example link
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-10">
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 cursor-pointer" onClick={() => onNavigate(View.DominioJuridico)}>
            <CompetenceRadar subjects={subjects} studySessions={studySessions} />
         </div>
 
@@ -342,7 +349,7 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {subjects.slice(0, 6).map(s => (
-                <div key={s.id} className="flex items-center justify-between p-3 md:p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 hover:scale-[1.02] transition-transform">
+                <div key={s.id} onClick={() => onNavigate(View.Subjects)} className="flex items-center justify-between p-3 md:p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 hover:scale-[1.02] transition-transform cursor-pointer">
                   <div className="flex items-center gap-3 md:gap-4 overflow-hidden">
                     <div className="w-4 h-4 md:w-5 md:h-5 rounded-full shadow-lg shrink-0" style={{ backgroundColor: s.color }} />
                     <span className="font-black text-slate-900 dark:text-white uppercase text-xs md:text-sm tracking-wide truncate">{s.name}</span>
@@ -363,21 +370,7 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
   );
 };
 
-const StatCard: React.FC<{ icon: React.ReactNode, label: string, value: string | number, unit?: string, subtext: string, bgColor: string, highlight?: boolean }> = ({ icon, label, value, unit, subtext, bgColor, highlight }) => (
-  <div className={`bg-white dark:bg-sanfran-rubiDark/40 p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border-2 shadow-xl hover:shadow-2xl md:hover:-translate-y-2 transition-all group overflow-hidden relative ${highlight ? 'border-orange-200 dark:border-orange-500/30 shadow-orange-900/10' : 'border-slate-200 dark:border-sanfran-rubi/30'}`}>
+const StatCard: React.FC<{ icon: React.ReactNode, label: string, value: string | number, unit?: string, subtext: string, bgColor: string, highlight?: boolean, onClick?: () => void }> = ({ icon, label, value, unit, subtext, bgColor, highlight, onClick }) => (
+  <div onClick={onClick} className={`bg-white dark:bg-sanfran-rubiDark/40 p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border-2 shadow-xl hover:shadow-2xl md:hover:-translate-y-2 transition-all group overflow-hidden relative cursor-pointer ${highlight ? 'border-orange-200 dark:border-orange-500/30 shadow-orange-900/10' : 'border-slate-200 dark:border-sanfran-rubi/30'}`}>
     {highlight && <div className="absolute top-0 right-0 w-20 md:w-24 h-20 md:h-24 bg-orange-500/5 rounded-full -mr-10 md:-mr-12 -mt-10 md:-mt-12 animate-pulse" />}
-    <div className={`w-12 h-12 md:w-16 md:h-16 rounded-2xl ${bgColor} flex items-center justify-center mb-4 md:mb-6 group-hover:scale-110 transition-transform shadow-lg`}>
-      {React.cloneElement(icon as React.ReactElement<any>, { size: 24 })}
-    </div>
-    <div className="space-y-0 md:space-y-1">
-      <p className="text-[10px] md:text-xs font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest">{label}</p>
-      <div className="flex items-baseline gap-1">
-        <h4 className="text-3xl md:text-4xl font-black text-slate-950 dark:text-white tabular-nums">{value}</h4>
-        {unit && <span className="text-xs font-black text-slate-400 uppercase">{unit}</span>}
-      </div>
-      <p className="text-[10px] text-slate-700 dark:text-slate-300 font-black uppercase tracking-wide opacity-80 truncate">{subtext}</p>
-    </div>
-  </div>
-);
-
-export default Dashboard;
+    <div className={`w-12 h-12 md:w-16 md:h-16 rounded-2xl ${bgColor} flex items-center justify-center mb-4 md:mb-6 group-hover
