@@ -66,7 +66,8 @@ export enum View {
   MockJury = 'mock_jury',
   PetitionWiki = 'petition_wiki',
   StudyPact = 'study_pact',
-  LargoAuction = 'largo_auction' // Nova View
+  LargoAuction = 'largo_auction',
+  SocialEvents = 'social_events' // Nova View
 }
 
 export interface Folder {
@@ -613,5 +614,26 @@ export interface Auction {
   highest_bidder_name?: string;
   ends_at: string; // ISO String
   status: 'active' | 'ended';
+  created_at: string;
+}
+
+// Social Events Types
+export interface SanFranEvent {
+  id: string;
+  title: string;
+  description: string;
+  event_date: string;
+  location: string;
+  category: 'festas' | 'academico' | 'esportes' | 'outros';
+  organizer: string;
+  created_by: string;
+  created_at: string;
+}
+
+export interface EventRSVP {
+  id: string;
+  event_id: string;
+  user_id: string;
+  user_name: string;
   created_at: string;
 }
