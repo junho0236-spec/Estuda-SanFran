@@ -206,13 +206,18 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       return;
     }
     
+    if (aiSourceText.length < 50) {
+      alert("Texto muito curto! Por favor, cole um parágrafo mais completo para que a IA possa extrair conceitos relevantes.");
+      return;
+    }
+    
     setIsLoading(true);
     try {
       const subjectName = subjects.find(s => s.id === selectedSubjectId)?.name || "Direito Geral";
       const generatedCards = await generateFlashcards(aiSourceText, subjectName, aiQuantity);
 
       if (!generatedCards || generatedCards.length === 0) {
-        throw new Error("A IA não retornou cards válidos.");
+        throw new Error("A IA não conseguiu extrair perguntas do texto fornecido. Tente um texto mais técnico.");
       }
 
       const cardsToInsert = generatedCards.map((c: any) => ({
@@ -248,7 +253,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
     } catch (err: any) {
       console.error(err);
-      alert("Erro na geração com IA: " + (err.message || "Tente novamente."));
+      alert(`Erro na geração com IA: ${err.message || "Tente novamente mais tarde."}`);
     } finally {
       setIsLoading(false);
     }
@@ -457,7 +462,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                     {isSelected ? <CheckSquare className="w-6 h-6 text-sanfran-rubi" /> : <Square className="w-6 h-6 text-slate-300" />}
                   </div>
                 )}
-                <p className="font-black text-slate-950 dark:text-white line-clamp-4 leading-tight">{card.front}</p>
+                <p className="font-black text-slate-900 dark:text-white line-clamp-4 leading-tight">{card.front}</p>
                 <div className="flex justify-between items-center mt-4">
                   <span className="text-[9px] font-black uppercase text-slate-400">PRAZO: {new Date(card.nextReview).toLocaleDateString()}</span>
                   <BrainCircuit className="w-5 h-5 text-sanfran-rubi opacity-40" />

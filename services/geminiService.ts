@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 
 // Inicializa o cliente Google GenAI de forma preguiçosa (lazy)
@@ -24,14 +25,9 @@ const getAiClient = () => {
   if (!aiInstance) {
     const apiKey = getApiKey();
     
-    if (!apiKey) {
-      console.warn("Gemini API Key is missing. Ensure VITE_GEMINI_API_KEY is set in Vercel Environment Variables.");
-      // Inicializa com string placeholder para a aplicação não quebrar na inicialização,
-      // mas falhará graciosamente na requisição.
-      aiInstance = new GoogleGenAI({ apiKey: "missing-key" });
-    } else {
-      aiInstance = new GoogleGenAI({ apiKey });
-    }
+    // Se não tiver chave, inicializa com string vazia para não quebrar o app imediatamente,
+    // mas a chamada de API falhará com erro claro.
+    aiInstance = new GoogleGenAI({ apiKey: apiKey || "missing_key" });
   }
   return aiInstance;
 };
@@ -50,10 +46,10 @@ export const getSafeApiKey = (): string | null => {
 export const generateFlashcards = async (text: string, subjectName: string, quantity: number = 5) => {
   try {
     const ai = getAiClient();
+    const apiKey = getApiKey();
     
-    // Validação prévia de segurança
-    if (getApiKey() === "") {
-        throw new Error("Chave de API não configurada (VITE_GEMINI_API_KEY).");
+    if (!apiKey) {
+        throw new Error("Chave de API não encontrada. Verifique se 'VITE_GEMINI_API_KEY' está configurada na Vercel e faça um Redeploy.");
     }
 
     const response = await ai.models.generateContent({
@@ -66,7 +62,7 @@ export const generateFlashcards = async (text: string, subjectName: string, quan
       Gere EXATAMENTE ${quantity} flashcards de alta qualidade no formato Pergunta e Resposta.
       - As perguntas (front) devem ser desafiadoras e focar em conceitos-chave, prazos, exceções ou princípios.
       - As respostas (back) devem ser objetivas, didáticas e, se possível, citar o artigo de lei ou súmula pertinente.
-      - Evite perguntas de "Sim/Não".`,
+      - Se o texto fornecido for sem sentido ou muito curto, retorne um array vazio.`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -90,16 +86,37 @@ export const generateFlashcards = async (text: string, subjectName: string, quan
     });
 
     const resultText = response.text;
-    if (!resultText) return [];
+    
+    if (!resultText) {
+        throw new Error("A IA retornou uma resposta vazia. Tente outro texto.");
+    }
 
-    return JSON.parse(resultText);
+    try {
+        const parsed = JSON.parse(resultText);
+        if (!Array.isArray(parsed)) {
+            throw new Error("Formato de resposta inválido (não é lista).");
+        }
+        return parsed;
+    } catch (parseError) {
+        console.error("JSON Parse Error:", resultText);
+        throw new Error("Erro ao processar resposta da IA.");
+    }
+
   } catch (error: any) {
     console.error("Erro detalhado ao gerar flashcards:", error);
-    // Propaga o erro para ser tratado na UI (alert) se for crítico
-    if (error.message.includes("API Key") || error.status === 400 || error.status === 403) {
-        throw new Error("Erro de Autenticação na IA. Verifique a VITE_GEMINI_API_KEY.");
+    
+    // Tratamento de erros específicos da API para mensagem mais amigável
+    if (error.status === 403 || (error.message && error.message.includes("API key"))) {
+        throw new Error("Erro de Permissão (403): Verifique sua VITE_GEMINI_API_KEY.");
     }
-    return [];
+    if (error.status === 400) {
+        throw new Error("Erro na Requisição (400): O texto pode ser muito longo ou inválido.");
+    }
+    if (error.status === 429) {
+        throw new Error("Muitas requisições. Aguarde um momento.");
+    }
+    
+    throw error; // Propaga o erro original para o componente
   }
 };
 
@@ -138,8 +155,9 @@ export const simplifyLegalText = async (complexText: string) => {
       "${complexText}"`,
     });
     return response.text;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erro ao simplificar texto:", error);
-    return "Não foi possível simplificar o texto no momento. Verifique sua conexão ou a chave de API.";
+    if (error.message.includes("API key")) return "Erro de Configuração: API Key inválida.";
+    return "Não foi possível simplificar o texto no momento. Verifique sua conexão.";
   }
 };
