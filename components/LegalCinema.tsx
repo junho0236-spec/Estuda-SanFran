@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Play, CheckCircle2, XCircle, Clapperboard, Film, ArrowLeft, Tv, HelpCircle, ExternalLink } from 'lucide-react';
+import { Play, CheckCircle2, XCircle, Clapperboard, Film, ArrowLeft, Tv, HelpCircle, ImageIcon, Eye } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { CinemaClip } from '../types';
 import confetti from 'canvas-confetti';
@@ -9,17 +9,17 @@ interface LegalCinemaProps {
   userId: string;
 }
 
-// MOCK DATA: Usando Trailers Oficiais para evitar bloqueio de copyright (Embed Allowed)
+// MOCK DATA: Mantidos os IDs para gerar as thumbnails, mas o foco agora é a análise do caso.
 const MOCK_CLIPS: CinemaClip[] = [
   {
     id: '1',
     title: 'The Fraud',
-    source_name: 'Suits (Trailer S1)',
+    source_name: 'Suits (S1)',
     youtube_id: '85z53bAebsI', 
     start_time: 0,
     end_time: 60,
     difficulty: 'easy',
-    question: "Qual o principal dilema legal apresentado no trailer?",
+    question: "Nesta cena icônica de Suits, qual o principal dilema legal de Mike Ross?",
     options: ["Mike não passou no exame da ordem", "Mike nunca frequentou a faculdade de direito", "Harvey está sendo processado"],
     correct_option: 1,
     explanation: "O segredo central é que Mike Ross pratica direito sem licença e sem diploma ('Harvard Law'), o que configura exercício ilegal da profissão."
@@ -32,7 +32,7 @@ const MOCK_CLIPS: CinemaClip[] = [
     start_time: 60,
     end_time: 140,
     difficulty: 'medium',
-    question: "Qual a tese de defesa sugerida no vídeo?",
+    question: "No julgamento militar, qual a tese de defesa sugerida pela expressão 'Code Red'?",
     options: ["Legítima Defesa", "Obediência Hierárquica (Orders)", "Insanidade Mental"],
     correct_option: 1,
     explanation: "A defesa argumenta que os soldados estavam apenas seguindo ordens superiores ('Following orders'), questionando a responsabilidade militar."
@@ -45,7 +45,7 @@ const MOCK_CLIPS: CinemaClip[] = [
     start_time: 10,
     end_time: 100,
     difficulty: 'easy',
-    question: "Qual o tipo de ação judicial movida por Erin?",
+    question: "Erin Brockovich é famosa por qual tipo de ação judicial?",
     options: ["Class Action (Ação Coletiva)", "Divórcio Litigioso", "Falência Empresarial"],
     correct_option: 0,
     explanation: "O filme retrata uma 'Class Action' contra a PG&E por contaminação da água, buscando indenização para centenas de residentes."
@@ -58,7 +58,7 @@ const MOCK_CLIPS: CinemaClip[] = [
     start_time: 20,
     end_time: 100,
     difficulty: 'medium',
-    question: "Qual o principal desafio de Vinny no tribunal?",
+    question: "Qual o principal desafio de Vinny no tribunal nesta comédia jurídica?",
     options: ["Ele não conhece o procedimento penal", "O cliente é culpado", "O juiz é corrupto"],
     correct_option: 0,
     explanation: "O humor vem do fato de Vinny não conhecer as regras de etiqueta e procedimento do tribunal ('Procedure'), irritando o juiz."
@@ -71,7 +71,7 @@ const MOCK_CLIPS: CinemaClip[] = [
     start_time: 30,
     end_time: 90,
     difficulty: 'easy',
-    question: "Qual o objetivo de Elle Woods ao entrar em Harvard?",
+    question: "Qual o objetivo inicial de Elle Woods ao entrar em Harvard Law?",
     options: ["Tornar-se sócia de um escritório", "Reconquistar o namorado", "Processar um salão de beleza"],
     correct_option: 1,
     explanation: "Ela entra em 'Law School' inicialmente para provar que é séria o suficiente para seu ex-namorado ('Warner')."
@@ -84,7 +84,7 @@ const MOCK_CLIPS: CinemaClip[] = [
     start_time: 40,
     end_time: 120,
     difficulty: 'hard',
-    question: "Qual a base do processo contra Mark Zuckerberg?",
+    question: "Qual a base do processo contra Mark Zuckerberg no filme?",
     options: ["Roubo de Propriedade Intelectual", "Fraude Fiscal", "Difamação"],
     correct_option: 0,
     explanation: "Ele é acusado de roubar a ideia ('Intellectual Property') dos gêmeos Winklevoss para criar o Facebook."
@@ -163,10 +163,10 @@ const LegalCinema: React.FC<LegalCinemaProps> = ({ userId }) => {
           <div>
              <div className="inline-flex items-center gap-2 bg-sky-900/10 px-4 py-2 rounded-full border border-sky-900/20 mb-4 dark:bg-sky-500/10 dark:border-sky-500/20">
                 <Clapperboard className="w-4 h-4 text-sky-700 dark:text-sky-400" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-sky-700 dark:text-sky-400">Listening Lab</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-sky-700 dark:text-sky-400">Estudo de Caso</span>
              </div>
-             <h2 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-none">Cinema Jurídico</h2>
-             <p className="text-slate-500 font-bold italic text-lg mt-2">Aprenda Legal English com cenas de filmes e séries.</p>
+             <h2 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-none">Cenas Jurídicas</h2>
+             <p className="text-slate-500 font-bold italic text-lg mt-2">Analise momentos icônicos do cinema e responda o quiz jurídico.</p>
           </div>
         </header>
 
@@ -186,12 +186,12 @@ const LegalCinema: React.FC<LegalCinemaProps> = ({ userId }) => {
                       <img 
                         src={`https://img.youtube.com/vi/${clip.youtube_id}/hqdefault.jpg`} 
                         alt="Thumbnail" 
-                        className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity"
+                        className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity grayscale group-hover:grayscale-0"
                         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                       />
                       <div className="absolute inset-0 flex items-center justify-center z-20">
                          <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border-2 border-white/50 group-hover:scale-110 transition-transform">
-                            <Play size={32} className="text-white fill-current ml-1" />
+                            <ImageIcon size={32} className="text-white ml-1" />
                          </div>
                       </div>
                       
@@ -206,8 +206,8 @@ const LegalCinema: React.FC<LegalCinemaProps> = ({ userId }) => {
                          <h3 className="text-xl font-black text-slate-900 dark:text-white leading-tight">{clip.title}</h3>
                       </div>
                       <div className="mt-auto pt-4 border-t border-slate-100 dark:border-white/5 flex justify-between items-center text-slate-400">
-                         <span className="text-xs font-bold flex items-center gap-1"><Tv size={14} /> Video Quiz</span>
-                         <span className="text-[10px] font-black uppercase tracking-widest">Iniciar</span>
+                         <span className="text-xs font-bold flex items-center gap-1"><Eye size={14} /> Análise do Caso</span>
+                         <span className="text-[10px] font-black uppercase tracking-widest">Abrir</span>
                       </div>
                    </div>
                 </button>
@@ -218,7 +218,7 @@ const LegalCinema: React.FC<LegalCinemaProps> = ({ userId }) => {
     );
   }
 
-  // View: Player
+  // View: Analysis (Static)
   return (
     <div className="h-full flex flex-col max-w-5xl mx-auto pb-20 px-4 md:px-0 animate-in zoom-in-95 duration-300">
        
@@ -235,41 +235,33 @@ const LegalCinema: React.FC<LegalCinemaProps> = ({ userId }) => {
 
        <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-8 min-h-0">
           
-          {/* Video Column */}
+          {/* Image & Context Column */}
           <div className="lg:col-span-2 flex flex-col gap-6">
-             {/* Container do vídeo */}
-             <div className="w-full max-w-3xl mx-auto aspect-video bg-black rounded-[2rem] overflow-hidden shadow-2xl border-4 border-slate-900 dark:border-white/10 relative z-10">
-                <iframe 
-                  width="100%" 
-                  height="100%" 
-                  src={`https://www.youtube.com/embed/${selectedClip.youtube_id}?rel=0&modestbranding=1&controls=1&origin=${window.location.origin}`} 
-                  title="YouTube video player" 
-                  frameBorder="0" 
-                  allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                  allowFullScreen
-                  className="absolute inset-0"
-                ></iframe>
+             {/* Container da Imagem Estática */}
+             <div className="w-full max-w-3xl mx-auto aspect-video bg-black rounded-[2rem] overflow-hidden shadow-2xl border-4 border-slate-900 dark:border-white/10 relative z-10 group">
+                <img 
+                   src={`https://img.youtube.com/vi/${selectedClip.youtube_id}/maxresdefault.jpg`} 
+                   alt="Cena" 
+                   className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-700"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent flex flex-col justify-end p-8">
+                   <span className="text-white/60 font-bold uppercase tracking-widest text-xs mb-2 flex items-center gap-2"><Film size={14}/> Cena em Análise</span>
+                   <h3 className="text-white text-3xl font-black uppercase tracking-tight leading-none">{selectedClip.title}</h3>
+                </div>
              </div>
              
              <div className="flex flex-col gap-3 max-w-3xl mx-auto w-full">
-               <div className="bg-sky-50 dark:bg-sky-900/10 p-4 rounded-2xl border border-sky-100 dark:border-sky-800/30 flex items-start gap-3">
-                  <HelpCircle className="text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" />
+               <div className="bg-sky-50 dark:bg-sky-900/10 p-6 rounded-[2rem] border border-sky-100 dark:border-sky-800/30 flex items-start gap-4">
+                  <div className="bg-sky-100 dark:bg-sky-900/30 p-3 rounded-2xl shrink-0">
+                     <HelpCircle className="text-sky-600 dark:text-sky-400 w-6 h-6" />
+                  </div>
                   <div>
-                     <p className="text-sm font-bold text-sky-800 dark:text-sky-200">Contexto:</p>
-                     <p className="text-xs text-sky-700 dark:text-sky-300 mt-1">
-                       Assista ao trailer ou clipe acima. Devido a restrições de direitos autorais de estúdio, utilizamos materiais promocionais oficiais para garantir a reprodução. Responda ao quiz com base no contexto apresentado.
+                     <p className="text-sm font-black text-sky-900 dark:text-sky-200 uppercase tracking-wide mb-1">Contexto Jurídico</p>
+                     <p className="text-sm text-sky-800 dark:text-sky-300 leading-relaxed">
+                       Observe a cena acima retirada de <strong>{selectedClip.source_name}</strong>. Com base no seu conhecimento jurídico e no enredo conhecido desta obra, responda à questão ao lado para testar seu domínio sobre o tema.
                      </p>
                   </div>
                </div>
-               
-               <a 
-                 href={`https://www.youtube.com/watch?v=${selectedClip.youtube_id}`} 
-                 target="_blank" 
-                 rel="noopener noreferrer"
-                 className="flex items-center justify-center gap-2 p-3 bg-red-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-700 transition-colors shadow-lg"
-               >
-                 <ExternalLink size={14} /> Abrir no YouTube
-               </a>
              </div>
           </div>
 
