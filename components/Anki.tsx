@@ -13,14 +13,11 @@ import {
   X,
   Gavel,
   Check,
-  Archive,
-  Sparkles,
-  Zap
+  Archive
 } from 'lucide-react';
 import { Flashcard, Subject, Folder } from '../types';
 import { supabase } from '../services/supabaseClient';
 import { updateQuestProgress } from '../services/questService';
-import { generateFlashcards } from '../services/geminiService';
 
 interface AnkiProps {
   subjects: Subject[];
@@ -32,11 +29,9 @@ interface AnkiProps {
 }
 
 const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folders, setFolders, userId }) => {
-  const [mode, setMode] = useState<'browse' | 'study' | 'create' | 'bulk' | 'ai_create'>('browse');
+  const [mode, setMode] = useState<'browse' | 'study' | 'create' | 'bulk'>('browse');
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(subjects[0]?.id || '');
-  
-  // States comuns
   const [bulkInput, setBulkInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -45,10 +40,6 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [manualBack, setManualBack] = useState('');
   const [newFolderName, setNewFolderName] = useState('');
   const [showFolderInput, setShowFolderInput] = useState(false);
-  
-  // AI State
-  const [aiSourceText, setAiSourceText] = useState('');
-  const [aiQuantity, setAiQuantity] = useState(5);
   
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set());
@@ -200,60 +191,6 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     }
   };
 
-  const handleAIGenerate = async () => {
-    if (!aiSourceText.trim()) {
-      alert("Cole um texto para a IA analisar.");
-      return;
-    }
-    
-    setIsLoading(true);
-    try {
-      const subjectName = subjects.find(s => s.id === selectedSubjectId)?.name || "Direito Geral";
-      const generatedCards = await generateFlashcards(aiSourceText, subjectName, aiQuantity);
-
-      if (!generatedCards || generatedCards.length === 0) {
-        throw new Error("A IA não retornou cards válidos.");
-      }
-
-      const cardsToInsert = generatedCards.map((c: any) => ({
-        id: Math.random().toString(36).substr(2, 9),
-        front: c.front,
-        back: c.back,
-        subject_id: selectedSubjectId,
-        folder_id: currentFolderId,
-        next_review: Date.now(),
-        interval: 0,
-        user_id: userId,
-        archived_at: null
-      }));
-
-      const { error } = await supabase.from('flashcards').insert(cardsToInsert);
-      if (error) throw error;
-
-      const formattedCards: Flashcard[] = cardsToInsert.map(c => ({
-        id: c.id,
-        front: c.front,
-        back: c.back,
-        subjectId: c.subject_id,
-        folderId: c.folder_id,
-        nextReview: c.next_review,
-        interval: c.interval,
-        archived_at: null
-      }));
-
-      setFlashcards(prev => [...prev, ...formattedCards]);
-      setMode('browse');
-      setAiSourceText('');
-      alert(`Sucesso! ${cardsToInsert.length} cards gerados pela IA.`);
-
-    } catch (err: any) {
-      console.error(err);
-      alert("Erro na geração com IA: " + (err.message || "Tente novamente."));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleManualCreate = async () => {
     if (!manualFront.trim() || !manualBack.trim()) return;
     const newId = Math.random().toString(36).substr(2, 9);
@@ -375,29 +312,16 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   <button onClick={() => { setMode('study'); setCurrentIndex(0); setIsFlipped(false); }} disabled={reviewQueue.length === 0} className="flex items-center gap-2 px-8 py-3.5 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest disabled:opacity-50 hover:bg-sanfran-rubiDark shadow-xl">
                     <RotateCcw className="w-5 h-5" /> Estudar ({reviewQueue.length})
                   </button>
-                  
-                  {/* BOTÃO GERAR COM IA */}
-                  <button 
-                    onClick={() => setMode('ai_create')} 
-                    className="flex items-center gap-2 px-6 py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:scale-105 transition-all"
-                  >
-                    <Sparkles className="w-5 h-5" /> Gerar com IA
-                  </button>
-
                   <button onClick={() => {setMode('create');}} className="flex items-center gap-2 px-6 py-3.5 bg-white dark:bg-sanfran-rubiDark text-sanfran-rubi dark:text-white border-2 border-sanfran-rubi rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-50 shadow-xl">
                     <Plus className="w-5 h-5" /> Novo Card
                   </button>
-                  
-                  {/* Botões Secundários em Dropdown ou Compactos */}
-                  <button onClick={() => setMode('bulk')} className="p-3.5 bg-usp-blue text-white rounded-2xl shadow-xl" title="Importação em Lote">
-                    <FolderPlus className="w-5 h-5" />
+                  <button onClick={() => setMode('bulk')} className="flex items-center gap-2 px-6 py-3.5 bg-usp-blue text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">
+                    <Plus className="w-5 h-5" /> Em Lote
                   </button>
-                  <button onClick={() => setIsSelectionMode(true)} className="p-3.5 bg-white dark:bg-sanfran-rubiDark text-slate-500 border-2 border-slate-200 rounded-2xl shadow-xl" title="Seleção">
-                    <CheckSquare className="w-5 h-5" />
+                  <button onClick={() => setIsSelectionMode(true)} className="flex items-center gap-2 px-6 py-3.5 bg-white dark:bg-sanfran-rubiDark text-slate-500 border-2 border-slate-200 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-50 shadow-xl">
+                    <CheckSquare className="w-5 h-5" /> Selecionar
                   </button>
-                  <button onClick={() => setShowFolderInput(true)} className="p-3.5 bg-white dark:bg-sanfran-rubiDark text-sanfran-rubi border-2 border-slate-200 rounded-2xl shadow-sm" title="Nova Pasta">
-                    <Plus className="w-6 h-6" />
-                  </button>
+                  <button onClick={() => setShowFolderInput(true)} className="p-3.5 bg-white dark:bg-sanfran-rubiDark text-sanfran-rubi border-2 border-slate-200 rounded-2xl shadow-sm"><FolderPlus className="w-6 h-6" /></button>
                 </>
               )}
             </>
@@ -485,7 +409,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               </div>
               <div className="absolute inset-0 w-full h-full bg-slate-50 dark:bg-black/80 border-[6px] border-usp-blue/40 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden rotate-y-180">
                 <span className="text-xs font-black text-usp-blue uppercase tracking-[0.3em] mb-8">Resposta</span>
-                <p className="text-2xl font-black text-slate-900 dark:text-white leading-tight">{reviewQueue[currentIndex].back}</p>
+                <p className="text-2xl font-black text-slate-950 dark:text-white leading-tight">{reviewQueue[currentIndex].back}</p>
               </div>
             </div>
           </div>
@@ -498,73 +422,6 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
           )}
           <button onClick={() => setMode('browse')} className="mt-12 text-slate-400 font-black text-xs uppercase underline">Sair da Audiência</button>
         </div>
-      )}
-
-      {/* --- AI GENERATION MODE --- */}
-      {mode === 'ai_create' && (
-         <div className="bg-white dark:bg-sanfran-rubiDark p-10 rounded-[3rem] border-4 border-purple-500 shadow-2xl relative overflow-hidden">
-             {/* Background Decoration */}
-             <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
-
-             <div className="flex items-center gap-4 mb-8 relative z-10">
-               <button onClick={() => setMode('browse')} className="p-3"><ArrowLeft className="w-8 h-8 text-slate-400" /></button>
-               <div>
-                  <div className="flex items-center gap-2">
-                     <Sparkles className="text-purple-500 w-6 h-6 animate-pulse" />
-                     <h3 className="text-3xl font-black text-slate-950 dark:text-white uppercase">IA Generator</h3>
-                  </div>
-                  <p className="text-sm font-bold text-slate-500">Criação automática baseada em doutrina ou lei.</p>
-               </div>
-             </div>
-
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative z-10">
-                <div className="md:col-span-2 space-y-4">
-                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Texto Base (Cole aqui)</label>
-                   <textarea 
-                     value={aiSourceText} 
-                     onChange={(e) => setAiSourceText(e.target.value)} 
-                     placeholder="Cole aqui o artigo da lei, o resumo da aula ou trecho da doutrina..." 
-                     className="w-full h-80 p-6 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-[2rem] font-bold resize-none outline-none focus:border-purple-500 custom-scrollbar" 
-                   />
-                </div>
-                
-                <div className="space-y-6">
-                   <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Disciplina</label>
-                      <select value={selectedSubjectId} onChange={(e) => setSelectedSubjectId(e.target.value)} className="w-full p-4 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-2xl font-bold outline-none">
-                         {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                      </select>
-                   </div>
-                   
-                   <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Quantidade de Cards</label>
-                      <div className="flex items-center gap-4 bg-slate-50 dark:bg-black/50 p-4 rounded-2xl border-2 border-slate-200">
-                         <input 
-                           type="range" min="1" max="10" 
-                           value={aiQuantity} 
-                           onChange={(e) => setAiQuantity(Number(e.target.value))} 
-                           className="flex-1 accent-purple-500" 
-                         />
-                         <span className="text-xl font-black text-purple-600 dark:text-purple-400 w-8 text-center">{aiQuantity}</span>
-                      </div>
-                   </div>
-
-                   <button 
-                     onClick={handleAIGenerate} 
-                     disabled={isLoading} 
-                     className="w-full py-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-[2rem] font-black uppercase text-lg shadow-xl hover:scale-105 transition-transform flex items-center justify-center gap-2 disabled:opacity-50"
-                   >
-                     {isLoading ? <div className="animate-spin w-6 h-6 border-4 border-white/30 border-t-white rounded-full"></div> : <><Zap size={24} fill="currentColor" /> Gerar Cards</>}
-                   </button>
-                   
-                   <div className="bg-purple-50 dark:bg-purple-900/10 p-4 rounded-2xl border border-purple-100 dark:border-purple-800/30">
-                      <p className="text-[9px] font-bold text-purple-700 dark:text-purple-300 uppercase leading-relaxed">
-                         Dica: A IA funciona melhor com textos claros e bem formatados. Evite colar livros inteiros de uma vez.
-                      </p>
-                   </div>
-                </div>
-             </div>
-         </div>
       )}
 
       {mode === 'bulk' && (

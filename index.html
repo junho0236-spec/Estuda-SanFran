@@ -11,15 +11,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script>
-      // Shim para process.env com a chave fornecida
-      window.process = window.process || { 
-        env: {
-          API_KEY: "AIzaSyD73fUpmZa7ixffTb7cswoLpdzzMdbKQZE"
-        } 
-      };
+      // Shim para process.env
+      window.process = window.process || { env: {} };
       
-      // Diagnóstico
-      window.__API_KEY__ = window.process.env.API_KEY;
+      // Diagnóstico: Se a Vercel injetar via script tag no futuro ou via DefinePlugin
+      window.__API_KEY__ = ""; 
 
       tailwind.config = {
         darkMode: 'class',
