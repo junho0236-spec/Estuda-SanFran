@@ -12,7 +12,8 @@ import {
   Scale,
   GitCommit,
   Mic,
-  Eye
+  Eye,
+  Key
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -148,7 +149,7 @@ const SanFranImprovement: React.FC<SanFranImprovementProps> = ({ onNavigate }) =
            </div>
         </button>
 
-        {/* CARD 5: LEITURA DINÂMICA (Wide) - ADICIONADO */}
+        {/* CARD 5: LEITURA DINÂMICA (Wide) */}
         <button
           onClick={() => onNavigate(View.SpeedReader)}
           className="group col-span-1 md:col-span-2 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-orange-400 transition-all flex flex-col justify-between h-full hover:shadow-orange-500/10"
@@ -162,6 +163,24 @@ const SanFranImprovement: React.FC<SanFranImprovementProps> = ({ onNavigate }) =
            <div className="text-left mt-4">
               <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Leitura Dinâmica</h4>
               <p className="text-[10px] font-bold text-slate-400 uppercase">Treino RSVP & Velocidade</p>
+           </div>
+        </button>
+
+        {/* CARD: MNEMONICA VAULT (Wide) - ADICIONADO */}
+        <button
+          onClick={() => onNavigate(View.Mnemonics)}
+          className="group col-span-1 md:col-span-2 bg-[#1e293b] text-white rounded-[2.5rem] p-6 border border-slate-600 shadow-lg hover:shadow-amber-500/30 hover:scale-[1.02] transition-all flex flex-col justify-between relative overflow-hidden h-full"
+        >
+           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')] opacity-10"></div>
+           <div className="flex justify-between items-start relative z-10">
+              <div className="p-3 bg-white/10 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20">
+                 <Key size={20} className="text-amber-500" />
+              </div>
+              <ArrowUpRight size={16} className="text-amber-200 group-hover:text-white transition-colors" />
+           </div>
+           <div className="text-left mt-4 relative z-10">
+              <h4 className="text-lg font-black uppercase tracking-tight text-white">Mnemônica Vault</h4>
+              <p className="text-[10px] font-bold text-amber-200 uppercase">Banco de Macetes</p>
            </div>
         </button>
 
