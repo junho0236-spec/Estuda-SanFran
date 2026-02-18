@@ -1,12 +1,9 @@
-import * as GoogleGenerativeAI from "@google/generative-ai";
+import { GoogleGenAI, SchemaType } from "@google/generative-ai";
 
 // Sua chave paga de US$ 300
 const API_KEY = "AIzaSyD73fUpmZa7ixffTb7cswoLpdzzMdbKQZE";
 
-// Isso aqui força o código a encontrar a função não importa onde ela esteja escondida
-const GoogleGenAI = (GoogleGenerativeAI as any).GoogleGenAI || (GoogleGenerativeAI as any).default?.GoogleGenAI;
-const SchemaType = (GoogleGenerativeAI as any).SchemaType || (GoogleGenerativeAI as any).default?.SchemaType;
-
+// Inicialização direta e oficial
 const genAI = new GoogleGenAI(API_KEY);
 
 export const getSafeApiKey = () => API_KEY;
@@ -31,12 +28,12 @@ export const generateFlashcards = async (text: string, subjectName: string, quan
       },
     });
 
-    const prompt = `Gere ${quantity} flashcards de estudo ativo sobre o texto de "${subjectName}": "${text}".`;
+    const prompt = `Você é um professor da SanFran. Gere ${quantity} flashcards sobre: ${text}`;
     const result = await model.generateContent(prompt);
     const response = await result.response;
     return JSON.parse(response.text());
   } catch (error) {
-    console.error("Erro na IA:", error);
+    console.error("Erro na geração:", error);
     throw error;
   }
 };
@@ -44,7 +41,7 @@ export const generateFlashcards = async (text: string, subjectName: string, quan
 export const getStudyMotivation = async (subjects: string[]) => {
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result = await model.generateContent("Dê uma frase curta de motivação em latim com tradução.");
+    const result = await model.generateContent("Dê uma frase curta em latim com tradução.");
     const response = await result.response;
     return response.text();
   } catch {
