@@ -67,7 +67,8 @@ export enum View {
   PetitionWiki = 'petition_wiki',
   StudyPact = 'study_pact',
   LargoAuction = 'largo_auction',
-  SocialEvents = 'social_events' // Nova View
+  SocialEvents = 'social_events',
+  TheVault = 'the_vault' // Nova View
 }
 
 export interface Folder {
@@ -635,5 +636,21 @@ export interface EventRSVP {
   event_id: string;
   user_id: string;
   user_name: string;
+  created_at: string;
+}
+
+// The Vault Types
+export interface VaultItem {
+  id: string;
+  title: string;
+  category: 'prova' | 'resumo' | 'anotacao';
+  subject: string;
+  professor: string;
+  year: number;
+  file_url: string;
+  uploader_id: string;
+  uploader_name: string;
+  upvotes: number;
+  downloads: number;
   created_at: string;
 }
