@@ -61,7 +61,8 @@ export enum View {
   SpacedRepetition = 'spaced_repetition',
   AttendanceCalculator = 'attendance_calculator',
   SyllabusTracker = 'syllabus_tracker',
-  DeadlinePlanner = 'deadline_planner' // Nova View
+  DeadlinePlanner = 'deadline_planner',
+  Mentorship = 'mentorship' // Nova View
 }
 
 export interface Folder {
@@ -521,4 +522,26 @@ export interface DeadlineItem {
   difficulty: number; // 1 to 5
   is_completed: boolean;
   created_at: string;
+}
+
+// Mentorship Types
+export interface MentorProfile {
+  user_id: string;
+  user_name: string;
+  areas: string[];
+  bio: string;
+  contact_info: string;
+  semester: number;
+  created_at: string;
+}
+
+export interface MentorshipConnection {
+  id: string;
+  mentor_id: string;
+  mentee_id: string;
+  mentee_name: string;
+  mentee_goal: string;
+  status: 'active' | 'archived';
+  created_at: string;
+  mentor_profiles?: MentorProfile; // Joined data
 }

@@ -56,7 +56,8 @@ import IracMethod from './components/IracMethod';
 import SpacedRepetition from './components/SpacedRepetition';
 import AttendanceCalculator from './components/AttendanceCalculator';
 import SyllabusTracker from './components/SyllabusTracker'; 
-import DeadlinePlanner from './components/DeadlinePlanner'; // Import
+import DeadlinePlanner from './components/DeadlinePlanner';
+import Mentorship from './components/Mentorship'; // Import
 import SanFranEssential from './components/SanFranEssential';
 import SanFranCommunity from './components/SanFranCommunity';
 import SanFranImprovement from './components/SanFranImprovement';
@@ -433,7 +434,7 @@ const App: React.FC = () => {
   const isEssentialChild = [View.Anki, View.Timer, View.Calendar, View.Ranking, View.Subjects, View.Tasks, View.DeadArchive, View.Calculator, View.ErrorLog, View.CodeTracker, View.IracMethod, View.SpacedRepetition, View.AttendanceCalculator, View.SyllabusTracker, View.DeadlinePlanner].includes(currentView);
   
   // Helper to check if current view is a child of SanFran Community
-  const isCommunityChild = [View.Debate, View.ClassificadosPatio, View.JurisprudenceMural, View.Societies, View.Largo, View.StudyRoom, View.Mural].includes(currentView);
+  const isCommunityChild = [View.Debate, View.ClassificadosPatio, View.JurisprudenceMural, View.Societies, View.Largo, View.StudyRoom, View.Mural, View.Mentorship].includes(currentView);
 
   // Helper to check if current view is a child of SanFran Improvement
   const isImprovementChild = [View.Specialization, View.TypingChallenge, View.DominioJuridico, View.Timeline, View.LeiSeca, View.Library, View.OralArgument].includes(currentView);
@@ -655,6 +656,7 @@ const App: React.FC = () => {
             {currentView === View.AttendanceCalculator && <AttendanceCalculator userId={session.user.id} />}
             {currentView === View.SyllabusTracker && <SyllabusTracker userId={session.user.id} />}
             {currentView === View.DeadlinePlanner && <DeadlinePlanner userId={session.user.id} />}
+            {currentView === View.Mentorship && <Mentorship userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
             
             {currentView === View.Duel && activeDuel && (
               <DuelArena 
