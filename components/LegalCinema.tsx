@@ -9,85 +9,85 @@ interface LegalCinemaProps {
   userId: string;
 }
 
-// Mock Data com IDs alternativos e mais estáveis
+// MOCK DATA: Usando Trailers Oficiais para evitar bloqueio de copyright (Embed Allowed)
 const MOCK_CLIPS: CinemaClip[] = [
   {
     id: '1',
-    title: 'Interrogatório Agressivo',
-    source_name: 'Suits (Mike Ross)',
-    youtube_id: 'cL3d-lD9-38', // Mock Trial Scene
-    start_time: 40,
-    end_time: 100,
-    difficulty: 'medium',
-    question: "Qual a estratégia usada por Harvey nesta cena?",
-    options: ["Intimidação direta", "Apelo emocional", "Acordo judicial"],
-    correct_option: 0,
-    explanation: "Harvey usa a intimidação e o blefe para desestabilizar a testemunha/oponente."
+    title: 'The Fraud',
+    source_name: 'Suits (Trailer S1)',
+    youtube_id: '85z53bAebsI', 
+    start_time: 0,
+    end_time: 60,
+    difficulty: 'easy',
+    question: "Qual o principal dilema legal apresentado no trailer?",
+    options: ["Mike não passou no exame da ordem", "Mike nunca frequentou a faculdade de direito", "Harvey está sendo processado"],
+    correct_option: 1,
+    explanation: "O segredo central é que Mike Ross pratica direito sem licença e sem diploma ('Harvard Law'), o que configura exercício ilegal da profissão."
   },
   {
     id: '2',
-    title: 'You Cant Handle the Truth',
+    title: 'Code Red',
     source_name: 'A Few Good Men',
-    youtube_id: 'hopNAI8Pefg', // Clip Clássico
-    start_time: 140,
-    end_time: 200,
-    difficulty: 'hard',
-    question: "O que o Coronel Jessup admite sob pressão?",
-    options: ["Que mentiu no relatório", "Que ordenou o 'Code Red'", "Que não estava na base"],
+    youtube_id: 'eWDmgV6f_T0', 
+    start_time: 60,
+    end_time: 140,
+    difficulty: 'medium',
+    question: "Qual a tese de defesa sugerida no vídeo?",
+    options: ["Legítima Defesa", "Obediência Hierárquica (Orders)", "Insanidade Mental"],
     correct_option: 1,
-    explanation: "A estratégia de Kaffee foi irritar Jessup até que seu orgulho o fizesse admitir que ordenou a punição extrajudicial ('Code Red')."
+    explanation: "A defesa argumenta que os soldados estavam apenas seguindo ordens superiores ('Following orders'), questionando a responsabilidade militar."
   },
   {
     id: '3',
-    title: 'Oferta de Acordo',
+    title: 'Environmental Law',
     source_name: 'Erin Brockovich',
-    youtube_id: 'lXg5u-4q7qA', // Water Scene
-    start_time: 30,
-    end_time: 90,
+    youtube_id: 'u_jE7-6U_QA', 
+    start_time: 10,
+    end_time: 100,
     difficulty: 'easy',
-    question: "Por que Erin recusa a oferta da empresa?",
-    options: ["O valor era insultuoso", "Não havia garantia escrita", "A empresa não assumiu a culpa"],
+    question: "Qual o tipo de ação judicial movida por Erin?",
+    options: ["Class Action (Ação Coletiva)", "Divórcio Litigioso", "Falência Empresarial"],
     correct_option: 0,
-    explanation: "Erin usa o copo de água (supostamente contaminada) para demonstrar que a oferta financeira não cobria o dano real à saúde das vítimas."
+    explanation: "O filme retrata uma 'Class Action' contra a PG&E por contaminação da água, buscando indenização para centenas de residentes."
   },
   {
     id: '4',
-    title: 'Testemunha Perita',
+    title: 'Procedural Incompetence',
     source_name: 'My Cousin Vinny',
-    youtube_id: '6qg66Q2dJsg', // Expert Witness Scene
-    start_time: 60,
-    end_time: 120,
+    youtube_id: 'SL4WrFn9824',
+    start_time: 20,
+    end_time: 100,
     difficulty: 'medium',
-    question: "Como Vinny qualifica a testemunha como 'Expert'?",
-    options: ["Mostrando seu diploma", "Testando seu conhecimento técnico", "Citando sua experiência"],
-    correct_option: 1,
-    explanation: "Ele faz perguntas técnicas extremamente específicas sobre mecânica automotiva para provar à corte que ela possui conhecimento notório."
+    question: "Qual o principal desafio de Vinny no tribunal?",
+    options: ["Ele não conhece o procedimento penal", "O cliente é culpado", "O juiz é corrupto"],
+    correct_option: 0,
+    explanation: "O humor vem do fato de Vinny não conhecer as regras de etiqueta e procedimento do tribunal ('Procedure'), irritando o juiz."
   },
   {
     id: '5',
-    title: 'Quebra de Álibi',
+    title: 'Stereotypes',
     source_name: 'Legally Blonde',
-    youtube_id: 'y1o_iY99eeA', // Perm Scene
-    start_time: 155,
-    end_time: 215,
+    youtube_id: 'E8I-Qzmbqnc',
+    start_time: 30,
+    end_time: 90,
     difficulty: 'easy',
-    question: "Qual o erro lógico apontado por Elle Woods?",
-    options: ["O tempo de viagem", "A regra de manutenção do permanente", "A cor do sapato"],
+    question: "Qual o objetivo de Elle Woods ao entrar em Harvard?",
+    options: ["Tornar-se sócia de um escritório", "Reconquistar o namorado", "Processar um salão de beleza"],
     correct_option: 1,
-    explanation: "Ela usa um conhecimento específico (não lavar o cabelo 24h após permanente) para provar que a testemunha estava mentindo sobre estar no chuveiro."
+    explanation: "Ela entra em 'Law School' inicialmente para provar que é séria o suficiente para seu ex-namorado ('Warner')."
   },
   {
     id: '6',
-    title: 'Depoimento Hostil',
+    title: 'IP Theft',
     source_name: 'The Social Network',
-    youtube_id: 'lB95KLmpLR4', // Deposition
-    start_time: 10,
-    end_time: 60,
+    youtube_id: 'lB95KLmpLR4',
+    start_time: 40,
+    end_time: 120,
     difficulty: 'hard',
-    question: "Qual o argumento de Mark sobre a propriedade intelectual?",
-    options: ["Ele assinou um contrato", "Ter uma ideia não é ter o produto", "O código foi roubado"],
-    correct_option: 1,
-    explanation: "Mark argumenta que se os autores tivessem inventado o Facebook, eles teriam inventado o Facebook. A ideia vaga não confere propriedade sobre a execução."
+    question: "Qual a base do processo contra Mark Zuckerberg?",
+    options: ["Roubo de Propriedade Intelectual", "Fraude Fiscal", "Difamação"],
+    correct_option: 0,
+    explanation: "Ele é acusado de roubar a ideia ('Intellectual Property') dos gêmeos Winklevoss para criar o Facebook."
   }
 ];
 
@@ -242,7 +242,7 @@ const LegalCinema: React.FC<LegalCinemaProps> = ({ userId }) => {
                 <iframe 
                   width="100%" 
                   height="100%" 
-                  src={`https://www.youtube.com/embed/${selectedClip.youtube_id}?start=${selectedClip.start_time}&end=${selectedClip.end_time}&rel=0&modestbranding=1&controls=1&origin=${window.location.origin}`} 
+                  src={`https://www.youtube.com/embed/${selectedClip.youtube_id}?rel=0&modestbranding=1&controls=1&origin=${window.location.origin}`} 
                   title="YouTube video player" 
                   frameBorder="0" 
                   allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
@@ -255,20 +255,20 @@ const LegalCinema: React.FC<LegalCinemaProps> = ({ userId }) => {
                <div className="bg-sky-50 dark:bg-sky-900/10 p-4 rounded-2xl border border-sky-100 dark:border-sky-800/30 flex items-start gap-3">
                   <HelpCircle className="text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" />
                   <div>
-                     <p className="text-sm font-bold text-sky-800 dark:text-sky-200">Instrução:</p>
+                     <p className="text-sm font-bold text-sky-800 dark:text-sky-200">Contexto:</p>
                      <p className="text-xs text-sky-700 dark:text-sky-300 mt-1">
-                       Clique no play. Se o vídeo não carregar devido a restrições do YouTube, use o link abaixo.
+                       Assista ao trailer ou clipe acima. Devido a restrições de direitos autorais de estúdio, utilizamos materiais promocionais oficiais para garantir a reprodução. Responda ao quiz com base no contexto apresentado.
                      </p>
                   </div>
                </div>
                
                <a 
-                 href={`https://www.youtube.com/watch?v=${selectedClip.youtube_id}&t=${selectedClip.start_time}s`} 
+                 href={`https://www.youtube.com/watch?v=${selectedClip.youtube_id}`} 
                  target="_blank" 
                  rel="noopener noreferrer"
                  className="flex items-center justify-center gap-2 p-3 bg-red-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-700 transition-colors shadow-lg"
                >
-                 <ExternalLink size={14} /> Vídeo indisponível? Assistir no YouTube
+                 <ExternalLink size={14} /> Abrir no YouTube
                </a>
              </div>
           </div>
