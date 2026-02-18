@@ -73,7 +73,8 @@ export enum View {
   BalcaoEstagios = 'balcao_estagios',
   TribunalOpiniao = 'tribunal_opiniao',
   BussolaOptativas = 'bussola_optativas',
-  AchadosPerdidos = 'achados_perdidos' // Nova View
+  AchadosPerdidos = 'achados_perdidos',
+  PerolasTribuna = 'perolas_tribuna' // Nova View
 }
 
 export interface Folder {
@@ -741,5 +742,18 @@ export interface LostFoundItem {
   image_url?: string;
   status: 'lost' | 'found';
   contact_info: string;
+  created_at: string;
+}
+
+// Pérolas da Tribuna
+export interface Quote {
+  id: string;
+  user_id: string;
+  user_name: string;
+  professor: string;
+  subject: string;
+  quote: string;
+  likes_funny: number;
+  likes_shock: number;
   created_at: string;
 }
