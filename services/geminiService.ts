@@ -1,12 +1,9 @@
-import * as GoogleGenerativeAI from "@google/generative-ai";
+import { GoogleGenAI, SchemaType } from "@google/generative-ai";
 
 // Sua chave paga de US$ 300
 const API_KEY = "AIzaSyD73fUpmZa7ixffTb7cswoLpdzzMdbKQZE";
 
-// A mágica está nesta linha abaixo: ela funciona mesmo se a biblioteca mudar
-const GoogleGenAI = (GoogleGenerativeAI as any).GoogleGenAI || (GoogleGenerativeAI as any).default?.GoogleGenAI;
-const SchemaType = (GoogleGenerativeAI as any).SchemaType || (GoogleGenerativeAI as any).default?.SchemaType;
-
+// Inicialização segura
 const genAI = new GoogleGenAI(API_KEY);
 
 export const getSafeApiKey = () => API_KEY;
@@ -31,11 +28,12 @@ export const generateFlashcards = async (text: string, subjectName: string, quan
       },
     });
 
-    const prompt = `Gere ${quantity} flashcards (Pergunta/Resposta) sobre "${subjectName}": ${text}`;
+    const prompt = `Gere ${quantity} flashcards de estudo ativo sobre o texto de "${subjectName}": "${text}".`;
     const result = await model.generateContent(prompt);
-    return JSON.parse(result.response.text());
+    const response = await result.response;
+    return JSON.parse(response.text());
   } catch (error) {
-    console.error("Erro:", error);
+    console.error("Erro na IA:", error);
     throw error;
   }
 };
@@ -43,15 +41,21 @@ export const generateFlashcards = async (text: string, subjectName: string, quan
 export const getStudyMotivation = async (subjects: string[]) => {
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result = await model.generateContent("Dê uma frase curta em latim com tradução para estudantes de Direito.");
-    return result.response.text();
+    const result = await model.generateContent("Dê uma frase curta de motivação em latim com tradução.");
+    const response = await result.response;
+    return response.text();
   } catch {
     return "Scientia Vinces.";
   }
 };
 
 export const simplifyLegalText = async (complexText: string) => {
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-  const result = await model.generateContent(`Simplifique: ${complexText}`);
-  return result.response.text();
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const result = await model.generateContent(`Simplifique este texto jurídico: ${complexText}`);
+    const response = await result.response;
+    return response.text();
+  } catch (error) {
+    throw error;
+  }
 };
