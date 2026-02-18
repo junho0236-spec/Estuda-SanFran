@@ -13,7 +13,8 @@ import {
   Radio,
   UserPlus,
   Gavel,
-  ScrollText // Added for Wiki
+  ScrollText,
+  Handshake
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -175,7 +176,7 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 6: WIKI DE PEÇAS (Novo - Wide) */}
+        {/* CARD 6: WIKI DE PEÇAS (Wide) */}
         <button
           onClick={() => onNavigate(View.PetitionWiki)}
           className="group relative col-span-1 md:col-span-2 bg-[#0e7490] dark:bg-cyan-950/40 rounded-[2.5rem] p-8 border border-cyan-500/30 shadow-xl hover:shadow-cyan-500/20 transition-all flex flex-col justify-between overflow-hidden"
@@ -195,7 +196,27 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 7: JURISPRUDÊNCIA (Standard) */}
+        {/* CARD 7: PACTO DE ESTUDO (Novo - Wide) */}
+        <button
+          onClick={() => onNavigate(View.StudyPact)}
+          className="group relative col-span-1 md:col-span-2 bg-[#020617] dark:bg-blue-950/40 rounded-[2.5rem] p-8 border border-blue-500/30 shadow-xl hover:shadow-blue-500/20 transition-all flex flex-col justify-between overflow-hidden"
+        >
+           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/clean-gray-paper.png')] opacity-10"></div>
+           <div className="absolute -left-10 -top-10 w-40 h-40 bg-blue-600/10 rounded-full blur-2xl"></div>
+
+           <div className="flex justify-between items-start relative z-10">
+              <div className="p-3 bg-blue-500/20 text-blue-300 rounded-2xl border border-blue-500/30 backdrop-blur-sm">
+                 <Handshake size={24} />
+              </div>
+              <ArrowUpRight size={20} className="text-blue-200 group-hover:text-white transition-colors" />
+           </div>
+           <div className="text-left mt-8 relative z-10">
+              <h4 className="text-2xl font-black text-white uppercase tracking-tight">Pacto de Estudo</h4>
+              <p className="text-xs font-bold text-blue-200 uppercase tracking-widest mt-1">Contrato de Foco • Responsabilidade Mútua</p>
+           </div>
+        </button>
+
+        {/* CARD 8: JURISPRUDÊNCIA (Standard) */}
         <button
           onClick={() => onNavigate(View.JurisprudenceMural)}
           className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-violet-400 transition-all flex flex-col justify-between h-full hover:shadow-violet-500/10"
@@ -212,7 +233,7 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 8: CLASSIFICADOS (Standard) */}
+        {/* CARD 9: CLASSIFICADOS (Standard) */}
         <button
           onClick={() => onNavigate(View.ClassificadosPatio)}
           className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-rose-400 transition-all flex flex-col justify-between h-full hover:shadow-rose-500/10"

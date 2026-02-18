@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck, BookX, ScrollText, FileText, Repeat, UserX, ListTodo } from 'lucide-react';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck, BookX, ScrollText, FileText, Repeat, UserX, ListTodo, Handshake } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel } from './types';
 import Dashboard from './components/Dashboard';
 import Profile from './components/Profile';
@@ -59,7 +59,8 @@ import SyllabusTracker from './components/SyllabusTracker';
 import DeadlinePlanner from './components/DeadlinePlanner';
 import Mentorship from './components/Mentorship';
 import MockJury from './components/MockJury';
-import PetitionWiki from './components/PetitionWiki'; // Import
+import PetitionWiki from './components/PetitionWiki'; 
+import StudyPact from './components/StudyPact'; // Import
 import SanFranEssential from './components/SanFranEssential';
 import SanFranCommunity from './components/SanFranCommunity';
 import SanFranImprovement from './components/SanFranImprovement';
@@ -436,7 +437,7 @@ const App: React.FC = () => {
   const isEssentialChild = [View.Anki, View.Timer, View.Calendar, View.Ranking, View.Subjects, View.Tasks, View.DeadArchive, View.Calculator, View.ErrorLog, View.CodeTracker, View.IracMethod, View.SpacedRepetition, View.AttendanceCalculator, View.SyllabusTracker, View.DeadlinePlanner].includes(currentView);
   
   // Helper to check if current view is a child of SanFran Community
-  const isCommunityChild = [View.Debate, View.ClassificadosPatio, View.JurisprudenceMural, View.Societies, View.Largo, View.StudyRoom, View.Mural, View.Mentorship, View.MockJury, View.PetitionWiki].includes(currentView);
+  const isCommunityChild = [View.Debate, View.ClassificadosPatio, View.JurisprudenceMural, View.Societies, View.Largo, View.StudyRoom, View.Mural, View.Mentorship, View.MockJury, View.PetitionWiki, View.StudyPact].includes(currentView);
 
   // Helper to check if current view is a child of SanFran Improvement
   const isImprovementChild = [View.Specialization, View.TypingChallenge, View.DominioJuridico, View.Timeline, View.LeiSeca, View.Library, View.OralArgument].includes(currentView);
@@ -661,6 +662,7 @@ const App: React.FC = () => {
             {currentView === View.Mentorship && <Mentorship userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
             {currentView === View.MockJury && <MockJury userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
             {currentView === View.PetitionWiki && <PetitionWiki userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
+            {currentView === View.StudyPact && <StudyPact userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
             
             {currentView === View.Duel && activeDuel && (
               <DuelArena 

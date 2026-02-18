@@ -64,7 +64,8 @@ export enum View {
   DeadlinePlanner = 'deadline_planner',
   Mentorship = 'mentorship',
   MockJury = 'mock_jury',
-  PetitionWiki = 'petition_wiki' // Nova View
+  PetitionWiki = 'petition_wiki',
+  StudyPact = 'study_pact' // Nova View
 }
 
 export interface Folder {
@@ -579,5 +580,21 @@ export interface PetitionWikiPost {
   author_name: string;
   validation_count: number;
   is_consolidated: boolean;
+  created_at: string;
+}
+
+// Study Pact Types
+export interface StudyPact {
+  id: string;
+  title: string;
+  creator_id: string;
+  creator_name: string;
+  partner_id?: string;
+  partner_name?: string;
+  target_hours_per_day: number;
+  duration_days: number;
+  stake_amount: number;
+  status: 'open' | 'active' | 'completed' | 'failed';
+  start_date?: string;
   created_at: string;
 }
