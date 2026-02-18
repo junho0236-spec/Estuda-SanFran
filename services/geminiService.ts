@@ -1,11 +1,9 @@
-import * as GoogleGenerativeAI from "@google/generative-ai";
+import { GoogleGenAI, SchemaType } from "@google/generative-ai";
 
-// Sua chave paga de US$ 300
+// 1. Sua chave paga de US$ 300
 const API_KEY = "AIzaSyD73fUpmZa7ixffTb7cswoLpdzzMdbKQZE";
 
-// ESTA É A LINHA QUE RESOLVE O ERRO DE EXPORTAÇÃO
-const { GoogleGenAI, SchemaType } = (GoogleGenerativeAI as any).default || GoogleGenerativeAI;
-
+// 2. Inicialização direta (padrão da versão 0.11.1)
 const genAI = new GoogleGenAI(API_KEY);
 
 export const getSafeApiKey = () => API_KEY;
