@@ -1,42 +1,23 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 
 // Inicializa o cliente Google GenAI de forma preguiçosa (lazy)
 let aiInstance: GoogleGenAI | null = null;
 
 const getApiKey = () => {
-  let key = "";
-
-  // 1. Tenta acessar via Vite (import.meta.env) - Prioridade para VITE_GEMINI_API_KEY
-  try {
-    const meta = import.meta as any;
-    if (meta && meta.env) {
-      if (meta.env.VITE_GEMINI_API_KEY) {
-        key = meta.env.VITE_GEMINI_API_KEY;
-      } else if (meta.env.API_KEY) {
-        // Fallback legado
-        key = meta.env.API_KEY;
-      }
-    }
-  } catch (e) {
-    // Ignora erro se import.meta não estiver disponível
+  // Tenta acessar diretamente a variável do Vite. 
+  // O bundler substitui import.meta.env.VITE_GEMINI_API_KEY pelo valor em tempo de build.
+  // Verificação explícita para evitar problemas com 'undefined'.
+  const meta = import.meta as any;
+  if (typeof meta !== 'undefined' && meta.env && meta.env.VITE_GEMINI_API_KEY) {
+    return meta.env.VITE_GEMINI_API_KEY;
   }
   
-  // 2. Tenta acessar via process.env (Vercel/Node fallback) se ainda não encontrou
-  if (!key && typeof process !== 'undefined' && process.env) {
-    if (process.env.VITE_GEMINI_API_KEY) {
-      key = process.env.VITE_GEMINI_API_KEY;
-    } else if (process.env.API_KEY) {
-      key = process.env.API_KEY;
-    }
+  // Fallback para process.env (compatibilidade com configs manuais ou outros environments)
+  if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+    return process.env.API_KEY;
   }
 
-  // 3. Fallback manual (se injetado via script window)
-  if (!key && typeof window !== 'undefined' && (window as any).__API_KEY__) {
-    key = (window as any).__API_KEY__;
-  }
-
-  return key;
+  return "";
 };
 
 const getAiClient = () => {
@@ -45,8 +26,8 @@ const getAiClient = () => {
     
     if (!apiKey) {
       console.warn("Gemini API Key is missing. Ensure VITE_GEMINI_API_KEY is set in Vercel Environment Variables.");
-      // Inicializa com string placeholder para não quebrar a aplicação imediatamente, 
-      // o erro real aparecerá quando tentar fazer uma requisição.
+      // Inicializa com string placeholder para a aplicação não quebrar na inicialização,
+      // mas falhará graciosamente na requisição.
       aiInstance = new GoogleGenAI({ apiKey: "missing-key" });
     } else {
       aiInstance = new GoogleGenAI({ apiKey });
@@ -59,7 +40,8 @@ const getAiClient = () => {
  * Retorna a chave de API configurada no ambiente (para debug se necessário).
  */
 export const getSafeApiKey = (): string | null => {
-  return getApiKey() || null;
+  const key = getApiKey();
+  return key ? `${key.substring(0, 4)}...` : null;
 };
 
 /**
@@ -68,6 +50,12 @@ export const getSafeApiKey = (): string | null => {
 export const generateFlashcards = async (text: string, subjectName: string, quantity: number = 5) => {
   try {
     const ai = getAiClient();
+    
+    // Validação prévia de segurança
+    if (getApiKey() === "") {
+        throw new Error("Chave de API não configurada (VITE_GEMINI_API_KEY).");
+    }
+
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview', 
       contents: `Você é um professor de Direito da USP. Sua tarefa é criar materiais de estudo ativo.
@@ -105,8 +93,12 @@ export const generateFlashcards = async (text: string, subjectName: string, quan
     if (!resultText) return [];
 
     return JSON.parse(resultText);
-  } catch (error) {
-    console.error("Erro ao gerar flashcards com IA:", error);
+  } catch (error: any) {
+    console.error("Erro detalhado ao gerar flashcards:", error);
+    // Propaga o erro para ser tratado na UI (alert) se for crítico
+    if (error.message.includes("API Key") || error.status === 400 || error.status === 403) {
+        throw new Error("Erro de Autenticação na IA. Verifique a VITE_GEMINI_API_KEY.");
+    }
     return [];
   }
 };
