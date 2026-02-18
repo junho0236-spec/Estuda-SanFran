@@ -1,10 +1,6 @@
-// Mudança crucial no endereço da importação para funcionar no navegador
 import { GoogleGenAI, SchemaType } from "@google/generative-ai";
 
-// Sua chave paga de US$ 300
 const API_KEY = "AIzaSyD73fUpmZa7ixffTb7cswoLpdzzMdbKQZE";
-
-// Inicialização
 const genAI = new GoogleGenAI(API_KEY);
 
 export const getSafeApiKey = () => API_KEY;
