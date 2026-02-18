@@ -81,7 +81,8 @@ export enum View {
   SpeedReader = 'speed_reader',
   Mnemonics = 'mnemonics',
   ReverseSchedule = 'reverse_schedule',
-  LegalCinema = 'legal_cinema' // Nova View
+  LegalCinema = 'legal_cinema',
+  GeneralLanguages = 'general_languages'
 }
 
 export interface Folder {
@@ -803,7 +804,7 @@ export interface BookChatMessage {
   created_at: string;
 }
 
-// Guerra das Turmas
+// Guerra Turmas
 export interface ClassWarStats {
   class_year: number;
   student_count: number;

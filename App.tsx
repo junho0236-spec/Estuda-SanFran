@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck, BookX, ScrollText, FileText, Repeat, UserX, ListTodo, Handshake, Eye, Key, CalendarCheck } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel } from './types';
@@ -84,7 +83,8 @@ import SanFranLife from './components/SanFranLife';
 import SanFranGames from './components/SanFranGames';
 import SanFranHelp from './components/SanFranHelp';
 import SanFranOAB from './components/SanFranOAB';
-import LegalCinema from './components/LegalCinema'; // Import
+import LegalCinema from './components/LegalCinema';
+import GeneralLanguages from './components/GeneralLanguages'; // New
 import { supabase } from './services/supabaseClient';
 
 export const getBrasiliaDate = () => {
@@ -190,6 +190,7 @@ const App: React.FC = () => {
             user_id: userState.user_id,
             name: userState.name,
             view: userState.view,
+            // FIX: Use subject_name, study_room_id and study_start_time from tracked userState instead of local scope variables
             subject_name: userState.subject_name,
             is_timer_active: userState.is_timer_active,
             last_seen: userState.last_seen,
@@ -459,7 +460,7 @@ const App: React.FC = () => {
   const isImprovementChild = [View.Specialization, View.TypingChallenge, View.DominioJuridico, View.Timeline, View.LeiSeca, View.Library, View.OralArgument].includes(currentView);
 
   // Helper to check if current view is a child of SanFran Languages
-  const isLanguagesChild = [View.SanFranIdiomas, View.LegalCinema].includes(currentView);
+  const isLanguagesChild = [View.SanFranIdiomas, View.LegalCinema, View.GeneralLanguages].includes(currentView);
 
   // Helper to check if current view is a child of SanFran Life
   const isLifeChild = [View.Office, View.Sebo].includes(currentView);
@@ -669,6 +670,7 @@ const App: React.FC = () => {
             {currentView === View.PrescriptionCalculator && <PrescriptionCalculator userId={session.user.id} />}
             {currentView === View.SanFranIdiomas && <SanFranIdiomas userId={session.user.id} />}
             {currentView === View.LegalCinema && <LegalCinema userId={session.user.id} />}
+            {currentView === View.GeneralLanguages && <GeneralLanguages userId={session.user.id} />}
             {currentView === View.ErrorLog && <ErrorLog userId={session.user.id} />}
             {currentView === View.CodeTracker && <CodeTracker userId={session.user.id} />}
             {currentView === View.IracMethod && <IracMethod userId={session.user.id} />}
