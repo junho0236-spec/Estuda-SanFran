@@ -62,7 +62,8 @@ export enum View {
   AttendanceCalculator = 'attendance_calculator',
   SyllabusTracker = 'syllabus_tracker',
   DeadlinePlanner = 'deadline_planner',
-  Mentorship = 'mentorship' // Nova View
+  Mentorship = 'mentorship',
+  MockJury = 'mock_jury' // Nova View
 }
 
 export interface Folder {
@@ -544,4 +545,25 @@ export interface MentorshipConnection {
   status: 'active' | 'archived';
   created_at: string;
   mentor_profiles?: MentorProfile; // Joined data
+}
+
+// Mock Jury Types
+export interface MockJurySession {
+  id: string;
+  title: string;
+  description: string;
+  creator_id: string;
+  creator_name: string;
+  prosecutor_id?: string;
+  prosecutor_name?: string;
+  defense_id?: string;
+  defense_name?: string;
+  prosecutor_argument?: string;
+  defense_argument?: string;
+  status: 'open' | 'drafting' | 'voting' | 'finished';
+  votes_prosecutor: number;
+  votes_defense: number;
+  voting_ends_at?: string;
+  winner_id?: string;
+  created_at: string;
 }

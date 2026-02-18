@@ -11,7 +11,8 @@ import {
   ArrowUpRight,
   Globe,
   Radio,
-  UserPlus
+  UserPlus,
+  Gavel
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -130,7 +131,7 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 4: MENTORSHIP (Novo Card - Wide) */}
+        {/* CARD 4: MENTORSHIP (Wide) */}
         <button
           onClick={() => onNavigate(View.Mentorship)}
           className="group relative col-span-1 md:col-span-2 bg-[#1c1917] dark:bg-amber-950/30 rounded-[2.5rem] p-8 border border-amber-500/30 shadow-xl hover:shadow-amber-500/20 transition-all flex flex-col justify-between overflow-hidden"
@@ -150,7 +151,30 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 5: CLUBE DE DEBATES (Standard) */}
+        {/* CARD 5: JÚRI SIMULADO (Novo Card - Wide) */}
+        <button
+          onClick={() => onNavigate(View.MockJury)}
+          className="group relative col-span-1 md:col-span-2 bg-[#270d0d] dark:bg-red-950/40 rounded-[2.5rem] p-8 border border-red-500/30 shadow-xl hover:shadow-red-500/20 transition-all flex flex-col justify-between overflow-hidden"
+        >
+           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/black-scales.png')] opacity-20"></div>
+           <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-red-600/20 rounded-full blur-2xl"></div>
+
+           <div className="flex justify-between items-start relative z-10">
+              <div className="p-3 bg-red-500/20 text-red-400 rounded-2xl border border-red-500/30 backdrop-blur-sm">
+                 <Gavel size={24} />
+              </div>
+              <div className="flex items-center gap-2">
+                 <span className="text-[9px] font-black uppercase bg-red-500/20 text-red-300 px-2 py-1 rounded border border-red-500/30">Valendo SanCoins</span>
+                 <ArrowUpRight size={20} className="text-red-200 group-hover:text-white transition-colors" />
+              </div>
+           </div>
+           <div className="text-left mt-8 relative z-10">
+              <h4 className="text-2xl font-black text-white uppercase tracking-tight">O Júri Simulado</h4>
+              <p className="text-xs font-bold text-red-200 uppercase tracking-widest mt-1">Acusação vs Defesa • Voto Popular</p>
+           </div>
+        </button>
+
+        {/* CARD 6: CLUBE DE DEBATES (Standard) */}
         <button
           onClick={() => onNavigate(View.Debate)}
           className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-yellow-400 transition-all flex flex-col justify-between h-full hover:shadow-yellow-500/10"
@@ -167,7 +191,7 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 6: JURISPRUDÊNCIA (Standard) */}
+        {/* CARD 7: JURISPRUDÊNCIA (Standard) */}
         <button
           onClick={() => onNavigate(View.JurisprudenceMural)}
           className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-violet-400 transition-all flex flex-col justify-between h-full hover:shadow-violet-500/10"
@@ -180,11 +204,11 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
            <div className="text-left mt-4">
               <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Jurisprudência</h4>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Tribunal Simulado</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Acervo Coletivo</p>
            </div>
         </button>
 
-        {/* CARD 7: CLASSIFICADOS (Standard) */}
+        {/* CARD 8: CLASSIFICADOS (Standard) */}
         <button
           onClick={() => onNavigate(View.ClassificadosPatio)}
           className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-rose-400 transition-all flex flex-col justify-between h-full hover:shadow-rose-500/10"
@@ -201,7 +225,7 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 8: MURAL (Standard) */}
+        {/* CARD 9: MURAL (Standard) */}
         <button
           onClick={() => onNavigate(View.Mural)}
           className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-orange-400 transition-all flex flex-col justify-between h-full hover:shadow-orange-500/10"
