@@ -2,13 +2,13 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 // Inicializa o cliente Google GenAI utilizando a API KEY do ambiente
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: "AIzaSyD73fUpmZa7ixffTb7cswoLpdzzMdbKQZE" });
 
 /**
  * Retorna a chave de API configurada no ambiente.
  */
 export const getSafeApiKey = (): string | null => {
-  return process.env.API_KEY || null;
+  return "AIzaSyD73fUpmZa7ixffTb7cswoLpdzzMdbKQZE" || null;
 };
 
 /**
