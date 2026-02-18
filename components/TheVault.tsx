@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   Archive, 
@@ -88,14 +89,7 @@ const TheVault: React.FC<TheVaultProps> = ({ userId, userName }) => {
 
       if (error) throw error;
 
-      // Gamification: Add coins
-      const { data: wallet } = await supabase.from('user_wallet').select('spent_coins').eq('user_id', userId).single();
-      const currentSpent = wallet?.spent_coins || 0;
-      // Adding 50 coins effectively means subtracting 50 from 'spent' in our logic (since balance = total_earned - spent)
-      // Wait, balance = earned - spent. To add balance, we decrease spent? No, that's weird.
-      // Better: assume a separate `bonus_coins` column exists or just simulate for MVP display.
-      // Let's just simulate the confetti reward.
-      
+      // Gamification: Add coins (simulated visual feedback)
       confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
       alert("Arquivo depositado no cofre com sucesso! +50 SanCoins (simbólico)");
       
