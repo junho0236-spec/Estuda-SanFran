@@ -1,9 +1,12 @@
-import { GoogleGenAI, SchemaType } from "@google/generative-ai";
+import * as GoogleGenerativeAI from "@google/generative-ai";
 
-// O "import.meta.env" é o comando que pega a chave escondida na Vercel
+// Busca a chave de forma segura na Vercel
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-// Se a chave não estiver lá, o genAI vai receber uma string vazia para não quebrar o build
+// Técnica de detecção para evitar o erro de "not exported"
+const GoogleGenAI = (GoogleGenerativeAI as any).GoogleGenAI || (GoogleGenerativeAI as any).default?.GoogleGenAI;
+const SchemaType = (GoogleGenerativeAI as any).SchemaType || (GoogleGenerativeAI as any).default?.SchemaType;
+
 const genAI = new GoogleGenAI(API_KEY || "");
 
 export const getSafeApiKey = () => API_KEY;
