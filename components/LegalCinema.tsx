@@ -9,85 +9,85 @@ interface LegalCinemaProps {
   userId: string;
 }
 
-// Mock Data para Fallback com IDs funcionais e tempos ajustados
+// Mock Data com IDs verificados para Embed
 const MOCK_CLIPS: CinemaClip[] = [
   {
     id: '1',
-    title: 'Objection! Hearsay',
-    source_name: 'Suits S01E01',
-    youtube_id: 'u0Qj8a8a_Yk', // Cena de treinamento
-    start_time: 20,
-    end_time: 60,
+    title: 'Interrogatório Agressivo',
+    source_name: 'Suits (Mike Ross)',
+    youtube_id: 'ir8tHl6y_Qo', 
+    start_time: 10,
+    end_time: 50,
     difficulty: 'medium',
-    question: "Qual foi o fundamento da objeção apresentada?",
-    options: ["Hearsay (Testemunho indireto)", "Speculation (Especulação)", "Leading the witness (Induzir a testemunha)"],
-    correct_option: 2,
-    explanation: "No clipe, a objeção é 'Leading', pois o advogado está colocando a resposta na boca da testemunha, o que é proibido no exame direto."
+    question: "Qual a estratégia usada por Harvey nesta cena?",
+    options: ["Intimidação direta", "Apelo emocional", "Acordo judicial"],
+    correct_option: 0,
+    explanation: "Harvey usa a intimidação e o blefe ('I play the man, not the odds') para desestabilizar o oponente sem precisar ir a julgamento."
   },
   {
     id: '2',
-    title: 'The Burden of Proof',
+    title: 'You Cant Handle the Truth',
     source_name: 'A Few Good Men',
-    youtube_id: '9FnO3igOkOk', // You can't handle the truth
-    start_time: 140,
-    end_time: 180,
+    youtube_id: '9FnO3igOkOk', 
+    start_time: 147,
+    end_time: 185,
     difficulty: 'hard',
-    question: "O que o advogado exige que a testemunha admita?",
-    options: ["Que ele mentiu no relatório", "Que ele ordenou o 'Code Red'", "Que ele não estava na base"],
+    question: "O que o Coronel Jessup admite sob pressão?",
+    options: ["Que mentiu no relatório", "Que ordenou o 'Code Red'", "Que não estava na base"],
     correct_option: 1,
-    explanation: "A estratégia foi forçar o Coronel a admitir que emitiu uma ordem ilegal ('Code Red'), transferindo a culpabilidade."
+    explanation: "A estratégia de Kaffee foi irritar Jessup até que seu orgulho o fizesse admitir que ordenou a punição extrajudicial ('Code Red')."
   },
   {
     id: '3',
-    title: 'Settlement Negotiation',
+    title: 'Oferta de Acordo',
     source_name: 'Erin Brockovich',
-    youtube_id: 'lXg5u-4q7qA', // Cena da negociação da água
-    start_time: 30,
-    end_time: 90,
+    youtube_id: '21R8s88d6p8', 
+    start_time: 40,
+    end_time: 100,
     difficulty: 'easy',
-    question: "Qual o argumento de Erin para recusar a oferta?",
-    options: ["O valor era muito baixo", "A água estava contaminada", "Não havia contrato escrito"],
+    question: "Por que Erin recusa a oferta da empresa?",
+    options: ["O valor era insultuoso", "Não havia garantia escrita", "A empresa não assumiu a culpa"],
     correct_option: 0,
-    explanation: "Erin rejeita a oferta de 'Settlement' (acordo) por considerá-la insultuosa dado o dano à saúde dos clientes."
+    explanation: "Erin usa o copo de água (supostamente contaminada) para demonstrar que a oferta financeira não cobria o dano real à saúde das vítimas."
   },
   {
     id: '4',
-    title: 'Expert Witness Qualification',
+    title: 'Testemunha Perita',
     source_name: 'My Cousin Vinny',
-    youtube_id: '6qg66Q2dJsg', // Mona Lisa Vito Testimony
+    youtube_id: 'HVjbf-tMCHo',
     start_time: 60,
     end_time: 120,
     difficulty: 'medium',
-    question: "O que permitiu que a testemunha fosse qualificada como 'Expert'?",
-    options: ["Diploma universitário", "Conhecimento técnico específico", "Ser mecânica certificada"],
+    question: "Como Vinny qualifica a testemunha como 'Expert'?",
+    options: ["Mostrando seu diploma", "Testando seu conhecimento técnico", "Citando sua experiência"],
     correct_option: 1,
-    explanation: "Ela demonstrou conhecimento técnico profundo sobre carros ('Positraction'), qualificando-a como perita (Expert Witness)."
+    explanation: "Ele faz perguntas técnicas extremamente específicas sobre mecânica automotiva para provar à corte que ela possui conhecimento notório (Expertise)."
   },
   {
     id: '5',
-    title: 'Impeaching the Witness',
+    title: 'Quebra de Álibi',
     source_name: 'Legally Blonde',
-    youtube_id: 'Kq-rD8P-a_o', // Cena do permanente
-    start_time: 120,
-    end_time: 180,
+    youtube_id: 'v1c2OfUgCv8',
+    start_time: 100,
+    end_time: 160,
     difficulty: 'easy',
-    question: "Qual técnica Elle Woods usou para derrubar o álibi?",
-    options: ["Hearsay", "Leading Questions", "Impeachment by Contradiction"],
-    correct_option: 2,
-    explanation: "Ela demonstrou uma contradição fática (o cuidado com o permanente) que provou que a testemunha estava mentindo (Impeachment)."
+    question: "Qual o erro lógico apontado por Elle Woods?",
+    options: ["O tempo de viagem", "A regra de manutenção do permanente", "A cor do sapato"],
+    correct_option: 1,
+    explanation: "Ela usa um conhecimento específico (não lavar o cabelo 24h após permanente) para provar que a testemunha estava mentindo sobre estar no chuveiro."
   },
   {
     id: '6',
-    title: 'Intellectual Property',
+    title: 'Depoimento Hostil',
     source_name: 'The Social Network',
-    youtube_id: 'I2zW84s0sPI', // Deposition scene
-    start_time: 0,
-    end_time: 50,
+    youtube_id: '-3RtOCnpMxE',
+    start_time: 10,
+    end_time: 60,
     difficulty: 'hard',
-    question: "Qual a postura do advogado durante o depoimento?",
-    options: ["Colaborativa", "Hostil e desinteressada", "Confusa"],
+    question: "Qual o argumento de Mark sobre a propriedade intelectual?",
+    options: ["Ele assinou um contrato", "Ter uma ideia não é ter o produto", "O código foi roubado"],
     correct_option: 1,
-    explanation: "Mark demonstra desdém pelo processo legal, argumentando que sua atenção vale mais que o depoimento ('Deposition')."
+    explanation: "Mark argumenta que se os autores tivessem inventado o Facebook, eles teriam inventado o Facebook. A ideia vaga não confere propriedade sobre a execução."
   }
 ];
 
@@ -243,10 +243,10 @@ const LegalCinema: React.FC<LegalCinemaProps> = ({ userId }) => {
                 <iframe 
                   width="100%" 
                   height="100%" 
-                  src={`https://www.youtube.com/embed/${selectedClip.youtube_id}?start=${selectedClip.start_time}&end=${selectedClip.end_time}&autoplay=1&rel=0&modestbranding=1&controls=1`} 
+                  src={`https://www.youtube.com/embed/${selectedClip.youtube_id}?start=${selectedClip.start_time}&end=${selectedClip.end_time}&rel=0&modestbranding=1&controls=1`} 
                   title="YouTube video player" 
                   frameBorder="0" 
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                  allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
                   allowFullScreen
                   className="absolute inset-0"
                 ></iframe>
@@ -256,7 +256,9 @@ const LegalCinema: React.FC<LegalCinemaProps> = ({ userId }) => {
                 <HelpCircle className="text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" />
                 <div>
                    <p className="text-sm font-bold text-sky-800 dark:text-sky-200">Instrução:</p>
-                   <p className="text-xs text-sky-700 dark:text-sky-300 mt-1">Assista ao clipe acima e preste atenção aos diálogos. O vídeo começará e terminará automaticamente no trecho relevante.</p>
+                   <p className="text-xs text-sky-700 dark:text-sky-300 mt-1">
+                     Clique no vídeo para iniciar. Ele deve tocar o trecho selecionado automaticamente. Se não funcionar, tente atualizar a página ou verificar sua conexão.
+                   </p>
                 </div>
              </div>
           </div>
