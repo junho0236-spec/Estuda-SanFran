@@ -77,7 +77,8 @@ export enum View {
   PerolasTribuna = 'perolas_tribuna',
   GuiaSobrevivencia = 'guia_sobrevivencia',
   ClubeLivro = 'clube_livro',
-  GuerraTurmas = 'guerra_turmas' // Nova View
+  GuerraTurmas = 'guerra_turmas',
+  SpeedReader = 'speed_reader' // Nova View
 }
 
 export interface Folder {
