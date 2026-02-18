@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { ListTodo, Plus, Trash2, CheckCircle2, Circle, AlertCircle, TrafficCone, GripVertical, FileText, Download } from 'lucide-react';
+import { ListTodo, Plus, Trash2, CheckCircle2, Circle, AlertCircle, TrafficCone, GripVertical, FileText, Download, X } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { SyllabusTracker as Tracker, SyllabusTopic, ConfidenceLevel } from '../types';
 
@@ -36,7 +36,13 @@ const SyllabusTracker: React.FC<SyllabusTrackerProps> = ({ userId }) => {
   const fetchTrackers = async () => {
     setLoading(true);
     try {
-      const { data } = await supabase.from('syllabus_trackers').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('syllabus_trackers').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error("Erro ao buscar editais:", error);
+        return;
+      }
+
       if (data) {
         setTrackers(data);
         if (data.length > 0 && !activeTracker) setActiveTracker(data[0]);
@@ -61,34 +67,59 @@ const SyllabusTracker: React.FC<SyllabusTrackerProps> = ({ userId }) => {
 
   const createTracker = async () => {
     if (!newTitle.trim() || !newSubject.trim()) return;
-    try {
-      const { data, error } = await supabase.from('syllabus_trackers').insert({
-        user_id: userId,
-        title: newTitle,
-        subject_name: newSubject,
-        subject_id: null // Opcional, pode ser linkado a Subject real no futuro
-      }).select().single();
+    
+    // Validação básica do userId
+    if (!userId) {
+      alert("Erro de autenticação: ID do usuário não encontrado. Tente fazer login novamente.");
+      return;
+    }
 
-      if (error) throw error;
-      setTrackers([data, ...trackers]);
-      setActiveTracker(data);
-      setIsCreating(false);
-      setNewTitle('');
-      setNewSubject('');
-    } catch (e) {
-      alert("Erro ao criar edital.");
+    try {
+      const payload = {
+        user_id: userId,
+        title: newTitle.trim(),
+        subject_name: newSubject.trim(),
+        subject_id: null
+      };
+
+      const { data, error } = await supabase.from('syllabus_trackers').insert(payload).select().single();
+
+      if (error) {
+        console.error("Supabase Error:", error);
+        throw new Error(error.message);
+      }
+
+      if (data) {
+        setTrackers([data, ...trackers]);
+        setActiveTracker(data);
+        setIsCreating(false);
+        setNewTitle('');
+        setNewSubject('');
+      }
+    } catch (e: any) {
+      console.error("Erro detalhado ao criar edital:", e);
+      let msg = "Erro desconhecido ao criar edital.";
+      if (e.message?.includes("relation") && e.message?.includes("does not exist")) {
+        msg = "A tabela 'syllabus_trackers' não existe no banco de dados. Execute o SQL de instalação.";
+      } else if (e.message) {
+        msg = `Erro: ${e.message}`;
+      }
+      alert(msg);
     }
   };
 
   const deleteTracker = async (id: string) => {
     if (!confirm("Excluir este edital e todos os tópicos?")) return;
     try {
-      await supabase.from('syllabus_trackers').delete().eq('id', id);
+      const { error } = await supabase.from('syllabus_trackers').delete().eq('id', id);
+      if (error) throw error;
+      
       const remaining = trackers.filter(t => t.id !== id);
       setTrackers(remaining);
       setActiveTracker(remaining.length > 0 ? remaining[0] : null);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      alert(`Erro ao excluir: ${e.message}`);
     }
   };
 
@@ -110,8 +141,9 @@ const SyllabusTracker: React.FC<SyllabusTrackerProps> = ({ userId }) => {
       
       if (data) setTopics([...topics, ...data]);
       setBulkTopics('');
-    } catch (e) {
-      alert("Erro ao adicionar tópicos.");
+    } catch (e: any) {
+      console.error(e);
+      alert(`Erro ao adicionar tópicos: ${e.message}`);
     }
   };
 
@@ -172,6 +204,8 @@ const SyllabusTracker: React.FC<SyllabusTrackerProps> = ({ userId }) => {
       {isCreating && (
          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
             <div className="bg-white dark:bg-[#1a1a1a] w-full max-w-md rounded-[2.5rem] p-8 border-4 border-[#4f46e5] shadow-2xl relative">
+               <button onClick={() => setIsCreating(false)} className="absolute top-6 right-6 text-slate-400 hover:text-red-500"><X size={24} /></button>
+               
                <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase mb-6">Criar Rastreador</h3>
                <div className="space-y-4">
                   <div>
@@ -182,10 +216,9 @@ const SyllabusTracker: React.FC<SyllabusTrackerProps> = ({ userId }) => {
                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1 mb-1 block">Disciplina / Área</label>
                      <input value={newSubject} onChange={e => setNewSubject(e.target.value)} placeholder="Ex: Civil" className="w-full p-4 bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-slate-700 rounded-xl font-bold outline-none focus:border-[#4f46e5]" />
                   </div>
-                  <div className="flex gap-3 mt-4">
-                     <button onClick={() => setIsCreating(false)} className="flex-1 py-4 bg-slate-100 dark:bg-white/10 text-slate-500 rounded-xl font-black uppercase text-xs">Cancelar</button>
-                     <button onClick={createTracker} className="flex-1 py-4 bg-[#4f46e5] text-white rounded-xl font-black uppercase text-xs shadow-lg">Criar</button>
-                  </div>
+                  <button onClick={createTracker} className="w-full py-4 bg-[#4f46e5] text-white rounded-xl font-black uppercase text-xs shadow-lg mt-2 hover:bg-[#4338ca] transition-colors">
+                     Criar e Iniciar
+                  </button>
                </div>
             </div>
          </div>
