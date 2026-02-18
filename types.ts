@@ -79,7 +79,8 @@ export enum View {
   ClubeLivro = 'clube_livro',
   GuerraTurmas = 'guerra_turmas',
   SpeedReader = 'speed_reader',
-  Mnemonics = 'mnemonics' // Nova View
+  Mnemonics = 'mnemonics',
+  ReverseSchedule = 'reverse_schedule' // Nova View
 }
 
 export interface Folder {
@@ -822,4 +823,20 @@ export interface Mnemonic {
   subject: string;
   expansion: MnemonicLetter[];
   description?: string;
+}
+
+// Reverse Schedule Types
+export interface PlanSubject {
+  name: string;
+  weight: number; // 1 to 3
+  color: string;
+}
+
+export interface StudyPlan {
+  id: string;
+  title: string;
+  exam_date: string;
+  daily_hours: number;
+  subjects_config: PlanSubject[];
+  created_at: string;
 }
