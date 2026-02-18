@@ -45,59 +45,60 @@ const SUITS_DEEP_DIVE: DeepDiveClip = {
   segments: [
     {
       id: 'seg_1',
-      startTime: 12,
+      startTime: 10,
       endTime: 18,
-      transcript: "I'm not looking for another associate. I'm looking for another me.",
+      transcript: "They're all gonna be walking in here in their fancy suits. I'm not looking for another associate. I'm looking for another me.",
       interactiveWords: [
-        { word: "associate", translation: "Associado", definition: "Advogado júnior contratado por um escritório, sem ser sócio." },
-        { word: "looking", translation: "Procurando", definition: "To search for something." }
+        { word: "associate", translation: "Associado", definition: "Um advogado júnior em um escritório, que não é sócio." },
+        { word: "fancy", translation: "Elegante / Chique", definition: "Expensive or elaborate." }
       ],
-      question: "O que Harvey quer dizer com 'looking for another me'?",
-      options: ["Ele quer um clone físico.", "Ele quer alguém que pense e aja como ele.", "Ele quer alguém com o mesmo nome."],
+      question: "Qual é a principal reclamação de Harvey sobre os candidatos que ele espera?",
+      options: ["Eles são muito jovens", "Eles são todos iguais (em 'ternos chiques')", "Eles não são de Harvard"],
       correctAnswer: 1,
-      feedback: "Exato. Harvey busca alguém com sua audácia e habilidade, não apenas mais um funcionário padrão."
+      feedback: "Exato. Ele os descarta como clones em 'ternos chiques', indicando que quer alguém único."
     },
     {
       id: 'seg_2',
-      startTime: 18,
-      endTime: 24,
-      transcript: "I can do this. I know the law better than anyone you've ever met.",
+      startTime: 24,
+      endTime: 32,
+      transcript: "You didn't go to Harvard Law. You haven't even passed the Bar exam. I passed the bar.",
       interactiveWords: [
-        { word: "law", translation: "A Lei / O Direito", definition: "O sistema de regras ou a profissão jurídica." },
-        { word: "met", translation: "Conheceu", definition: "Passado de 'Meet' (encontrar/conhecer)." }
+        { word: "Harvard", translation: "Harvard", definition: "Faculdade de Direito de elite. Na série, a firma só contrata de lá." },
+        { word: "Bar", translation: "Ordem (OAB)", definition: "Bar Exam é a prova para obter a licença de advogado." }
       ],
-      question: "Qual é a principal 'Soft Skill' (habilidade comportamental) que Mike demonstra aqui?",
-      options: ["Humildade", "Confiança / Arrogância", "Medo"],
+      question: "Quais são as duas credenciais formais que Harvey aponta que Mike não possui?",
+      options: ["Um diploma de direito e experiência", "Diploma de Harvard e aprovação na Ordem", "Uma recomendação e um bom terno"],
       correctAnswer: 1,
-      feedback: "Mike vende sua competência com extrema confiança ('better than anyone'), algo que Harvey valoriza."
+      feedback: "Exatamente. As duas objeções iniciais de Harvey são a falta do diploma de Harvard e da aprovação no exame da Ordem."
     },
     {
       id: 'seg_3',
-      startTime: 24,
-      endTime: 30,
-      transcript: "You didn't go to Harvard Law. You haven't even passed the Bar Exam.",
+      startTime: 41,
+      endTime: 53,
+      transcript: "I have a photographic memory... Okay, now tell me what it says... 'The legislative history of the Civil Rights Act of 1964 shows that...'",
       interactiveWords: [
-        { word: "Harvard", translation: "Harvard", definition: "Faculdade de elite. Na série, a firma só contrata de lá." },
-        { word: "Bar", translation: "Ordem (OAB)", definition: "Bar Exam é a prova necessária para obter a licença de advogado." }
+        { word: "photographic", translation: "Fotográfica", definition: "Relacionado a fotografias; com a precisão de uma foto." },
+        { word: "legislative", translation: "Legislativa", definition: "Relativo ao processo de criação de leis." }
       ],
-      question: "Quais são os dois pré-requisitos técnicos que Mike não possui?",
-      options: ["Idade e Experiência", "Dinheiro e Contatos", "Diploma de Harvard e Carteira da Ordem"],
-      correctAnswer: 2,
-      feedback: "Correto. Ele não tem o pedigree (Harvard) nem a licença legal (Bar Exam) para advogar."
+      question: "Que habilidade especial Mike alega ter (e demonstra)?",
+      options: ["Super velocidade", "Memória fotográfica", "Detecção de mentiras"],
+      correctAnswer: 1,
+      feedback: "Correto. Ele afirma ter uma 'memória fotográfica' e prova recitando o livro."
     },
     {
       id: 'seg_4',
-      startTime: 34,
-      endTime: 42,
-      transcript: "I learned it. I know what I'm doing. Or I wouldn't be in here.",
+      startTime: 68, // 1:08
+      endTime: 80, // 1:20
+      transcript: "Jessica: He's a fraud. Harvey: He's a genius. Jessica: You hired a fraud. I'm not going to let you put the firm at risk.",
       interactiveWords: [
-        { word: "learned", translation: "Aprendi", definition: "Adquirir conhecimento." },
-        { word: "doing", translation: "Fazendo", definition: "Executando uma ação." }
+        { word: "fraud", translation: "Fraude / Impostor", definition: "Alguém que engana os outros, fingindo ser quem não é." },
+        { word: "firm", translation: "Firma / Escritório", definition: "Uma sociedade de negócios, especialmente um escritório de advocacia." },
+        { word: "risk", translation: "Risco", definition: "Uma situação envolvendo exposição ao perigo." }
       ],
-      question: "Mike admite que não tem o diploma. Qual é o argumento dele?",
-      options: ["Ele vai estudar depois.", "Ele aprendeu o conteúdo por conta própria (autodidata).", "Ele comprou um diploma falso."],
+      question: "Qual é a principal preocupação de Jessica sobre a contratação de Mike?",
+      options: ["Ele é muito jovem", "Ele coloca o escritório em risco", "Ele não é um gênio"],
       correctAnswer: 1,
-      feedback: "Mike argumenta que possui o *conhecimento* ('I learned it'), mesmo sem a formalidade do diploma."
+      feedback: "Correto. A frase final dela é: 'Não vou deixar você colocar o escritório em risco', que é sua objeção principal."
     }
   ]
 };
@@ -120,6 +121,7 @@ const LegalCinema: React.FC<LegalCinemaProps> = ({ userId }) => {
     setActiveClip(clip);
     setCurrentSegmentIdx(0);
     resetSegmentState();
+    setCompleted(false); // Reset completion status
   };
 
   const resetSegmentState = () => {
