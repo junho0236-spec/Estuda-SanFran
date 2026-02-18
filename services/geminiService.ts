@@ -1,9 +1,24 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-// Inicializa o cliente Google GenAI utilizando a API KEY do ambiente
-// A chave deve estar definida nas variáveis de ambiente da Vercel como API_KEY
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Inicializa o cliente Google GenAI de forma preguiçosa (lazy)
+// Isso evita que a aplicação quebre (tela branca) se a chave não estiver presente no carregamento inicial
+let aiInstance: GoogleGenAI | null = null;
+
+const getAiClient = () => {
+  if (!aiInstance) {
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+      console.warn("Gemini API Key is missing. Check process.env.API_KEY");
+      // Inicializa com string vazia para não quebrar o construtor,
+      // mas as chamadas falharão graciosamente com erro de auth depois.
+      aiInstance = new GoogleGenAI({ apiKey: "" });
+    } else {
+      aiInstance = new GoogleGenAI({ apiKey });
+    }
+  }
+  return aiInstance;
+};
 
 /**
  * Retorna a chave de API configurada no ambiente.
@@ -18,6 +33,7 @@ export const getSafeApiKey = (): string | null => {
  */
 export const generateFlashcards = async (text: string, subjectName: string, quantity: number = 5) => {
   try {
+    const ai = getAiClient();
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview', // Modelo atualizado para melhor performance em texto
       contents: `Você é um professor de Direito da USP. Sua tarefa é criar materiais de estudo ativo.
@@ -57,7 +73,8 @@ export const generateFlashcards = async (text: string, subjectName: string, quan
     return JSON.parse(resultText);
   } catch (error) {
     console.error("Erro ao gerar flashcards com IA:", error);
-    throw error;
+    // Retorna array vazio em vez de lançar erro para não quebrar a UI
+    return [];
   }
 };
 
@@ -68,6 +85,7 @@ export const getStudyMotivation = async (subjects: string[]) => {
   const list = subjects.length > 0 ? subjects.join(", ") : "Direito";
   
   try {
+    const ai = getAiClient();
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Sou um estudante de Direito na SanFran (USP). Atualmente estudo: ${list}. Dê uma frase curta de motivação em latim relevante ao estudo jurídico e sua tradução em português.`,
@@ -84,6 +102,7 @@ export const getStudyMotivation = async (subjects: string[]) => {
  */
 export const simplifyLegalText = async (complexText: string) => {
   try {
+    const ai = getAiClient();
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview', 
       contents: `Você é um professor assistente da Faculdade de Direito do Largo São Francisco. 
@@ -96,6 +115,6 @@ export const simplifyLegalText = async (complexText: string) => {
     return response.text;
   } catch (error) {
     console.error("Erro ao simplificar texto:", error);
-    throw error;
+    return "Não foi possível simplificar o texto no momento. Verifique sua conexão ou a chave de API.";
   }
 };
