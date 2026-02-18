@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   Globe, 
@@ -14,14 +15,16 @@ import {
   MessageSquare,
   Sparkles,
   Search,
-  // FIX: Import missing X icon for modal close buttons
-  X
+  X,
+  ArrowLeft
 } from 'lucide-react';
+import { View } from '../types';
 import { supabase } from '../services/supabaseClient';
 import confetti from 'canvas-confetti';
 
 interface GeneralLanguagesProps {
   userId: string;
+  onNavigate: (view: View) => void;
 }
 
 type LangCode = 'en' | 'es' | 'fr' | 'de' | 'it';
@@ -52,10 +55,10 @@ const LESSONS_DATABASE: Record<LangCode, Lesson[]> = {
     { id: 'en_a1_2', level: 'A1', title: 'The Verb To Be', description: 'Am, Is, Are basics.', theory: 'I am, You are, He/She/It is. This verb is used for state or identity.', example: "She is a student at USP.", question: "Complete: 'They ___ happy.'", options: ["is", "am", "are"], answer: 2 }
   ],
   es: [
-    { id: 'es_a1_1', level: 'A1', title: 'Presentaciones', description: 'Presentarse a otros.', theory: 'Usamos "Hola" para saludar. Para decir el nombre decimos "Me llamo" o "Mi nombre es".', example: "Hola, me llamo Carmen. Soy de Madrid.", question: "¿Cómo dices tu nombre?", options: ["Me llamo...", "Hola soy...", "Todas son correctas"], answer: 2 }
+    { id: 'es_a1_1', level: 'A1', title: 'Presentaciones', description: 'Presentarse a otros.', theory: 'Usamos "Hola" para saludar. Para dizer o nome dizemos "Me llamo" ou "Mi nombre es".', example: "Hola, me llamo Carmen. Soy de Madrid.", question: "¿Cómo dices tu nombre?", options: ["Me llamo...", "Hola soy...", "Todas son correctas"], answer: 2 }
   ],
   fr: [
-    { id: 'fr_a1_1', level: 'A1', title: 'Salutations', description: 'Bonjour et au revoir.', theory: 'En français, on dit "Bonjour" pendant la journée et "Bonsoir" le soir.', example: "Bonjour, monsieur! Comment allez-vous?", question: "Comment salue-t-100p on le soir?", options: ["Bonjour", "Bonsoir", "Salut"], answer: 1 }
+    { id: 'fr_a1_1', level: 'A1', title: 'Salutations', description: 'Bonjour et au revoir.', theory: 'En français, on dit "Bonjour" pendant la journée et "Bonsoir" le soir.', example: "Bonjour, monsieur! Comment allez-vous?", question: "Comment salue-t-on le soir?", options: ["Bonjour", "Bonsoir", "Salut"], answer: 1 }
   ],
   de: [
     { id: 'de_a1_1', level: 'A1', title: 'Begrüßung', description: 'Grüße e Kennenlernen.', theory: 'Auf Deutsch sagt man "Guten Tag" für den Tag und "Guten Morgen" für den Morgen.', example: "Hallo! Ich bin Lucas. Wie geht es dir?", question: "Was sagt man am Morgen?", options: ["Guten Abend", "Guten Morgen", "Gute Nacht"], answer: 1 }
@@ -65,7 +68,7 @@ const LESSONS_DATABASE: Record<LangCode, Lesson[]> = {
   ]
 };
 
-const GeneralLanguages: React.FC<GeneralLanguagesProps> = ({ userId }) => {
+const GeneralLanguages: React.FC<GeneralLanguagesProps> = ({ userId, onNavigate }) => {
   const [currentLang, setCurrentLang] = useState<LangCode>('en');
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
@@ -91,7 +94,6 @@ const GeneralLanguages: React.FC<GeneralLanguagesProps> = ({ userId }) => {
         setCompletedLessons(data.completed_lessons || []);
         setTotalXP(data.total_xp || 0);
       } else if (error && error.code === 'PGRST116') {
-        // Init progress
         await supabase.from('general_lang_progress').insert({
           user_id: userId,
           completed_lessons: [],
@@ -154,40 +156,40 @@ const GeneralLanguages: React.FC<GeneralLanguagesProps> = ({ userId }) => {
   return (
     <div className="h-full flex flex-col animate-in fade-in duration-700 pb-20 px-2 md:px-0">
       
+      {/* HEADER WITH BACK BUTTON */}
+      <div className="flex items-center justify-between mb-8 shrink-0">
+        <div className="flex items-center gap-4">
+           <button 
+             onClick={() => onNavigate(View.SanFranLanguages)}
+             className="p-3 bg-slate-100 dark:bg-white/10 rounded-full hover:bg-slate-200 dark:hover:bg-white/20 transition-all shadow-sm"
+           >
+              <ArrowLeft size={20} className="text-slate-600 dark:text-slate-200" />
+           </button>
+           <div>
+              <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight leading-none">General Languages</h2>
+              <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mt-1">Trilha de Aprendizado</p>
+           </div>
+        </div>
+        <div className="flex gap-4">
+           <div className="bg-yellow-50 dark:bg-yellow-900/20 px-4 py-2 rounded-2xl border border-yellow-200 dark:border-yellow-800 flex items-center gap-2">
+              <Trophy size={16} className="text-yellow-600" />
+              <span className="font-black text-slate-900 dark:text-white tabular-nums">{totalXP} XP</span>
+           </div>
+        </div>
+      </div>
+
       {/* LANGUAGE SELECTOR */}
       <div className="flex gap-2 overflow-x-auto pb-6 no-scrollbar shrink-0">
          {(Object.keys(LANGUAGES_CONFIG) as LangCode[]).map(lc => (
             <button
                key={lc}
                onClick={() => { setCurrentLang(lc); setActiveLesson(null); }}
-               className={`flex items-center gap-3 px-6 py-4 rounded-[2rem] font-black uppercase text-xs tracking-widest transition-all border-2 ${currentLang === lc ? `${LANGUAGES_CONFIG[lc].color} text-white border-transparent shadow-xl scale-105` : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500 hover:border-slate-300'}`}
+               className={`flex items-center gap-3 px-6 py-4 rounded-[2rem] font-black uppercase text-[10px] tracking-widest transition-all border-2 ${currentLang === lc ? `${LANGUAGES_CONFIG[lc].color} text-white border-transparent shadow-xl scale-105` : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500 hover:border-slate-300'}`}
             >
                <span className="text-xl">{LANGUAGES_CONFIG[lc].flag}</span>
                {LANGUAGES_CONFIG[lc].label}
             </button>
          ))}
-      </div>
-
-      {/* DASHBOARD INFO */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 shrink-0">
-         <div className="bg-white dark:bg-sanfran-rubiDark/20 p-6 rounded-[2.5rem] border border-slate-200 dark:border-indigo-500/20 shadow-xl flex items-center gap-6">
-            <div className={`p-4 rounded-2xl ${LANGUAGES_CONFIG[currentLang].color} text-white shadow-lg`}>
-               <Globe size={24} />
-            </div>
-            <div>
-               <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Idioma Ativo</p>
-               <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">{LANGUAGES_CONFIG[currentLang].label}</h3>
-            </div>
-         </div>
-         <div className="bg-white dark:bg-sanfran-rubiDark/20 p-6 rounded-[2.5rem] border border-slate-200 dark:border-indigo-500/20 shadow-xl flex items-center gap-6">
-            <div className="p-4 rounded-2xl bg-yellow-500 text-white shadow-lg">
-               <Trophy size={24} />
-            </div>
-            <div>
-               <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Total Acumulado</p>
-               <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">{totalXP} XP</h3>
-            </div>
-         </div>
       </div>
 
       {/* LEARNING PATH */}
@@ -199,7 +201,7 @@ const GeneralLanguages: React.FC<GeneralLanguagesProps> = ({ userId }) => {
             return (
                <div key={level} className="space-y-6">
                   <div className="flex items-center gap-4">
-                     <div className="w-12 h-12 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-lg border-4 border-white dark:border-slate-800 shadow-lg">{level}</div>
+                     <div className="w-12 h-12 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-lg border-4 border-white dark:border-slate-800 shadow-lg shrink-0">{level}</div>
                      <h4 className="text-sm font-black uppercase tracking-widest text-slate-500">
                         {level === 'A1' ? 'Iniciante' : level === 'A2' ? 'Elementar' : level === 'B1' ? 'Intermediário' : 'Avançado'}
                      </h4>
@@ -355,23 +357,6 @@ const GeneralLanguages: React.FC<GeneralLanguagesProps> = ({ userId }) => {
                   )}
                </footer>
 
-            </div>
-         </div>
-      )}
-
-      {selectedWord && (
-         <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setSelectedWord(null)}>
-            <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden relative" onClick={e => e.stopPropagation()}>
-               <div className={`h-32 relative p-6 ${LANGUAGES_CONFIG[currentLang].color}`}>
-                  <button onClick={() => setSelectedWord(null)} className="absolute top-4 right-4 p-2 bg-white/20 rounded-full hover:bg-white/40"><X size={16} /></button>
-                  <p className="text-xs font-bold text-white uppercase tracking-widest mb-1">Termo {LANGUAGES_CONFIG[currentLang].label}</p>
-                  <h2 className="text-3xl font-black text-white tracking-tight">{selectedWord}</h2>
-               </div>
-               <div className="p-6 space-y-4">
-                  <p className="text-lg font-bold text-slate-800 dark:text-slate-200">Termo não encontrado</p>
-                  <p className="text-sm font-serif italic text-slate-600 dark:text-slate-400">"Desculpe, a tradução detalhada para este termo ainda está sendo redigida."</p>
-                  <button onClick={() => playAudio(selectedWord)} className="w-full py-3 bg-slate-100 dark:bg-slate-800 rounded-xl font-bold uppercase text-xs">Ouvir Pronúncia</button>
-               </div>
             </div>
          </div>
       )}
