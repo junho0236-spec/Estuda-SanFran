@@ -49,6 +49,45 @@ const MOCK_CLIPS: CinemaClip[] = [
     options: ["Verdict", "Settlement", "Sentencing"],
     correct_option: 1,
     explanation: "Um 'Settlement' é um acordo alcançado entre as partes para resolver o litígio sem a necessidade de um julgamento final."
+  },
+  {
+    id: '4',
+    title: 'Expert Witness Qualification',
+    source_name: 'My Cousin Vinny',
+    youtube_id: 'W-Q2t1K1G1M',
+    start_time: 200,
+    end_time: 260,
+    difficulty: 'medium',
+    question: "O que permitiu que a testemunha fosse qualificada como 'Expert'?",
+    options: ["Diploma universitário", "Experiência prática comprovada", "Ser mecânica certificada"],
+    correct_option: 1,
+    explanation: "Nos EUA (e BR), um 'Expert Witness' pode ser qualificado por conhecimento, habilidade, experiência, treinamento ou educação (FRE 702)."
+  },
+  {
+    id: '5',
+    title: 'Impeaching the Witness',
+    source_name: 'Legally Blonde',
+    youtube_id: 'y1o_iY99eeA',
+    start_time: 155,
+    end_time: 205,
+    difficulty: 'easy',
+    question: "Qual técnica Elle Woods usou para derrubar o álibi?",
+    options: ["Hearsay", "Leading Questions", "Impeachment by Contradiction"],
+    correct_option: 2,
+    explanation: "Ela demonstrou uma contradição fática (o cuidado com o permanente) que provou que a testemunha estava mentindo sobre estar no chuveiro (Impeachment)."
+  },
+  {
+    id: '6',
+    title: 'Intellectual Property',
+    source_name: 'The Social Network',
+    youtube_id: 'lB95KLmpLR4',
+    start_time: 20,
+    end_time: 60,
+    difficulty: 'hard',
+    question: "Qual o argumento central da defesa sobre a 'ideia' do Facebook?",
+    options: ["A ideia foi roubada", "Ideias não são protegíveis, execução sim", "Houve quebra de contrato verbal"],
+    correct_option: 1,
+    explanation: "A defesa argumenta que ter uma ideia não confere propriedade sobre o produto final se a execução (código/engenharia) foi distinta."
   }
 ];
 
