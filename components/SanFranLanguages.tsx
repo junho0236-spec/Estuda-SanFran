@@ -7,7 +7,8 @@ import {
   ArrowUpRight, 
   Mic2,
   FileText,
-  Construction
+  Construction,
+  Film
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -83,16 +84,31 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
           </div>
         </button>
 
-        {/* CARD 2: COMING SOON (Placeholder Vertical) */}
-        <div className="col-span-1 row-span-2 bg-slate-100 dark:bg-slate-900 rounded-[2.5rem] p-8 border-2 border-dashed border-slate-300 dark:border-slate-800 flex flex-col items-center justify-center text-center opacity-70">
-           <div className="w-20 h-20 bg-slate-200 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6">
-              <Construction className="text-slate-400 w-10 h-10" />
+        {/* CARD 2: CINEMA JURÍDICO (NOVO) */}
+        <button
+          onClick={() => onNavigate(View.LegalCinema)}
+          className="group relative col-span-1 row-span-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2.5rem] p-8 border border-slate-700 dark:border-slate-200 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between overflow-hidden"
+        >
+           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/black-scales.png')] opacity-20"></div>
+           <div className="absolute top-0 right-0 w-40 h-40 bg-purple-500/20 rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
+
+           <div className="w-full flex justify-between items-start relative z-10">
+              <Film size={24} className="text-slate-300 dark:text-slate-600" />
+              <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse"></div>
            </div>
-           <h4 className="text-lg font-black text-slate-500 dark:text-slate-400 uppercase tracking-tight">Em Breve</h4>
-           <p className="text-xs font-bold text-slate-400 dark:text-slate-500 mt-2 max-w-[150px]">
-              Novos idiomas como Espanhol Jurídico e Francês em desenvolvimento.
-           </p>
-        </div>
+
+           <div className="relative z-10 mt-auto">
+              <h3 className="text-2xl font-black uppercase tracking-tight leading-none mb-2">Cinema Jurídico</h3>
+              <p className="text-xs font-bold opacity-70 uppercase tracking-widest line-clamp-3">
+                Aprenda com Suits & HTGAWM. Clips reais, contexto e quizzes.
+              </p>
+           </div>
+           
+           <div className="w-full pt-4 border-t border-white/10 dark:border-black/10 mt-4 relative z-10 flex items-center justify-between">
+              <span className="text-[9px] font-black uppercase tracking-widest opacity-60">Pop Culture Law</span>
+              <ArrowUpRight size={16} />
+           </div>
+        </button>
 
       </div>
 

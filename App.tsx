@@ -75,7 +75,7 @@ import ClubeLivro from './components/ClubeLivro';
 import GuerraTurmas from './components/GuerraTurmas';
 import SpeedReader from './components/SpeedReader';
 import Mnemonics from './components/Mnemonics';
-import ReverseStudyPlanner from './components/ReverseStudyPlanner'; // Import
+import ReverseStudyPlanner from './components/ReverseStudyPlanner'; 
 import SanFranEssential from './components/SanFranEssential';
 import SanFranCommunity from './components/SanFranCommunity';
 import SanFranImprovement from './components/SanFranImprovement';
@@ -84,6 +84,7 @@ import SanFranLife from './components/SanFranLife';
 import SanFranGames from './components/SanFranGames';
 import SanFranHelp from './components/SanFranHelp';
 import SanFranOAB from './components/SanFranOAB';
+import LegalCinema from './components/LegalCinema'; // Import
 import { supabase } from './services/supabaseClient';
 
 export const getBrasiliaDate = () => {
@@ -458,7 +459,7 @@ const App: React.FC = () => {
   const isImprovementChild = [View.Specialization, View.TypingChallenge, View.DominioJuridico, View.Timeline, View.LeiSeca, View.Library, View.OralArgument].includes(currentView);
 
   // Helper to check if current view is a child of SanFran Languages
-  const isLanguagesChild = [View.SanFranIdiomas].includes(currentView);
+  const isLanguagesChild = [View.SanFranIdiomas, View.LegalCinema].includes(currentView);
 
   // Helper to check if current view is a child of SanFran Life
   const isLifeChild = [View.Office, View.Sebo].includes(currentView);
@@ -667,6 +668,7 @@ const App: React.FC = () => {
             {currentView === View.InternRPG && <InternRPG />}
             {currentView === View.PrescriptionCalculator && <PrescriptionCalculator userId={session.user.id} />}
             {currentView === View.SanFranIdiomas && <SanFranIdiomas userId={session.user.id} />}
+            {currentView === View.LegalCinema && <LegalCinema userId={session.user.id} />}
             {currentView === View.ErrorLog && <ErrorLog userId={session.user.id} />}
             {currentView === View.CodeTracker && <CodeTracker userId={session.user.id} />}
             {currentView === View.IracMethod && <IracMethod userId={session.user.id} />}

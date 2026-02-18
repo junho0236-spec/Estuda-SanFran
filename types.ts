@@ -80,7 +80,8 @@ export enum View {
   GuerraTurmas = 'guerra_turmas',
   SpeedReader = 'speed_reader',
   Mnemonics = 'mnemonics',
-  ReverseSchedule = 'reverse_schedule' // Nova View
+  ReverseSchedule = 'reverse_schedule',
+  LegalCinema = 'legal_cinema' // Nova View
 }
 
 export interface Folder {
@@ -839,4 +840,19 @@ export interface StudyPlan {
   daily_hours: number;
   subjects_config: PlanSubject[];
   created_at: string;
+}
+
+// Legal Cinema Types
+export interface CinemaClip {
+  id: string;
+  title: string;
+  source_name: string;
+  youtube_id: string;
+  start_time: number;
+  end_time: number;
+  difficulty: 'easy' | 'medium' | 'hard';
+  question: string;
+  options: string[];
+  correct_option: number;
+  explanation: string;
 }
