@@ -1,5 +1,5 @@
 {
-  "name": "sanfran-academy-hub-de-aprendizado-juridico",
+  "name": "sanfran-academy---hub-de-aprendizado-jurídico",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,19 +9,19 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/generative-ai": "0.11.1",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "lucide-react": "^0.464.0",
-    "@supabase/supabase-js": "^2.45.4",
-    "canvas-confetti": "^1.9.3",
-    "recharts": "^2.12.7",
-    "html2canvas": "^1.4.1"
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "@google/genai": "latest",
+    "lucide-react": "0.564.0",
+    "@supabase/supabase-js": "2",
+    "canvas-confetti": "1.9.3",
+    "recharts": "2.12.3",
+    "html2canvas": "1.4.1"
   },
   "devDependencies": {
-    "@types/node": "^22.10.2",
-    "@vitejs/plugin-react": "^4.3.4",
-    "typescript": "^5.7.2",
-    "vite": "^6.0.3"
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
   }
 }

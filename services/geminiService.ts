@@ -1,61 +1,101 @@
-import { GoogleGenAI, SchemaType } from "@google/generative-ai";
 
-// Lê a chave nova que você escondeu na Vercel
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+import { GoogleGenAI, Type } from "@google/genai";
 
-// Inicialização direta e limpa
-const genAI = new GoogleGenAI(API_KEY || "");
+// Inicializa o cliente Google GenAI utilizando a API KEY do ambiente
+// A chave deve estar definida nas variáveis de ambiente da Vercel como API_KEY
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-export const getSafeApiKey = () => API_KEY;
+/**
+ * Retorna a chave de API configurada no ambiente.
+ */
+export const getSafeApiKey = (): string | null => {
+  return process.env.API_KEY || null;
+};
 
+/**
+ * Gera flashcards a partir de um texto jurídico ou acadêmico utilizando Gemini.
+ * Ideal para tarefas complexas de estruturação de conhecimento.
+ */
 export const generateFlashcards = async (text: string, subjectName: string, quantity: number = 5) => {
   try {
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
-      generationConfig: {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview', // Modelo atualizado para melhor performance em texto
+      contents: `Você é um professor de Direito da USP. Sua tarefa é criar materiais de estudo ativo.
+      
+      Analise o seguinte texto jurídico sobre "${subjectName}":
+      "${text}"
+      
+      Gere EXATAMENTE ${quantity} flashcards de alta qualidade no formato Pergunta e Resposta.
+      - As perguntas (front) devem ser desafiadoras e focar em conceitos-chave, prazos, exceções ou princípios.
+      - As respostas (back) devem ser objetivas, didáticas e, se possível, citar o artigo de lei ou súmula pertinente.
+      - Evite perguntas de "Sim/Não".`,
+      config: {
         responseMimeType: "application/json",
         responseSchema: {
-          type: SchemaType.ARRAY,
+          type: Type.ARRAY,
           items: {
-            type: SchemaType.OBJECT,
+            type: Type.OBJECT,
             properties: {
-              front: { type: SchemaType.STRING },
-              back: { type: SchemaType.STRING },
+              front: {
+                type: Type.STRING,
+                description: 'A pergunta jurídica, caso prático curto ou conceito a ser definido.',
+              },
+              back: {
+                type: Type.STRING,
+                description: 'A resposta correta, explicação doutrinária e fundamentação legal.',
+              },
             },
-            required: ["front", "back"],
+            required: ['front', 'back'],
           },
         },
       },
     });
 
-    const prompt = `Você é um professor da SanFran. Gere ${quantity} flashcards sobre: ${text}`;
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return JSON.parse(response.text());
+    const resultText = response.text;
+    if (!resultText) return [];
+
+    return JSON.parse(resultText);
   } catch (error) {
-    console.error("Erro na geração:", error);
+    console.error("Erro ao gerar flashcards com IA:", error);
     throw error;
   }
 };
 
+/**
+ * Retorna uma frase de motivação em latim com tradução, baseada no contexto das disciplinas estudadas.
+ */
 export const getStudyMotivation = async (subjects: string[]) => {
+  const list = subjects.length > 0 ? subjects.join(", ") : "Direito";
+  
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result = await model.generateContent("Dê uma frase curta em latim com tradução.");
-    const response = await result.response;
-    return response.text();
-  } catch {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Sou um estudante de Direito na SanFran (USP). Atualmente estudo: ${list}. Dê uma frase curta de motivação em latim relevante ao estudo jurídico e sua tradução em português.`,
+    });
+    return response.text || "Scientia Vinces.";
+  } catch (error) {
+    console.warn("Erro ao buscar motivação via IA:", error);
     return "Scientia Vinces.";
   }
 };
 
+/**
+ * Simplifica textos jurídicos complexos usando o modelo Flash.
+ */
 export const simplifyLegalText = async (complexText: string) => {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result = await model.generateContent(`Simplifique este texto jurídico: ${complexText}`);
-    const response = await result.response;
-    return response.text();
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview', 
+      contents: `Você é um professor assistente da Faculdade de Direito do Largo São Francisco. 
+      Sua tarefa é "traduzir" o seguinte texto jurídico complexo (juridiquês) para uma linguagem clara, didática e direta, acessível a um estudante de primeiro ano.
+      Mantenha a precisão técnica, mas explique termos difíceis se necessário.
+      
+      Texto para simplificar:
+      "${complexText}"`,
+    });
+    return response.text;
   } catch (error) {
+    console.error("Erro ao simplificar texto:", error);
     throw error;
   }
 };
