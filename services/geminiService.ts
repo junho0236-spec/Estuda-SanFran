@@ -1,8 +1,17 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-// Inicializa o cliente Google GenAI utilizando a API KEY do ambiente
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+/**
+ * Obtém o cliente Gemini de forma segura.
+ * Inicializa apenas quando chamado, prevenindo crash inicial do app se a chave estiver ausente.
+ */
+const getAiClient = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    throw new Error("Chave de API (API_KEY) não encontrada no ambiente.");
+  }
+  return new GoogleGenAI({ apiKey });
+};
 
 /**
  * Retorna a chave de API configurada no ambiente.
@@ -17,6 +26,7 @@ export const getSafeApiKey = (): string | null => {
  */
 export const generateFlashcards = async (text: string, subjectName: string, quantity: number = 5) => {
   try {
+    const ai = getAiClient();
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-001', // Modelo otimizado para velocidade e custo em tarefas de extração
       contents: `Você é um professor de Direito da USP. Sua tarefa é criar materiais de estudo ativo.
@@ -54,9 +64,10 @@ export const generateFlashcards = async (text: string, subjectName: string, quan
     if (!resultText) return [];
 
     return JSON.parse(resultText);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erro ao gerar flashcards com IA:", error);
-    throw error;
+    // Relança o erro para ser tratado na UI (ex: mostrar alerta)
+    throw new Error(error.message || "Falha na conexão com a IA.");
   }
 };
 
@@ -68,6 +79,7 @@ export const getStudyMotivation = async (subjects: string[]) => {
   const list = subjects.length > 0 ? subjects.join(", ") : "Direito";
   
   try {
+    const ai = getAiClient();
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-001',
       contents: `Sou um estudante de Direito na SanFran (USP). Atualmente estudo: ${list}. Dê uma frase curta de motivação em latim relevante ao estudo jurídico e sua tradução em português.`,
@@ -84,6 +96,7 @@ export const getStudyMotivation = async (subjects: string[]) => {
  */
 export const simplifyLegalText = async (complexText: string) => {
   try {
+    const ai = getAiClient();
     const response = await ai.models.generateContent({
       // MODELO MAIS BARATO E RÁPIDO
       model: 'gemini-2.5-flash-001', 
