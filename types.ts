@@ -63,7 +63,8 @@ export enum View {
   SyllabusTracker = 'syllabus_tracker',
   DeadlinePlanner = 'deadline_planner',
   Mentorship = 'mentorship',
-  MockJury = 'mock_jury' // Nova View
+  MockJury = 'mock_jury',
+  PetitionWiki = 'petition_wiki' // Nova View
 }
 
 export interface Folder {
@@ -565,5 +566,18 @@ export interface MockJurySession {
   votes_defense: number;
   voting_ends_at?: string;
   winner_id?: string;
+  created_at: string;
+}
+
+// Petition Wiki Types
+export interface PetitionWikiPost {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  author_id: string;
+  author_name: string;
+  validation_count: number;
+  is_consolidated: boolean;
   created_at: string;
 }
