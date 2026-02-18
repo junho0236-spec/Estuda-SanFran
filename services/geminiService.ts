@@ -18,7 +18,7 @@ export const getSafeApiKey = (): string | null => {
 export const generateFlashcards = async (text: string, subjectName: string, quantity: number = 5) => {
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-001', // Modelo otimizado para velocidade e custo em tarefas de extração
+      model: 'gemini-1.5-flash', // Modelo otimizado para velocidade e custo em tarefas de extração
       contents: `Você é um professor de Direito da USP. Sua tarefa é criar materiais de estudo ativo.
       
       Analise o seguinte texto jurídico sobre "${subjectName}":
@@ -69,7 +69,7 @@ export const getStudyMotivation = async (subjects: string[]) => {
   
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-001',
+      model: 'gemini-1.5-flash',
       contents: `Sou um estudante de Direito na SanFran (USP). Atualmente estudo: ${list}. Dê uma frase curta de motivação em latim relevante ao estudo jurídico e sua tradução em português.`,
     });
     return response.text || "Scientia Vinces.";
@@ -86,7 +86,7 @@ export const simplifyLegalText = async (complexText: string) => {
   try {
     const response = await ai.models.generateContent({
       // MODELO MAIS BARATO E RÁPIDO
-      model: 'gemini-2.5-flash-001', 
+      model: 'gemini-1.5-flash', 
       contents: `Você é um professor assistente da Faculdade de Direito do Largo São Francisco. 
       Sua tarefa é "traduzir" o seguinte texto jurídico complexo (juridiquês) para uma linguagem clara, didática e direta, acessível a um estudante de primeiro ano.
       Mantenha a precisão técnica, mas explique termos difíceis se necessário.
