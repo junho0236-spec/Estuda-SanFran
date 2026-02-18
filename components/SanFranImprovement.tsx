@@ -11,7 +11,8 @@ import {
   Brain,
   Scale,
   GitCommit,
-  Mic
+  Mic,
+  Eye
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -147,7 +148,24 @@ const SanFranImprovement: React.FC<SanFranImprovementProps> = ({ onNavigate }) =
            </div>
         </button>
 
-        {/* CARD 5: BIBLIOTECA (Wide) */}
+        {/* CARD 5: LEITURA DINÂMICA (Wide) - ADICIONADO */}
+        <button
+          onClick={() => onNavigate(View.SpeedReader)}
+          className="group col-span-1 md:col-span-2 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-orange-400 transition-all flex flex-col justify-between h-full hover:shadow-orange-500/10"
+        >
+           <div className="flex justify-between items-start">
+              <div className="p-3 bg-orange-100 dark:bg-orange-900/20 text-orange-600 rounded-2xl">
+                 <Eye size={20} />
+              </div>
+              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-orange-500 transition-colors" />
+           </div>
+           <div className="text-left mt-4">
+              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Leitura Dinâmica</h4>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Treino RSVP & Velocidade</p>
+           </div>
+        </button>
+
+        {/* CARD 6: BIBLIOTECA (Wide) */}
         <button
           onClick={() => onNavigate(View.Library)}
           className="group col-span-1 md:col-span-2 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-indigo-400 transition-all flex flex-col justify-between h-full hover:shadow-indigo-500/10"
@@ -164,7 +182,7 @@ const SanFranImprovement: React.FC<SanFranImprovementProps> = ({ onNavigate }) =
            </div>
         </button>
 
-        {/* CARD 6: TIMELINE (Wide) */}
+        {/* CARD 7: TIMELINE (Wide) */}
         <button
           onClick={() => onNavigate(View.Timeline)}
           className="group col-span-1 md:col-span-2 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-pink-400 transition-all flex flex-col justify-between h-full hover:shadow-pink-500/10"
@@ -181,7 +199,7 @@ const SanFranImprovement: React.FC<SanFranImprovementProps> = ({ onNavigate }) =
            </div>
         </button>
 
-        {/* CARD 7: SUSTENTAÇÃO (Wide) */}
+        {/* CARD 8: SUSTENTAÇÃO (Wide) */}
         <button
           onClick={() => onNavigate(View.OralArgument)}
           className="group col-span-1 md:col-span-2 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-rose-400 transition-all flex flex-col justify-between h-full hover:shadow-rose-500/10"
