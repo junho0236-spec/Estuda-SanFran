@@ -5,13 +5,12 @@ import { GoogleGenAI, Type } from "@google/genai";
 let aiInstance: GoogleGenAI | null = null;
 
 const getApiKey = (): string => {
-  // Acesso direto para permitir substituição estática pelo Vite.
-  // Variáveis de ambiente no Vite DEVEM começar com VITE_ e ser acessadas por import.meta.env
-  // FIX: Cast `import.meta` to `any` to bypass TypeScript error when type definitions for Vite are not available.
-  const key = (import.meta as any).env.VITE_GEMINI_API_KEY;
+  // O Vite EXIGE o prefixo VITE_ para expor variáveis de ambiente ao navegador.
+  // A variável no painel da Vercel deve se chamar VITE_API_KEY.
+  const key = (import.meta as any).env.VITE_API_KEY;
   
   if (!key) {
-    console.warn("Gemini Service: VITE_GEMINI_API_KEY não foi encontrada nas variáveis de ambiente do build.");
+    console.warn("Gemini Service: VITE_API_KEY não foi encontrada nas variáveis de ambiente do build.");
   }
 
   return key || "";
@@ -43,7 +42,7 @@ export const generateFlashcards = async (text: string, subjectName: string, quan
     const apiKey = getApiKey();
     
     if (!apiKey || apiKey === "missing_key") {
-        throw new Error("A chave de API (VITE_GEMINI_API_KEY) não foi detectada. Verifique se a variável de ambiente está configurada no painel da Vercel e se um novo 'Redeploy' foi feito após a alteração.");
+        throw new Error("Chave de API não detectada. 1) Verifique se a variável 'VITE_API_KEY' está no painel da Vercel. 2) Se estiver, é OBRIGATÓRIO fazer um novo 'Redeploy' para que a alteração tenha efeito.");
     }
 
     const response = await ai.models.generateContent({
@@ -100,7 +99,7 @@ export const generateFlashcards = async (text: string, subjectName: string, quan
     console.error("Erro detalhado ao gerar flashcards:", error);
     
     if (error.status === 403 || (error.message && error.message.includes("API key"))) {
-        throw new Error("Erro de Permissão (403): Verifique se a VITE_GEMINI_API_KEY é válida.");
+        throw new Error("Erro de Permissão (403). Verifique se: \n1) O valor da VITE_API_KEY está correto. \n2) A API 'Generative Language' está ATIVADA no seu projeto Google Cloud. \n3) O faturamento está ativo no projeto.");
     }
     if (error.status === 400) {
         throw new Error("Erro na Requisição (400): O texto pode ser muito longo ou inválido.");
@@ -141,7 +140,7 @@ export const simplifyLegalText = async (complexText: string) => {
     const apiKey = getApiKey();
 
     if (!apiKey || apiKey === "missing_key") {
-      return "Erro: Chave de API (VITE_GEMINI_API_KEY) não configurada. Verifique as variáveis de ambiente e faça um novo deploy.";
+      return "Erro: Chave de API (VITE_API_KEY) não configurada. Verifique as variáveis de ambiente e faça um novo deploy.";
     }
 
     const response = await ai.models.generateContent({
