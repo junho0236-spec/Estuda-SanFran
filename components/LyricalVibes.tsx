@@ -1,9 +1,9 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Music2, Play, CheckCircle2, RotateCcw, Trophy, AlertCircle, 
   Search, Heart, Zap, Flame, Skull, Disc, Mic2, 
-  Filter, Sparkles, Coins, Unlock 
+  Filter, Sparkles, Coins, Unlock, BookOpen, ArrowRight
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import confetti from 'canvas-confetti';
@@ -20,6 +20,7 @@ interface EnhancedSong extends Song {
   color: string; // Cor temática da música
 }
 
+// BANCO DE DADOS APRIMORADO: DICAS MONOLÍNGUES E LETRAS COMPLETAS
 const SONGS_DB: EnhancedSong[] = [
   {
     id: '1',
@@ -34,20 +35,23 @@ const SONGS_DB: EnhancedSong[] = [
       { text: "We were good, we were gold" },
       { text: "Kinda dream that can't be sold" },
       { text: "We were right 'til we weren't" },
-      { text: "Built a home and watched it", missingWord: "burn", hint: "queimar" },
+      { text: "Built a home and watched it", missingWord: "burn", hint: "To undergo combustion; to be on fire." },
       { text: "Mm, I didn't wanna leave you" },
       { text: "I didn't wanna lie" },
       { text: "Started to cry but then remembered I" },
-      { text: "I can buy myself", missingWord: "flowers", hint: "flores" },
-      { text: "Write my name in the", missingWord: "sand", hint: "areia" },
+      { text: "I can buy myself", missingWord: "flowers", hint: "The reproductive structure of a plant, often colorful and fragrant." },
+      { text: "Write my name in the", missingWord: "sand", hint: "Small grains of rock found on beaches and deserts." },
       { text: "Talk to myself for hours" },
-      { text: "Say things you don't", missingWord: "understand", hint: "entender" },
+      { text: "Say things you don't", missingWord: "understand", hint: "To perceive the meaning of something; to comprehend." },
+      { text: "I can take myself dancing" },
+      { text: "And I can hold my own", missingWord: "hand", hint: "The end part of the arm beyond the wrist." },
+      { text: "Yeah, I can love me better than you can" }
     ]
   },
   {
     id: '2',
     title: 'Despacito',
-    artist: 'Luis Fonsi',
+    artist: 'Luis Fonsi ft. Daddy Yankee',
     youtube_id: 'kJQP7kiw5Fk',
     lang: 'es',
     genre: 'Reggaeton',
@@ -55,15 +59,19 @@ const SONGS_DB: EnhancedSong[] = [
     color: 'from-orange-400 to-amber-500',
     lyrics: [
       { text: "Sí, sabes que ya llevo un rato mirándote" },
-      { text: "Tengo que bailar contigo hoy" },
+      { text: "Tengo que bailar contigo hoy (DY)" },
       { text: "Vi que tu mirada ya estaba llamándome" },
-      { text: "Muéstrame el camino que yo", missingWord: "voy", hint: "vou" },
+      { text: "Muéstrame el camino que yo", missingWord: "voy", hint: "Primera persona del verbo ir. Moverse de un lugar hacia otro." },
       { text: "Tú, tú eres el imán y yo soy el metal" },
       { text: "Me voy acercando y voy armando el plan" },
-      { text: "Solo con pensarlo se acelera el", missingWord: "pulso", hint: "pulso" },
+      { text: "Solo con pensarlo se acelera el", missingWord: "pulso", hint: "Latido intermitente de las arterias, que se percibe en varias partes del cuerpo." },
       { text: "Ya, ya me está gustando más de lo normal" },
       { text: "Todos mis sentidos van pidiendo más" },
-      { text: "Esto hay que tomarlo sin ningún", missingWord: "apuro", hint: "pressa" },
+      { text: "Esto hay que tomarlo sin ningún", missingWord: "apuro", hint: "Prisa, urgencia o precipitación." },
+      { text: "Despacito" },
+      { text: "Quiero respirar tu cuello", missingWord: "despacito", hint: "Lentamente, con poca velocidad." },
+      { text: "Deja que te diga cosas al oído" },
+      { text: "Para que te acuerdes si no estás", missingWord: "conmigo", hint: "En mi compañía; juntamente con mi persona." }
     ]
   },
   {
@@ -79,12 +87,15 @@ const SONGS_DB: EnhancedSong[] = [
       { text: "Oh ma douce souffrance" },
       { text: "Pourquoi s'acharner? Tu recommences" },
       { text: "Je ne suis qu'un être sans importance" },
-      { text: "Sans lui je suis un peu", missingWord: "parano", hint: "paranoico" },
+      { text: "Sans lui je suis un peu", missingWord: "parano", hint: "Abréviation de paranoïaque. Qui souffre de délire de persécution." },
       { text: "Je déambule seule dans le métro" },
       { text: "Une dernière danse" },
       { text: "Pour oublier ma peine immense" },
-      { text: "Je veux m'enfuir que tout", missingWord: "recommence", hint: "recomece" },
-      { text: "Je remue le ciel, le jour, la", missingWord: "nuit", hint: "noite" },
+      { text: "Je veux m'enfuir que tout", missingWord: "recommence", hint: "Commencer une nouvelle fois." },
+      { text: "Je remue le ciel, le jour, la", missingWord: "nuit", hint: "La période de temps comprise entre le coucher et le lever du soleil." },
+      { text: "Je danse avec le vent, la pluie" },
+      { text: "Un peu d'amour, un brin de", missingWord: "miel", hint: "Substance sucrée produite par les abeilles." },
+      { text: "Et je danse, danse, danse, danse, danse, danse" }
     ]
   },
   {
@@ -98,57 +109,15 @@ const SONGS_DB: EnhancedSong[] = [
     color: 'from-purple-500 to-indigo-600',
     lyrics: [
       { text: "Is this the real life? Is this just fantasy?" },
-      { text: "Caught in a landslide, no escape from", missingWord: "reality", hint: "realidade" },
+      { text: "Caught in a landslide, no escape from", missingWord: "reality", hint: "The world or the state of things as they actually exist." },
       { text: "Open your eyes, look up to the skies and see" },
-      { text: "I'm just a poor boy, I need no", missingWord: "sympathy", hint: "simpatia/pena" },
+      { text: "I'm just a poor boy, I need no", missingWord: "sympathy", hint: "Feelings of pity and sorrow for someone else's misfortune." },
       { text: "Because I'm easy come, easy go, little high, little low" },
-      { text: "Any way the wind blows doesn't really matter to", missingWord: "me", hint: "mim" },
+      { text: "Any way the wind blows doesn't really matter to", missingWord: "me", hint: "Used by a speaker to refer to himself or herself." },
       { text: "Mama, just killed a man" },
-      { text: "Put a gun against his head, pulled my trigger, now he's", missingWord: "dead", hint: "morto" },
-    ]
-  },
-  {
-    id: '5',
-    title: '99 Luftballons',
-    artist: 'Nena',
-    youtube_id: 'La4Dcd1aUcE',
-    lang: 'de',
-    genre: 'Pop',
-    difficultyLevel: 2,
-    color: 'from-red-500 to-yellow-500',
-    lyrics: [
-      { text: "Hast du etwas Zeit für mich?" },
-      { text: "Dann singe ich ein Lied für", missingWord: "dich", hint: "você" },
-      { text: "Von 99 Luftballons" },
-      { text: "Auf ihrem Weg zum", missingWord: "Horizont", hint: "horizonte" },
-      { text: "Denkst du vielleicht grad an mich?" },
-      { text: "Dann singe ich ein Lied für dich" },
-      { text: "Von 99 Luftballons" },
-      { text: "Und dass sowas von sowas", missingWord: "kommt", hint: "vem" },
-    ]
-  },
-  {
-    id: '6',
-    title: 'Zitti e Buoni',
-    artist: 'Måneskin',
-    youtube_id: 'QN1odfjtMoo',
-    lang: 'it',
-    genre: 'Rock',
-    difficultyLevel: 3,
-    color: 'from-red-700 to-black',
-    lyrics: [
-      { text: "Loro non sanno di che parlo" },
-      { text: "Voi siete sporchi, fra', di fango" },
-      { text: "Giallo di siga' fra le dita" },
-      { text: "Io con la siga' camminando" },
-      { text: "Scusami ma ci credo tanto" },
-      { text: "Che posso fare questo salto" },
-      { text: "E anche se la strada è in", missingWord: "salita", hint: "subida" },
-      { text: "Per questo ora mi sto allenando" },
-      { text: "Buonasera, signore e signori" },
-      { text: "Fuori gli attori" },
-      { text: "Vi conviene toccarvi i", missingWord: "coglioni", hint: "testículos (gíria)" },
-      { text: "Vi conviene stare zitti e buoni" }
+      { text: "Put a gun against his head, pulled my trigger, now he's", missingWord: "dead", hint: "No longer alive." },
+      { text: "Mama, life had just begun" },
+      { text: "But now I've gone and thrown it all", missingWord: "away", hint: "To or at a distance from a particular place." }
     ]
   }
 ];
@@ -170,6 +139,20 @@ const LyricalVibes: React.FC<LyricalVibesProps> = ({ userId }) => {
   const [filterLang, setFilterLang] = useState<string>('all');
   const [filterGenre, setFilterGenre] = useState<string>('all');
 
+  // Input Refs for Navigation
+  const inputRefs = useRef<Record<number, HTMLInputElement | null>>({});
+
+  // Calculations
+  const totalBlanks = useMemo(() => {
+    return currentSong ? currentSong.lyrics.filter(l => l.missingWord).length : 0;
+  }, [currentSong]);
+
+  const filledCorrectly = useMemo(() => {
+    return Object.values(feedback).filter(f => f === 'correct').length;
+  }, [feedback]);
+
+  const progressPercent = totalBlanks > 0 ? (filledCorrectly / totalBlanks) * 100 : 0;
+
   const handleSelectSong = (song: EnhancedSong) => {
     setCurrentSong(song);
     setInputs({});
@@ -179,11 +162,35 @@ const LyricalVibes: React.FC<LyricalVibesProps> = ({ userId }) => {
     setCombo(0);
     setStatus('playing');
     setShowSearch(false);
+    inputRefs.current = {};
   };
 
   const handleInputChange = (index: number, value: string) => {
     if (status !== 'playing') return;
     setInputs(prev => ({ ...prev, [index]: value }));
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
+    if (e.key === 'Enter') {
+       // Find next missing word index
+       if (!currentSong) return;
+       let nextIndex = -1;
+       
+       for (let i = index + 1; i < currentSong.lyrics.length; i++) {
+           if (currentSong.lyrics[i].missingWord) {
+               nextIndex = i;
+               break;
+           }
+       }
+       
+       // If valid next index, focus it
+       if (nextIndex !== -1 && inputRefs.current[nextIndex]) {
+           inputRefs.current[nextIndex]?.focus();
+       } else {
+           // If no next, maybe submit? Or cycle to start? Let's just blur to indicate end.
+           (e.target as HTMLInputElement).blur();
+       }
+    }
   };
 
   const checkAnswers = async () => {
@@ -192,12 +199,10 @@ const LyricalVibes: React.FC<LyricalVibesProps> = ({ userId }) => {
     let correctInThisCheck = 0;
     let wrongInThisCheck = 0;
     const newFeedback = { ...feedback };
-    let totalBlanks = 0;
     let completedBlanks = 0;
 
     currentSong.lyrics.forEach((line, idx) => {
       if (line.missingWord) {
-        totalBlanks++;
         const userInput = inputs[idx]?.trim().toLowerCase();
         const correctWord = line.missingWord.toLowerCase();
         
@@ -296,7 +301,7 @@ const LyricalVibes: React.FC<LyricalVibesProps> = ({ userId }) => {
               <span className="text-[10px] font-black uppercase tracking-widest text-white">Music Academy</span>
            </div>
            <h2 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-none">Lyrical Vibes</h2>
-           <p className="text-slate-500 font-bold italic text-lg mt-2">Aprenda cantando. Domine o idioma no ritmo.</p>
+           <p className="text-slate-500 font-bold italic text-lg mt-2">Imersão musical total.</p>
         </div>
         
         {currentSong && !showSearch && (
@@ -485,8 +490,16 @@ const LyricalVibes: React.FC<LyricalVibesProps> = ({ userId }) => {
 
             {/* LYRICS & INPUTS */}
             <div className="lg:w-7/12 flex flex-col h-[500px] lg:h-auto bg-white dark:bg-sanfran-rubiDark/20 rounded-[2.5rem] border-2 border-slate-200 dark:border-white/10 shadow-xl overflow-hidden relative">
-               <div className={`absolute top-0 left-0 w-full h-2 bg-gradient-to-r ${currentSong.color}`}></div>
+               <div className={`absolute top-0 left-0 w-full h-3 bg-gradient-to-r ${currentSong.color} z-20`}></div>
                
+               {/* Progress Bar */}
+               <div className="w-full h-1 bg-slate-100 dark:bg-white/5 relative">
+                  <div 
+                     className="h-full bg-emerald-500 transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(16,185,129,0.5)]" 
+                     style={{ width: `${progressPercent}%` }}
+                  />
+               </div>
+
                <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
                   {currentSong.lyrics.map((line, idx) => (
                      <div key={idx} className="flex flex-wrap items-baseline gap-2 text-lg md:text-2xl font-medium text-slate-700 dark:text-slate-300 leading-relaxed font-serif">
@@ -496,8 +509,10 @@ const LyricalVibes: React.FC<LyricalVibesProps> = ({ userId }) => {
                               <div className="relative inline-block group">
                                  <input 
                                    type="text"
+                                   ref={(el) => inputRefs.current[idx] = el}
                                    value={inputs[idx] || ''}
                                    onChange={(e) => handleInputChange(idx, e.target.value)}
+                                   onKeyDown={(e) => handleKeyDown(e, idx)}
                                    disabled={status !== 'playing' || feedback[idx] === 'correct'}
                                    className={`min-w-[120px] bg-transparent border-b-4 text-center font-bold outline-none transition-all ${
                                       feedback[idx] === 'correct' ? 'border-emerald-500 text-emerald-600' : 
@@ -508,11 +523,19 @@ const LyricalVibes: React.FC<LyricalVibesProps> = ({ userId }) => {
                                    autoComplete="off"
                                  />
                                  
-                                 {/* HINT (Only shows if easy mode or bought) */}
+                                 {/* DICTIONARY HINT (Only shows if easy mode or bought) */}
                                  {(!feedback[idx] && line.hint && difficulty === 'easy') && (
-                                    <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[9px] text-slate-400 font-bold bg-white dark:bg-black px-2 py-0.5 rounded shadow-sm opacity-0 group-hover:opacity-100 transition-opacity cursor-help pointer-events-none z-20">
-                                       {line.hint}
-                                    </span>
+                                    <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 translate-y-full opacity-0 group-hover:opacity-100 transition-all duration-300 z-30 pointer-events-none w-64">
+                                       <div className="bg-slate-900 text-white text-xs p-3 rounded-xl shadow-2xl border border-white/10 backdrop-blur-md">
+                                          <div className="flex items-center gap-2 mb-1 border-b border-white/20 pb-1">
+                                             <BookOpen size={12} className="text-purple-400" />
+                                             <span className="font-black uppercase tracking-widest text-[9px] text-purple-400">Definition</span>
+                                          </div>
+                                          <p className="font-serif italic leading-snug">"{line.hint}"</p>
+                                       </div>
+                                       {/* Arrow */}
+                                       <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px] border-b-slate-900"></div>
+                                    </div>
                                  )}
                               </div>
                               <span>{line.text.split(line.missingWord)[1]}</span>
