@@ -104,6 +104,89 @@ const SONGS_DB: EnhancedSong[] = [
     ]
   },
   {
+    id: '5',
+    title: 'Good 4 u',
+    artist: 'Olivia Rodrigo',
+    youtube_id: 'gNi_6U5Pm_o',
+    lang: 'en',
+    genre: 'Rock',
+    difficultyLevel: 2,
+    color: 'from-violet-500 to-purple-600',
+    lyrics: [
+      { text: "(Ah)" },
+      { text: "Good for you, I guess you moved on really", missingWord: "easily", hint: "Without difficulty or effort." },
+      { text: "You found a new girl and it only took a couple weeks" },
+      { text: "Remember when you said that you wanted to give me the", missingWord: "world", hint: "The earth, together with all of its countries and peoples." },
+      { text: "(Ah-ah-ah-ah)" },
+
+      { text: "And good for you, I guess that you've been workin' on yourself" },
+      { text: "I guess that", missingWord: "therapist", hint: "A person skilled in a particular kind of therapy." },
+      { text: "I found for you, she really helped" },
+      { text: "Now you can be a better man for your brand new girl" },
+
+      { text: "Well, good for you, you look happy and", missingWord: "healthy", hint: "In good physical or mental condition." },
+      { text: "Not me, if you ever cared to ask" },
+      { text: "Good for you, you're doin' great out there", missingWord: "without", hint: "In the absence of." },
+      { text: "me, baby, God, I wish that I could do that" },
+
+      { text: "I've lost my", missingWord: "mind", hint: "The element of a person that enables them to be aware." },
+      { text: "I've spent the night cryin' on the floor of my", missingWord: "bathroom", hint: "A room containing a toilet and sink." },
+      { text: "But you're so unaffected, I really don't get it" },
+      { text: "But I guess good for you" },
+
+      { text: "Well, good for you, I guess you're gettin' everything you want" },
+      { text: "You bought a new car and your", missingWord: "career", hint: "An occupation undertaken for a significant period." },
+      { text: "'s really takin' off" },
+      { text: "It's like we never even", missingWord: "happened", hint: "Took place; occurred." },
+      { text: "Baby, what the fuck is up with that? (Huh?)" },
+
+      { text: "And good for you, it's like you never even", missingWord: "met", hint: "Past tense of meet." },
+      { text: "me" },
+      { text: "Remember when you swore to God I was the only person who ever got you?" },
+      { text: "Well, screw that, and screw you" },
+      { text: "You will never have to", missingWord: "hurt", hint: "To cause physical or mental pain." },
+      { text: "the way you know that I do" },
+
+      { text: "Well, good for you, you look happy and healthy" },
+      { text: "Not me, if you ever cared to ask" },
+      { text: "Good for you, you're doin' great out there without me" },
+      { text: "Baby, God, I wish that I could do that" },
+
+      { text: "I've lost my mind, I've spent the night" },
+      { text: "Cryin' on the floor of my bathroom" },
+      { text: "But you're so", missingWord: "unaffected", hint: "Feeling or showing no effects or changes." },
+      { text: "I really don't get it" },
+      { text: "But I guess good for you" },
+
+      { text: "(Ah-ah-ah-ah)" },
+      { text: "(Ah-ah-ah-ah)" },
+
+      { text: "Maybe I'm too", missingWord: "emotional", hint: "Aroused or characterized by intense feeling." },
+      { text: "But your", missingWord: "apathy", hint: "Lack of interest, enthusiasm, or concern." },
+      { text: "'s like a wound in salt" },
+      { text: "Maybe I'm too emotional" },
+      { text: "Or maybe you never cared at all" },
+
+      { text: "Maybe I'm too emotional" },
+      { text: "Your apathy is like a wound in salt" },
+      { text: "Maybe I'm too emotional" },
+      { text: "Or maybe you never", missingWord: "cared", hint: "Felt concern or interest." },
+      { text: "at all" },
+
+      { text: "Well, good for you, you look happy and healthy" },
+      { text: "Not me, if you ever cared to ask" },
+      { text: "Good for you, you're doin' great out there without me" },
+      { text: "Baby, like a damn", missingWord: "sociopath", hint: "A person with a personality disorder manifesting in antisocial attitudes." },
+
+      { text: "I’ve lost my mind, I've spent the night" },
+      { text: "Cryin' on the floor of my bathroom" },
+      { text: "But you're so unaffected, I really don't get it" },
+      { text: "But I guess good for you" },
+
+      { text: "Well, good for you, I guess you moved on really easily" }
+    ]
+  },
+  {
     id: '2',
     title: 'Despacito',
     artist: 'Luis Fonsi ft. Daddy Yankee',
@@ -414,24 +497,13 @@ const LyricalVibes: React.FC<LyricalVibesProps> = ({ userId }) => {
             <div className="flex flex-wrap gap-4 mb-6">
                 <div className="flex items-center gap-2 bg-slate-100 dark:bg-white/5 p-1 rounded-xl">
                    <Filter size={16} className="text-slate-400 ml-2" />
-                   {['all', 'en', 'es', 'fr', 'de', 'it'].map(lang => (
+                   {['all', 'en', 'es', 'fr'].map(lang => (
                       <button 
                         key={lang}
                         onClick={() => setFilterLang(lang)}
                         className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${filterLang === lang ? 'bg-white dark:bg-sanfran-rubi text-slate-900 dark:text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                       >
                          {lang === 'all' ? 'Todos' : lang.toUpperCase()}
-                      </button>
-                   ))}
-                </div>
-                <div className="flex items-center gap-2 bg-slate-100 dark:bg-white/5 p-1 rounded-xl">
-                   {['all', 'Pop', 'Rock', 'Reggaeton'].map(genre => (
-                      <button 
-                        key={genre}
-                        onClick={() => setFilterGenre(genre)}
-                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${filterGenre === genre ? 'bg-white dark:bg-purple-600 text-slate-900 dark:text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                      >
-                         {genre === 'all' ? 'Gêneros' : genre}
                       </button>
                    ))}
                 </div>
