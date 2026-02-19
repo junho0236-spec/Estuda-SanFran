@@ -39,20 +39,52 @@ const SONGS_DB: EnhancedSong[] = [
     difficultyLevel: 1,
     color: 'from-rose-400 to-red-500',
     lyrics: [
+      // Verse 1
       { text: "We were good, we were gold" },
       { text: "Kinda dream that can't be sold" },
       { text: "We were right 'til we weren't" },
       { text: "Built a home and watched it", missingWord: "burn", hint: "To undergo combustion; to be on fire." },
-      { text: "Mm, I didn't wanna leave you" },
+      
+      // Pre-Chorus
+      { text: "Mm, I didn't wanna", missingWord: "leave", hint: "To go away from a place or person." },
       { text: "I didn't wanna lie" },
       { text: "Started to cry but then remembered I" },
+      
+      // Chorus
       { text: "I can buy myself", missingWord: "flowers", hint: "The reproductive structure of a plant, often colorful and fragrant." },
       { text: "Write my name in the", missingWord: "sand", hint: "Small grains of rock found on beaches and deserts." },
-      { text: "Talk to myself for hours" },
+      { text: "Talk to myself for", missingWord: "hours", hint: "A period of time equal to sixty minutes." },
       { text: "Say things you don't", missingWord: "understand", hint: "To perceive the meaning of something; to comprehend." },
-      { text: "I can take myself dancing" },
+      { text: "I can take myself", missingWord: "dancing", hint: "To move the body rhythmically to music." },
       { text: "And I can hold my own", missingWord: "hand", hint: "The end part of the arm beyond the wrist." },
-      { text: "Yeah, I can love me better than you can" }
+      { text: "Yeah, I can love me better than you can" },
+      
+      // Verse 2
+      { text: "Paint my nails, cherry", missingWord: "red", hint: "The color of blood or fire." },
+      { text: "Match the roses that you left" },
+      { text: "No remorse, no", missingWord: "regret", hint: "A feeling of sadness or disappointment over something that has happened." },
+      { text: "I forgive every word you said" },
+
+      // Pre-Chorus
+      { text: "Ooh, I didn't wanna leave you, baby" },
+      { text: "I didn't wanna fight" },
+      { text: "Started to", missingWord: "cry", hint: "To shed tears as an expression of distress or pain." },
+      { text: "But then remembered I" },
+
+      // Chorus
+      { text: "I can buy myself flowers" },
+      { text: "Write my name in the sand" },
+      { text: "Talk to myself for hours" },
+      { text: "Say things you don't understand" },
+      { text: "I can take myself dancing, yeah" },
+      { text: "And I can hold my own hand" },
+      { text: "Yeah, I can love me better than you can" },
+
+      // Post-Chorus / Outro
+      { text: "Can love me better" },
+      { text: "I can love me better, baby" },
+      { text: "Can love me better" },
+      { text: "I can love me better, baby" }
     ]
   },
   {
@@ -366,13 +398,24 @@ const LyricalVibes: React.FC<LyricalVibesProps> = ({ userId }) => {
             <div className="flex flex-wrap gap-4 mb-6">
                 <div className="flex items-center gap-2 bg-slate-100 dark:bg-white/5 p-1 rounded-xl">
                    <Filter size={16} className="text-slate-400 ml-2" />
-                   {['all', 'en', 'es', 'fr'].map(lang => (
+                   {['all', 'en', 'es', 'fr', 'de', 'it'].map(lang => (
                       <button 
                         key={lang}
                         onClick={() => setFilterLang(lang)}
                         className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${filterLang === lang ? 'bg-white dark:bg-sanfran-rubi text-slate-900 dark:text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                       >
                          {lang === 'all' ? 'Todos' : lang.toUpperCase()}
+                      </button>
+                   ))}
+                </div>
+                <div className="flex items-center gap-2 bg-slate-100 dark:bg-white/5 p-1 rounded-xl">
+                   {['all', 'Pop', 'Rock', 'Reggaeton'].map(genre => (
+                      <button 
+                        key={genre}
+                        onClick={() => setFilterGenre(genre)}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${filterGenre === genre ? 'bg-white dark:bg-purple-600 text-slate-900 dark:text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                      >
+                         {genre === 'all' ? 'Gêneros' : genre}
                       </button>
                    ))}
                 </div>
