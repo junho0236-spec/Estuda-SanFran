@@ -87,7 +87,8 @@ export enum View {
   PronunciationLab = 'pronunciation_lab',
   LyricalVibes = 'lyrical_vibes',
   TheExchangeStudent = 'the_exchange_student',
-  VisualFlashcards = 'visual_flashcards'
+  VisualFlashcards = 'visual_flashcards',
+  BilingualNews = 'bilingual_news'
 }
 
 export interface Folder {
@@ -900,4 +901,18 @@ export interface ExchangeRPGScenario {
   speaker?: string; // e.g. "Immigration Officer"
   backgroundImage?: string;
   options: RPGScenarioOption[];
+}
+
+// Bilingual News Types
+export interface NewsArticle {
+  id: string;
+  title: string;
+  headline?: string;
+  content: string;
+  image_url?: string;
+  category: 'tech' | 'pop' | 'sports' | 'travel';
+  language: 'en' | 'es' | 'fr' | 'de' | 'it';
+  difficulty_level?: 'Beginner' | 'Intermediate' | 'Advanced';
+  source_name?: string;
+  created_at: string;
 }

@@ -12,7 +12,8 @@ import {
   GraduationCap,
   Music2,
   Plane,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Newspaper
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -142,7 +143,7 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 4: VISUAL FLASHCARDS (NEW!) */}
+        {/* CARD 4: VISUAL FLASHCARDS */}
         <button
           onClick={() => onNavigate(View.VisualFlashcards)}
           className="group relative col-span-1 md:col-span-1 lg:col-span-1 row-span-2 bg-gradient-to-br from-amber-500 to-orange-600 text-white rounded-[2.5rem] p-8 border border-white/20 shadow-xl hover:shadow-2xl hover:shadow-orange-500/20 hover:scale-[1.01] transition-all duration-300 flex flex-col justify-between overflow-hidden"
@@ -167,7 +168,35 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 5: LYRICAL VIBES */}
+        {/* CARD 5: BILINGUAL NEWS (NEW!) */}
+        <button
+          onClick={() => onNavigate(View.BilingualNews)}
+          className="group relative col-span-1 md:col-span-1 lg:col-span-2 row-span-2 bg-[#1e293b] text-white rounded-[2.5rem] p-8 border border-slate-600 shadow-xl hover:shadow-2xl hover:shadow-slate-500/20 hover:scale-[1.01] transition-all duration-300 flex flex-col justify-between overflow-hidden"
+        >
+           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/newspaper.png')] opacity-10"></div>
+           
+           <div className="flex justify-between items-start relative z-10">
+              <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
+                 <Newspaper size={24} className="text-white" />
+              </div>
+              <div className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md border border-white/10">
+                 Notícias & Atualidades
+              </div>
+           </div>
+           
+           <div className="relative z-10 mt-8">
+              <h3 className="text-2xl md:text-3xl font-black uppercase tracking-tight leading-none">News Reader</h3>
+              <p className="text-sm font-medium text-slate-300 leading-snug max-w-sm mt-2">
+                 Leia sobre Tech, Cultura e Esportes. Clique em qualquer palavra para tradução imediata.
+              </p>
+           </div>
+           
+           <div className="absolute bottom-8 right-8 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-4 group-hover:translate-x-0">
+              <ArrowUpRight size={24} />
+           </div>
+        </button>
+
+        {/* CARD 6: LYRICAL VIBES (Moved) */}
         <button
           onClick={() => onNavigate(View.LyricalVibes)}
           className="group relative col-span-1 md:col-span-1 lg:col-span-2 row-span-2 bg-gradient-to-r from-pink-500 to-rose-600 text-white rounded-[2.5rem] p-8 md:p-10 border border-white/10 shadow-xl hover:shadow-2xl hover:shadow-pink-500/20 hover:scale-[1.01] transition-all duration-300 flex flex-col justify-between overflow-hidden"
@@ -187,7 +216,7 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
            <div className="relative z-10 space-y-2 mt-8">
               <h3 className="text-2xl md:text-4xl font-black uppercase tracking-tight leading-none">Lyrical Vibes</h3>
               <p className="text-sm font-medium text-pink-100 leading-snug max-w-sm">
-                 Preencha as lacunas das suas músicas favoritas. Pop, Rock e Indie para aprender se divertindo.
+                 Preencha as lacunas das suas músicas favoritas.
               </p>
            </div>
            
@@ -196,7 +225,7 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 6: CINEMA JURÍDICO (Standard) */}
+        {/* CARD 7: CINEMA JURÍDICO (Standard) */}
         <button
           onClick={() => onNavigate(View.LegalCinema)}
           className="group relative col-span-1 md:col-span-1 lg:col-span-1 row-span-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2.5rem] p-8 border border-slate-700 dark:border-slate-200 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between overflow-hidden"
@@ -217,7 +246,7 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 7: GENERAL LANGUAGES (Standard) */}
+        {/* CARD 8: GENERAL LANGUAGES (Standard) */}
         <button
           onClick={() => onNavigate(View.GeneralLanguages)}
           className="group relative col-span-1 md:col-span-1 lg:col-span-1 row-span-2 bg-indigo-600 text-white rounded-[2.5rem] p-8 border border-indigo-500 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between overflow-hidden"
