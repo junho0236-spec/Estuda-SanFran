@@ -43,44 +43,60 @@ const SONGS_DB: EnhancedSong[] = [
       { text: "We were good, we were gold" },
       { text: "Kinda dream that can't be sold" },
       { text: "We were right 'til we weren't" },
-      { text: "Built a home and watched it", missingWord: "burn", hint: "To undergo combustion; to be on fire." },
+      { text: "Built a home and watched it", missingWord: "burn", hint: "To be on fire; undergo combustion." },
       
       // Pre-Chorus
-      { text: "Mm, I didn't wanna", missingWord: "leave", hint: "To go away from a place or person." },
+      { text: "Mm, I didn't wanna leave you" },
       { text: "I didn't wanna lie" },
       { text: "Started to cry but then remembered I" },
       
-      // Chorus
-      { text: "I can buy myself", missingWord: "flowers", hint: "The reproductive structure of a plant, often colorful and fragrant." },
-      { text: "Write my name in the", missingWord: "sand", hint: "Small grains of rock found on beaches and deserts." },
-      { text: "Talk to myself for", missingWord: "hours", hint: "A period of time equal to sixty minutes." },
-      { text: "Say things you don't", missingWord: "understand", hint: "To perceive the meaning of something; to comprehend." },
+      // Chorus 1
+      { text: "I can buy myself", missingWord: "flowers", hint: "The reproductive structure of a plant, often colorful." },
+      { text: "Write my name in the", missingWord: "sand", hint: "Small grains of rock found on beaches." },
+      { text: "Talk to myself for", missingWord: "hours", hint: "Periods of time equal to sixty minutes." },
+      { text: "Say things you don't", missingWord: "understand", hint: "To perceive the meaning of; comprehend." },
       { text: "I can take myself", missingWord: "dancing", hint: "To move the body rhythmically to music." },
-      { text: "And I can hold my own", missingWord: "hand", hint: "The end part of the arm beyond the wrist." },
+      { text: "And I can hold my own", missingWord: "hand", hint: "The end part of the human arm." },
       { text: "Yeah, I can love me better than you can" },
       
       // Verse 2
       { text: "Paint my nails, cherry", missingWord: "red", hint: "The color of blood or fire." },
       { text: "Match the roses that you left" },
-      { text: "No remorse, no", missingWord: "regret", hint: "A feeling of sadness or disappointment over something that has happened." },
+      { text: "No remorse, no", missingWord: "regret", hint: "A feeling of sadness about something you did or didn't do." },
       { text: "I forgive every word you said" },
 
-      // Pre-Chorus
+      // Pre-Chorus 2
       { text: "Ooh, I didn't wanna leave you, baby" },
       { text: "I didn't wanna fight" },
-      { text: "Started to", missingWord: "cry", hint: "To shed tears as an expression of distress or pain." },
+      { text: "Started to", missingWord: "cry", hint: "To shed tears due to emotion." },
       { text: "But then remembered I" },
 
-      // Chorus
+      // Chorus 2
       { text: "I can buy myself flowers" },
       { text: "Write my name in the sand" },
-      { text: "Talk to myself for hours" },
+      { text: "Talk to myself for", missingWord: "hours", hint: "A long period of time." },
       { text: "Say things you don't understand" },
-      { text: "I can take myself dancing, yeah" },
+      { text: "I can take myself", missingWord: "dancing", hint: "Rhythmic movement to music." },
       { text: "And I can hold my own hand" },
       { text: "Yeah, I can love me better than you can" },
 
-      // Post-Chorus / Outro
+      // Bridge / Chorus Reprise
+      { text: "Can love me better" },
+      { text: "I can love me better, baby" },
+      { text: "Can love me", missingWord: "better", hint: "Of a higher standard; more excellent." },
+      { text: "I can love me better, baby" },
+
+      // Final Chorus
+      { text: "I can buy myself", missingWord: "flowers", hint: "Blossoms on a plant." },
+      { text: "Write my name in the sand" },
+      { text: "Talk to myself for hours" },
+      { text: "Say things you don't", missingWord: "understand", hint: "Grasp the meaning of." },
+      { text: "I can take myself dancing" },
+      { text: "And I can hold my own", missingWord: "hand", hint: "Body part used for holding." },
+      { text: "Yeah, I can love me better than", missingWord: "you", hint: "Pronoun referring to the person being addressed." },
+      { text: "Can" },
+      
+      // Outro
       { text: "Can love me better" },
       { text: "I can love me better, baby" },
       { text: "Can love me better" },
