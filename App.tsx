@@ -8,7 +8,6 @@ import Scratchpad from './components/Scratchpad';
 import { supabase } from './services/supabaseClient';
 
 // Lazy Load dos Componentes para Performance (Code Splitting)
-// Isso evita carregar todos os MBs de código de uma vez no início
 const Dashboard = React.lazy(() => import('./components/Dashboard'));
 const Profile = React.lazy(() => import('./components/Profile'));
 const Anki = React.lazy(() => import('./components/Anki'));
@@ -92,6 +91,7 @@ const LegalCinema = React.lazy(() => import('./components/LegalCinema'));
 const GeneralLanguages = React.lazy(() => import('./components/GeneralLanguages')); 
 const LegalSimplifier = React.lazy(() => import('./components/LegalSimplifier'));
 const PronunciationLab = React.lazy(() => import('./components/PronunciationLab'));
+const LyricalVibes = React.lazy(() => import('./components/LyricalVibes'));
 
 // Loading Fallback Component com Estilo
 const PageLoader = () => (
@@ -483,7 +483,7 @@ const App: React.FC = () => {
   const isImprovementChild = [View.Specialization, View.TypingChallenge, View.DominioJuridico, View.Timeline, View.LeiSeca, View.Library, View.OralArgument].includes(currentView);
 
   // Helper to check if current view is a child of SanFran Languages
-  const isLanguagesChild = [View.SanFranIdiomas, View.LegalCinema, View.GeneralLanguages, View.PronunciationLab].includes(currentView);
+  const isLanguagesChild = [View.SanFranIdiomas, View.LegalCinema, View.GeneralLanguages, View.PronunciationLab, View.LyricalVibes].includes(currentView);
 
   // Helper to check if current view is a child of SanFran Life
   const isLifeChild = [View.Office, View.Sebo].includes(currentView);
@@ -697,6 +697,7 @@ const App: React.FC = () => {
                 {currentView === View.GeneralLanguages && <GeneralLanguages userId={session.user.id} />}
                 {currentView === View.LegalSimplifier && <LegalSimplifier />}
                 {currentView === View.PronunciationLab && <PronunciationLab userId={session.user.id} />}
+                {currentView === View.LyricalVibes && <LyricalVibes userId={session.user.id} />}
                 {currentView === View.ErrorLog && <ErrorLog userId={session.user.id} />}
                 {currentView === View.CodeTracker && <CodeTracker userId={session.user.id} />}
                 {currentView === View.IracMethod && <IracMethod userId={session.user.id} />}

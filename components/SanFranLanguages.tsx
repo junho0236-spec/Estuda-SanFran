@@ -9,7 +9,8 @@ import {
   FileText,
   Construction,
   Film,
-  GraduationCap
+  GraduationCap,
+  Music2
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -114,10 +115,10 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
           </div>
         </button>
 
-        {/* CARD 3: PRONÚNCIA LAB (NEW) */}
+        {/* CARD 3: PRONÚNCIA LAB */}
         <button
           onClick={() => onNavigate(View.PronunciationLab)}
-          className="group relative col-span-1 md:col-span-2 lg:col-span-2 row-span-2 bg-[#0d9488] text-white rounded-[2.5rem] p-8 border border-teal-500/50 shadow-xl hover:shadow-2xl hover:shadow-teal-500/20 hover:scale-[1.01] transition-all duration-300 flex flex-col justify-between overflow-hidden"
+          className="group relative col-span-1 md:col-span-1 lg:col-span-1 row-span-2 bg-[#0d9488] text-white rounded-[2.5rem] p-8 border border-teal-500/50 shadow-xl hover:shadow-2xl hover:shadow-teal-500/20 hover:scale-[1.01] transition-all duration-300 flex flex-col justify-between overflow-hidden"
         >
            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/sound-wave.png')] opacity-20"></div>
            <div className="absolute top-0 right-0 w-64 h-64 bg-teal-400/20 rounded-full blur-3xl -mr-16 -mt-16 group-hover:scale-125 transition-transform duration-700"></div>
@@ -126,15 +127,12 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
               <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
                  <Mic2 size={24} className="text-white" />
               </div>
-              <div className="bg-teal-500/30 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md border border-white/10">
-                 Feedback IA
-              </div>
            </div>
            
            <div className="relative z-10 space-y-2 mt-8">
-              <h3 className="text-2xl md:text-3xl font-black uppercase tracking-tight leading-none">Pronúncia Lab</h3>
-              <p className="text-sm font-medium text-teal-100/90 leading-snug max-w-sm">
-                 Perda o medo de falar. Feedback visual instantâneo para sua pronúncia.
+              <h3 className="text-xl md:text-2xl font-black uppercase tracking-tight leading-none">Pronúncia Lab</h3>
+              <p className="text-xs font-medium text-teal-100/90 leading-snug">
+                 Feedback de voz instantâneo com IA.
               </p>
            </div>
            
@@ -143,26 +141,54 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 4: CINEMA JURÍDICO */}
+        {/* CARD 4: LYRICAL VIBES (NEW) */}
         <button
-          onClick={() => onNavigate(View.LegalCinema)}
-          className="group relative col-span-1 md:col-span-2 lg:col-span-2 row-span-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2.5rem] p-8 border border-slate-700 dark:border-slate-200 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-row items-center justify-between overflow-hidden"
+          onClick={() => onNavigate(View.LyricalVibes)}
+          className="group relative col-span-1 md:col-span-1 lg:col-span-2 row-span-2 bg-gradient-to-r from-pink-500 to-rose-600 text-white rounded-[2.5rem] p-8 md:p-10 border border-white/10 shadow-xl hover:shadow-2xl hover:shadow-pink-500/20 hover:scale-[1.01] transition-all duration-300 flex flex-col justify-between overflow-hidden"
         >
-           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/black-scales.png')] opacity-20"></div>
+           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')] opacity-10"></div>
+           <div className="absolute -left-20 -bottom-20 w-80 h-80 bg-purple-500/30 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-700"></div>
            
-           <div className="flex items-center gap-6 relative z-10">
-              <div className="bg-purple-500 p-4 rounded-2xl shadow-lg">
-                 <Film size={24} className="text-white" />
+           <div className="flex justify-between items-start relative z-10">
+              <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
+                 <Music2 size={24} className="text-white" />
               </div>
-              <div className="text-left">
-                 <h3 className="text-2xl font-black uppercase tracking-tight leading-none mb-1">Cinema Lab</h3>
-                 <p className="text-xs font-bold opacity-70 uppercase tracking-widest max-w-[150px]">
-                    Aprenda com Suits, HTGAWM e Cinema Europeu.
-                 </p>
+              <div className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md border border-white/10">
+                 Aprenda com Música
               </div>
            </div>
            
-           <ArrowUpRight size={24} className="relative z-10" />
+           <div className="relative z-10 space-y-2 mt-8">
+              <h3 className="text-2xl md:text-4xl font-black uppercase tracking-tight leading-none">Lyrical Vibes</h3>
+              <p className="text-sm font-medium text-pink-100 leading-snug max-w-sm">
+                 Preencha as lacunas das suas músicas favoritas. Pop, Rock e Indie para aprender se divertindo.
+              </p>
+           </div>
+           
+           <div className="absolute bottom-8 right-8 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-4 group-hover:translate-x-0">
+              <ArrowUpRight size={24} />
+           </div>
+        </button>
+
+        {/* CARD 5: CINEMA JURÍDICO (Standard) */}
+        <button
+          onClick={() => onNavigate(View.LegalCinema)}
+          className="group relative col-span-1 md:col-span-1 lg:col-span-1 row-span-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2.5rem] p-8 border border-slate-700 dark:border-slate-200 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between overflow-hidden"
+        >
+           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/black-scales.png')] opacity-20"></div>
+           
+           <div className="flex items-start justify-between relative z-10">
+              <div className="bg-purple-500 p-3 rounded-2xl shadow-lg">
+                 <Film size={24} className="text-white" />
+              </div>
+           </div>
+           
+           <div className="relative z-10 mt-6">
+              <h3 className="text-xl font-black uppercase tracking-tight leading-none mb-1">Cinema Lab</h3>
+              <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest">
+                 Aprenda com Suits e HTGAWM.
+              </p>
+           </div>
         </button>
 
       </div>

@@ -84,7 +84,8 @@ export enum View {
   LegalCinema = 'legal_cinema',
   GeneralLanguages = 'general_languages',
   LegalSimplifier = 'legal_simplifier',
-  PronunciationLab = 'pronunciation_lab'
+  PronunciationLab = 'pronunciation_lab',
+  LyricalVibes = 'lyrical_vibes'
 }
 
 export interface Folder {
@@ -858,4 +859,20 @@ export interface CinemaClip {
   options: string[];
   correct_option: number;
   explanation: string;
+}
+
+// Lyrical Vibes Types
+export interface LyricLine {
+  text: string;
+  missingWord?: string;
+  hint?: string;
+}
+
+export interface Song {
+  id: string;
+  title: string;
+  artist: string;
+  youtube_id: string;
+  lang: 'en' | 'es' | 'fr' | 'de' | 'it';
+  lyrics: LyricLine[];
 }
