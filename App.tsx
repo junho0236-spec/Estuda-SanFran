@@ -95,6 +95,7 @@ const LyricalVibes = React.lazy(() => import('./components/LyricalVibes'));
 const TheExchangeStudent = React.lazy(() => import('./components/TheExchangeStudent'));
 const VisualFlashcards = React.lazy(() => import('./components/VisualFlashcards'));
 const BilingualNews = React.lazy(() => import('./components/BilingualNews'));
+const SlangChallenge = React.lazy(() => import('./components/SlangChallenge'));
 
 // Loading Fallback Component com Estilo
 const PageLoader = () => (
@@ -486,7 +487,7 @@ const App: React.FC = () => {
   const isImprovementChild = [View.Specialization, View.TypingChallenge, View.DominioJuridico, View.Timeline, View.LeiSeca, View.Library, View.OralArgument].includes(currentView);
 
   // Helper to check if current view is a child of SanFran Languages
-  const isLanguagesChild = [View.SanFranIdiomas, View.LegalCinema, View.GeneralLanguages, View.PronunciationLab, View.LyricalVibes, View.TheExchangeStudent, View.VisualFlashcards, View.BilingualNews].includes(currentView);
+  const isLanguagesChild = [View.SanFranIdiomas, View.LegalCinema, View.GeneralLanguages, View.PronunciationLab, View.LyricalVibes, View.TheExchangeStudent, View.VisualFlashcards, View.BilingualNews, View.SlangChallenge].includes(currentView);
 
   // Helper to check if current view is a child of SanFran Life
   const isLifeChild = [View.Office, View.Sebo].includes(currentView);
@@ -704,6 +705,7 @@ const App: React.FC = () => {
                 {currentView === View.TheExchangeStudent && <TheExchangeStudent userId={session.user.id} />}
                 {currentView === View.VisualFlashcards && <VisualFlashcards userId={session.user.id} />}
                 {currentView === View.BilingualNews && <BilingualNews userId={session.user.id} />}
+                {currentView === View.SlangChallenge && <SlangChallenge userId={session.user.id} />}
                 {currentView === View.ErrorLog && <ErrorLog userId={session.user.id} />}
                 {currentView === View.CodeTracker && <CodeTracker userId={session.user.id} />}
                 {currentView === View.IracMethod && <IracMethod userId={session.user.id} />}

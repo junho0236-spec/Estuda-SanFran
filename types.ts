@@ -88,7 +88,8 @@ export enum View {
   LyricalVibes = 'lyrical_vibes',
   TheExchangeStudent = 'the_exchange_student',
   VisualFlashcards = 'visual_flashcards',
-  BilingualNews = 'bilingual_news'
+  BilingualNews = 'bilingual_news',
+  SlangChallenge = 'slang_challenge'
 }
 
 export interface Folder {
@@ -915,4 +916,24 @@ export interface NewsArticle {
   difficulty_level?: 'Beginner' | 'Intermediate' | 'Advanced';
   source_name?: string;
   created_at: string;
+}
+
+// Slang Challenge Types
+export interface Slang {
+  id: string;
+  language: 'en' | 'es' | 'fr' | 'de' | 'it';
+  term: string;
+  literal_meaning: string;
+  actual_meaning: string;
+  example_sentence: string;
+  origin: string; // e.g., "UK", "Verlan", "Madrid"
+  difficulty: 'Easy' | 'Medium' | 'Hard';
+}
+
+export interface CollectedSlang {
+  id: string;
+  slang_id: string;
+  term: string;
+  meaning: string;
+  collected_at: string;
 }

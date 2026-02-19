@@ -13,7 +13,8 @@ import {
   Music2,
   Plane,
   Image as ImageIcon,
-  Newspaper
+  Newspaper,
+  MessageCircle
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -168,7 +169,7 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 5: BILINGUAL NEWS (NEW!) */}
+        {/* CARD 5: BILINGUAL NEWS */}
         <button
           onClick={() => onNavigate(View.BilingualNews)}
           className="group relative col-span-1 md:col-span-1 lg:col-span-2 row-span-2 bg-[#1e293b] text-white rounded-[2.5rem] p-8 border border-slate-600 shadow-xl hover:shadow-2xl hover:shadow-slate-500/20 hover:scale-[1.01] transition-all duration-300 flex flex-col justify-between overflow-hidden"
@@ -196,27 +197,23 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 6: LYRICAL VIBES (Moved) */}
+        {/* CARD 6: SLANG CHALLENGE (NEW!) */}
         <button
-          onClick={() => onNavigate(View.LyricalVibes)}
-          className="group relative col-span-1 md:col-span-1 lg:col-span-2 row-span-2 bg-gradient-to-r from-pink-500 to-rose-600 text-white rounded-[2.5rem] p-8 md:p-10 border border-white/10 shadow-xl hover:shadow-2xl hover:shadow-pink-500/20 hover:scale-[1.01] transition-all duration-300 flex flex-col justify-between overflow-hidden"
+          onClick={() => onNavigate(View.SlangChallenge)}
+          className="group relative col-span-1 md:col-span-1 lg:col-span-1 row-span-2 bg-gradient-to-br from-pink-500 to-rose-600 text-white rounded-[2.5rem] p-8 border border-white/20 shadow-xl hover:shadow-2xl hover:shadow-pink-500/20 hover:scale-[1.01] transition-all duration-300 flex flex-col justify-between overflow-hidden"
         >
-           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')] opacity-10"></div>
-           <div className="absolute -left-20 -bottom-20 w-80 h-80 bg-purple-500/30 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-700"></div>
+           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/wall-4-light.png')] opacity-20"></div>
            
            <div className="flex justify-between items-start relative z-10">
               <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
-                 <Music2 size={24} className="text-white" />
-              </div>
-              <div className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md border border-white/10">
-                 Aprenda com Música
+                 <MessageCircle size={24} className="text-white" />
               </div>
            </div>
            
-           <div className="relative z-10 space-y-2 mt-8">
-              <h3 className="text-2xl md:text-4xl font-black uppercase tracking-tight leading-none">Lyrical Vibes</h3>
-              <p className="text-sm font-medium text-pink-100 leading-snug max-w-sm">
-                 Preencha as lacunas das suas músicas favoritas.
+           <div className="relative z-10 mt-8">
+              <h3 className="text-xl md:text-2xl font-black uppercase tracking-tight leading-none">Desafio da Gíria</h3>
+              <p className="text-xs font-medium text-pink-100/90 leading-snug mt-2">
+                 Aprenda o idioma das ruas. Gírias e expressões nativas.
               </p>
            </div>
            
@@ -225,23 +222,23 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 7: CINEMA JURÍDICO (Standard) */}
+        {/* CARD 7: LYRICAL VIBES */}
         <button
-          onClick={() => onNavigate(View.LegalCinema)}
-          className="group relative col-span-1 md:col-span-1 lg:col-span-1 row-span-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2.5rem] p-8 border border-slate-700 dark:border-slate-200 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between overflow-hidden"
+          onClick={() => onNavigate(View.LyricalVibes)}
+          className="group relative col-span-1 md:col-span-1 lg:col-span-1 row-span-2 bg-[#4338ca] text-white rounded-[2.5rem] p-8 border border-indigo-500 shadow-xl hover:shadow-2xl hover:shadow-indigo-500/20 hover:scale-[1.01] transition-all duration-300 flex flex-col justify-between overflow-hidden"
         >
-           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/black-scales.png')] opacity-20"></div>
+           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')] opacity-10"></div>
            
-           <div className="flex items-start justify-between relative z-10">
-              <div className="bg-purple-500 p-3 rounded-2xl shadow-lg">
-                 <Film size={24} className="text-white" />
+           <div className="flex justify-between items-start relative z-10">
+              <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
+                 <Music2 size={24} className="text-white" />
               </div>
            </div>
            
-           <div className="relative z-10 mt-6">
-              <h3 className="text-xl font-black uppercase tracking-tight leading-none mb-1">Cinema Lab</h3>
-              <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest">
-                 Aprenda com Suits e HTGAWM.
+           <div className="relative z-10 mt-8">
+              <h3 className="text-xl md:text-2xl font-black uppercase tracking-tight leading-none">Lyrical Vibes</h3>
+              <p className="text-xs font-medium text-indigo-100/90 leading-snug mt-2">
+                 Aprenda com Música. Preencha as lacunas.
               </p>
            </div>
         </button>
