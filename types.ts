@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 export enum View {
@@ -85,7 +86,8 @@ export enum View {
   LegalSimplifier = 'legal_simplifier',
   PronunciationLab = 'pronunciation_lab',
   LyricalVibes = 'lyrical_vibes',
-  TheExchangeStudent = 'the_exchange_student'
+  TheExchangeStudent = 'the_exchange_student',
+  VisualFlashcards = 'visual_flashcards'
 }
 
 export interface Folder {

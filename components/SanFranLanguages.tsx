@@ -11,7 +11,8 @@ import {
   Film,
   GraduationCap,
   Music2,
-  Plane
+  Plane,
+  Image as ImageIcon
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -141,7 +142,32 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 4: LYRICAL VIBES */}
+        {/* CARD 4: VISUAL FLASHCARDS (NEW!) */}
+        <button
+          onClick={() => onNavigate(View.VisualFlashcards)}
+          className="group relative col-span-1 md:col-span-1 lg:col-span-1 row-span-2 bg-gradient-to-br from-amber-500 to-orange-600 text-white rounded-[2.5rem] p-8 border border-white/20 shadow-xl hover:shadow-2xl hover:shadow-orange-500/20 hover:scale-[1.01] transition-all duration-300 flex flex-col justify-between overflow-hidden"
+        >
+           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20"></div>
+           
+           <div className="flex justify-between items-start relative z-10">
+              <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
+                 <ImageIcon size={24} className="text-white" />
+              </div>
+           </div>
+           
+           <div className="relative z-10 mt-8">
+              <h3 className="text-xl md:text-2xl font-black uppercase tracking-tight leading-none">Flashcards Visuais</h3>
+              <p className="text-xs font-medium text-orange-100/90 leading-snug mt-2">
+                 Vocabulário A1 com imagens. Rápido e intuitivo.
+              </p>
+           </div>
+           
+           <div className="absolute bottom-8 right-8 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-4 group-hover:translate-x-0">
+              <ArrowUpRight size={24} />
+           </div>
+        </button>
+
+        {/* CARD 5: LYRICAL VIBES */}
         <button
           onClick={() => onNavigate(View.LyricalVibes)}
           className="group relative col-span-1 md:col-span-1 lg:col-span-2 row-span-2 bg-gradient-to-r from-pink-500 to-rose-600 text-white rounded-[2.5rem] p-8 md:p-10 border border-white/10 shadow-xl hover:shadow-2xl hover:shadow-pink-500/20 hover:scale-[1.01] transition-all duration-300 flex flex-col justify-between overflow-hidden"
@@ -170,7 +196,7 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 5: CINEMA JURÍDICO (Standard) */}
+        {/* CARD 6: CINEMA JURÍDICO (Standard) */}
         <button
           onClick={() => onNavigate(View.LegalCinema)}
           className="group relative col-span-1 md:col-span-1 lg:col-span-1 row-span-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2.5rem] p-8 border border-slate-700 dark:border-slate-200 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between overflow-hidden"
@@ -191,7 +217,7 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 6: GENERAL LANGUAGES (Standard) */}
+        {/* CARD 7: GENERAL LANGUAGES (Standard) */}
         <button
           onClick={() => onNavigate(View.GeneralLanguages)}
           className="group relative col-span-1 md:col-span-1 lg:col-span-1 row-span-2 bg-indigo-600 text-white rounded-[2.5rem] p-8 border border-indigo-500 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between overflow-hidden"
