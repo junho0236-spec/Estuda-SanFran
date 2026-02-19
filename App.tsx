@@ -1,94 +1,108 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck, BookX, ScrollText, FileText, Repeat, UserX, ListTodo, Handshake, Eye, Key, CalendarCheck } from 'lucide-react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck, BookX, ScrollText, FileText, Repeat, UserX, ListTodo, Handshake, Eye, Key, CalendarCheck, Loader2 } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel } from './types';
-import Dashboard from './components/Dashboard';
-import Profile from './components/Profile';
-import Anki from './components/Anki';
-import Pomodoro from './components/Pomodoro';
-import Subjects from './components/Subjects';
-import Tasks from './components/Tasks';
-import CalendarView from './components/CalendarView';
-import Ranking from './components/Ranking';
-import Library from './components/Library';
-import Largo from './components/Largo';
-import Mural from './components/Mural';
-import GradeCalculator from './components/GradeCalculator';
-import DeadlineCalculator from './components/DeadlineCalculator';
-import OralArgument from './components/OralArgument';
-import StudyRooms from './components/StudyRooms';
 import Login from './components/Login';
 import Atmosphere from './components/Atmosphere';
 import Scratchpad from './components/Scratchpad';
-import VirtualOffice from './components/VirtualOffice';
-import Societies from './components/Societies';
-import LeiSeca from './components/LeiSeca';
-import Editais from './components/Editais';
-import TimelineBuilder from './components/TimelineBuilder';
-import DeadArchive from './components/DeadArchive';
-import CitationGenerator from './components/CitationGenerator';
-import JurisprudenceMural from './components/JurisprudenceMural';
-import SumulaChallenge from './components/SumulaChallenge';
-import Sebo from './components/Sebo';
-import ClassificadosPatio from './components/ClassificadosPatio';
-import DuelArena from './components/DuelArena';
-import OabCountdown from './components/OabCountdown';
-import SpecializationTree from './components/SpecializationTree';
-import TypingChallenge from './components/TypingChallenge';
-import Petitum from './components/Petitum';
-import Dosimetria from './components/Dosimetria';
-import Debate from './components/Debate';
-import Trunfo from './components/Trunfo';
-import Honorarios from './components/Honorarios';
-import Checklist from './components/Checklist';
-import InvestigationBoard from './components/InvestigationBoard';
-import LatinGame from './components/LatinGame';
-import SucessaoSimulator from './components/SucessaoSimulator';
-import JurisTinder from './components/JurisTinder';
-import InternRPG from './components/InternRPG';
-import PrescriptionCalculator from './components/PrescriptionCalculator';
-import SanFranIdiomas from './components/SanFranIdiomas';
-import DigitalID from './components/DigitalID';
-import DominioJuridico from './components/DominioJuridico';
-import ErrorLog from './components/ErrorLog';
-import CodeTracker from './components/CodeTracker';
-import IracMethod from './components/IracMethod'; 
-import SpacedRepetition from './components/SpacedRepetition';
-import AttendanceCalculator from './components/AttendanceCalculator';
-import SyllabusTracker from './components/SyllabusTracker'; 
-import DeadlinePlanner from './components/DeadlinePlanner';
-import Mentorship from './components/Mentorship';
-import MockJury from './components/MockJury';
-import PetitionWiki from './components/PetitionWiki'; 
-import StudyPact from './components/StudyPact';
-import LargoAuction from './components/LargoAuction';
-import SocialEvents from './components/SocialEvents';
-import TheVault from './components/TheVault'; 
-import CaronasRepublicas from './components/CaronasRepublicas';
-import BalcaoEstagios from './components/BalcaoEstagios'; 
-import TribunalOpiniao from './components/TribunalOpiniao'; 
-import BussolaOptativas from './components/BussolaOptativas';
-import AchadosPerdidos from './components/AchadosPerdidos';
-import PerolasTribuna from './components/PerolasTribuna';
-import GuiaSobrevivencia from './components/GuiaSobrevivencia';
-import ClubeLivro from './components/ClubeLivro'; 
-import GuerraTurmas from './components/GuerraTurmas';
-import SpeedReader from './components/SpeedReader';
-import Mnemonics from './components/Mnemonics';
-import ReverseStudyPlanner from './components/ReverseStudyPlanner'; 
-import SanFranEssential from './components/SanFranEssential';
-import SanFranCommunity from './components/SanFranCommunity';
-import SanFranImprovement from './components/SanFranImprovement';
-import SanFranLanguages from './components/SanFranLanguages';
-import SanFranLife from './components/SanFranLife';
-import SanFranGames from './components/SanFranGames';
-import SanFranHelp from './components/SanFranHelp';
-import SanFranOAB from './components/SanFranOAB';
-import LegalCinema from './components/LegalCinema';
-import GeneralLanguages from './components/GeneralLanguages'; 
-import LegalSimplifier from './components/LegalSimplifier';
-import PronunciationLab from './components/PronunciationLab';
 import { supabase } from './services/supabaseClient';
+
+// Lazy Load dos Componentes para Performance (Code Splitting)
+// Isso evita carregar todos os MBs de código de uma vez no início
+const Dashboard = React.lazy(() => import('./components/Dashboard'));
+const Profile = React.lazy(() => import('./components/Profile'));
+const Anki = React.lazy(() => import('./components/Anki'));
+const Pomodoro = React.lazy(() => import('./components/Pomodoro'));
+const Subjects = React.lazy(() => import('./components/Subjects'));
+const Tasks = React.lazy(() => import('./components/Tasks'));
+const CalendarView = React.lazy(() => import('./components/CalendarView'));
+const Ranking = React.lazy(() => import('./components/Ranking'));
+const Library = React.lazy(() => import('./components/Library'));
+const Largo = React.lazy(() => import('./components/Largo'));
+const Mural = React.lazy(() => import('./components/Mural'));
+const GradeCalculator = React.lazy(() => import('./components/GradeCalculator'));
+const DeadlineCalculator = React.lazy(() => import('./components/DeadlineCalculator'));
+const OralArgument = React.lazy(() => import('./components/OralArgument'));
+const StudyRooms = React.lazy(() => import('./components/StudyRooms'));
+const VirtualOffice = React.lazy(() => import('./components/VirtualOffice'));
+const Societies = React.lazy(() => import('./components/Societies'));
+const LeiSeca = React.lazy(() => import('./components/LeiSeca'));
+const Editais = React.lazy(() => import('./components/Editais'));
+const TimelineBuilder = React.lazy(() => import('./components/TimelineBuilder'));
+const DeadArchive = React.lazy(() => import('./components/DeadArchive'));
+const CitationGenerator = React.lazy(() => import('./components/CitationGenerator'));
+const JurisprudenceMural = React.lazy(() => import('./components/JurisprudenceMural'));
+const SumulaChallenge = React.lazy(() => import('./components/SumulaChallenge'));
+const Sebo = React.lazy(() => import('./components/Sebo'));
+const ClassificadosPatio = React.lazy(() => import('./components/ClassificadosPatio'));
+const DuelArena = React.lazy(() => import('./components/DuelArena'));
+const OabCountdown = React.lazy(() => import('./components/OabCountdown'));
+const SpecializationTree = React.lazy(() => import('./components/SpecializationTree'));
+const TypingChallenge = React.lazy(() => import('./components/TypingChallenge'));
+const Petitum = React.lazy(() => import('./components/Petitum'));
+const Dosimetria = React.lazy(() => import('./components/Dosimetria'));
+const Debate = React.lazy(() => import('./components/Debate'));
+const Trunfo = React.lazy(() => import('./components/Trunfo'));
+const Honorarios = React.lazy(() => import('./components/Honorarios'));
+const Checklist = React.lazy(() => import('./components/Checklist'));
+const InvestigationBoard = React.lazy(() => import('./components/InvestigationBoard'));
+const LatinGame = React.lazy(() => import('./components/LatinGame'));
+const SucessaoSimulator = React.lazy(() => import('./components/SucessaoSimulator'));
+const JurisTinder = React.lazy(() => import('./components/JurisTinder'));
+const InternRPG = React.lazy(() => import('./components/InternRPG'));
+const PrescriptionCalculator = React.lazy(() => import('./components/PrescriptionCalculator'));
+const SanFranIdiomas = React.lazy(() => import('./components/SanFranIdiomas'));
+const DigitalID = React.lazy(() => import('./components/DigitalID'));
+const DominioJuridico = React.lazy(() => import('./components/DominioJuridico'));
+const ErrorLog = React.lazy(() => import('./components/ErrorLog'));
+const CodeTracker = React.lazy(() => import('./components/CodeTracker'));
+const IracMethod = React.lazy(() => import('./components/IracMethod')); 
+const SpacedRepetition = React.lazy(() => import('./components/SpacedRepetition'));
+const AttendanceCalculator = React.lazy(() => import('./components/AttendanceCalculator'));
+const SyllabusTracker = React.lazy(() => import('./components/SyllabusTracker')); 
+const DeadlinePlanner = React.lazy(() => import('./components/DeadlinePlanner'));
+const Mentorship = React.lazy(() => import('./components/Mentorship'));
+const MockJury = React.lazy(() => import('./components/MockJury'));
+const PetitionWiki = React.lazy(() => import('./components/PetitionWiki')); 
+const StudyPact = React.lazy(() => import('./components/StudyPact'));
+const LargoAuction = React.lazy(() => import('./components/LargoAuction'));
+const SocialEvents = React.lazy(() => import('./components/SocialEvents'));
+const TheVault = React.lazy(() => import('./components/TheVault')); 
+const CaronasRepublicas = React.lazy(() => import('./components/CaronasRepublicas'));
+const BalcaoEstagios = React.lazy(() => import('./components/BalcaoEstagios')); 
+const TribunalOpiniao = React.lazy(() => import('./components/TribunalOpiniao')); 
+const BussolaOptativas = React.lazy(() => import('./components/BussolaOptativas'));
+const AchadosPerdidos = React.lazy(() => import('./components/AchadosPerdidos'));
+const PerolasTribuna = React.lazy(() => import('./components/PerolasTribuna'));
+const GuiaSobrevivencia = React.lazy(() => import('./components/GuiaSobrevivencia'));
+const ClubeLivro = React.lazy(() => import('./components/ClubeLivro')); 
+const GuerraTurmas = React.lazy(() => import('./components/GuerraTurmas'));
+const SpeedReader = React.lazy(() => import('./components/SpeedReader'));
+const Mnemonics = React.lazy(() => import('./components/Mnemonics'));
+const ReverseStudyPlanner = React.lazy(() => import('./components/ReverseStudyPlanner')); 
+const SanFranEssential = React.lazy(() => import('./components/SanFranEssential'));
+const SanFranCommunity = React.lazy(() => import('./components/SanFranCommunity'));
+const SanFranImprovement = React.lazy(() => import('./components/SanFranImprovement'));
+const SanFranLanguages = React.lazy(() => import('./components/SanFranLanguages'));
+const SanFranLife = React.lazy(() => import('./components/SanFranLife'));
+const SanFranGames = React.lazy(() => import('./components/SanFranGames'));
+const SanFranHelp = React.lazy(() => import('./components/SanFranHelp'));
+const SanFranOAB = React.lazy(() => import('./components/SanFranOAB'));
+const LegalCinema = React.lazy(() => import('./components/LegalCinema'));
+const GeneralLanguages = React.lazy(() => import('./components/GeneralLanguages')); 
+const LegalSimplifier = React.lazy(() => import('./components/LegalSimplifier'));
+const PronunciationLab = React.lazy(() => import('./components/PronunciationLab'));
+
+// Loading Fallback Component com Estilo
+const PageLoader = () => (
+  <div className="flex flex-col items-center justify-center h-full w-full animate-in fade-in duration-300 min-h-[400px]">
+    <div className="relative">
+       <div className="absolute inset-0 bg-sanfran-rubi blur-2xl opacity-20 rounded-full animate-pulse"></div>
+       <Loader2 className="w-12 h-12 text-sanfran-rubi animate-spin relative z-10" />
+    </div>
+    <p className="mt-4 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 animate-pulse">Carregando Módulo...</p>
+  </div>
+);
 
 export const getBrasiliaDate = () => {
   return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
@@ -621,140 +635,142 @@ const App: React.FC = () => {
 
         <main className={`flex-1 overflow-y-auto ${isExtremeFocus ? 'p-0' : 'p-4 md:p-10'} relative transition-all duration-700`}>
           <div className={`${isExtremeFocus ? 'max-w-none h-full flex items-center justify-center' : 'max-w-6xl mx-auto h-full'}`}>
-            {currentView === View.Dashboard && (
-              <Dashboard 
-                subjects={subjects} 
-                flashcards={flashcards} 
-                tasks={tasks} 
-                studySessions={studySessions} 
-                readings={readings} 
-                onNavigate={setCurrentView}
-              />
-            )}
-            
-            {/* HUBS */}
-            {currentView === View.SanFranEssential && <SanFranEssential onNavigate={setCurrentView} />}
-            {currentView === View.SanFranCommunity && <SanFranCommunity onNavigate={setCurrentView} />}
-            {currentView === View.SanFranImprovement && <SanFranImprovement onNavigate={setCurrentView} />}
-            {currentView === View.SanFranLanguages && <SanFranLanguages onNavigate={setCurrentView} />}
-            {currentView === View.SanFranLife && <SanFranLife onNavigate={setCurrentView} />}
-            {currentView === View.SanFranGames && <SanFranGames onNavigate={setCurrentView} />}
-            {currentView === View.SanFranHelp && <SanFranHelp onNavigate={setCurrentView} />}
-            {currentView === View.SanFranOAB && <SanFranOAB onNavigate={setCurrentView} />}
+             <Suspense fallback={<PageLoader />}>
+                {currentView === View.Dashboard && (
+                  <Dashboard 
+                    subjects={subjects} 
+                    flashcards={flashcards} 
+                    tasks={tasks} 
+                    studySessions={studySessions} 
+                    readings={readings} 
+                    onNavigate={setCurrentView}
+                  />
+                )}
+                
+                {/* HUBS */}
+                {currentView === View.SanFranEssential && <SanFranEssential onNavigate={setCurrentView} />}
+                {currentView === View.SanFranCommunity && <SanFranCommunity onNavigate={setCurrentView} />}
+                {currentView === View.SanFranImprovement && <SanFranImprovement onNavigate={setCurrentView} />}
+                {currentView === View.SanFranLanguages && <SanFranLanguages onNavigate={setCurrentView} />}
+                {currentView === View.SanFranLife && <SanFranLife onNavigate={setCurrentView} />}
+                {currentView === View.SanFranGames && <SanFranGames onNavigate={setCurrentView} />}
+                {currentView === View.SanFranHelp && <SanFranHelp onNavigate={setCurrentView} />}
+                {currentView === View.SanFranOAB && <SanFranOAB onNavigate={setCurrentView} />}
 
-            {currentView === View.Profile && <Profile />}
-            {currentView === View.DominioJuridico && <DominioJuridico subjects={subjects} studySessions={studySessions} />}
-            {currentView === View.DigitalID && <DigitalID userId={session.user.id} userName={session.user.user_metadata?.full_name} studySessions={studySessions} tasks={tasks} />}
-            {currentView === View.Office && <VirtualOffice studySessions={studySessions} userName={session.user.user_metadata?.full_name} />}
-            {currentView === View.Sebo && <Sebo userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
-            {currentView === View.ClassificadosPatio && <ClassificadosPatio userId={session.user.id} userName={session.user.user_metadata?.full_name} studySessions={studySessions} />}
-            {currentView === View.Specialization && <SpecializationTree subjects={subjects} studySessions={studySessions} />}
-            {currentView === View.SumulaChallenge && <SumulaChallenge userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
-            {currentView === View.JurisprudenceMural && <JurisprudenceMural userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
-            {currentView === View.Societies && <Societies userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
-            {currentView === View.LeiSeca && <LeiSeca userId={session.user.id} />}
-            {currentView === View.CitationGenerator && <CitationGenerator />}
-            {currentView === View.Editais && <Editais userId={session.user.id} />}
-            {currentView === View.Timeline && <TimelineBuilder />}
-            {currentView === View.DeadArchive && <DeadArchive userId={session.user.id} />}
-            {currentView === View.Anki && <Anki subjects={subjects} flashcards={flashcards} setFlashcards={setFlashcards} folders={folders} setFolders={setFolders} userId={session.user.id} />}
-            {currentView === View.Library && <Library readings={readings} setReadings={setReadings} subjects={subjects} userId={session.user.id} />}
-            {currentView === View.Largo && <Largo presenceUsers={presenceUsers} currentUserId={session.user.id} />}
-            {currentView === View.Mural && <Mural userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-            {currentView === View.Calculator && <GradeCalculator subjects={subjects} />}
-            {currentView === View.DeadlineCalculator && <DeadlineCalculator />}
-            {currentView === View.Dosimetria && <Dosimetria userId={session.user.id} />}
-            {currentView === View.Honorarios && <Honorarios userId={session.user.id} />}
-            {currentView === View.Checklist && <Checklist userId={session.user.id} />}
-            {currentView === View.InvestigationBoard && <InvestigationBoard userId={session.user.id} />}
-            {currentView === View.LatinGame && <LatinGame userId={session.user.id} />}
-            {currentView === View.Debate && <Debate userId={session.user.id} />}
-            {currentView === View.Trunfo && <Trunfo userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
-            {currentView === View.OabCountdown && <OabCountdown userId={session.user.id} />}
-            {currentView === View.TypingChallenge && <TypingChallenge userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
-            {currentView === View.Petitum && <Petitum userId={session.user.id} />}
-            {currentView === View.SucessaoSimulator && <SucessaoSimulator />}
-            {currentView === View.JurisTinder && <JurisTinder />}
-            {currentView === View.InternRPG && <InternRPG />}
-            {currentView === View.PrescriptionCalculator && <PrescriptionCalculator userId={session.user.id} />}
-            {currentView === View.SanFranIdiomas && <SanFranIdiomas userId={session.user.id} />}
-            {currentView === View.LegalCinema && <LegalCinema userId={session.user.id} />}
-            {currentView === View.GeneralLanguages && <GeneralLanguages userId={session.user.id} />}
-            {currentView === View.LegalSimplifier && <LegalSimplifier />}
-            {currentView === View.PronunciationLab && <PronunciationLab userId={session.user.id} />}
-            {currentView === View.ErrorLog && <ErrorLog userId={session.user.id} />}
-            {currentView === View.CodeTracker && <CodeTracker userId={session.user.id} />}
-            {currentView === View.IracMethod && <IracMethod userId={session.user.id} />}
-            {currentView === View.SpacedRepetition && <SpacedRepetition userId={session.user.id} />}
-            {currentView === View.AttendanceCalculator && <AttendanceCalculator userId={session.user.id} />}
-            {currentView === View.SyllabusTracker && <SyllabusTracker userId={session.user.id} />}
-            {currentView === View.DeadlinePlanner && <DeadlinePlanner userId={session.user.id} />}
-            {currentView === View.Mentorship && <Mentorship userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-            {currentView === View.MockJury && <MockJury userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-            {currentView === View.PetitionWiki && <PetitionWiki userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-            {currentView === View.StudyPact && <StudyPact userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-            {currentView === View.LargoAuction && <LargoAuction userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-            {currentView === View.SocialEvents && <SocialEvents userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-            {currentView === View.TheVault && <TheVault userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-            {currentView === View.CaronasRepublicas && <CaronasRepublicas userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-            {currentView === View.BalcaoEstagios && <BalcaoEstagios userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-            {currentView === View.TribunalOpiniao && <TribunalOpiniao userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-            {currentView === View.BussolaOptativas && <BussolaOptativas userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-            {currentView === View.AchadosPerdidos && <AchadosPerdidos userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-            {currentView === View.PerolasTribuna && <PerolasTribuna userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-            {currentView === View.GuiaSobrevivencia && <GuiaSobrevivencia userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-            {currentView === View.ClubeLivro && <ClubeLivro userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-            {currentView === View.GuerraTurmas && <GuerraTurmas userId={session.user.id} />}
-            {currentView === View.SpeedReader && <SpeedReader />}
-            {currentView === View.Mnemonics && <Mnemonics userId={session.user.id} />}
-            {currentView === View.ReverseSchedule && <ReverseStudyPlanner userId={session.user.id} />}
-            
-            {currentView === View.Duel && activeDuel && (
-              <DuelArena 
-                duel={activeDuel} 
-                userId={session.user.id} 
-                onFinished={() => { setActiveDuel(null); setCurrentView(View.Largo); }} 
-              />
-            )}
-            
-            {currentView === View.StudyRoom && (
-              <StudyRooms 
-                presenceUsers={presenceUsers} 
-                currentUserId={session.user.id}
-                currentRoomId={currentRoomId}
-                setCurrentRoomId={setCurrentRoomId}
-                setRoomStartTime={setRoomStartTime}
-              />
-            )}
+                {currentView === View.Profile && <Profile />}
+                {currentView === View.DominioJuridico && <DominioJuridico subjects={subjects} studySessions={studySessions} />}
+                {currentView === View.DigitalID && <DigitalID userId={session.user.id} userName={session.user.user_metadata?.full_name} studySessions={studySessions} tasks={tasks} />}
+                {currentView === View.Office && <VirtualOffice studySessions={studySessions} userName={session.user.user_metadata?.full_name} />}
+                {currentView === View.Sebo && <Sebo userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
+                {currentView === View.ClassificadosPatio && <ClassificadosPatio userId={session.user.id} userName={session.user.user_metadata?.full_name} studySessions={studySessions} />}
+                {currentView === View.Specialization && <SpecializationTree subjects={subjects} studySessions={studySessions} />}
+                {currentView === View.SumulaChallenge && <SumulaChallenge userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
+                {currentView === View.JurisprudenceMural && <JurisprudenceMural userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
+                {currentView === View.Societies && <Societies userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
+                {currentView === View.LeiSeca && <LeiSeca userId={session.user.id} />}
+                {currentView === View.CitationGenerator && <CitationGenerator />}
+                {currentView === View.Editais && <Editais userId={session.user.id} />}
+                {currentView === View.Timeline && <TimelineBuilder />}
+                {currentView === View.DeadArchive && <DeadArchive userId={session.user.id} />}
+                {currentView === View.Anki && <Anki subjects={subjects} flashcards={flashcards} setFlashcards={setFlashcards} folders={folders} setFolders={setFolders} userId={session.user.id} />}
+                {currentView === View.Library && <Library readings={readings} setReadings={setReadings} subjects={subjects} userId={session.user.id} />}
+                {currentView === View.Largo && <Largo presenceUsers={presenceUsers} currentUserId={session.user.id} />}
+                {currentView === View.Mural && <Mural userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
+                {currentView === View.Calculator && <GradeCalculator subjects={subjects} />}
+                {currentView === View.DeadlineCalculator && <DeadlineCalculator />}
+                {currentView === View.Dosimetria && <Dosimetria userId={session.user.id} />}
+                {currentView === View.Honorarios && <Honorarios userId={session.user.id} />}
+                {currentView === View.Checklist && <Checklist userId={session.user.id} />}
+                {currentView === View.InvestigationBoard && <InvestigationBoard userId={session.user.id} />}
+                {currentView === View.LatinGame && <LatinGame userId={session.user.id} />}
+                {currentView === View.Debate && <Debate userId={session.user.id} />}
+                {currentView === View.Trunfo && <Trunfo userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
+                {currentView === View.OabCountdown && <OabCountdown userId={session.user.id} />}
+                {currentView === View.TypingChallenge && <TypingChallenge userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
+                {currentView === View.Petitum && <Petitum userId={session.user.id} />}
+                {currentView === View.SucessaoSimulator && <SucessaoSimulator />}
+                {currentView === View.JurisTinder && <JurisTinder />}
+                {currentView === View.InternRPG && <InternRPG />}
+                {currentView === View.PrescriptionCalculator && <PrescriptionCalculator userId={session.user.id} />}
+                {currentView === View.SanFranIdiomas && <SanFranIdiomas userId={session.user.id} />}
+                {currentView === View.LegalCinema && <LegalCinema userId={session.user.id} />}
+                {currentView === View.GeneralLanguages && <GeneralLanguages userId={session.user.id} />}
+                {currentView === View.LegalSimplifier && <LegalSimplifier />}
+                {currentView === View.PronunciationLab && <PronunciationLab userId={session.user.id} />}
+                {currentView === View.ErrorLog && <ErrorLog userId={session.user.id} />}
+                {currentView === View.CodeTracker && <CodeTracker userId={session.user.id} />}
+                {currentView === View.IracMethod && <IracMethod userId={session.user.id} />}
+                {currentView === View.SpacedRepetition && <SpacedRepetition userId={session.user.id} />}
+                {currentView === View.AttendanceCalculator && <AttendanceCalculator userId={session.user.id} />}
+                {currentView === View.SyllabusTracker && <SyllabusTracker userId={session.user.id} />}
+                {currentView === View.DeadlinePlanner && <DeadlinePlanner userId={session.user.id} />}
+                {currentView === View.Mentorship && <Mentorship userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
+                {currentView === View.MockJury && <MockJury userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
+                {currentView === View.PetitionWiki && <PetitionWiki userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
+                {currentView === View.StudyPact && <StudyPact userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
+                {currentView === View.LargoAuction && <LargoAuction userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
+                {currentView === View.SocialEvents && <SocialEvents userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
+                {currentView === View.TheVault && <TheVault userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
+                {currentView === View.CaronasRepublicas && <CaronasRepublicas userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
+                {currentView === View.BalcaoEstagios && <BalcaoEstagios userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
+                {currentView === View.TribunalOpiniao && <TribunalOpiniao userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
+                {currentView === View.BussolaOptativas && <BussolaOptativas userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
+                {currentView === View.AchadosPerdidos && <AchadosPerdidos userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
+                {currentView === View.PerolasTribuna && <PerolasTribuna userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
+                {currentView === View.GuiaSobrevivencia && <GuiaSobrevivencia userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
+                {currentView === View.ClubeLivro && <ClubeLivro userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
+                {currentView === View.GuerraTurmas && <GuerraTurmas userId={session.user.id} />}
+                {currentView === View.SpeedReader && <SpeedReader />}
+                {currentView === View.Mnemonics && <Mnemonics userId={session.user.id} />}
+                {currentView === View.ReverseSchedule && <ReverseStudyPlanner userId={session.user.id} />}
+                
+                {currentView === View.Duel && activeDuel && (
+                  <DuelArena 
+                    duel={activeDuel} 
+                    userId={session.user.id} 
+                    onFinished={() => { setActiveDuel(null); setCurrentView(View.Largo); }} 
+                  />
+                )}
+                
+                {currentView === View.StudyRoom && (
+                  <StudyRooms 
+                    presenceUsers={presenceUsers} 
+                    currentUserId={session.user.id}
+                    currentRoomId={currentRoomId}
+                    setCurrentRoomId={setCurrentRoomId}
+                    setRoomStartTime={setRoomStartTime}
+                  />
+                )}
 
-            {currentView === View.Timer && (
-              <Pomodoro 
-                subjects={subjects} 
-                readings={readings}
-                userId={session.user.id} 
-                studySessions={studySessions} 
-                setStudySessions={setStudySessions}
-                isActive={timerIsActive}
-                setIsActive={setTimerIsActive}
-                secondsLeft={timerSecondsLeft}
-                setSecondsLeft={setTimerSecondsLeft}
-                mode={timerMode}
-                setMode={setTimerMode}
-                selectedSubjectId={timerSelectedSubjectId}
-                setSelectedSubjectId={setTimerSelectedSubjectId}
-                selectedReadingId={timerSelectedReadingId}
-                setSelectedReadingId={setTimerSelectedReadingId}
-                setTotalInitial={setTimerTotalInitial}
-                onManualFinalize={manualFinalize}
-                isExtremeFocus={isExtremeFocus}
-              />
-            )}
+                {currentView === View.Timer && (
+                  <Pomodoro 
+                    subjects={subjects} 
+                    readings={readings}
+                    userId={session.user.id} 
+                    studySessions={studySessions} 
+                    setStudySessions={setStudySessions}
+                    isActive={timerIsActive}
+                    setIsActive={setTimerIsActive}
+                    secondsLeft={timerSecondsLeft}
+                    setSecondsLeft={setTimerSecondsLeft}
+                    mode={timerMode}
+                    setMode={setTimerMode}
+                    selectedSubjectId={timerSelectedSubjectId}
+                    setSelectedSubjectId={setTimerSelectedSubjectId}
+                    selectedReadingId={timerSelectedReadingId}
+                    setSelectedReadingId={setTimerSelectedReadingId}
+                    setTotalInitial={setTimerTotalInitial}
+                    onManualFinalize={manualFinalize}
+                    isExtremeFocus={isExtremeFocus}
+                  />
+                )}
 
-            {currentView === View.OralArgument && <OralArgument />}
-            {currentView === View.Calendar && <CalendarView subjects={subjects} tasks={tasks} userId={session.user.id} studySessions={studySessions} />}
-            {currentView === View.Ranking && <Ranking userId={session.user.id} session={session} />}
-            {currentView === View.Subjects && <Subjects subjects={subjects} setSubjects={setSubjects} userId={session.user.id} />}
-            {currentView === View.Tasks && <Tasks subjects={subjects} tasks={tasks} setTasks={setTasks} userId={session.user.id} />}
+                {currentView === View.OralArgument && <OralArgument />}
+                {currentView === View.Calendar && <CalendarView subjects={subjects} tasks={tasks} userId={session.user.id} studySessions={studySessions} />}
+                {currentView === View.Ranking && <Ranking userId={session.user.id} session={session} />}
+                {currentView === View.Subjects && <Subjects subjects={subjects} setSubjects={setSubjects} userId={session.user.id} />}
+                {currentView === View.Tasks && <Tasks subjects={subjects} tasks={tasks} setTasks={setTasks} userId={session.user.id} />}
+             </Suspense>
           </div>
         </main>
 

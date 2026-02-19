@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Volume2, RotateCcw, CheckCircle2, AlertCircle, RefreshCw, Trophy, Languages } from 'lucide-react';
+import { Mic, MicOff, Volume2, RotateCcw, CheckCircle2, AlertCircle, RefreshCw, Trophy, Languages, Loader2 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import confetti from 'canvas-confetti';
 
@@ -74,13 +74,17 @@ const PHRASES_DB: Record<LangCode, string[]> = {
 const PronunciationLab: React.FC<PronunciationLabProps> = ({ userId }) => {
   const [currentLang, setCurrentLang] = useState<LangCode>('en');
   const [currentPhrase, setCurrentPhrase] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
+  
+  // States: idle, listening, processing, result, error
+  const [status, setStatus] = useState<'idle' | 'listening' | 'processing' | 'result' | 'error'>('idle');
   const [transcript, setTranscript] = useState('');
   const [score, setScore] = useState<number | null>(null);
   const [wordFeedback, setWordFeedback] = useState<{ word: string, status: 'correct' | 'missed' }[]>([]);
   const [browserSupport, setBrowserSupport] = useState(true);
+  const [errorMsg, setErrorMsg] = useState('');
   
   const recognitionRef = useRef<any>(null);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     // Check browser support
@@ -88,14 +92,24 @@ const PronunciationLab: React.FC<PronunciationLabProps> = ({ userId }) => {
       setBrowserSupport(false);
     }
     loadNewPhrase();
+    return () => {
+       if (recognitionRef.current) recognitionRef.current.abort();
+       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    };
   }, []);
 
   useEffect(() => {
     loadNewPhrase();
+    resetState();
+  }, [currentLang]);
+
+  const resetState = () => {
+    setStatus('idle');
     setTranscript('');
     setScore(null);
     setWordFeedback([]);
-  }, [currentLang]);
+    setErrorMsg('');
+  };
 
   const loadNewPhrase = () => {
     const list = PHRASES_DB[currentLang];
@@ -106,66 +120,97 @@ const PronunciationLab: React.FC<PronunciationLabProps> = ({ userId }) => {
   const startRecording = () => {
     if (!browserSupport) return;
     
-    setIsRecording(true);
-    setTranscript('');
-    setScore(null);
-    setWordFeedback([]);
+    resetState();
+    setStatus('listening');
 
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    recognitionRef.current = new SpeechRecognition();
-    
-    recognitionRef.current.lang = LANGUAGES_CONFIG[currentLang].bcp47;
-    recognitionRef.current.continuous = false;
-    recognitionRef.current.interimResults = false;
+    try {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      
+      recognitionRef.current.lang = LANGUAGES_CONFIG[currentLang].bcp47;
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+      recognitionRef.current.maxAlternatives = 1;
 
-    recognitionRef.current.onresult = (event: any) => {
-      const text = event.results[0][0].transcript;
-      setTranscript(text);
-      analyzePronunciation(text);
-    };
+      recognitionRef.current.onstart = () => {
+         setStatus('listening');
+         // Safety timeout: if no speech detected in 8s, stop
+         silenceTimerRef.current = setTimeout(() => {
+            if (status === 'listening') {
+               recognitionRef.current?.stop();
+               setErrorMsg("Não ouvi nada. Tente falar mais alto ou verifique o microfone.");
+               setStatus('error');
+            }
+         }, 8000);
+      };
 
-    recognitionRef.current.onerror = (event: any) => {
-      console.error("Speech recognition error", event.error);
-      setIsRecording(false);
-    };
+      recognitionRef.current.onspeechend = () => {
+         setStatus('processing');
+         if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      };
 
-    recognitionRef.current.onend = () => {
-      setIsRecording(false);
-    };
+      recognitionRef.current.onresult = (event: any) => {
+        const text = event.results[0][0].transcript;
+        setTranscript(text);
+        analyzePronunciation(text);
+      };
 
-    recognitionRef.current.start();
+      recognitionRef.current.onerror = (event: any) => {
+        console.error("Speech recognition error", event.error);
+        if (event.error === 'no-speech') {
+            setErrorMsg("Nenhuma fala detectada.");
+        } else if (event.error === 'not-allowed') {
+            setErrorMsg("Permissão de microfone negada.");
+        } else {
+            setErrorMsg("Erro ao reconhecer áudio.");
+        }
+        setStatus('error');
+      };
+
+      recognitionRef.current.onend = () => {
+        if (status === 'listening') {
+           // Se acabou e ainda estava ouvindo (sem onresult), foi cancelado ou erro silencioso
+           setStatus('idle');
+        }
+      };
+
+      recognitionRef.current.start();
+    } catch (e) {
+      console.error(e);
+      setErrorMsg("Falha ao iniciar o gravador.");
+      setStatus('error');
+    }
   };
 
   const stopRecording = () => {
     if (recognitionRef.current) {
       recognitionRef.current.stop();
-      setIsRecording(false);
     }
   };
 
   const analyzePronunciation = async (spokenText: string) => {
+    setStatus('processing');
+    
+    // Simulate slight processing delay for UX (feeling of "analysis")
+    await new Promise(resolve => setTimeout(resolve, 600));
+
     const targetWords = currentPhrase.toLowerCase().replace(/[.,?¡!]/g, '').split(/\s+/);
     const spokenWords = spokenText.toLowerCase().replace(/[.,?¡!]/g, '').split(/\s+/);
 
     let matchCount = 0;
-    const feedback: { word: string, status: 'correct' | 'missed' }[] = [];
-
-    // Simple matching algorithm (can be improved with Levenshtein distance)
+    
+    // Improved matching (check if target word exists ANYWHERE in spoken array to be lenient)
     targetWords.forEach(target => {
-      // Check if spoken text contains this word (loose matching)
       if (spokenWords.includes(target)) {
         matchCount++;
-        feedback.push({ word: target, status: 'correct' });
-      } else {
-        feedback.push({ word: target, status: 'missed' });
       }
     });
 
+    // Score calculation
     const calculatedScore = Math.round((matchCount / targetWords.length) * 100);
     setScore(calculatedScore);
     
-    // Map feedback back to original case/punctuation for display? 
-    // For simplicity, we'll construct the feedback using the original phrase split
+    // Visual Feedback Construction
     const originalWords = currentPhrase.split(' ');
     const visualFeedback = originalWords.map((word) => {
         const clean = word.toLowerCase().replace(/[.,?¡!]/g, '');
@@ -173,12 +218,13 @@ const PronunciationLab: React.FC<PronunciationLabProps> = ({ userId }) => {
         return { word, status: isMatched ? 'correct' : 'missed' } as const;
     });
     setWordFeedback(visualFeedback);
+    setStatus('result');
 
     if (calculatedScore >= 80) {
       confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
     }
 
-    // Save to DB (Optional Gamification)
+    // Save to DB (Optional)
     try {
        await supabase.from('pronunciation_scores').insert({
          user_id: userId,
@@ -186,9 +232,7 @@ const PronunciationLab: React.FC<PronunciationLabProps> = ({ userId }) => {
          phrase: currentPhrase,
          score: calculatedScore
        });
-    } catch (e) {
-       // Silent fail if table doesn't exist
-    }
+    } catch (e) {}
   };
 
   const playAudio = (text: string) => {
@@ -249,7 +293,7 @@ const PronunciationLab: React.FC<PronunciationLabProps> = ({ userId }) => {
             <div className="mb-10 w-full">
                <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.3em] mb-4">Frase Alvo</p>
                
-               {score !== null ? (
+               {status === 'result' ? (
                  // Result View
                  <div className="text-2xl md:text-4xl font-serif font-medium leading-relaxed flex flex-wrap justify-center gap-2">
                     {wordFeedback.map((wf, idx) => (
@@ -266,10 +310,10 @@ const PronunciationLab: React.FC<PronunciationLabProps> = ({ userId }) => {
                )}
 
                <div className="mt-6 flex justify-center gap-4">
-                  <button onClick={() => playAudio(currentPhrase)} className="p-3 bg-slate-100 dark:bg-white/10 rounded-full text-slate-500 hover:text-teal-500 transition-colors">
+                  <button onClick={() => playAudio(currentPhrase)} className="p-3 bg-slate-100 dark:bg-white/10 rounded-full text-slate-500 hover:text-teal-500 transition-colors" title="Ouvir original">
                      <Volume2 size={24} />
                   </button>
-                  <button onClick={loadNewPhrase} className="p-3 bg-slate-100 dark:bg-white/10 rounded-full text-slate-500 hover:text-teal-500 transition-colors">
+                  <button onClick={loadNewPhrase} className="p-3 bg-slate-100 dark:bg-white/10 rounded-full text-slate-500 hover:text-teal-500 transition-colors" title="Nova frase">
                      <RefreshCw size={24} />
                   </button>
                </div>
@@ -277,25 +321,48 @@ const PronunciationLab: React.FC<PronunciationLabProps> = ({ userId }) => {
 
             {/* Recording Area */}
             <div className="relative">
-               {isRecording && (
+               {status === 'listening' && (
                   <div className="absolute inset-0 bg-red-500 rounded-full animate-ping opacity-20"></div>
                )}
+               {status === 'processing' && (
+                  <div className="absolute inset-0 bg-teal-500 rounded-full animate-pulse opacity-20"></div>
+               )}
+               
                <button 
                   onMouseDown={startRecording}
                   onMouseUp={stopRecording}
                   onTouchStart={startRecording}
                   onTouchEnd={stopRecording}
-                  className={`relative w-24 h-24 rounded-full flex items-center justify-center shadow-2xl transition-all active:scale-95 ${isRecording ? 'bg-red-500 text-white scale-110' : 'bg-teal-500 text-white hover:bg-teal-600'}`}
+                  disabled={status === 'processing'}
+                  className={`relative w-24 h-24 rounded-full flex items-center justify-center shadow-2xl transition-all active:scale-95 ${
+                    status === 'listening' ? 'bg-red-500 text-white scale-110' : 
+                    status === 'processing' ? 'bg-teal-500/50 text-white cursor-wait' :
+                    'bg-teal-500 text-white hover:bg-teal-600'
+                  }`}
                >
-                  {isRecording ? <MicOff size={32} /> : <Mic size={32} />}
+                  {status === 'listening' ? <MicOff size={32} /> : status === 'processing' ? <Loader2 size={32} className="animate-spin" /> : <Mic size={32} />}
                </button>
             </div>
-            <p className="mt-6 text-xs font-bold text-slate-400 uppercase tracking-widest">
-               {isRecording ? 'Ouvindo...' : 'Segure para Falar'}
-            </p>
+            
+            <div className="mt-6 h-6">
+                {status === 'listening' && (
+                    <p className="text-xs font-bold text-red-500 uppercase tracking-widest animate-pulse">Ouvindo...</p>
+                )}
+                {status === 'processing' && (
+                    <p className="text-xs font-bold text-teal-500 uppercase tracking-widest animate-bounce">Analisando...</p>
+                )}
+                {status === 'idle' || status === 'result' ? (
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Segure para Falar</p>
+                ) : null}
+                {status === 'error' && (
+                    <p className="text-xs font-bold text-red-500 uppercase tracking-widest flex items-center justify-center gap-2">
+                        <AlertCircle size={12} /> {errorMsg}
+                    </p>
+                )}
+            </div>
 
             {/* Feedback Score */}
-            {score !== null && (
+            {status === 'result' && score !== null && (
                <div className="mt-10 animate-in slide-in-from-bottom-4 w-full max-w-sm">
                   <div className={`p-6 rounded-2xl border-2 flex items-center justify-between ${score >= 80 ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-500/30' : 'bg-orange-50 dark:bg-orange-900/20 border-orange-500/30'}`}>
                      <div>
