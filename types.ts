@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 export enum View {
@@ -85,7 +84,8 @@ export enum View {
   GeneralLanguages = 'general_languages',
   LegalSimplifier = 'legal_simplifier',
   PronunciationLab = 'pronunciation_lab',
-  LyricalVibes = 'lyrical_vibes'
+  LyricalVibes = 'lyrical_vibes',
+  TheExchangeStudent = 'the_exchange_student'
 }
 
 export interface Folder {
@@ -394,7 +394,7 @@ export interface RPGChoice {
   feedback?: string;
 }
 
-export interface RPGScenario {
+export interface InternRPGScenario {
   id: string;
   title: string;
   text: string;
@@ -875,4 +875,27 @@ export interface Song {
   youtube_id: string;
   lang: 'en' | 'es' | 'fr' | 'de' | 'it';
   lyrics: LyricLine[];
+}
+
+// The Exchange Student Types
+export type ExchangeCity = 'London' | 'Paris' | 'Berlin' | 'Rome';
+
+export interface RPGScenarioOption {
+  text: string;
+  nextId: string;
+  requiredLevel?: number; // 0 = Beginner, 1 = Intermediate, 2 = Advanced
+  costMoney?: number;
+  costEnergy?: number;
+  rewardMoney?: number;
+  rewardEnergy?: number;
+  rewardConfidence?: number;
+  translation?: string; // Optional help text
+}
+
+export interface ExchangeRPGScenario {
+  id: string;
+  text: string;
+  speaker?: string; // e.g. "Immigration Officer"
+  backgroundImage?: string;
+  options: RPGScenarioOption[];
 }

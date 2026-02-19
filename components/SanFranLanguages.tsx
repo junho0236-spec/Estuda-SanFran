@@ -10,7 +10,8 @@ import {
   Construction,
   Film,
   GraduationCap,
-  Music2
+  Music2,
+  Plane
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -75,33 +76,32 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
           </div>
         </button>
 
-        {/* CARD 2: IDIOMAS GERAIS (New Hero) */}
+        {/* CARD 2: O INTERCAMBISTA (New Hero) */}
         <button
-          onClick={() => onNavigate(View.GeneralLanguages)}
-          className="group relative col-span-1 md:col-span-2 lg:col-span-2 row-span-2 bg-[#4338ca] text-white rounded-[2.5rem] p-8 md:p-10 flex flex-col justify-between overflow-hidden shadow-2xl hover:shadow-indigo-500/20 hover:scale-[1.01] transition-all duration-500"
+          onClick={() => onNavigate(View.TheExchangeStudent)}
+          className="group relative col-span-1 md:col-span-2 lg:col-span-2 row-span-2 bg-[#4c1d95] text-white rounded-[2.5rem] p-8 md:p-10 flex flex-col justify-between overflow-hidden shadow-2xl hover:shadow-violet-500/20 hover:scale-[1.01] transition-all duration-500"
         >
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/p5.png')] opacity-10"></div>
-          <div className="absolute -left-20 -bottom-20 w-96 h-96 bg-gradient-to-tr from-indigo-400/30 to-transparent rounded-full blur-3xl group-hover:scale-125 transition-transform duration-700"></div>
+          <div className="absolute -left-20 -bottom-20 w-96 h-96 bg-gradient-to-tr from-violet-400/30 to-transparent rounded-full blur-3xl group-hover:scale-125 transition-transform duration-700"></div>
 
           <div className="relative z-10 flex justify-between items-start">
             <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
-               <Languages className="w-8 h-8 text-indigo-200" />
+               <Plane className="w-8 h-8 text-violet-200" />
             </div>
-            <div className="bg-indigo-400/20 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md text-indigo-100 border border-indigo-500/30 flex items-center gap-2">
-               <Globe size={12} /> Idiomas Gerais
+            <div className="bg-violet-400/20 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md text-violet-100 border border-violet-500/30 flex items-center gap-2">
+               <Globe size={12} /> RPG Textual
             </div>
           </div>
 
           <div className="relative z-10 space-y-4 text-left mt-8">
              <div>
-                <h3 className="text-3xl md:text-4xl font-black tracking-tight leading-none text-white mb-2">General App</h3>
-                <p className="text-sm md:text-base font-medium text-indigo-100 opacity-90">
-                  Do básico ao avançado. Gramática e conversação cotidiana.
+                <h3 className="text-3xl md:text-4xl font-black tracking-tight leading-none text-white mb-2">O Intercambista</h3>
+                <p className="text-sm md:text-base font-medium text-violet-100 opacity-90">
+                  Sobreviva em Londres, Paris, Berlim ou Roma. Aprenda vivendo.
                 </p>
              </div>
              <div className="flex gap-2">
-                <span className="px-2 py-1 bg-white/10 rounded-lg text-[9px] font-bold uppercase">EN</span>
-                <span className="px-2 py-1 bg-white/10 rounded-lg text-[9px] font-bold uppercase">ES</span>
+                <span className="px-2 py-1 bg-white/10 rounded-lg text-[9px] font-bold uppercase">UK</span>
                 <span className="px-2 py-1 bg-white/10 rounded-lg text-[9px] font-bold uppercase">FR</span>
                 <span className="px-2 py-1 bg-white/10 rounded-lg text-[9px] font-bold uppercase">DE</span>
                 <span className="px-2 py-1 bg-white/10 rounded-lg text-[9px] font-bold uppercase">IT</span>
@@ -109,7 +109,7 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
           </div>
 
           <div className="absolute bottom-8 right-8 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-4 group-hover:translate-x-0">
-             <div className="bg-white text-indigo-600 p-3 rounded-full shadow-lg">
+             <div className="bg-white text-violet-600 p-3 rounded-full shadow-lg">
                 <ArrowUpRight size={24} />
              </div>
           </div>
@@ -141,7 +141,7 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 4: LYRICAL VIBES (NEW) */}
+        {/* CARD 4: LYRICAL VIBES */}
         <button
           onClick={() => onNavigate(View.LyricalVibes)}
           className="group relative col-span-1 md:col-span-1 lg:col-span-2 row-span-2 bg-gradient-to-r from-pink-500 to-rose-600 text-white rounded-[2.5rem] p-8 md:p-10 border border-white/10 shadow-xl hover:shadow-2xl hover:shadow-pink-500/20 hover:scale-[1.01] transition-all duration-300 flex flex-col justify-between overflow-hidden"
@@ -187,6 +187,27 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
               <h3 className="text-xl font-black uppercase tracking-tight leading-none mb-1">Cinema Lab</h3>
               <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest">
                  Aprenda com Suits e HTGAWM.
+              </p>
+           </div>
+        </button>
+
+        {/* CARD 6: GENERAL LANGUAGES (Standard) */}
+        <button
+          onClick={() => onNavigate(View.GeneralLanguages)}
+          className="group relative col-span-1 md:col-span-1 lg:col-span-1 row-span-2 bg-indigo-600 text-white rounded-[2.5rem] p-8 border border-indigo-500 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between overflow-hidden"
+        >
+           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20"></div>
+           
+           <div className="flex items-start justify-between relative z-10">
+              <div className="bg-white/20 p-3 rounded-2xl shadow-lg">
+                 <Languages size={24} className="text-white" />
+              </div>
+           </div>
+           
+           <div className="relative z-10 mt-6">
+              <h3 className="text-xl font-black uppercase tracking-tight leading-none mb-1">General App</h3>
+              <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest">
+                 Gramática & Vocabulário Geral.
               </p>
            </div>
         </button>

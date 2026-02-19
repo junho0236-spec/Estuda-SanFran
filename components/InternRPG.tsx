@@ -1,12 +1,13 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   Zap, Heart, Award, RefreshCw, Briefcase, FileText, AlertTriangle, 
   Siren, Terminal, ArrowRight, Skull, Frown, PartyPopper, Scale, Trophy
 } from 'lucide-react';
-import { RPGScenario, RPGStat, RPGChoice } from '../types';
+import { InternRPGScenario, RPGStat, RPGChoice } from '../types';
 
 // --- DATA: SCENARIOS ---
-const SCENARIOS: RPGScenario[] = [
+const SCENARIOS: InternRPGScenario[] = [
   {
     id: 'start',
     title: 'Sexta-feira, 17:00h',
