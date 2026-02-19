@@ -1,16 +1,17 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 
 // Inicializa o cliente Google GenAI de forma preguiçosa (lazy)
 let aiInstance: GoogleGenAI | null = null;
 
 const getApiKey = (): string => {
-  // Obtém a chave de API exclusivamente de process.env.API_KEY conforme diretrizes.
-  const key = process.env.API_KEY;
+  // Acesso direto para permitir substituição estática pelo Vite.
+  // Variáveis de ambiente no Vite DEVEM começar com VITE_ e ser acessadas por import.meta.env
+  // FIX: Cast `import.meta` to `any` to bypass TypeScript error when type definitions for Vite are not available.
+  const key = (import.meta as any).env.VITE_GEMINI_API_KEY;
   
   if (!key) {
-    console.warn("Gemini Service: API_KEY não encontrada. Verifique suas variáveis de ambiente.");
-  } else {
-    console.log("Gemini Service: API Key carregada");
+    console.warn("Gemini Service: VITE_GEMINI_API_KEY não foi encontrada nas variáveis de ambiente do build.");
   }
 
   return key || "";
@@ -19,7 +20,7 @@ const getApiKey = (): string => {
 const getAiClient = () => {
   if (!aiInstance) {
     const apiKey = getApiKey();
-    // Inicializa mesmo sem chave para não quebrar o app no load, o erro será pego na chamada
+    // A chamada falhará com erro claro se a chave estiver faltando.
     aiInstance = new GoogleGenAI({ apiKey: apiKey || "missing_key" });
   }
   return aiInstance;
@@ -41,8 +42,8 @@ export const generateFlashcards = async (text: string, subjectName: string, quan
     const ai = getAiClient();
     const apiKey = getApiKey();
     
-    if (!apiKey) {
-        throw new Error("A chave de API (API_KEY) não foi detectada. Por favor, verifique se a variável está configurada.");
+    if (!apiKey || apiKey === "missing_key") {
+        throw new Error("A chave de API (VITE_GEMINI_API_KEY) não foi detectada. Verifique se a variável de ambiente está configurada no painel da Vercel e se um novo 'Redeploy' foi feito após a alteração.");
     }
 
     const response = await ai.models.generateContent({
@@ -99,7 +100,7 @@ export const generateFlashcards = async (text: string, subjectName: string, quan
     console.error("Erro detalhado ao gerar flashcards:", error);
     
     if (error.status === 403 || (error.message && error.message.includes("API key"))) {
-        throw new Error("Erro de Permissão (403): Verifique se a API_KEY é válida.");
+        throw new Error("Erro de Permissão (403): Verifique se a VITE_GEMINI_API_KEY é válida.");
     }
     if (error.status === 400) {
         throw new Error("Erro na Requisição (400): O texto pode ser muito longo ou inválido.");
@@ -139,8 +140,8 @@ export const simplifyLegalText = async (complexText: string) => {
     const ai = getAiClient();
     const apiKey = getApiKey();
 
-    if (!apiKey) {
-      return "Erro: Chave de API (API_KEY) não configurada.";
+    if (!apiKey || apiKey === "missing_key") {
+      return "Erro: Chave de API (VITE_GEMINI_API_KEY) não configurada. Verifique as variáveis de ambiente e faça um novo deploy.";
     }
 
     const response = await ai.models.generateContent({
