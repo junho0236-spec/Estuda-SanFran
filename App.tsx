@@ -87,6 +87,7 @@ import SanFranOAB from './components/SanFranOAB';
 import LegalCinema from './components/LegalCinema';
 import GeneralLanguages from './components/GeneralLanguages'; 
 import LegalSimplifier from './components/LegalSimplifier';
+import PronunciationLab from './components/PronunciationLab';
 import { supabase } from './services/supabaseClient';
 
 export const getBrasiliaDate = () => {
@@ -468,7 +469,7 @@ const App: React.FC = () => {
   const isImprovementChild = [View.Specialization, View.TypingChallenge, View.DominioJuridico, View.Timeline, View.LeiSeca, View.Library, View.OralArgument].includes(currentView);
 
   // Helper to check if current view is a child of SanFran Languages
-  const isLanguagesChild = [View.SanFranIdiomas, View.LegalCinema, View.GeneralLanguages].includes(currentView);
+  const isLanguagesChild = [View.SanFranIdiomas, View.LegalCinema, View.GeneralLanguages, View.PronunciationLab].includes(currentView);
 
   // Helper to check if current view is a child of SanFran Life
   const isLifeChild = [View.Office, View.Sebo].includes(currentView);
@@ -680,6 +681,7 @@ const App: React.FC = () => {
             {currentView === View.LegalCinema && <LegalCinema userId={session.user.id} />}
             {currentView === View.GeneralLanguages && <GeneralLanguages userId={session.user.id} />}
             {currentView === View.LegalSimplifier && <LegalSimplifier />}
+            {currentView === View.PronunciationLab && <PronunciationLab userId={session.user.id} />}
             {currentView === View.ErrorLog && <ErrorLog userId={session.user.id} />}
             {currentView === View.CodeTracker && <CodeTracker userId={session.user.id} />}
             {currentView === View.IracMethod && <IracMethod userId={session.user.id} />}

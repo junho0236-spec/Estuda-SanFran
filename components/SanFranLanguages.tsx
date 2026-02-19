@@ -114,10 +114,39 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
           </div>
         </button>
 
-        {/* CARD 3: CINEMA JURÍDICO */}
+        {/* CARD 3: PRONÚNCIA LAB (NEW) */}
+        <button
+          onClick={() => onNavigate(View.PronunciationLab)}
+          className="group relative col-span-1 md:col-span-2 lg:col-span-2 row-span-2 bg-[#0d9488] text-white rounded-[2.5rem] p-8 border border-teal-500/50 shadow-xl hover:shadow-2xl hover:shadow-teal-500/20 hover:scale-[1.01] transition-all duration-300 flex flex-col justify-between overflow-hidden"
+        >
+           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/sound-wave.png')] opacity-20"></div>
+           <div className="absolute top-0 right-0 w-64 h-64 bg-teal-400/20 rounded-full blur-3xl -mr-16 -mt-16 group-hover:scale-125 transition-transform duration-700"></div>
+           
+           <div className="flex justify-between items-start relative z-10">
+              <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
+                 <Mic2 size={24} className="text-white" />
+              </div>
+              <div className="bg-teal-500/30 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md border border-white/10">
+                 Feedback IA
+              </div>
+           </div>
+           
+           <div className="relative z-10 space-y-2 mt-8">
+              <h3 className="text-2xl md:text-3xl font-black uppercase tracking-tight leading-none">Pronúncia Lab</h3>
+              <p className="text-sm font-medium text-teal-100/90 leading-snug max-w-sm">
+                 Perda o medo de falar. Feedback visual instantâneo para sua pronúncia.
+              </p>
+           </div>
+           
+           <div className="absolute bottom-8 right-8 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-4 group-hover:translate-x-0">
+              <ArrowUpRight size={24} />
+           </div>
+        </button>
+
+        {/* CARD 4: CINEMA JURÍDICO */}
         <button
           onClick={() => onNavigate(View.LegalCinema)}
-          className="group relative col-span-1 md:col-span-2 lg:col-span-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2.5rem] p-8 border border-slate-700 dark:border-slate-200 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-row items-center justify-between overflow-hidden h-32"
+          className="group relative col-span-1 md:col-span-2 lg:col-span-2 row-span-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2.5rem] p-8 border border-slate-700 dark:border-slate-200 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-row items-center justify-between overflow-hidden"
         >
            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/black-scales.png')] opacity-20"></div>
            
@@ -127,7 +156,7 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
               </div>
               <div className="text-left">
                  <h3 className="text-2xl font-black uppercase tracking-tight leading-none mb-1">Cinema Lab</h3>
-                 <p className="text-xs font-bold opacity-70 uppercase tracking-widest">
+                 <p className="text-xs font-bold opacity-70 uppercase tracking-widest max-w-[150px]">
                     Aprenda com Suits, HTGAWM e Cinema Europeu.
                  </p>
               </div>

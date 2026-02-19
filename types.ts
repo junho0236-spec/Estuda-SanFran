@@ -83,7 +83,8 @@ export enum View {
   ReverseSchedule = 'reverse_schedule',
   LegalCinema = 'legal_cinema',
   GeneralLanguages = 'general_languages',
-  LegalSimplifier = 'legal_simplifier'
+  LegalSimplifier = 'legal_simplifier',
+  PronunciationLab = 'pronunciation_lab'
 }
 
 export interface Folder {
