@@ -89,7 +89,8 @@ export enum View {
   TheExchangeStudent = 'the_exchange_student',
   VisualFlashcards = 'visual_flashcards',
   BilingualNews = 'bilingual_news',
-  SlangChallenge = 'slang_challenge'
+  SlangChallenge = 'slang_challenge',
+  QuestionBank = 'question_bank'
 }
 
 export interface Folder {

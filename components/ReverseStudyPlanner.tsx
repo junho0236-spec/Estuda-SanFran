@@ -94,8 +94,9 @@ const ReverseStudyPlanner: React.FC<ReverseStudyPlannerProps> = ({ userId }) => 
         // Reset form
         setStep(1); setNewTitle(''); setNewDate(''); setNewSubjects([]); setNewSyllabus(''); setGeneratedSchedule([]);
       }
-    } catch (e) {
-      alert("Erro ao salvar cronograma.");
+    } catch (e: any) {
+      console.error(e);
+      alert(`Erro ao salvar cronograma: ${e.message || JSON.stringify(e)}`);
     }
   };
 
@@ -106,7 +107,7 @@ const ReverseStudyPlanner: React.FC<ReverseStudyPlannerProps> = ({ userId }) => 
     }
     setIsGenerating(true);
     try {
-      let apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || import.meta.env.VITE_API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
+      let apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || (import.meta as any).env.VITE_API_KEY || (import.meta as any).env.VITE_GEMINI_API_KEY;
       
       // Fallback if API key is missing (e.g. .env.local was deleted)
       if (!apiKey) {
@@ -117,7 +118,7 @@ const ReverseStudyPlanner: React.FC<ReverseStudyPlannerProps> = ({ userId }) => 
             await aistudio.openSelectKey();
             // Assume success after openSelectKey returns
           }
-          apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || import.meta.env.VITE_API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
+          apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || (import.meta as any).env.VITE_API_KEY || (import.meta as any).env.VITE_GEMINI_API_KEY;
         }
       }
       

@@ -96,6 +96,7 @@ const TheExchangeStudent = React.lazy(() => import('./components/TheExchangeStud
 const VisualFlashcards = React.lazy(() => import('./components/VisualFlashcards'));
 const BilingualNews = React.lazy(() => import('./components/BilingualNews'));
 const SlangChallenge = React.lazy(() => import('./components/SlangChallenge'));
+const QuestionBank = React.lazy(() => import('./components/QuestionBank'));
 
 // Loading Fallback Component com Estilo
 const PageLoader = () => (
@@ -484,7 +485,7 @@ const App: React.FC = () => {
   const isCommunityChild = [View.Debate, View.ClassificadosPatio, View.JurisprudenceMural, View.Societies, View.Largo, View.StudyRoom, View.Mural, View.Mentorship, View.MockJury, View.PetitionWiki, View.StudyPact, View.LargoAuction, View.SocialEvents, View.TheVault, View.CaronasRepublicas, View.BalcaoEstagios, View.TribunalOpiniao, View.BussolaOptativas, View.AchadosPerdidos, View.PerolasTribuna, View.GuiaSobrevivencia, View.ClubeLivro, View.GuerraTurmas].includes(currentView);
 
   // Helper to check if current view is a child of SanFran Improvement
-  const isImprovementChild = [View.Specialization, View.TypingChallenge, View.DominioJuridico, View.Timeline, View.LeiSeca, View.Library, View.OralArgument].includes(currentView);
+  const isImprovementChild = [View.Specialization, View.TypingChallenge, View.DominioJuridico, View.Timeline, View.LeiSeca, View.Library, View.OralArgument, View.QuestionBank].includes(currentView);
 
   // Helper to check if current view is a child of SanFran Languages
   const isLanguagesChild = [View.SanFranIdiomas, View.LegalCinema, View.GeneralLanguages, View.PronunciationLab, View.LyricalVibes, View.TheExchangeStudent, View.VisualFlashcards, View.BilingualNews, View.SlangChallenge].includes(currentView);
@@ -703,6 +704,7 @@ const App: React.FC = () => {
                 {currentView === View.PronunciationLab && <PronunciationLab userId={session.user.id} />}
                 {currentView === View.LyricalVibes && <LyricalVibes userId={session.user.id} />}
                 {currentView === View.TheExchangeStudent && <TheExchangeStudent userId={session.user.id} />}
+                {currentView === View.QuestionBank && <QuestionBank userId={session.user.id} />}
                 {currentView === View.VisualFlashcards && <VisualFlashcards userId={session.user.id} />}
                 {currentView === View.BilingualNews && <BilingualNews userId={session.user.id} />}
                 {currentView === View.SlangChallenge && <SlangChallenge userId={session.user.id} />}
