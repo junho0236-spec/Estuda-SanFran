@@ -12,7 +12,9 @@ import {
   Loader2,
   AlertCircle,
   Download,
-  Star
+  Star,
+  ArrowLeft,
+  LayoutList
 } from 'lucide-react';
 
 interface Question {
@@ -48,6 +50,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [wrongQuestions, setWrongQuestions] = useState<string[]>([]);
   const [showWrongOnly, setShowWrongOnly] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'single'>('list');
   
   // Stats
   const [correctCount, setCorrectCount] = useState(0);
@@ -144,6 +147,8 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
         
         const newTopics = Array.from(new Set([...topics, ...data.map(q => q.topic)])).filter(Boolean);
         setTopics(newTopics);
+        
+        setViewMode('list');
       }
     } catch (error: any) {
       console.error('Error importing questions:', error);
@@ -191,6 +196,8 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
         if (data.topic && !topics.includes(data.topic)) {
           setTopics([...topics, data.topic]);
         }
+        
+        setViewMode('list');
       }
     } catch (error: any) {
       console.error('Error adding question:', error);
@@ -276,6 +283,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
     setCurrentIndex(0);
     setSelectedOption(null);
     setShowExplanation(false);
+    setViewMode('list');
   }, [selectedSubject, selectedTopic, difficultyFilter, sortBy, showFavoritesOnly, showWrongOnly]);
 
   if (loading) {
@@ -524,6 +532,67 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
 
           {/* Question Area */}
           {filteredQuestions.length > 0 && currentQuestion ? (
+            viewMode === 'list' ? (
+              <div className="grid grid-cols-1 gap-4">
+                {filteredQuestions.map((q, idx) => (
+                  <div 
+                    key={q.id}
+                    onClick={() => {
+                      setCurrentIndex(idx);
+                      setViewMode('single');
+                      setSelectedOption(null);
+                      setShowExplanation(false);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-md cursor-pointer transition-all group relative overflow-hidden"
+                  >
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex flex-wrap gap-2">
+                        <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-md text-xs font-bold uppercase tracking-wider">
+                          {q.subject}
+                        </span>
+                        {q.topic && (
+                          <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-md text-xs font-bold uppercase tracking-wider">
+                            {q.topic}
+                          </span>
+                        )}
+                        <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase tracking-wider ${
+                          q.difficulty === 'facil' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
+                          q.difficulty === 'media' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300' :
+                          'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                        }`}>
+                          {q.difficulty}
+                        </span>
+                      </div>
+                      
+                      {favorites.includes(q.id) && (
+                        <Star size={16} className="fill-yellow-500 text-yellow-500 shrink-0" />
+                      )}
+                    </div>
+                    
+                    <p className="text-slate-700 dark:text-slate-300 font-medium line-clamp-2 mb-4 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                      {q.statement}
+                    </p>
+                    
+                    <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-100 dark:border-slate-800">
+                      <span className="text-xs text-slate-400 font-medium">
+                        ID: {q.id.substring(0, 8)}...
+                      </span>
+                      <span className="text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                        Resolver <ChevronRight size={14} />
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                <button 
+                  onClick={() => setViewMode('list')}
+                  className="self-start flex items-center gap-2 px-4 py-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors font-bold text-sm uppercase tracking-wider hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl"
+                >
+                  <ArrowLeft size={18} /> Voltar para a Lista
+                </button>
             <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
               {/* Question Header */}
               <div className="bg-slate-50 dark:bg-slate-800/50 p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
@@ -644,6 +713,8 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
                 </button>
               </div>
             </div>
+            </div>
+            )
           ) : (
             <div className="bg-white dark:bg-slate-900 rounded-3xl p-12 text-center border border-slate-200 dark:border-slate-800">
               <AlertCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" />
