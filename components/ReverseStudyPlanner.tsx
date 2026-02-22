@@ -106,7 +106,26 @@ const ReverseStudyPlanner: React.FC<ReverseStudyPlannerProps> = ({ userId }) => 
     }
     setIsGenerating(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      let apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+      
+      // Fallback if API key is missing (e.g. .env.local was deleted)
+      if (!apiKey) {
+        const aistudio = (window as any).aistudio;
+        if (aistudio && aistudio.hasSelectedApiKey) {
+          const hasKey = await aistudio.hasSelectedApiKey();
+          if (!hasKey) {
+            await aistudio.openSelectKey();
+            // Assume success after openSelectKey returns
+          }
+          apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+        }
+      }
+      
+      if (!apiKey) {
+         throw new Error("Chave da API não encontrada. Por favor, configure a variável GEMINI_API_KEY no arquivo .env.local ou selecione uma chave.");
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
       const prompt = `Você é um especialista em planejamento de estudos. O usuário tem uma prova na data ${newDate} e pode estudar ${newHours} horas por dia.
 Aqui está o edital (conteúdo programático):
 ${newSyllabus}
