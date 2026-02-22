@@ -106,7 +106,7 @@ const ReverseStudyPlanner: React.FC<ReverseStudyPlannerProps> = ({ userId }) => 
     }
     setIsGenerating(true);
     try {
-      let apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+      let apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || import.meta.env.VITE_API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
       
       // Fallback if API key is missing (e.g. .env.local was deleted)
       if (!apiKey) {
@@ -117,12 +117,12 @@ const ReverseStudyPlanner: React.FC<ReverseStudyPlannerProps> = ({ userId }) => 
             await aistudio.openSelectKey();
             // Assume success after openSelectKey returns
           }
-          apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+          apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || import.meta.env.VITE_API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
         }
       }
       
       if (!apiKey) {
-         throw new Error("Chave da API não encontrada. Por favor, configure a variável GEMINI_API_KEY no arquivo .env.local ou selecione uma chave.");
+         throw new Error("Chave da API não encontrada. Verifique se VITE_API_KEY está configurada no Vercel ou .env.");
       }
 
       const ai = new GoogleGenAI({ apiKey });
