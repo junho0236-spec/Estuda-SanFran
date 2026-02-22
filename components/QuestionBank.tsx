@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { sampleQuestions } from './sampleQuestions';
+import { GoogleGenAI, Type } from '@google/genai';
 import { 
   BookOpen, 
   CheckCircle2, 
@@ -14,7 +15,9 @@ import {
   Download,
   Star,
   ArrowLeft,
-  LayoutList
+  LayoutList,
+  Sparkles,
+  X
 } from 'lucide-react';
 
 interface Question {
@@ -51,13 +54,29 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
   const [wrongQuestions, setWrongQuestions] = useState<string[]>([]);
   const [showWrongOnly, setShowWrongOnly] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'single'>('list');
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [notes, setNotes] = useState<Record<string, string>>({});
   
   // Stats
   const [correctCount, setCorrectCount] = useState(0);
+
+  const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 3000);
+  };
   const [wrongCount, setWrongCount] = useState(0);
 
   // Form for new question
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showAIGenerator, setShowAIGenerator] = useState(false);
+  const [aiConfig, setAiConfig] = useState({
+    subject: '',
+    topic: '',
+    count: 3,
+    difficulty: 'media' as 'facil' | 'media' | 'dificil'
+  });
+  const [isGenerating, setIsGenerating] = useState(false);
   const [newQuestion, setNewQuestion] = useState<Partial<Question>>({
     subject: '',
     topic: '',
@@ -81,14 +100,22 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
     if (storedWrong) {
       setWrongQuestions(JSON.parse(storedWrong));
     }
+
+    // Load notes from local storage
+    const storedNotes = localStorage.getItem(`sanfran_notes_${userId}`);
+    if (storedNotes) {
+      setNotes(JSON.parse(storedNotes));
+    }
   }, [userId]);
 
   const toggleFavorite = (questionId: string) => {
     let newFavorites;
     if (favorites.includes(questionId)) {
       newFavorites = favorites.filter(id => id !== questionId);
+      showNotification('Removido dos favoritos', 'success');
     } else {
       newFavorites = [...favorites, questionId];
+      showNotification('Adicionado aos favoritos', 'success');
     }
     setFavorites(newFavorites);
     localStorage.setItem(`sanfran_favorites_${userId}`, JSON.stringify(newFavorites));
@@ -139,7 +166,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
 
       if (data) {
         setQuestions([...data, ...questions]);
-        alert(`${data.length} questões importadas com sucesso!`);
+        showNotification(`${data.length} questões importadas com sucesso!`, 'success');
         
         // Update filters
         const newSubjects = Array.from(new Set([...subjects, ...data.map(q => q.subject)])).filter(Boolean);
@@ -152,7 +179,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
       }
     } catch (error: any) {
       console.error('Error importing questions:', error);
-      alert(`Erro ao importar questões: ${error.message}`);
+      showNotification(`Erro ao importar questões: ${error.message}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -163,11 +190,12 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
     
     // Basic validation
     if (!newQuestion.subject || !newQuestion.statement || newQuestion.options?.some(o => !o)) {
-      alert('Preencha todos os campos obrigatórios e as 4 alternativas.');
+      showNotification('Preencha todos os campos obrigatórios e as 4 alternativas.', 'error');
       return;
     }
 
     try {
+      setIsSubmitting(true);
       const { data, error } = await supabase
         .from('questions')
         .insert([newQuestion])
@@ -179,6 +207,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
       if (data) {
         setQuestions([data, ...questions]);
         setShowAddForm(false);
+        showNotification('Questão adicionada com sucesso!', 'success');
         // Reset form
         setNewQuestion({
           subject: '',
@@ -201,7 +230,85 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
       }
     } catch (error: any) {
       console.error('Error adding question:', error);
-      alert(`Erro ao adicionar questão: ${error.message || JSON.stringify(error)}`);
+      showNotification(`Erro ao adicionar questão: ${error.message || JSON.stringify(error)}`, 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleGenerateAI = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!aiConfig.subject) {
+      showNotification('Preencha a matéria/assunto.', 'error');
+      return;
+    }
+
+    try {
+      setIsGenerating(true);
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      
+      const prompt = `Crie ${aiConfig.count} questões de múltipla escolha de nível ${aiConfig.difficulty} sobre a matéria "${aiConfig.subject}" e tópico "${aiConfig.topic}".
+      Cada questão deve ter 4 alternativas.
+      A explicação deve ser detalhada, explicando por que a alternativa correta está certa e por que cada uma das outras alternativas está incorreta.
+      Retorne as questões no formato JSON.`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                subject: { type: Type.STRING, description: "A matéria (ex: Direito Civil)" },
+                topic: { type: Type.STRING, description: "O tópico (ex: Contratos)" },
+                statement: { type: Type.STRING, description: "O enunciado da questão" },
+                options: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING },
+                  description: "As 4 alternativas da questão"
+                },
+                correct_answer: { type: Type.INTEGER, description: "O índice da alternativa correta (0 a 3)" },
+                explanation: { type: Type.STRING, description: "Explicação detalhada de cada alternativa" },
+                difficulty: { type: Type.STRING, description: "A dificuldade: 'facil', 'media' ou 'dificil'" }
+              },
+              required: ["subject", "topic", "statement", "options", "correct_answer", "explanation", "difficulty"]
+            }
+          }
+        }
+      });
+
+      if (response.text) {
+        const generatedQuestions = JSON.parse(response.text);
+        
+        const { data, error } = await supabase
+          .from('questions')
+          .insert(generatedQuestions)
+          .select();
+
+        if (error) throw error;
+
+        if (data) {
+          setQuestions([...data, ...questions]);
+          setShowAIGenerator(false);
+          showNotification(`${data.length} questões geradas com sucesso!`, 'success');
+          
+          const newSubjects = Array.from(new Set([...subjects, ...data.map(q => q.subject)])).filter(Boolean);
+          setSubjects(newSubjects);
+          
+          const newTopics = Array.from(new Set([...topics, ...data.map(q => q.topic)])).filter(Boolean);
+          setTopics(newTopics);
+          
+          setViewMode('list');
+        }
+      }
+    } catch (error: any) {
+      console.error('Error generating questions:', error);
+      showNotification(`Erro ao gerar questões: ${error.message}`, 'error');
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -262,6 +369,19 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
     }
   };
 
+  const handleSaveNote = (questionId: string, noteText: string) => {
+    // Only save if content changed from storage
+    const storedNotes = localStorage.getItem(`sanfran_notes_${userId}`);
+    const parsedStored = storedNotes ? JSON.parse(storedNotes) : {};
+    
+    if (parsedStored[questionId] !== noteText) {
+       const newNotes = { ...notes, [questionId]: noteText };
+       setNotes(newNotes);
+       localStorage.setItem(`sanfran_notes_${userId}`, JSON.stringify(newNotes));
+       showNotification('Anotação salva com sucesso!', 'success');
+    }
+  };
+
   const handleNext = () => {
     if (currentIndex < filteredQuestions.length - 1) {
       setCurrentIndex(prev => prev + 1);
@@ -318,6 +438,12 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
             </button>
           )}
           <button
+            onClick={() => setShowAIGenerator(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition-colors"
+          >
+            <Sparkles size={16} /> Gerar com IA
+          </button>
+          <button
             onClick={() => setShowAddForm(!showAddForm)}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-colors"
           >
@@ -325,6 +451,90 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
           </button>
         </div>
       </header>
+
+      {showAIGenerator && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md animate-in zoom-in-95 duration-300">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Sparkles className="text-purple-500" />
+                Gerador com IA
+              </h2>
+              <button onClick={() => setShowAIGenerator(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                <X size={24} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleGenerateAI} className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Matéria / Assunto *</label>
+                <input
+                  type="text"
+                  required
+                  value={aiConfig.subject}
+                  onChange={e => setAiConfig({...aiConfig, subject: e.target.value})}
+                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
+                  placeholder="Ex: Direito Penal"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Tópico Específico (Opcional)</label>
+                <input
+                  type="text"
+                  value={aiConfig.topic}
+                  onChange={e => setAiConfig({...aiConfig, topic: e.target.value})}
+                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
+                  placeholder="Ex: Crimes contra a vida"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Quantidade</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    required
+                    value={aiConfig.count}
+                    onChange={e => setAiConfig({...aiConfig, count: parseInt(e.target.value) || 1})}
+                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Dificuldade</label>
+                  <select
+                    value={aiConfig.difficulty}
+                    onChange={e => setAiConfig({...aiConfig, difficulty: e.target.value as any})}
+                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
+                  >
+                    <option value="facil">Fácil</option>
+                    <option value="media">Média</option>
+                    <option value="dificil">Difícil</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="pt-4">
+                <button
+                  type="submit"
+                  disabled={isGenerating}
+                  className="w-full py-4 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" /> Gerando...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={18} /> Gerar Questões
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {showAddForm ? (
         <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-xl border border-slate-200 dark:border-slate-800">
@@ -418,9 +628,16 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
             <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
               <button
                 type="submit"
-                className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black uppercase tracking-widest transition-colors"
+                disabled={isSubmitting}
+                className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
               >
-                Salvar Questão
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" /> Salvando...
+                  </>
+                ) : (
+                  'Salvar Questão'
+                )}
               </button>
             </div>
           </form>
@@ -566,7 +783,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
                       </div>
                       
                       {favorites.includes(q.id) && (
-                        <Star size={16} className="fill-yellow-500 text-yellow-500 shrink-0" />
+                        <Star size={16} className="fill-yellow-500 text-yellow-500 shrink-0 animate-in zoom-in duration-300" />
                       )}
                     </div>
                     
@@ -609,12 +826,12 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => toggleFavorite(currentQuestion.id)}
-                    className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                    className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-all duration-200 active:scale-90"
                     title={favorites.includes(currentQuestion.id) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
                   >
                     <Star 
                       size={20} 
-                      className={favorites.includes(currentQuestion.id) ? "fill-yellow-500 text-yellow-500" : "text-slate-400"} 
+                      className={`transition-all duration-300 ${favorites.includes(currentQuestion.id) ? "fill-yellow-500 text-yellow-500 scale-110" : "text-slate-400"}`} 
                     />
                   </button>
                   <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
@@ -683,11 +900,41 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
                     <h4 className="font-bold text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
                       <BookOpen size={18} /> Explicação
                     </h4>
-                    <p className="text-blue-900/80 dark:text-blue-200/80 leading-relaxed text-sm">
+                    <p className="text-blue-900/80 dark:text-blue-200/80 leading-relaxed text-sm whitespace-pre-wrap">
                       {currentQuestion.explanation}
                     </p>
                   </div>
                 )}
+
+                {/* Personal Notes */}
+                <div className="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800">
+                  <h4 className="font-bold text-slate-700 dark:text-slate-300 mb-4 flex items-center gap-2">
+                    <LayoutList size={18} /> Minhas Anotações
+                  </h4>
+                  <div className="relative">
+                    <textarea
+                      value={notes[currentQuestion.id] || ''}
+                      onChange={(e) => {
+                        const newNotes = { ...notes, [currentQuestion.id]: e.target.value };
+                        setNotes(newNotes);
+                      }}
+                      onBlur={(e) => {
+                        handleSaveNote(currentQuestion.id, e.target.value);
+                      }}
+                      className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none resize-none text-sm text-slate-700 dark:text-slate-300 min-h-[100px]"
+                      placeholder="Adicione suas observações sobre esta questão..."
+                    />
+                    <div className="absolute bottom-3 right-3">
+                      <button 
+                        onClick={() => handleSaveNote(currentQuestion.id, notes[currentQuestion.id] || '')}
+                        className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
+                        title="Salvar anotação"
+                      >
+                        <CheckCircle2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Footer / Navigation */}
@@ -735,6 +982,14 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
             </div>
           )}
         </>
+      )}
+      {notification && (
+        <div className={`fixed bottom-6 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 z-50 animate-in slide-in-from-bottom-5 fade-in duration-300 ${
+          notification.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+        }`}>
+          {notification.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
+          <span className="font-bold text-sm">{notification.message}</span>
+        </div>
       )}
     </div>
   );
