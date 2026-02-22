@@ -11,7 +11,8 @@ import {
   Plus,
   Loader2,
   AlertCircle,
-  Download
+  Download,
+  Star
 } from 'lucide-react';
 
 interface Question {
@@ -43,6 +44,8 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
   const [selectedTopic, setSelectedTopic] = useState<string>('Todos');
   const [difficultyFilter, setDifficultyFilter] = useState<string>('Todos');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'difficulty_asc' | 'difficulty_desc'>('newest');
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   
   // Stats
   const [correctCount, setCorrectCount] = useState(0);
@@ -62,7 +65,23 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
 
   useEffect(() => {
     fetchQuestions();
-  }, []);
+    // Load favorites from local storage
+    const storedFavorites = localStorage.getItem(`sanfran_favorites_${userId}`);
+    if (storedFavorites) {
+      setFavorites(JSON.parse(storedFavorites));
+    }
+  }, [userId]);
+
+  const toggleFavorite = (questionId: string) => {
+    let newFavorites;
+    if (favorites.includes(questionId)) {
+      newFavorites = favorites.filter(id => id !== questionId);
+    } else {
+      newFavorites = [...favorites, questionId];
+    }
+    setFavorites(newFavorites);
+    localStorage.setItem(`sanfran_favorites_${userId}`, JSON.stringify(newFavorites));
+  };
 
   const fetchQuestions = async () => {
     try {
@@ -181,7 +200,8 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
     const matchSubject = selectedSubject === 'Todos' || q.subject === selectedSubject;
     const matchTopic = selectedTopic === 'Todos' || q.topic === selectedTopic;
     const matchDifficulty = difficultyFilter === 'Todos' || q.difficulty === difficultyFilter;
-    return matchSubject && matchTopic && matchDifficulty;
+    const matchFavorite = !showFavoritesOnly || favorites.includes(q.id);
+    return matchSubject && matchTopic && matchDifficulty && matchFavorite;
   }).sort((a, b) => {
     if (sortBy === 'newest') return 0; // Already sorted by created_at desc from DB
     if (sortBy === 'oldest') return -1; // Reverse order
@@ -232,7 +252,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
     setCurrentIndex(0);
     setSelectedOption(null);
     setShowExplanation(false);
-  }, [selectedSubject, selectedTopic, difficultyFilter, sortBy]);
+  }, [selectedSubject, selectedTopic, difficultyFilter, sortBy, showFavoritesOnly]);
 
   if (loading) {
     return (
@@ -426,6 +446,18 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
                 <option value="difficulty_asc">Mais Fáceis Primeiro</option>
                 <option value="difficulty_desc">Mais Difíceis Primeiro</option>
               </select>
+
+              <button
+                onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  showFavoritesOnly 
+                    ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800' 
+                    : 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                }`}
+              >
+                <Star size={16} className={showFavoritesOnly ? 'fill-yellow-500 text-yellow-500' : ''} />
+                Favoritas
+              </button>
               
               <div className="ml-auto text-sm text-slate-500 font-medium">
                 {filteredQuestions.length} questões encontradas
@@ -469,13 +501,25 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
                     </span>
                   )}
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                  currentQuestion.difficulty === 'facil' ? 'bg-green-100 text-green-700' :
-                  currentQuestion.difficulty === 'media' ? 'bg-yellow-100 text-yellow-700' :
-                  'bg-red-100 text-red-700'
-                }`}>
-                  {currentQuestion.difficulty}
-                </span>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => toggleFavorite(currentQuestion.id)}
+                    className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                    title={favorites.includes(currentQuestion.id) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+                  >
+                    <Star 
+                      size={20} 
+                      className={favorites.includes(currentQuestion.id) ? "fill-yellow-500 text-yellow-500" : "text-slate-400"} 
+                    />
+                  </button>
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                    currentQuestion.difficulty === 'facil' ? 'bg-green-100 text-green-700' :
+                    currentQuestion.difficulty === 'media' ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-red-100 text-red-700'
+                  }`}>
+                    {currentQuestion.difficulty}
+                  </span>
+                </div>
               </div>
 
               {/* Question Body */}
