@@ -107,15 +107,15 @@ const ReverseStudyPlanner: React.FC<ReverseStudyPlannerProps> = ({ userId }) => 
     setIsGenerating(true);
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const prompt = `Você é um especialista em planejamento de estudos. O usuário tem uma prova na data ${newDate} e pode estudar ${newHours} horas por dia. Hoje é ${new Date().toLocaleDateString()}.
+      const prompt = `Você é um especialista em planejamento de estudos. O usuário tem uma prova na data ${newDate} e pode estudar ${newHours} horas por dia.
 Aqui está o edital (conteúdo programático):
 ${newSyllabus}
 
-Crie um cronograma de estudos diário otimizado, distribuindo os tópicos do edital ao longo dos dias disponíveis até a véspera da prova.
+Crie um ciclo de estudos semanal (7 dias, do Dia 1 ao Dia 7) otimizado, distribuindo os tópicos do edital. Este ciclo será repetido até a prova.
 Retorne um JSON seguindo o schema fornecido.
 Use cores do tailwind (ex: bg-red-500, bg-blue-500, bg-green-500, bg-yellow-500, bg-purple-500, bg-pink-500, bg-indigo-500, bg-orange-500) para as matérias.
 A soma das horas de cada dia deve ser no máximo ${newHours}.
-Seja realista e distribua bem o conteúdo. Se o tempo for curto, foque nos tópicos principais.`;
+Seja realista e distribua bem o conteúdo. Foque nos tópicos principais.`;
 
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
@@ -127,7 +127,7 @@ Seja realista e distribua bem o conteúdo. Se o tempo for curto, foque nos tópi
             items: {
               type: Type.OBJECT,
               properties: {
-                date: { type: Type.STRING, description: "Data no formato YYYY-MM-DD" },
+                date: { type: Type.STRING, description: "Dia da semana (ex: Dia 1, Dia 2, ..., Dia 7)" },
                 slots: {
                   type: Type.ARRAY,
                   items: {
@@ -149,16 +149,56 @@ Seja realista e distribua bem o conteúdo. Se o tempo for curto, foque nos tópi
       });
 
       const jsonStr = response.text?.trim() || "[]";
-      const parsed = JSON.parse(jsonStr) as DailyPlan[];
+      let parsed = JSON.parse(jsonStr);
+      
+      if (!Array.isArray(parsed)) {
+        if (parsed && typeof parsed === 'object' && Array.isArray(parsed.schedule)) {
+          parsed = parsed.schedule;
+        } else if (parsed && typeof parsed === 'object' && Array.isArray(parsed.slots)) {
+          parsed = parsed.slots;
+        } else {
+          parsed = [];
+        }
+      }
+      
+      parsed = parsed as DailyPlan[];
+      
+      // Expand the 7-day cycle to the full period until the exam
+      const targetDate = new Date(newDate + 'T00:00:00');
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const diffTime = targetDate.getTime() - today.getTime();
+      const totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (totalDays > 0 && parsed.length > 0) {
+        const fullSchedule: DailyPlan[] = [];
+        for (let d = 0; d < totalDays; d++) {
+          const dayDate = new Date(today);
+          dayDate.setDate(today.getDate() + d);
+          const cycleDay = parsed[d % parsed.length];
+          
+          const year = dayDate.getFullYear();
+          const month = String(dayDate.getMonth() + 1).padStart(2, '0');
+          const day = String(dayDate.getDate()).padStart(2, '0');
+          
+          fullSchedule.push({
+            date: `${year}-${month}-${day}`,
+            slots: Array.isArray(cycleDay.slots) ? cycleDay.slots : []
+          });
+        }
+        parsed = fullSchedule;
+      }
       
       // Extract subjects from the generated schedule
       const subjectsMap = new Map<string, string>();
       parsed.forEach(day => {
-        day.slots.forEach(slot => {
-          if (!subjectsMap.has(slot.subject)) {
-            subjectsMap.set(slot.subject, slot.color);
-          }
-        });
+        if (Array.isArray(day.slots)) {
+          day.slots.forEach(slot => {
+            if (!subjectsMap.has(slot.subject)) {
+              subjectsMap.set(slot.subject, slot.color);
+            }
+          });
+        }
       });
       
       const extractedSubjects = Array.from(subjectsMap.entries()).map(([name, color]) => ({
@@ -172,7 +212,7 @@ Seja realista e distribua bem o conteúdo. Se o tempo for curto, foque nos tópi
       setStep(3);
     } catch (e) {
       console.error(e);
-      alert("Erro ao gerar cronograma com IA.");
+      alert("Erro ao gerar cronograma com IA: " + (e instanceof Error ? e.message : JSON.stringify(e)));
     } finally {
       setIsGenerating(false);
     }
