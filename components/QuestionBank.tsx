@@ -46,6 +46,8 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'difficulty_asc' | 'difficulty_desc'>('newest');
   const [favorites, setFavorites] = useState<string[]>([]);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [wrongQuestions, setWrongQuestions] = useState<string[]>([]);
+  const [showWrongOnly, setShowWrongOnly] = useState(false);
   
   // Stats
   const [correctCount, setCorrectCount] = useState(0);
@@ -69,6 +71,12 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
     const storedFavorites = localStorage.getItem(`sanfran_favorites_${userId}`);
     if (storedFavorites) {
       setFavorites(JSON.parse(storedFavorites));
+    }
+    
+    // Load wrong questions from local storage
+    const storedWrong = localStorage.getItem(`sanfran_wrong_${userId}`);
+    if (storedWrong) {
+      setWrongQuestions(JSON.parse(storedWrong));
     }
   }, [userId]);
 
@@ -201,7 +209,9 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
     const matchTopic = selectedTopic === 'Todos' || q.topic === selectedTopic;
     const matchDifficulty = difficultyFilter === 'Todos' || q.difficulty === difficultyFilter;
     const matchFavorite = !showFavoritesOnly || favorites.includes(q.id);
-    return matchSubject && matchTopic && matchDifficulty && matchFavorite;
+    const matchWrong = !showWrongOnly || wrongQuestions.includes(q.id);
+    
+    return matchSubject && matchTopic && matchDifficulty && matchFavorite && matchWrong;
   }).sort((a, b) => {
     if (sortBy === 'newest') return 0; // Already sorted by created_at desc from DB
     if (sortBy === 'oldest') return -1; // Reverse order
@@ -226,8 +236,22 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
     
     if (index === currentQuestion.correct_answer) {
       setCorrectCount(prev => prev + 1);
+      
+      // If answered correctly, remove from wrong questions list if present
+      if (wrongQuestions.includes(currentQuestion.id)) {
+        const newWrong = wrongQuestions.filter(id => id !== currentQuestion.id);
+        setWrongQuestions(newWrong);
+        localStorage.setItem(`sanfran_wrong_${userId}`, JSON.stringify(newWrong));
+      }
     } else {
       setWrongCount(prev => prev + 1);
+      
+      // If answered incorrectly, add to wrong questions list
+      if (!wrongQuestions.includes(currentQuestion.id)) {
+        const newWrong = [...wrongQuestions, currentQuestion.id];
+        setWrongQuestions(newWrong);
+        localStorage.setItem(`sanfran_wrong_${userId}`, JSON.stringify(newWrong));
+      }
     }
   };
 
@@ -252,7 +276,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
     setCurrentIndex(0);
     setSelectedOption(null);
     setShowExplanation(false);
-  }, [selectedSubject, selectedTopic, difficultyFilter, sortBy, showFavoritesOnly]);
+  }, [selectedSubject, selectedTopic, difficultyFilter, sortBy, showFavoritesOnly, showWrongOnly]);
 
   if (loading) {
     return (
@@ -456,7 +480,19 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
                 }`}
               >
                 <Star size={16} className={showFavoritesOnly ? 'fill-yellow-500 text-yellow-500' : ''} />
-                Favoritas
+                Favoritas {favorites.length > 0 && <span className="ml-1 opacity-75">({favorites.length})</span>}
+              </button>
+
+              <button
+                onClick={() => setShowWrongOnly(!showWrongOnly)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  showWrongOnly 
+                    ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 border border-red-200 dark:border-red-800' 
+                    : 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                }`}
+              >
+                <AlertCircle size={16} className={showWrongOnly ? 'text-red-500' : ''} />
+                Revisar Erros {wrongQuestions.length > 0 && <span className="ml-1 opacity-75">({wrongQuestions.length})</span>}
               </button>
               
               <div className="ml-auto text-sm text-slate-500 font-medium">
