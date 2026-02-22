@@ -841,12 +841,26 @@ export interface PlanSubject {
   color: string;
 }
 
+export interface DailyPlanSlot {
+  subject: string;
+  topic: string;
+  hours: number;
+  color: string;
+}
+
+export interface DailyPlan {
+  date: string; // YYYY-MM-DD
+  slots: DailyPlanSlot[];
+}
+
 export interface StudyPlan {
   id: string;
   title: string;
   exam_date: string;
   daily_hours: number;
   subjects_config: PlanSubject[];
+  syllabus_text?: string;
+  generated_schedule?: DailyPlan[];
   created_at: string;
 }
 

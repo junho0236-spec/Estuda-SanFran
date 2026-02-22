@@ -12,10 +12,13 @@ import {
   History,
   CheckCircle2,
   CalendarCheck,
-  X
+  X,
+  Loader2,
+  Sparkles
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
-import { StudyPlan, PlanSubject } from '../types';
+import { StudyPlan, PlanSubject, DailyPlan } from '../types';
+import { GoogleGenAI, Type } from '@google/genai';
 
 interface ReverseStudyPlannerProps {
   userId: string;
@@ -32,14 +35,14 @@ const ReverseStudyPlanner: React.FC<ReverseStudyPlannerProps> = ({ userId }) => 
   const [currentPlan, setCurrentPlan] = useState<StudyPlan | null>(null);
 
   // Creation State
-  const [step, setStep] = useState(1); // 1: Setup, 2: Subjects, 3: Review
+  const [step, setStep] = useState(1); // 1: Setup, 2: Subjects/Syllabus, 3: Review
   const [newTitle, setNewTitle] = useState('');
   const [newDate, setNewDate] = useState('');
   const [newHours, setNewHours] = useState(3);
-  const [newSubjects, setNewSubjects] = useState<PlanSubject[]>([
-    { name: 'Direito Civil', weight: 2, color: COLORS[0] },
-    { name: 'Direito Penal', weight: 1, color: COLORS[1] }
-  ]);
+  const [newSyllabus, setNewSyllabus] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedSchedule, setGeneratedSchedule] = useState<DailyPlan[]>([]);
+  const [newSubjects, setNewSubjects] = useState<PlanSubject[]>([]);
 
   // Subject Input
   const [subName, setSubName] = useState('');
@@ -76,7 +79,9 @@ const ReverseStudyPlanner: React.FC<ReverseStudyPlannerProps> = ({ userId }) => 
         title: newTitle,
         exam_date: newDate,
         daily_hours: newHours,
-        subjects_config: newSubjects
+        subjects_config: newSubjects,
+        syllabus_text: newSyllabus,
+        generated_schedule: generatedSchedule
       };
 
       const { data, error } = await supabase.from('study_plans').insert(payload).select().single();
@@ -87,15 +92,109 @@ const ReverseStudyPlanner: React.FC<ReverseStudyPlannerProps> = ({ userId }) => 
         setCurrentPlan(data);
         setMode('view');
         // Reset form
-        setStep(1); setNewTitle(''); setNewDate(''); setNewSubjects([]);
+        setStep(1); setNewTitle(''); setNewDate(''); setNewSubjects([]); setNewSyllabus(''); setGeneratedSchedule([]);
       }
     } catch (e) {
       alert("Erro ao salvar cronograma.");
     }
   };
 
+  const generateWithAI = async () => {
+    if (!newSyllabus.trim()) {
+      alert("Por favor, insira o edital.");
+      return;
+    }
+    setIsGenerating(true);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const prompt = `Você é um especialista em planejamento de estudos. O usuário tem uma prova na data ${newDate} e pode estudar ${newHours} horas por dia. Hoje é ${new Date().toLocaleDateString()}.
+Aqui está o edital (conteúdo programático):
+${newSyllabus}
+
+Crie um cronograma de estudos diário otimizado, distribuindo os tópicos do edital ao longo dos dias disponíveis até a véspera da prova.
+Retorne um JSON seguindo o schema fornecido.
+Use cores do tailwind (ex: bg-red-500, bg-blue-500, bg-green-500, bg-yellow-500, bg-purple-500, bg-pink-500, bg-indigo-500, bg-orange-500) para as matérias.
+A soma das horas de cada dia deve ser no máximo ${newHours}.
+Seja realista e distribua bem o conteúdo. Se o tempo for curto, foque nos tópicos principais.`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                date: { type: Type.STRING, description: "Data no formato YYYY-MM-DD" },
+                slots: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      subject: { type: Type.STRING, description: "Nome da matéria" },
+                      topic: { type: Type.STRING, description: "Tópico específico" },
+                      hours: { type: Type.NUMBER, description: "Horas dedicadas" },
+                      color: { type: Type.STRING, description: "Cor do Tailwind" }
+                    },
+                    required: ["subject", "topic", "hours", "color"]
+                  }
+                }
+              },
+              required: ["date", "slots"]
+            }
+          }
+        }
+      });
+
+      const jsonStr = response.text?.trim() || "[]";
+      const parsed = JSON.parse(jsonStr) as DailyPlan[];
+      
+      // Extract subjects from the generated schedule
+      const subjectsMap = new Map<string, string>();
+      parsed.forEach(day => {
+        day.slots.forEach(slot => {
+          if (!subjectsMap.has(slot.subject)) {
+            subjectsMap.set(slot.subject, slot.color);
+          }
+        });
+      });
+      
+      const extractedSubjects = Array.from(subjectsMap.entries()).map(([name, color]) => ({
+        name,
+        color,
+        weight: 1
+      }));
+      
+      setNewSubjects(extractedSubjects);
+      setGeneratedSchedule(parsed);
+      setStep(3);
+    } catch (e) {
+      console.error(e);
+      alert("Erro ao gerar cronograma com IA.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   // --- CALCULATION LOGIC ---
-  const generateSchedule = useMemo(() => {
+  const displaySchedule = useMemo(() => {
+    if (currentPlan && currentPlan.generated_schedule && currentPlan.generated_schedule.length > 0) {
+      return currentPlan.generated_schedule.map(day => ({
+        ...day,
+        date: new Date(day.date + 'T00:00:00')
+      }));
+    }
+    
+    if (mode === 'create' && step === 3 && generatedSchedule.length > 0) {
+      return generatedSchedule.map(day => ({
+        ...day,
+        date: new Date(day.date + 'T00:00:00')
+      }));
+    }
+
+    // Fallback to old logic if no generated schedule
     const plan = currentPlan || (mode === 'create' && step === 3 ? {
       title: newTitle,
       exam_date: newDate,
@@ -150,6 +249,7 @@ const ReverseStudyPlanner: React.FC<ReverseStudyPlannerProps> = ({ userId }) => 
         
         daySlots.push({
            subject: subj.name,
+           topic: 'Estudo Geral',
            color: subj.color,
            hours: hoursToAssign
         });
@@ -165,7 +265,7 @@ const ReverseStudyPlanner: React.FC<ReverseStudyPlannerProps> = ({ userId }) => 
     }
 
     return schedule;
-  }, [currentPlan, mode, step]);
+  }, [currentPlan, mode, step, generatedSchedule]);
 
   const handleDeletePlan = async (id: string) => {
     if (!confirm("Excluir este plano?")) return;
@@ -188,8 +288,8 @@ const ReverseStudyPlanner: React.FC<ReverseStudyPlannerProps> = ({ userId }) => 
                 <CalendarCheck className="w-4 h-4 text-emerald-400" />
                 <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Algoritmo de Estudo</span>
              </div>
-             <h2 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-none">Cronograma Reverso</h2>
-             <p className="text-slate-500 font-bold italic text-lg mt-2">Defina a data. Nós definimos o caminho.</p>
+             <h2 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-none">Cronograma Dinâmico</h2>
+             <p className="text-slate-500 font-bold italic text-lg mt-2">A IA analisa o edital e cria seu plano de estudos.</p>
           </div>
           <button 
             onClick={() => { setMode('create'); setStep(1); }}
@@ -284,37 +384,28 @@ const ReverseStudyPlanner: React.FC<ReverseStudyPlannerProps> = ({ userId }) => 
 
               {step === 2 && (
                  <div className="space-y-6">
-                    <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase text-center">Matérias & Pesos</h3>
+                    <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase text-center">Edital & Conteúdo</h3>
                     
-                    <div className="flex gap-2">
-                       <input value={subName} onChange={e => setSubName(e.target.value)} placeholder="Matéria (Ex: Civil)" className="flex-1 p-3 bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-white/10 rounded-xl font-bold text-sm outline-none" />
-                       <select value={subWeight} onChange={e => setSubWeight(Number(e.target.value))} className="w-24 p-3 bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-white/10 rounded-xl font-bold text-sm outline-none">
-                          <option value={1}>Peso 1</option>
-                          <option value={2}>Peso 2</option>
-                          <option value={3}>Peso 3</option>
-                       </select>
-                       <button onClick={addSubject} className="p-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl"><Plus size={20} /></button>
-                    </div>
-
-                    <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-2">
-                       {newSubjects.map((s, idx) => (
-                          <div key={idx} className="flex justify-between items-center p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10">
-                             <div className="flex items-center gap-3">
-                                <div className={`w-3 h-3 rounded-full ${s.color}`}></div>
-                                <span className="font-bold text-sm">{s.name}</span>
-                             </div>
-                             <div className="flex items-center gap-4">
-                                <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Peso {s.weight}</span>
-                                <button onClick={() => removeSubject(idx)} className="text-slate-400 hover:text-red-500"><X size={14} /></button>
-                             </div>
-                          </div>
-                       ))}
-                       {newSubjects.length === 0 && <p className="text-center text-xs text-slate-400 py-4">Adicione matérias para distribuir.</p>}
+                    <div>
+                       <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Cole o Edital ou Tópicos</label>
+                       <textarea 
+                         value={newSyllabus} 
+                         onChange={e => setNewSyllabus(e.target.value)} 
+                         placeholder="Ex: Direito Civil: Obrigações, Contratos, Direitos Reais..." 
+                         className="w-full h-48 p-4 bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-white/10 rounded-xl font-bold text-sm outline-none focus:border-emerald-500 resize-none mt-2"
+                       />
                     </div>
 
                     <div className="flex gap-4 pt-4">
                        <button onClick={() => setStep(1)} className="flex-1 py-4 text-slate-500 font-bold uppercase text-xs">Voltar</button>
-                       <button onClick={() => { if(newSubjects.length > 0) setStep(3); else alert('Adicione matérias'); }} className="flex-1 py-4 bg-emerald-600 text-white rounded-xl font-black uppercase text-xs shadow-lg">Gerar Prévia</button>
+                       <button 
+                         onClick={generateWithAI} 
+                         disabled={isGenerating}
+                         className="flex-1 py-4 bg-emerald-600 text-white rounded-xl font-black uppercase text-xs shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
+                       >
+                          {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                          {isGenerating ? 'Analisando Edital...' : 'Gerar com IA'}
+                       </button>
                     </div>
                  </div>
               )}
@@ -324,9 +415,9 @@ const ReverseStudyPlanner: React.FC<ReverseStudyPlannerProps> = ({ userId }) => 
                     <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase text-center">Prévia do Plano</h3>
                     <div className="bg-slate-50 dark:bg-black/20 p-4 rounded-xl border border-slate-200 dark:border-white/10 text-center">
                        <p className="text-sm font-bold text-slate-600 dark:text-slate-300">
-                          {generateSchedule.length} Dias de Estudo até {new Date(newDate).toLocaleDateString()}
+                          {displaySchedule.length} Dias de Estudo até {new Date(newDate).toLocaleDateString()}
                        </p>
-                       <p className="text-xs text-slate-400 mt-1">Carga Total: {generateSchedule.length * newHours} Horas</p>
+                       <p className="text-xs text-slate-400 mt-1">Carga Total: {displaySchedule.length * newHours} Horas</p>
                     </div>
                     
                     <div className="flex gap-4 pt-4">
@@ -355,7 +446,7 @@ const ReverseStudyPlanner: React.FC<ReverseStudyPlannerProps> = ({ userId }) => 
                  </button>
                  <div>
                     <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">{currentPlan.title}</h2>
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{generateSchedule.length} Dias Restantes</p>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{displaySchedule.length} Dias Restantes</p>
                  </div>
               </div>
            </div>
@@ -364,7 +455,7 @@ const ReverseStudyPlanner: React.FC<ReverseStudyPlannerProps> = ({ userId }) => 
               <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-slate-200 dark:bg-white/10 z-0"></div>
               
               <div className="space-y-6 z-10 relative pl-0">
-                 {generateSchedule.map((day, idx) => (
+                 {displaySchedule.map((day, idx) => (
                     <div key={idx} className="flex gap-6 group">
                        {/* Date Bubble */}
                        <div className="w-12 flex flex-col items-center shrink-0 pt-2 bg-[#fcfcfc] dark:bg-sanfran-rubiBlack z-10">
@@ -378,12 +469,15 @@ const ReverseStudyPlanner: React.FC<ReverseStudyPlannerProps> = ({ userId }) => 
                        <div className={`flex-1 p-4 rounded-2xl border-2 transition-all ${idx === 0 ? 'bg-emerald-50/50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800' : 'bg-white dark:bg-sanfran-rubiDark/20 border-slate-200 dark:border-white/5 hover:border-slate-300'}`}>
                           <div className="flex flex-col gap-2">
                              {day.slots.map((slot, sIdx) => (
-                                <div key={sIdx} className="flex items-center justify-between p-2 bg-white/50 dark:bg-black/20 rounded-lg border border-slate-100 dark:border-white/5">
-                                   <div className="flex items-center gap-3">
-                                      <div className={`w-2 h-8 rounded-full ${slot.color}`}></div>
-                                      <span className="font-bold text-sm text-slate-800 dark:text-slate-200">{slot.subject}</span>
+                                <div key={sIdx} className="flex flex-col p-3 bg-white/50 dark:bg-black/20 rounded-lg border border-slate-100 dark:border-white/5">
+                                   <div className="flex items-center justify-between mb-1">
+                                      <div className="flex items-center gap-3">
+                                         <div className={`w-2 h-4 rounded-full ${slot.color}`}></div>
+                                         <span className="font-bold text-sm text-slate-800 dark:text-slate-200">{slot.subject}</span>
+                                      </div>
+                                      <span className="text-xs font-black text-slate-400">{slot.hours}h</span>
                                    </div>
-                                   <span className="text-xs font-black text-slate-400">{slot.hours}h</span>
+                                   <p className="text-xs text-slate-500 dark:text-slate-400 pl-5">{slot.topic}</p>
                                 </div>
                              ))}
                           </div>
