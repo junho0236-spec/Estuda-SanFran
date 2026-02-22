@@ -850,22 +850,6 @@ export interface StudyPlan {
   created_at: string;
 }
 
-export interface DailyPlan {
-  date: string;
-  topics: string[];
-  notes: string;
-}
-
-export interface DynamicStudyPlan {
-  id: string;
-  title: string;
-  exam_date: string;
-  daily_hours: number;
-  syllabus: string;
-  generated_plan: DailyPlan[];
-  created_at: string;
-}
-
 // Legal Cinema Types
 export interface CinemaClip {
   id: string;
