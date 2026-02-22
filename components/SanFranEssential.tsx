@@ -105,7 +105,7 @@ const SanFranEssential: React.FC<SanFranEssentialProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD: CRONOGRAMA REVERSO - NOVO */}
+        {/* CARD: CRONOGRAMA DINÂMICO - NOVO */}
         <button
           onClick={() => onNavigate(View.ReverseSchedule)}
           className="group col-span-1 bg-emerald-600 text-white rounded-[2.5rem] p-6 border border-emerald-700 shadow-lg hover:shadow-emerald-500/30 hover:scale-[1.02] transition-all flex flex-col justify-between relative overflow-hidden"
@@ -118,8 +118,8 @@ const SanFranEssential: React.FC<SanFranEssentialProps> = ({ onNavigate }) => {
               <ArrowUpRight size={16} className="text-emerald-200 group-hover:text-white transition-colors" />
            </div>
            <div className="text-left mt-4 relative z-10">
-              <h4 className="text-lg font-black uppercase tracking-tight text-white">Cronograma Reverso</h4>
-              <p className="text-[10px] font-bold text-emerald-100 uppercase">Planejamento Matemático</p>
+              <h4 className="text-lg font-black uppercase tracking-tight text-white">Cronograma Dinâmico</h4>
+              <p className="text-[10px] font-bold text-emerald-100 uppercase">Planejamento com IA</p>
            </div>
         </button>
 
