@@ -36,8 +36,11 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
   
   // Filters
   const [subjects, setSubjects] = useState<string[]>([]);
+  const [topics, setTopics] = useState<string[]>([]);
   const [selectedSubject, setSelectedSubject] = useState<string>('Todos');
+  const [selectedTopic, setSelectedTopic] = useState<string>('Todos');
   const [difficultyFilter, setDifficultyFilter] = useState<string>('Todos');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'difficulty_asc' | 'difficulty_desc'>('newest');
   
   // Stats
   const [correctCount, setCorrectCount] = useState(0);
@@ -78,9 +81,12 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
       } else if (data) {
         setQuestions(data);
         
-        // Extract unique subjects
+        // Extract unique subjects and topics
         const uniqueSubjects = Array.from(new Set(data.map(q => q.subject))).filter(Boolean);
         setSubjects(uniqueSubjects);
+        
+        const uniqueTopics = Array.from(new Set(data.map(q => q.topic))).filter(Boolean);
+        setTopics(uniqueTopics);
       }
     } catch (error) {
       console.error('Error fetching questions:', error);
@@ -124,6 +130,9 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
         if (!subjects.includes(data.subject)) {
           setSubjects([...subjects, data.subject]);
         }
+        if (data.topic && !topics.includes(data.topic)) {
+          setTopics([...topics, data.topic]);
+        }
       }
     } catch (error: any) {
       console.error('Error adding question:', error);
@@ -139,8 +148,21 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
 
   const filteredQuestions = questions.filter(q => {
     const matchSubject = selectedSubject === 'Todos' || q.subject === selectedSubject;
+    const matchTopic = selectedTopic === 'Todos' || q.topic === selectedTopic;
     const matchDifficulty = difficultyFilter === 'Todos' || q.difficulty === difficultyFilter;
-    return matchSubject && matchDifficulty;
+    return matchSubject && matchTopic && matchDifficulty;
+  }).sort((a, b) => {
+    if (sortBy === 'newest') return 0; // Already sorted by created_at desc from DB
+    if (sortBy === 'oldest') return -1; // Reverse order
+    
+    const difficultyMap = { 'facil': 1, 'media': 2, 'dificil': 3 };
+    const diffA = difficultyMap[a.difficulty] || 0;
+    const diffB = difficultyMap[b.difficulty] || 0;
+    
+    if (sortBy === 'difficulty_asc') return diffA - diffB;
+    if (sortBy === 'difficulty_desc') return diffB - diffA;
+    
+    return 0;
   });
 
   const currentQuestion = filteredQuestions[currentIndex];
@@ -179,7 +201,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
     setCurrentIndex(0);
     setSelectedOption(null);
     setShowExplanation(false);
-  }, [selectedSubject, difficultyFilter]);
+  }, [selectedSubject, selectedTopic, difficultyFilter, sortBy]);
 
   if (loading) {
     return (
@@ -332,6 +354,17 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
               </select>
 
               <select
+                value={selectedTopic}
+                onChange={(e) => setSelectedTopic(e.target.value)}
+                className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-medium outline-none"
+              >
+                <option value="Todos">Todos os Tópicos</option>
+                {topics.map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+
+              <select
                 value={difficultyFilter}
                 onChange={(e) => setDifficultyFilter(e.target.value)}
                 className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-medium outline-none"
@@ -340,6 +373,17 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
                 <option value="facil">Fácil</option>
                 <option value="media">Média</option>
                 <option value="dificil">Difícil</option>
+              </select>
+              
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-medium outline-none"
+              >
+                <option value="newest">Mais Recentes</option>
+                <option value="oldest">Mais Antigas</option>
+                <option value="difficulty_asc">Mais Fáceis Primeiro</option>
+                <option value="difficulty_desc">Mais Difíceis Primeiro</option>
               </select>
               
               <div className="ml-auto text-sm text-slate-500 font-medium">
