@@ -46,14 +46,13 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
   // Filters
   const [subjects, setSubjects] = useState<string[]>([]);
   const [topics, setTopics] = useState<string[]>([]);
-  const [selectedSubject, setSelectedSubject] = useState<string>('Todos');
-  const [selectedTopic, setSelectedTopic] = useState<string>('Todos');
-  const [difficultyFilter, setDifficultyFilter] = useState<string>('Todos');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState<string>('');
+  const [selectedTopic, setSelectedTopic] = useState<string>('');
+  const [difficultyFilter, setDifficultyFilter] = useState<string>('');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'difficulty_asc' | 'difficulty_desc'>('newest');
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
-  const [wrongQuestions, setWrongQuestions] = useState<string[]>([]);
-  const [showWrongOnly, setShowWrongOnly] = useState(false);
+  const [questionStatus, setQuestionStatus] = useState<'all' | 'resolved' | 'unresolved' | 'correct' | 'wrong'>('all');
   const [viewMode, setViewMode] = useState<'list' | 'single'>('list');
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -384,13 +383,25 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
   };
 
   const filteredQuestions = questions.filter(q => {
-    const matchSubject = selectedSubject === 'Todos' || q.subject === selectedSubject;
-    const matchTopic = selectedTopic === 'Todos' || q.topic === selectedTopic;
-    const matchDifficulty = difficultyFilter === 'Todos' || q.difficulty === difficultyFilter;
-    const matchFavorite = !showFavoritesOnly || favorites.includes(q.id);
-    const matchWrong = !showWrongOnly || wrongQuestions.includes(q.id);
+    const matchSearch = searchTerm === '' || 
+      q.statement.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      (q.explanation && q.explanation.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchSubject = selectedSubject === '' || selectedSubject === 'Todos' || q.subject === selectedSubject;
+    const matchTopic = selectedTopic === '' || selectedTopic === 'Todos' || q.topic === selectedTopic;
+    const matchDifficulty = difficultyFilter === '' || difficultyFilter === 'Todos' || q.difficulty === difficultyFilter;
     
-    return matchSubject && matchTopic && matchDifficulty && matchFavorite && matchWrong;
+    let matchStatus = true;
+    const isWrong = wrongQuestions.includes(q.id);
+    
+    if (questionStatus === 'wrong') {
+      matchStatus = isWrong;
+    } else if (questionStatus === 'correct') {
+      matchStatus = !isWrong; // Approximation
+    } else if (questionStatus === 'resolved') {
+      matchStatus = true; // Approximation
+    }
+    
+    return matchSearch && matchSubject && matchTopic && matchDifficulty && matchStatus;
   }).sort((a, b) => {
     if (sortBy === 'newest') return 0; // Already sorted by created_at desc from DB
     if (sortBy === 'oldest') return -1; // Reverse order
@@ -730,111 +741,108 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
       ) : (
         <>
           {/* Filters & Stats */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-800 flex flex-wrap gap-4 items-center">
-              <div className="flex items-center gap-2 text-slate-500">
-                <Filter size={18} />
-                <span className="text-sm font-bold uppercase tracking-wider">Filtros:</span>
-              </div>
-              
-              <select
-                value={selectedSubject}
-                onChange={(e) => setSelectedSubject(e.target.value)}
-                className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-medium outline-none"
-              >
-                <option value="Todos">Todas as Matérias</option>
-                {subjects.map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-
-              <select
-                value={selectedTopic}
-                onChange={(e) => setSelectedTopic(e.target.value)}
-                className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-medium outline-none"
-              >
-                <option value="Todos">Todos os Tópicos</option>
-                {topics.map(t => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-
-              <select
-                value={difficultyFilter}
-                onChange={(e) => setDifficultyFilter(e.target.value)}
-                className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-medium outline-none"
-              >
-                <option value="Todos">Qualquer Dificuldade</option>
-                <option value="facil">Fácil</option>
-                <option value="media">Média</option>
-                <option value="dificil">Difícil</option>
-              </select>
-              
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-medium outline-none"
-              >
-                <option value="newest">Mais Recentes</option>
-                <option value="oldest">Mais Antigas</option>
-                <option value="difficulty_asc">Mais Fáceis Primeiro</option>
-                <option value="difficulty_desc">Mais Difíceis Primeiro</option>
-              </select>
-
-              <button
-                onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  showFavoritesOnly 
-                    ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800' 
-                    : 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
-                }`}
-              >
-                <Star size={16} className={showFavoritesOnly ? 'fill-yellow-500 text-yellow-500' : ''} />
-                Favoritas {favorites.length > 0 && <span className="ml-1 opacity-75">({favorites.length})</span>}
-              </button>
-
-              <button
-                onClick={() => setShowWrongOnly(!showWrongOnly)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  showWrongOnly 
-                    ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 border border-red-200 dark:border-red-800' 
-                    : 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
-                }`}
-              >
-                <AlertCircle size={16} className={showWrongOnly ? 'text-red-500' : ''} />
-                Revisar Erros {wrongQuestions.length > 0 && <span className="ml-1 opacity-75">({wrongQuestions.length})</span>}
-              </button>
-              
-              <div className="ml-auto text-sm text-slate-500 font-medium">
-                {filteredQuestions.length} questões encontradas
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 mb-6 overflow-hidden">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <div className="flex-1 relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Pesquisar"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="block w-full pl-10 pr-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md leading-5 bg-slate-50 dark:bg-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                />
               </div>
             </div>
+            
+            <div className="p-4 bg-slate-50 dark:bg-slate-800/50">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <select
+                  value={selectedSubject}
+                  onChange={(e) => setSelectedSubject(e.target.value)}
+                  className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
+                >
+                  <option value="">Disciplina</option>
+                  {subjects.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
 
-            <div className="bg-slate-900 dark:bg-black rounded-2xl p-4 shadow-sm flex items-center justify-around text-white relative group">
-              <button 
-                onClick={resetStats}
-                className="absolute top-2 right-2 p-1 text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
-                title="Zerar estatísticas"
-              >
-                <RotateCcw size={12} />
-              </button>
-              <div className="text-center">
-                <div className="text-2xl font-black text-green-400">{correctCount}</div>
-                <div className="text-[10px] uppercase tracking-widest text-slate-400">Acertos</div>
+                <select
+                  value={selectedTopic}
+                  onChange={(e) => setSelectedTopic(e.target.value)}
+                  className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
+                >
+                  <option value="">Assunto</option>
+                  {topics.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={difficultyFilter}
+                  onChange={(e) => setDifficultyFilter(e.target.value)}
+                  className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
+                >
+                  <option value="">Dificuldade</option>
+                  <option value="facil">Fácil</option>
+                  <option value="media">Média</option>
+                  <option value="dificil">Difícil</option>
+                </select>
               </div>
-              <div className="w-px h-8 bg-slate-700"></div>
-              <div className="text-center">
-                <div className="text-2xl font-black text-red-400">{wrongCount}</div>
-                <div className="text-[10px] uppercase tracking-widest text-slate-400">Erros</div>
-              </div>
-              <div className="w-px h-8 bg-slate-700"></div>
-              <div className="text-center">
-                <div className="text-2xl font-black text-blue-400">
-                  {correctCount + wrongCount > 0 
-                    ? Math.round((correctCount / (correctCount + wrongCount)) * 100) 
-                    : 0}%
+
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-4 flex-wrap">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300 min-w-[120px]">Minhas questões:</span>
+                  <div className="flex gap-2 flex-wrap">
+                    <button 
+                      onClick={() => setQuestionStatus('all')}
+                      className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${questionStatus === 'all' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700 dark:hover:bg-slate-800'}`}
+                    >
+                      Todas
+                    </button>
+                    <button 
+                      onClick={() => setQuestionStatus('correct')}
+                      className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${questionStatus === 'correct' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700 dark:hover:bg-slate-800'}`}
+                    >
+                      Certas
+                    </button>
+                    <button 
+                      onClick={() => setQuestionStatus('wrong')}
+                      className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${questionStatus === 'wrong' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700 dark:hover:bg-slate-800'}`}
+                    >
+                      Erradas
+                    </button>
+                  </div>
                 </div>
-                <div className="text-[10px] uppercase tracking-widest text-slate-400">Aproveitamento</div>
+              </div>
+            </div>
+            
+            <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900">
+              <div className="text-sm text-slate-500 font-medium">
+                <span className="font-bold text-slate-900 dark:text-white">{filteredQuestions.length}</span> questões encontradas
+              </div>
+              
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                    setSelectedSubject('');
+                    setSelectedTopic('');
+                    setDifficultyFilter('');
+                    setQuestionStatus('all');
+                  }}
+                  className="text-sm font-medium text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                >
+                  Limpar filtro
+                </button>
+                <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors">
+                  Filtrar questões
+                </button>
               </div>
             </div>
           </div>
@@ -846,50 +854,39 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
                 {filteredQuestions.map((q, idx) => (
                   <div 
                     key={q.id}
-                    onClick={() => {
-                      setCurrentIndex(idx);
-                      setViewMode('single');
-                      setSelectedOption(null);
-                      setShowExplanation(false);
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-md cursor-pointer transition-all group relative overflow-hidden"
+                    className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden"
                   >
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex flex-wrap gap-2">
-                        <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-md text-xs font-bold uppercase tracking-wider">
-                          {q.subject}
-                        </span>
-                        {q.topic && (
-                          <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-md text-xs font-bold uppercase tracking-wider">
-                            {q.topic}
-                          </span>
-                        )}
-                        <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase tracking-wider ${
-                          q.difficulty === 'facil' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
-                          q.difficulty === 'media' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300' :
-                          'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-                        }`}>
-                          {q.difficulty}
-                        </span>
-                      </div>
-                      
-                      {favorites.includes(q.id) && (
-                        <Star size={16} className="fill-yellow-500 text-yellow-500 shrink-0 animate-in zoom-in duration-300" />
-                      )}
+                    <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2 text-sm">
+                      <span className="font-bold text-slate-900 dark:text-white">{idx + 1}</span>
+                      <span className="text-blue-600 dark:text-blue-400 font-medium">{q.id.substring(0, 8)}</span>
+                      <span className="text-slate-400 mx-1">•</span>
+                      <span className="text-blue-600 dark:text-blue-400 font-medium">{q.subject}</span>
+                      <span className="text-slate-400 mx-1">▸</span>
+                      <span className="text-blue-600 dark:text-blue-400 font-medium truncate">{q.topic}</span>
                     </div>
                     
-                    <p className="text-slate-700 dark:text-slate-300 font-medium line-clamp-2 mb-4 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                      {q.statement}
-                    </p>
+                    <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex gap-4 text-xs font-medium text-slate-500">
+                      <span>Ano: <span className="text-slate-900 dark:text-white">2024</span></span>
+                      <span>Dificuldade: <span className="text-slate-900 dark:text-white capitalize">{q.difficulty}</span></span>
+                    </div>
                     
-                    <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-100 dark:border-slate-800">
-                      <span className="text-xs text-slate-400 font-medium">
-                        ID: {q.id.substring(0, 8)}...
-                      </span>
-                      <span className="text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                        Resolver <ChevronRight size={14} />
-                      </span>
+                    <div className="p-6">
+                      <p className="text-slate-800 dark:text-slate-200 leading-relaxed mb-6">
+                        {q.statement}
+                      </p>
+                      
+                      <button
+                        onClick={() => {
+                          setCurrentIndex(idx);
+                          setViewMode('single');
+                          setSelectedOption(null);
+                          setShowExplanation(false);
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className="px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 rounded-md text-sm font-bold transition-colors"
+                      >
+                        Resolver Questão
+                      </button>
                     </div>
                   </div>
                 ))}
