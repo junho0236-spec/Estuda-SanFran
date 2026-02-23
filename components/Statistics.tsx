@@ -9,7 +9,10 @@ import {
   Calendar,
   BarChart3,
   PieChart as PieChartIcon,
-  Activity
+  Activity,
+  Filter,
+  Calendar as CalendarIconLucide,
+  ChevronDown
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -44,12 +47,60 @@ const Statistics: React.FC<StatisticsProps> = ({
   subjects,
   correctQuestionsCount = 0 
 }) => {
-  // Calculations
-  const totalStudySeconds = studySessions.reduce((acc, s) => acc + s.duration, 0);
+  const [dateFilter, setDateFilter] = React.useState<'7days' | '30days' | 'all' | 'custom'>('all');
+  const [customRange, setCustomRange] = React.useState<{ start: string, end: string }>({
+    start: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString().split('T')[0],
+    end: new Date().toISOString().split('T')[0]
+  });
+
+  const getFilteredData = () => {
+    const now = new Date();
+    let startDate: Date | null = null;
+    let endDate: Date = new Date();
+
+    if (dateFilter === '7days') {
+      startDate = new Date();
+      startDate.setDate(now.getDate() - 7);
+    } else if (dateFilter === '30days') {
+      startDate = new Date();
+      startDate.setDate(now.getDate() - 30);
+    } else if (dateFilter === 'custom') {
+      startDate = new Date(customRange.start);
+      endDate = new Date(customRange.end);
+      endDate.setHours(23, 59, 59, 999);
+    }
+
+    const filteredSessions = studySessions.filter(s => {
+      const sDate = new Date(s.start_time);
+      if (startDate && sDate < startDate) return false;
+      if (sDate > endDate) return false;
+      return true;
+    });
+
+    const filteredTasks = tasks.filter(t => {
+      if (!t.completedAt) return true; // Keep uncompleted tasks or handle them differently? 
+      // Usually statistics for a period should show what was DONE in that period.
+      const tDate = new Date(t.completedAt);
+      if (startDate && tDate < startDate) return false;
+      if (tDate > endDate) return false;
+      return true;
+    });
+
+    // Flashcards don't have a clear "reviewed at" timestamp in the current type, 
+    // but we can assume sessions cover the study time. 
+    // For now, we'll just filter sessions and tasks as they are the most time-sensitive.
+    
+    return { filteredSessions, filteredTasks };
+  };
+
+  const { filteredSessions, filteredTasks } = getFilteredData();
+
+  // Calculations using filtered data
+  const totalStudySeconds = filteredSessions.reduce((acc, s) => acc + s.duration, 0);
   const totalStudyHours = (totalStudySeconds / 3600).toFixed(1);
   
-  const completedTasks = tasks.filter(t => t.completed).length;
-  const totalTasks = tasks.length;
+  const completedTasks = filteredTasks.filter(t => t.completed).length;
+  const totalTasks = filteredTasks.length;
   const taskCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   const reviewedCards = flashcards.filter(f => f.interval > 0).length;
@@ -58,7 +109,7 @@ const Statistics: React.FC<StatisticsProps> = ({
 
   // Data for Charts
   const sessionsBySubject = subjects.map(subject => {
-    const duration = studySessions
+    const duration = filteredSessions
       .filter(s => s.subject_id === subject.id)
       .reduce((acc, s) => acc + s.duration, 0);
     return {
@@ -68,8 +119,10 @@ const Statistics: React.FC<StatisticsProps> = ({
     };
   }).filter(s => s.value > 0);
 
-  // Last 7 days study time
-  const last7Days = [...Array(7)].map((_, i) => {
+  // Last 7 days study time (always 7 days for this specific chart or should it follow filter?)
+  // Let's make it follow the filter if it's 7 or 30 days, otherwise show last 7.
+  const chartDays = dateFilter === '30days' ? 30 : 7;
+  const trendData = [...Array(chartDays)].map((_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const dateStr = d.toISOString().split('T')[0];
@@ -125,6 +178,43 @@ const Statistics: React.FC<StatisticsProps> = ({
                 Análise quantitativa da sua evolução no Largo de São Francisco
               </p>
            </div>
+        </div>
+
+        {/* Date Filters */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-2xl border border-slate-200 dark:border-white/10">
+            {(['7days', '30days', 'all', 'custom'] as const).map((filter) => (
+              <button
+                key={filter}
+                onClick={() => setDateFilter(filter)}
+                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
+                  dateFilter === filter 
+                    ? 'bg-white dark:bg-sanfran-rubi text-slate-900 dark:text-white shadow-md' 
+                    : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+                }`}
+              >
+                {filter === '7days' ? '7 Dias' : filter === '30days' ? '30 Dias' : filter === 'all' ? 'Tudo' : 'Personalizado'}
+              </button>
+            ))}
+          </div>
+
+          {dateFilter === 'custom' && (
+            <div className="flex items-center gap-2 animate-in slide-in-from-right-4 duration-300">
+              <input 
+                type="date" 
+                value={customRange.start}
+                onChange={(e) => setCustomRange(prev => ({ ...prev, start: e.target.value }))}
+                className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2 text-[10px] font-bold text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-sanfran-rubi/50"
+              />
+              <span className="text-slate-400 font-black text-[10px]">ATÉ</span>
+              <input 
+                type="date" 
+                value={customRange.end}
+                onChange={(e) => setCustomRange(prev => ({ ...prev, end: e.target.value }))}
+                className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2 text-[10px] font-bold text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-sanfran-rubi/50"
+              />
+            </div>
+          )}
         </div>
       </header>
 
@@ -189,7 +279,7 @@ const Statistics: React.FC<StatisticsProps> = ({
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               {chartView === 'weekly' ? (
-                <AreaChart data={last7Days}>
+                <AreaChart data={trendData}>
                   <defs>
                     <linearGradient id="colorMinutes" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#9B111E" stopOpacity={0.3}/>
@@ -327,9 +417,9 @@ const Statistics: React.FC<StatisticsProps> = ({
         />
         <ProgressCard 
           title="Consistência Semanal" 
-          percentage={Math.min(100, Math.round((last7Days.filter(d => d.minutes > 0).length / 7) * 100))} 
+          percentage={Math.min(100, Math.round((trendData.filter(d => d.minutes > 0).length / trendData.length) * 100))} 
           color="bg-sanfran-rubi" 
-          description="Frequência de dias estudados na última semana."
+          description="Frequência de dias estudados no período selecionado."
         />
       </div>
 
