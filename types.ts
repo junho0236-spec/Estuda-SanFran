@@ -303,13 +303,16 @@ export interface ClassifiedAd {
 
 export interface Question {
   id: string;
-  question_text: string;
+  subject: string;
+  topic: string;
+  statement: string;
   options: string[];
-  answer: number;
-  category: string;
-  discipline: string;
+  correct_answer: number;
+  explanation?: string;
+  difficulty: 'facil' | 'media' | 'dificil';
   exam_board?: string;
   year?: number;
+  created_at?: string;
 }
 
 export interface DuelQuestion {

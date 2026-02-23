@@ -1,5 +1,7 @@
 import { pdfQuestions } from './pdfQuestions';
 import { pdfQuestions2 } from './pdfQuestions2';
+import { pdfQuestions3 } from './pdfQuestions3';
+import { pdfQuestions4 } from './pdfQuestions4';
 
 export const sampleQuestions = [
   {
@@ -124,5 +126,7 @@ export const sampleQuestions = [
     difficulty: "media"
   },
   ...pdfQuestions,
-  ...pdfQuestions2
+  ...pdfQuestions2,
+  ...pdfQuestions3,
+  ...pdfQuestions4
 ];
