@@ -301,6 +301,17 @@ export interface ClassifiedAd {
   created_at: string;
 }
 
+export interface Question {
+  id: string;
+  question_text: string;
+  options: string[];
+  answer: number;
+  category: string;
+  discipline: string;
+  exam_board?: string;
+  year?: number;
+}
+
 export interface DuelQuestion {
   id: string;
   question: string;
@@ -327,6 +338,16 @@ export interface Duel {
 
 export interface UserConfig {
   oab_exam_date: string;
+}
+
+export interface UserProgress {
+  user_id: string;
+  answered_questions: string[];
+  correct_questions: string[];
+  favorite_questions: string[];
+  skipped_questions: string[];
+  current_question_index: number;
+  last_activity_at: string;
 }
 
 export interface PetitumSection {
