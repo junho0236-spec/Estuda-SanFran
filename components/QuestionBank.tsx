@@ -17,7 +17,8 @@ import {
   ArrowLeft,
   LayoutList,
   Sparkles,
-  X
+  X,
+  RotateCcw
 } from 'lucide-react';
 
 interface Question {
@@ -106,6 +107,13 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
     if (storedNotes) {
       setNotes(JSON.parse(storedNotes));
     }
+
+    // Load stats from local storage
+    const storedCorrect = localStorage.getItem(`sanfran_correct_count_${userId}`);
+    if (storedCorrect) setCorrectCount(parseInt(storedCorrect));
+    
+    const storedWrongCount = localStorage.getItem(`sanfran_wrong_count_${userId}`);
+    if (storedWrongCount) setWrongCount(parseInt(storedWrongCount));
   }, [userId]);
 
   const toggleFavorite = (questionId: string) => {
@@ -349,7 +357,9 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
     setShowExplanation(true);
     
     if (index === currentQuestion.correct_answer) {
-      setCorrectCount(prev => prev + 1);
+      const newCount = correctCount + 1;
+      setCorrectCount(newCount);
+      localStorage.setItem(`sanfran_correct_count_${userId}`, newCount.toString());
       
       // If answered correctly, remove from wrong questions list if present
       if (wrongQuestions.includes(currentQuestion.id)) {
@@ -358,7 +368,9 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
         localStorage.setItem(`sanfran_wrong_${userId}`, JSON.stringify(newWrong));
       }
     } else {
-      setWrongCount(prev => prev + 1);
+      const newCount = wrongCount + 1;
+      setWrongCount(newCount);
+      localStorage.setItem(`sanfran_wrong_count_${userId}`, newCount.toString());
       
       // If answered incorrectly, add to wrong questions list
       if (!wrongQuestions.includes(currentQuestion.id)) {
@@ -379,6 +391,16 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
        setNotes(newNotes);
        localStorage.setItem(`sanfran_notes_${userId}`, JSON.stringify(newNotes));
        showNotification('Anotação salva com sucesso!', 'success');
+    }
+  };
+
+  const resetStats = () => {
+    if (confirm('Deseja realmente zerar suas estatísticas de acertos e erros?')) {
+      setCorrectCount(0);
+      setWrongCount(0);
+      localStorage.removeItem(`sanfran_correct_count_${userId}`);
+      localStorage.removeItem(`sanfran_wrong_count_${userId}`);
+      showNotification('Estatísticas zeradas', 'success');
     }
   };
 
@@ -725,7 +747,14 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
               </div>
             </div>
 
-            <div className="bg-slate-900 dark:bg-black rounded-2xl p-4 shadow-sm flex items-center justify-around text-white">
+            <div className="bg-slate-900 dark:bg-black rounded-2xl p-4 shadow-sm flex items-center justify-around text-white relative group">
+              <button 
+                onClick={resetStats}
+                className="absolute top-2 right-2 p-1 text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                title="Zerar estatísticas"
+              >
+                <RotateCcw size={12} />
+              </button>
               <div className="text-center">
                 <div className="text-2xl font-black text-green-400">{correctCount}</div>
                 <div className="text-[10px] uppercase tracking-widest text-slate-400">Acertos</div>
