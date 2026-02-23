@@ -86,6 +86,28 @@ const Statistics: React.FC<StatisticsProps> = ({
     };
   }).reverse();
 
+  // Last 4 weeks study time (Monthly Trend)
+  const last4Weeks = [...Array(4)].map((_, i) => {
+    const start = new Date();
+    start.setDate(start.getDate() - (i * 7 + 6));
+    const end = new Date();
+    end.setDate(end.getDate() - (i * 7));
+    
+    const weekLabel = `Semana ${4 - i}`;
+    
+    const weekDuration = studySessions.filter(s => {
+      const sDate = new Date(s.start_time);
+      return sDate >= start && sDate <= end;
+    }).reduce((acc, s) => acc + s.duration, 0);
+
+    return {
+      name: weekLabel,
+      hours: parseFloat((weekDuration / 3600).toFixed(1))
+    };
+  }).reverse();
+
+  const [chartView, setChartView] = React.useState<'weekly' | 'monthly'>('weekly');
+
   return (
     <div className="space-y-8 animate-in fade-in duration-700 pb-20">
       {/* Header */}
@@ -141,57 +163,100 @@ const Statistics: React.FC<StatisticsProps> = ({
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         
-        {/* Study Time Area Chart */}
+        {/* Study Time Trend Chart */}
         <div className="bg-white dark:bg-sanfran-rubiDark/20 p-8 rounded-[2rem] border border-slate-200 dark:border-sanfran-rubi/20 shadow-xl">
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
               <Activity className="text-sanfran-rubi w-5 h-5" />
-              <h3 className="text-lg font-black uppercase tracking-tight text-slate-900 dark:text-white">Ritmo de Estudo</h3>
+              <h3 className="text-lg font-black uppercase tracking-tight text-slate-900 dark:text-white">Tendência de Estudo</h3>
             </div>
-            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Últimos 7 Dias</span>
+            <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-xl">
+              <button 
+                onClick={() => setChartView('weekly')}
+                className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-all ${chartView === 'weekly' ? 'bg-white dark:bg-sanfran-rubi text-slate-900 dark:text-white shadow-sm' : 'text-slate-400'}`}
+              >
+                7 Dias
+              </button>
+              <button 
+                onClick={() => setChartView('monthly')}
+                className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-all ${chartView === 'monthly' ? 'bg-white dark:bg-sanfran-rubi text-slate-900 dark:text-white shadow-sm' : 'text-slate-400'}`}
+              >
+                Mensal
+              </button>
+            </div>
           </div>
           
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={last7Days}>
-                <defs>
-                  <linearGradient id="colorMinutes" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#9B111E" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#9B111E" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
-                <XAxis 
-                  dataKey="day" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{fontSize: 10, fontWeight: 900, fill: '#94a3b8'}}
-                  dy={10}
-                />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{fontSize: 10, fontWeight: 900, fill: '#94a3b8'}}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#fff', 
-                    borderRadius: '12px', 
-                    border: 'none', 
-                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-                    fontSize: '12px',
-                    fontWeight: 'bold'
-                  }}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="minutes" 
-                  stroke="#9B111E" 
-                  strokeWidth={3}
-                  fillOpacity={1} 
-                  fill="url(#colorMinutes)" 
-                />
-              </AreaChart>
+              {chartView === 'weekly' ? (
+                <AreaChart data={last7Days}>
+                  <defs>
+                    <linearGradient id="colorMinutes" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#9B111E" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#9B111E" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
+                  <XAxis 
+                    dataKey="day" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fontSize: 10, fontWeight: 900, fill: '#94a3b8'}}
+                    dy={10}
+                  />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fontSize: 10, fontWeight: 900, fill: '#94a3b8'}}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#fff', 
+                      borderRadius: '12px', 
+                      border: 'none', 
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                      fontSize: '12px',
+                      fontWeight: 'bold'
+                    }}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="minutes" 
+                    stroke="#9B111E" 
+                    strokeWidth={3}
+                    fillOpacity={1} 
+                    fill="url(#colorMinutes)" 
+                  />
+                </AreaChart>
+              ) : (
+                <BarChart data={last4Weeks}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
+                  <XAxis 
+                    dataKey="name" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fontSize: 10, fontWeight: 900, fill: '#94a3b8'}}
+                    dy={10}
+                  />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fontSize: 10, fontWeight: 900, fill: '#94a3b8'}}
+                  />
+                  <Tooltip 
+                    cursor={{fill: 'rgba(155, 17, 30, 0.05)'}}
+                    contentStyle={{ 
+                      backgroundColor: '#fff', 
+                      borderRadius: '12px', 
+                      border: 'none', 
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                      fontSize: '12px',
+                      fontWeight: 'bold'
+                    }}
+                  />
+                  <Bar dataKey="hours" fill="#9B111E" radius={[8, 8, 0, 0]} barSize={40} />
+                </BarChart>
+              )}
             </ResponsiveContainer>
           </div>
         </div>
