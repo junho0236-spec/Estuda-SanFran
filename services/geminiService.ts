@@ -194,7 +194,89 @@ export const explainLegalTerm = async (term: string, context: string) => {
 /**
  * Gera um mnemônico criativo a partir de uma lista de requisitos ou palavras.
  */
-export const generateMnemonic = async (requirements: string) => {
+
+
+/**
+ * Gera um resumo conciso de um texto longo.
+ */
+export const summarizeText = async (text: string) => {
+  try {
+    const ai = getAiClient();
+    const apiKey = getApiKey();
+
+    if (!apiKey || apiKey === "missing_key") {
+      return "Erro: Chave de API não configurada.";
+    }
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Você é um assistente de estudo jurídico.
+      Resuma o seguinte texto de forma concisa e didática, focando nos pontos mais importantes. O resumo deve ter entre 3 a 5 parágrafos.
+      
+      Texto para resumir:
+      "${text}"`,
+    });
+    return response.text;
+  } catch (error) {
+    console.error("Erro ao resumir texto:", error);
+    return "Não foi possível resumir o texto no momento.";
+  }
+};
+
+/**
+ * Extrai os pontos-chave de um texto.
+ */
+export const extractKeyPoints = async (text: string) => {
+  try {
+    const ai = getAiClient();
+    const apiKey = getApiKey();
+
+    if (!apiKey || apiKey === "missing_key") {
+      return "Erro: Chave de API não configurada.";
+    }
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Você é um assistente de estudo jurídico.
+      Extraia os 5 a 10 pontos-chave mais importantes do seguinte texto. Apresente-os como uma lista numerada.
+      
+      Texto para analisar:
+      "${text}"`,
+    });
+    return response.text;
+  } catch (error) {
+    console.error("Erro ao extrair pontos-chave:", error);
+    return "Não foi possível extrair os pontos-chave no momento.";
+  }
+};
+
+/**
+ * Gera um mapa mental textual dos principais conceitos de um texto.
+ */
+export const generateMindMap = async (text: string) => {
+  try {
+    const ai = getAiClient();
+    const apiKey = getApiKey();
+
+    if (!apiKey || apiKey === "missing_key") {
+      return "Erro: Chave de API não configurada.";
+    }
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Você é um assistente de estudo jurídico.
+      Crie um mapa mental textual (usando tópicos e sub-tópicos com indentação) dos principais conceitos e suas relações no seguinte texto.
+      Comece com o tema central e ramifique para os sub-temas e detalhes.
+      
+      Texto para mapear:
+      "${text}"`,
+    });
+    return response.text;
+  } catch (error) {
+    console.error("Erro ao gerar mapa mental:", error);
+    return "Não foi possível gerar o mapa mental no momento.";
+  }
+};
   try {
     const ai = getAiClient();
     const apiKey = getApiKey();

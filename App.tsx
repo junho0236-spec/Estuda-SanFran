@@ -97,6 +97,7 @@ const VisualFlashcards = React.lazy(() => import('./components/VisualFlashcards'
 const BilingualNews = React.lazy(() => import('./components/BilingualNews'));
 const SlangChallenge = React.lazy(() => import('./components/SlangChallenge'));
 const QuestionBank = React.lazy(() => import('./components/QuestionBank'));
+const IntelligentSummarizer = React.lazy(() => import('./components/IntelligentSummarizer'));
 
 // Loading Fallback Component com Estilo
 const PageLoader = () => (
@@ -707,6 +708,7 @@ const App: React.FC = () => {
                 {currentView === View.LyricalVibes && <LyricalVibes userId={session.user.id} />}
                 {currentView === View.TheExchangeStudent && <TheExchangeStudent userId={session.user.id} />}
                 {currentView === View.QuestionBank && <QuestionBank userId={session.user.id} />}
+                {currentView === View.IntelligentSummarizer && <IntelligentSummarizer userId={session.user.id} />}
                 {currentView === View.VisualFlashcards && <VisualFlashcards userId={session.user.id} />}
                 {currentView === View.BilingualNews && <BilingualNews userId={session.user.id} />}
                 {currentView === View.SlangChallenge && <SlangChallenge userId={session.user.id} />}

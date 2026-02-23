@@ -90,7 +90,8 @@ export enum View {
   VisualFlashcards = 'visual_flashcards',
   BilingualNews = 'bilingual_news',
   SlangChallenge = 'slang_challenge',
-  QuestionBank = 'question_bank'
+  QuestionBank = 'question_bank',
+  IntelligentSummarizer = 'intelligent_summarizer'
 }
 
 export interface Folder {
