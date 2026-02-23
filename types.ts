@@ -92,7 +92,8 @@ export enum View {
   SlangChallenge = 'slang_challenge',
   QuestionBank = 'question_bank',
   IntelligentSummarizer = 'intelligent_summarizer',
-  Statistics = 'statistics'
+  Statistics = 'statistics',
+  StudyBuddy = 'study_buddy'
 }
 
 export interface Folder {

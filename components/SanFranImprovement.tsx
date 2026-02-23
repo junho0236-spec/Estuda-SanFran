@@ -14,7 +14,8 @@ import {
   Mic,
   Eye,
   Key,
-  HelpCircle
+  HelpCircle,
+  Bot
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -268,6 +269,24 @@ const SanFranImprovement: React.FC<SanFranImprovementProps> = ({ onNavigate }) =
            <div className="text-left mt-4">
               <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Banco de Questões</h4>
               <p className="text-[10px] font-bold text-slate-400 uppercase">Treino de Múltipla Escolha</p>
+           </div>
+        </button>
+
+        {/* CARD 10: AMIGO DE ESTUDO IA (Wide) - NOVO */}
+        <button
+          onClick={() => onNavigate(View.StudyBuddy)}
+          className="group col-span-1 md:col-span-2 bg-gradient-to-br from-sanfran-rubi to-red-800 text-white rounded-[2.5rem] p-6 border border-sanfran-rubi shadow-lg hover:shadow-red-500/30 hover:scale-[1.02] transition-all flex flex-col justify-between relative overflow-hidden h-full"
+        >
+           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')] opacity-10"></div>
+           <div className="flex justify-between items-start relative z-10">
+              <div className="p-3 bg-white/20 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20">
+                 <Bot size={20} className="text-white" />
+              </div>
+              <ArrowUpRight size={16} className="text-red-200 group-hover:text-white transition-colors" />
+           </div>
+           <div className="text-left mt-4 relative z-10">
+              <h4 className="text-lg font-black uppercase tracking-tight text-white">Amigo de Estudo IA</h4>
+              <p className="text-[10px] font-bold text-red-100 uppercase">Mentor Jurídico Inteligente</p>
            </div>
         </button>
 
