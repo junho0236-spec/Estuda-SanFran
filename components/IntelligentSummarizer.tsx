@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, FileText, BookOpen, Brain, Copy, Check, History, Trash2, X, Loader2 } from 'lucide-react';
+import { Sparkles, FileText, BookOpen, Brain, Copy, Check, History, Trash2, X, Loader2, Zap, ArrowRight, Key } from 'lucide-react';
 import { summarizeText, extractKeyPoints, generateMindMap } from '../services/geminiService';
 import Markdown from 'react-markdown';
 import { supabase } from '../services/supabaseClient';
@@ -17,7 +17,7 @@ interface SummaryHistory {
   created_at: string;
 }
 
-const IntelligentSummarizer: React.FC<IntelligentSummarizerProps> = ({ userId }) => {
+export const IntelligentSummarizer: React.FC<IntelligentSummarizerProps> = ({ userId }) => {
   const [inputText, setInputText] = useState('');
   const [outputText, setOutputText] = useState('');
   const [loading, setLoading] = useState(false);

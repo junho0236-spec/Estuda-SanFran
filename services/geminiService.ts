@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 
 // Inicializa o cliente Google GenAI de forma preguiçosa (lazy)
@@ -194,7 +193,65 @@ export const explainLegalTerm = async (term: string, context: string) => {
 /**
  * Gera um mnemônico criativo a partir de uma lista de requisitos ou palavras.
  */
+export const generateMnemonic = async (requirements: string) => {
+  try {
+    const ai = getAiClient();
+    const apiKey = getApiKey();
 
+    if (!apiKey || apiKey === "missing_key") {
+      throw new Error("Chave de API não configurada.");
+    }
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Você é um especialista em técnicas de memorização para estudantes de Direito.
+      
+      Crie um mnemônico (sigla, acrônimo ou frase engraçada/criativa) para ajudar a memorizar a seguinte lista de itens/requisitos:
+      "${requirements}"
+      
+      Retorne um JSON com o seguinte formato:
+      {
+        "acronym": "A sigla ou palavra principal gerada",
+        "title": "Um título curto para o assunto",
+        "expansion": [
+          { "letter": "Letra ou sílaba", "meaning": "O significado correspondente" }
+        ],
+        "description": "Uma breve explicação ou frase engraçada para ajudar a lembrar"
+      }`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            acronym: { type: Type.STRING },
+            title: { type: Type.STRING },
+            expansion: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  letter: { type: Type.STRING },
+                  meaning: { type: Type.STRING }
+                },
+                required: ['letter', 'meaning']
+              }
+            },
+            description: { type: Type.STRING }
+          },
+          required: ['acronym', 'title', 'expansion', 'description']
+        }
+      }
+    });
+
+    const resultText = response.text;
+    if (!resultText) throw new Error("Resposta vazia da IA.");
+    
+    return JSON.parse(resultText);
+  } catch (error) {
+    console.error("Erro ao gerar mnemônico:", error);
+    throw error;
+  }
+};
 
 /**
  * Gera um resumo conciso de um texto longo.
@@ -275,63 +332,5 @@ export const generateMindMap = async (text: string) => {
   } catch (error) {
     console.error("Erro ao gerar mapa mental:", error);
     return "Não foi possível gerar o mapa mental no momento.";
-  }
-};
-  try {
-    const ai = getAiClient();
-    const apiKey = getApiKey();
-
-    if (!apiKey || apiKey === "missing_key") {
-      throw new Error("Chave de API não configurada.");
-    }
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Você é um especialista em técnicas de memorização para estudantes de Direito.
-      
-      Crie um mnemônico (sigla, acrônimo ou frase engraçada/criativa) para ajudar a memorizar a seguinte lista de itens/requisitos:
-      "${requirements}"
-      
-      Retorne um JSON com o seguinte formato:
-      {
-        "acronym": "A sigla ou palavra principal gerada",
-        "title": "Um título curto para o assunto",
-        "expansion": [
-          { "letter": "Letra ou sílaba", "meaning": "O significado correspondente" }
-        ],
-        "description": "Uma breve explicação ou frase engraçada para ajudar a lembrar"
-      }`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            acronym: { type: Type.STRING },
-            title: { type: Type.STRING },
-            expansion: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  letter: { type: Type.STRING },
-                  meaning: { type: Type.STRING }
-                },
-                required: ['letter', 'meaning']
-              }
-            },
-            description: { type: Type.STRING }
-          },
-          required: ['acronym', 'title', 'expansion', 'description']
-        }
-      }
-    });
-
-    const resultText = response.text;
-    if (!resultText) throw new Error("Resposta vazia da IA.");
-    
-    return JSON.parse(resultText);
-  } catch (error) {
-    console.error("Erro ao gerar mnemônico:", error);
-    throw error;
   }
 };
