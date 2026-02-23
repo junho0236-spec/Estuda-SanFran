@@ -9,9 +9,10 @@ interface DuelArenaProps {
   duel: Duel;
   userId: string;
   onFinished: () => void;
+  onCorrectAnswer?: () => void;
 }
 
-const DuelArena: React.FC<DuelArenaProps> = ({ duel: initialDuel, userId, onFinished }) => {
+const DuelArena: React.FC<DuelArenaProps> = ({ duel: initialDuel, userId, onFinished, onCorrectAnswer }) => {
   const [duel, setDuel] = useState<Duel>(initialDuel);
   const [timeLeft, setTimeLeft] = useState(15);
   const [answered, setAnswered] = useState(false);
@@ -53,6 +54,7 @@ const DuelArena: React.FC<DuelArenaProps> = ({ duel: initialDuel, userId, onFini
     setShowFeedback(optionIdx);
     
     const isCorrect = optionIdx === currentQuestion.answer;
+    if (isCorrect && onCorrectAnswer) onCorrectAnswer();
     const timeTaken = (Date.now() - startTime) / 1000;
     const speedBonus = isCorrect ? Math.max(0, Math.round((15 - timeTaken) * 3)) : 0;
     const points = isCorrect ? (100 + speedBonus) : 0;

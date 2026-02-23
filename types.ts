@@ -91,7 +91,8 @@ export enum View {
   BilingualNews = 'bilingual_news',
   SlangChallenge = 'slang_challenge',
   QuestionBank = 'question_bank',
-  IntelligentSummarizer = 'intelligent_summarizer'
+  IntelligentSummarizer = 'intelligent_summarizer',
+  Statistics = 'statistics'
 }
 
 export interface Folder {

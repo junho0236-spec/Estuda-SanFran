@@ -24,9 +24,10 @@ import {
 
 interface QuestionBankProps {
   userId: string;
+  onCorrectAnswer?: () => void;
 }
 
-const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
+const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer }) => {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -498,6 +499,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
     if (index === currentQuestion.correct_answer) {
       const newCount = correctCount + 1;
       setCorrectCount(newCount);
+      if (onCorrectAnswer) onCorrectAnswer();
       localStorage.setItem(`sanfran_correct_count_${userId}`, newCount.toString());
       
       let newCorrect = [...correctQuestions];

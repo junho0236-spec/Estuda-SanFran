@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, Suspense } from 'react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck, BookX, ScrollText, FileText, Repeat, UserX, ListTodo, Handshake, Eye, Key, CalendarCheck, Loader2 } from 'lucide-react';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck, BookX, ScrollText, FileText, Repeat, UserX, ListTodo, Handshake, Eye, Key, CalendarCheck, Loader2, BarChart3 } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel } from './types';
 import Login from './components/Login';
 import Atmosphere from './components/Atmosphere';
@@ -81,6 +81,7 @@ const GuerraTurmas = React.lazy(() => import('./components/GuerraTurmas'));
 const SpeedReader = React.lazy(() => import('./components/SpeedReader'));
 const Mnemonics = React.lazy(() => import('./components/Mnemonics'));
 const ReverseStudyPlanner = React.lazy(() => import('./components/ReverseStudyPlanner')); 
+const Statistics = React.lazy(() => import('./components/Statistics'));
 const SanFranEssential = React.lazy(() => import('./components/SanFranEssential'));
 const SanFranCommunity = React.lazy(() => import('./components/SanFranCommunity'));
 const SanFranImprovement = React.lazy(() => import('./components/SanFranImprovement'));
@@ -183,6 +184,7 @@ const App: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [readings, setReadings] = useState<Reading[]>([]);
   const [studySessions, setStudySessions] = useState<StudySession[]>([]);
+  const [correctQuestionsCount, setCorrectQuestionsCount] = useState(0);
 
   // --- Timer Global State (Pomodoro) ---
   const [timerIsActive, setTimerIsActive] = useState(false);
@@ -414,17 +416,19 @@ const App: React.FC = () => {
     
     try {
       if (isOnline) {
-        const [resSubs, resFlds, resCards, resTks, resSessions, resReadings] = await Promise.all([
+        const [resSubs, resFlds, resCards, resTks, resSessions, resReadings, resProgress] = await Promise.all([
           supabase.from('subjects').select('*').eq('user_id', userId),
           supabase.from('folders').select('*').eq('user_id', userId),
           supabase.from('flashcards').select('*').eq('user_id', userId).is('archived_at', null),
           supabase.from('tasks').select('*').eq('user_id', userId).is('archived_at', null).order('created_at', { ascending: false }),
           supabase.from('study_sessions').select('*').eq('user_id', userId).order('start_time', { ascending: false }),
-          supabase.from('readings').select('*').eq('user_id', userId).order('created_at', { ascending: false })
+          supabase.from('readings').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+          supabase.from('user_progress').select('correct_count').eq('user_id', userId).single()
         ]);
 
         if (resSubs.data) setSubjects(resSubs.data);
         if (resFlds.data) setFolders(resFlds.data.map(f => ({ id: f.id, name: f.name, parentId: f.parent_id })));
+        if (resProgress.data) setCorrectQuestionsCount(resProgress.data.correct_count || 0);
         
         if (resCards.data) {
           const formattedCards = resCards.data.map(c => ({
@@ -510,6 +514,7 @@ const App: React.FC = () => {
     { id: View.Subjects, icon: BookOpen, label: 'Disciplinas', color: 'text-pink-600', bg: 'bg-pink-100' },
     { id: View.Tasks, icon: CheckSquare, label: 'Tarefas', color: 'text-emerald-600', bg: 'bg-emerald-100' },
     { id: View.Anki, icon: BrainCircuit, label: 'Anki Flashcards', color: 'text-slate-900', bg: 'bg-slate-200' },
+    { id: View.Statistics, icon: BarChart3, label: 'Estatísticas', color: 'text-usp-gold', bg: 'bg-usp-gold/10' },
     { id: View.Timer, icon: TimerIcon, label: 'Controle de Tempo', color: 'text-red-600', bg: 'bg-red-100' },
 
     // HUBS
@@ -524,7 +529,7 @@ const App: React.FC = () => {
   ];
 
   // Helper to check if current view is a child of SanFran Essential (Updated List)
-  const isEssentialChild = [View.Calendar, View.Ranking, View.DeadArchive, View.Calculator, View.ErrorLog, View.CodeTracker, View.IracMethod, View.SpacedRepetition, View.AttendanceCalculator, View.SyllabusTracker, View.DeadlinePlanner, View.SpeedReader, View.Mnemonics, View.ReverseSchedule].includes(currentView);
+  const isEssentialChild = [View.Calendar, View.Ranking, View.DeadArchive, View.Calculator, View.ErrorLog, View.CodeTracker, View.IracMethod, View.SpacedRepetition, View.AttendanceCalculator, View.SyllabusTracker, View.DeadlinePlanner, View.SpeedReader, View.Mnemonics, View.ReverseSchedule, View.Statistics].includes(currentView);
   
   // Helper to check if current view is a child of SanFran Community
   const isCommunityChild = [View.Debate, View.ClassificadosPatio, View.JurisprudenceMural, View.Societies, View.Largo, View.StudyRoom, View.Mural, View.Mentorship, View.MockJury, View.PetitionWiki, View.StudyPact, View.LargoAuction, View.SocialEvents, View.TheVault, View.CaronasRepublicas, View.BalcaoEstagios, View.TribunalOpiniao, View.BussolaOptativas, View.AchadosPerdidos, View.PerolasTribuna, View.GuiaSobrevivencia, View.ClubeLivro, View.GuerraTurmas].includes(currentView);
@@ -764,7 +769,7 @@ const App: React.FC = () => {
                 {currentView === View.PronunciationLab && <PronunciationLab userId={session.user.id} />}
                 {currentView === View.LyricalVibes && <LyricalVibes userId={session.user.id} />}
                 {currentView === View.TheExchangeStudent && <TheExchangeStudent userId={session.user.id} />}
-                {currentView === View.QuestionBank && <QuestionBank userId={session.user.id} />}
+                {currentView === View.QuestionBank && <QuestionBank userId={session.user.id} onCorrectAnswer={() => setCorrectQuestionsCount(prev => prev + 1)} />}
                 {currentView === View.IntelligentSummarizer && <IntelligentSummarizer userId={session.user.id} />}
                 {currentView === View.VisualFlashcards && <VisualFlashcards userId={session.user.id} />}
                 {currentView === View.BilingualNews && <BilingualNews userId={session.user.id} />}
@@ -795,12 +800,14 @@ const App: React.FC = () => {
                 {currentView === View.SpeedReader && <SpeedReader />}
                 {currentView === View.Mnemonics && <Mnemonics userId={session.user.id} />}
                 {currentView === View.ReverseSchedule && <ReverseStudyPlanner userId={session.user.id} />}
+                {currentView === View.Statistics && <Statistics studySessions={studySessions} flashcards={flashcards} tasks={tasks} subjects={subjects} correctQuestionsCount={correctQuestionsCount} />}
                 
                 {currentView === View.Duel && activeDuel && (
                   <DuelArena 
                     duel={activeDuel} 
                     userId={session.user.id} 
                     onFinished={() => { setActiveDuel(null); setCurrentView(View.Largo); }} 
+                    onCorrectAnswer={() => setCorrectQuestionsCount(prev => prev + 1)}
                   />
                 )}
                 

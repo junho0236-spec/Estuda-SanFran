@@ -1,0 +1,301 @@
+
+import React from 'react';
+import { 
+  TrendingUp, 
+  Clock, 
+  BrainCircuit, 
+  CheckCircle2, 
+  Target, 
+  Calendar,
+  BarChart3,
+  PieChart as PieChartIcon,
+  Activity
+} from 'lucide-react';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer, 
+  Cell,
+  PieChart,
+  Pie,
+  LineChart,
+  Line,
+  AreaChart,
+  Area
+} from 'recharts';
+import { StudySession, Flashcard, Task, Subject } from '../types';
+
+interface StatisticsProps {
+  studySessions: StudySession[];
+  flashcards: Flashcard[];
+  tasks: Task[];
+  subjects: Subject[];
+  correctQuestionsCount?: number; // Added from user request context if available
+}
+
+const Statistics: React.FC<StatisticsProps> = ({ 
+  studySessions, 
+  flashcards, 
+  tasks, 
+  subjects,
+  correctQuestionsCount = 0 
+}) => {
+  // Calculations
+  const totalStudySeconds = studySessions.reduce((acc, s) => acc + s.duration, 0);
+  const totalStudyHours = (totalStudySeconds / 3600).toFixed(1);
+  
+  const completedTasks = tasks.filter(t => t.completed).length;
+  const totalTasks = tasks.length;
+  const taskCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+  const reviewedCards = flashcards.filter(f => f.interval > 0).length;
+  const totalCards = flashcards.length;
+  const cardMasteryRate = totalCards > 0 ? Math.round((reviewedCards / totalCards) * 100) : 0;
+
+  // Data for Charts
+  const sessionsBySubject = subjects.map(subject => {
+    const duration = studySessions
+      .filter(s => s.subject_id === subject.id)
+      .reduce((acc, s) => acc + s.duration, 0);
+    return {
+      name: subject.name,
+      value: Math.round(duration / 60), // in minutes
+      color: subject.color
+    };
+  }).filter(s => s.value > 0);
+
+  // Last 7 days study time
+  const last7Days = [...Array(7)].map((_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().split('T')[0];
+    const dayName = d.toLocaleDateString('pt-BR', { weekday: 'short' });
+    
+    const dayDuration = studySessions
+      .filter(s => s.start_time.startsWith(dateStr))
+      .reduce((acc, s) => acc + s.duration, 0);
+      
+    return {
+      date: dateStr,
+      day: dayName,
+      minutes: Math.round(dayDuration / 60)
+    };
+  }).reverse();
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-700 pb-20">
+      {/* Header */}
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b-4 border-double border-slate-200 dark:border-sanfran-rubi/20">
+        <div className="flex items-center gap-6">
+           <div className="bg-slate-900 dark:bg-white p-4 rounded-lg shadow-2xl">
+              <TrendingUp className="w-8 h-8 text-white dark:text-sanfran-rubiBlack" />
+           </div>
+           <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-1">Métricas de Desempenho</p>
+              <h2 className="text-3xl md:text-5xl font-black text-slate-950 dark:text-white uppercase tracking-tighter font-serif leading-none">
+                Estatísticas Acadêmicas
+              </h2>
+              <p className="text-slate-500 dark:text-slate-400 font-bold text-sm mt-1 font-serif italic">
+                Análise quantitativa da sua evolução no Largo de São Francisco
+              </p>
+           </div>
+        </div>
+      </header>
+
+      {/* Key Metrics Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <MetricCard 
+          icon={<Clock className="text-blue-500" />} 
+          label="Tempo Total" 
+          value={`${totalStudyHours}h`} 
+          subValue="Horas de Foco"
+          color="border-blue-500"
+        />
+        <MetricCard 
+          icon={<BrainCircuit className="text-purple-500" />} 
+          label="Flashcards" 
+          value={reviewedCards} 
+          subValue={`de ${totalCards} revisados`}
+          color="border-purple-500"
+        />
+        <MetricCard 
+          icon={<CheckCircle2 className="text-emerald-500" />} 
+          label="Tarefas" 
+          value={completedTasks} 
+          subValue={`${taskCompletionRate}% concluídas`}
+          color="border-emerald-500"
+        />
+        <MetricCard 
+          icon={<Target className="text-sanfran-rubi" />} 
+          label="Questões" 
+          value={correctQuestionsCount} 
+          subValue="Acertos Totais"
+          color="border-sanfran-rubi"
+        />
+      </div>
+
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        {/* Study Time Area Chart */}
+        <div className="bg-white dark:bg-sanfran-rubiDark/20 p-8 rounded-[2rem] border border-slate-200 dark:border-sanfran-rubi/20 shadow-xl">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3">
+              <Activity className="text-sanfran-rubi w-5 h-5" />
+              <h3 className="text-lg font-black uppercase tracking-tight text-slate-900 dark:text-white">Ritmo de Estudo</h3>
+            </div>
+            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Últimos 7 Dias</span>
+          </div>
+          
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={last7Days}>
+                <defs>
+                  <linearGradient id="colorMinutes" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#9B111E" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#9B111E" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
+                <XAxis 
+                  dataKey="day" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{fontSize: 10, fontWeight: 900, fill: '#94a3b8'}}
+                  dy={10}
+                />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{fontSize: 10, fontWeight: 900, fill: '#94a3b8'}}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#fff', 
+                    borderRadius: '12px', 
+                    border: 'none', 
+                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                    fontSize: '12px',
+                    fontWeight: 'bold'
+                  }}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="minutes" 
+                  stroke="#9B111E" 
+                  strokeWidth={3}
+                  fillOpacity={1} 
+                  fill="url(#colorMinutes)" 
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Distribution Pie Chart */}
+        <div className="bg-white dark:bg-sanfran-rubiDark/20 p-8 rounded-[2rem] border border-slate-200 dark:border-sanfran-rubi/20 shadow-xl">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3">
+              <PieChartIcon className="text-usp-gold w-5 h-5" />
+              <h3 className="text-lg font-black uppercase tracking-tight text-slate-900 dark:text-white">Distribuição por Matéria</h3>
+            </div>
+            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Tempo Total</span>
+          </div>
+
+          <div className="h-[300px] w-full flex flex-col md:flex-row items-center">
+            <div className="flex-1 h-full w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={sessionsBySubject}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {sessionsBySubject.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex-1 space-y-2 mt-4 md:mt-0 md:pl-8">
+              {sessionsBySubject.slice(0, 5).map((s, i) => (
+                <div key={i} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }}></div>
+                    <span className="text-[10px] font-black uppercase text-slate-600 dark:text-slate-400 truncate max-w-[120px]">{s.name}</span>
+                  </div>
+                  <span className="text-[10px] font-black text-slate-900 dark:text-white">{s.value} min</span>
+                </div>
+              ))}
+              {sessionsBySubject.length > 5 && (
+                <p className="text-[9px] font-bold text-slate-400 italic text-center mt-2">... e mais {sessionsBySubject.length - 5} matérias</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Detailed Progress Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <ProgressCard 
+          title="Domínio de Flashcards" 
+          percentage={cardMasteryRate} 
+          color="bg-purple-500" 
+          description="Percentual de cards que já saíram da fase inicial de aprendizado."
+        />
+        <ProgressCard 
+          title="Eficiência em Tarefas" 
+          percentage={taskCompletionRate} 
+          color="bg-emerald-500" 
+          description="Taxa de conclusão de processos e petições na sua pauta."
+        />
+        <ProgressCard 
+          title="Consistência Semanal" 
+          percentage={Math.min(100, Math.round((last7Days.filter(d => d.minutes > 0).length / 7) * 100))} 
+          color="bg-sanfran-rubi" 
+          description="Frequência de dias estudados na última semana."
+        />
+      </div>
+
+    </div>
+  );
+};
+
+const MetricCard: React.FC<{ icon: React.ReactNode, label: string, value: string | number, subValue: string, color: string }> = ({ icon, label, value, subValue, color }) => (
+  <div className={`bg-white dark:bg-sanfran-rubiDark/20 p-6 rounded-[2rem] border-l-8 ${color} shadow-lg hover:scale-105 transition-transform duration-300`}>
+    <div className="flex items-center gap-3 mb-4">
+      <div className="p-2 bg-slate-50 dark:bg-white/5 rounded-xl">
+        {icon}
+      </div>
+      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</span>
+    </div>
+    <div className="text-3xl font-black text-slate-950 dark:text-white tracking-tighter leading-none mb-1">{value}</div>
+    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">{subValue}</div>
+  </div>
+);
+
+const ProgressCard: React.FC<{ title: string, percentage: number, color: string, description: string }> = ({ title, percentage, color, description }) => (
+  <div className="bg-white dark:bg-sanfran-rubiDark/20 p-8 rounded-[2rem] border border-slate-200 dark:border-sanfran-rubi/20 shadow-xl">
+    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">{title}</h4>
+    <div className="flex items-end gap-4 mb-4">
+      <div className="text-5xl font-black text-slate-950 dark:text-white tracking-tighter leading-none">{percentage}%</div>
+      <div className="flex-1 h-3 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden mb-1">
+        <div className={`h-full ${color} transition-all duration-1000`} style={{ width: `${percentage}%` }}></div>
+      </div>
+    </div>
+    <p className="text-[10px] font-medium text-slate-500 leading-relaxed">{description}</p>
+  </div>
+);
+
+export default Statistics;

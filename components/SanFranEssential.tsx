@@ -20,7 +20,8 @@ import {
   Eye,
   Key,
   CalendarCheck,
-  Calculator as CalculatorIcon
+  Calculator as CalculatorIcon,
+  BarChart3
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -371,6 +372,24 @@ const SanFranEssential: React.FC<SanFranEssentialProps> = ({ onNavigate }) => {
            <div className="text-left mt-4">
               <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Calculadora</h4>
               <p className="text-[10px] font-bold text-slate-400 uppercase">Média & Notas</p>
+           </div>
+        </button>
+
+        {/* CARD 12: ESTATÍSTICAS (Compact) - NOVO */}
+        <button
+          onClick={() => onNavigate(View.Statistics)}
+          className="group col-span-1 bg-slate-900 text-white rounded-[2.5rem] p-6 border border-slate-800 shadow-lg hover:shadow-sanfran-rubi/20 hover:scale-[1.02] transition-all flex flex-col justify-between relative overflow-hidden"
+        >
+           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-sanfran-rubi/20 via-transparent to-transparent"></div>
+           <div className="flex justify-between items-start relative z-10">
+              <div className="p-3 bg-white/10 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20">
+                 <BarChart3 size={20} className="text-sanfran-rubi" />
+              </div>
+              <ArrowUpRight size={16} className="text-slate-400 group-hover:text-white transition-colors" />
+           </div>
+           <div className="text-left mt-4 relative z-10">
+              <h4 className="text-lg font-black uppercase tracking-tight text-white">Estatísticas</h4>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Seu Progresso</p>
            </div>
         </button>
 
