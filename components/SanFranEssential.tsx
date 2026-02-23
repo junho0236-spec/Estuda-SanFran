@@ -356,6 +356,23 @@ const SanFranEssential: React.FC<SanFranEssentialProps> = ({ onNavigate }) => {
            </div>
         </button>
 
+        {/* CARD 11: CALCULADORA DE NOTAS (Compact) - NOVO */}
+        <button
+          onClick={() => onNavigate(View.Calculator)}
+          className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-usp-gold transition-all flex flex-col justify-between h-full hover:shadow-usp-gold/10"
+        >
+           <div className="flex justify-between items-start">
+              <div className="p-3 bg-usp-gold/10 text-usp-gold rounded-2xl">
+                 <CalculatorIcon size={20} />
+              </div>
+              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-usp-gold transition-colors" />
+           </div>
+           <div className="text-left mt-4">
+              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Calculadora</h4>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Média & Notas</p>
+           </div>
+        </button>
+
         {/* CARD 10: ARQUIVO MORTO (Wide Footer) */}
         <button
           onClick={() => onNavigate(View.DeadArchive)}

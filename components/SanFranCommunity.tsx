@@ -481,6 +481,57 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
            </div>
         </button>
 
+        {/* CARD 21: MURAL (Standard) - NOVO */}
+        <button
+          onClick={() => onNavigate(View.Mural)}
+          className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-indigo-400 transition-all flex flex-col justify-between h-full hover:shadow-indigo-500/10"
+        >
+           <div className="flex justify-between items-start">
+              <div className="p-3 bg-indigo-100 dark:bg-indigo-900/20 text-indigo-600 rounded-2xl">
+                 <Megaphone size={20} />
+              </div>
+              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-indigo-500 transition-colors" />
+           </div>
+           <div className="text-left mt-4">
+              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Mural</h4>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Avisos da Comunidade</p>
+           </div>
+        </button>
+
+        {/* CARD 22: DEBATE (Standard) - NOVO */}
+        <button
+          onClick={() => onNavigate(View.Debate)}
+          className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-cyan-400 transition-all flex flex-col justify-between h-full hover:shadow-cyan-500/10"
+        >
+           <div className="flex justify-between items-start">
+              <div className="p-3 bg-cyan-100 dark:bg-cyan-900/20 text-cyan-600 rounded-2xl">
+                 <MessageSquare size={20} />
+              </div>
+              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-cyan-500 transition-colors" />
+           </div>
+           <div className="text-left mt-4">
+              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Debate</h4>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Fórum de Discussão</p>
+           </div>
+        </button>
+
+        {/* CARD 23: SOCIETIES (Standard) - NOVO */}
+        <button
+          onClick={() => onNavigate(View.Societies)}
+          className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-amber-400 transition-all flex flex-col justify-between h-full hover:shadow-amber-500/10"
+        >
+           <div className="flex justify-between items-start">
+              <div className="p-3 bg-amber-100 dark:bg-amber-900/20 text-amber-600 rounded-2xl">
+                 <Handshake size={20} />
+              </div>
+              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-amber-500 transition-colors" />
+           </div>
+           <div className="text-left mt-4">
+              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Sociedades</h4>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Grêmios & Coletivos</p>
+           </div>
+        </button>
+
       </div>
 
     </div>

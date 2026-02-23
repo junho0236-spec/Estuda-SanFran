@@ -243,7 +243,7 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
            </div>
         </button>
 
-        {/* CARD 8: GENERAL LANGUAGES (Standard) */}
+         {/* CARD 8: GENERAL LANGUAGES (Standard) */}
         <button
           onClick={() => onNavigate(View.GeneralLanguages)}
           className="group relative col-span-1 md:col-span-1 lg:col-span-1 row-span-2 bg-indigo-600 text-white rounded-[2.5rem] p-8 border border-indigo-500 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between overflow-hidden"
@@ -260,6 +260,27 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
               <h3 className="text-xl font-black uppercase tracking-tight leading-none mb-1">General App</h3>
               <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest">
                  Gramática & Vocabulário Geral.
+              </p>
+           </div>
+        </button>
+
+        {/* CARD 9: LEGAL CINEMA (Standard) - NOVO */}
+        <button
+          onClick={() => onNavigate(View.LegalCinema)}
+          className="group relative col-span-1 md:col-span-1 lg:col-span-1 row-span-2 bg-slate-900 text-white rounded-[2.5rem] p-8 border border-slate-700 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between overflow-hidden"
+        >
+           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/film.png')] opacity-10"></div>
+           
+           <div className="flex items-start justify-between relative z-10">
+              <div className="bg-white/10 p-3 rounded-2xl shadow-lg border border-white/10">
+                 <Film size={24} className="text-white" />
+              </div>
+           </div>
+           
+           <div className="relative z-10 mt-6">
+              <h3 className="text-xl font-black uppercase tracking-tight leading-none mb-1">Legal Cinema</h3>
+              <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest">
+                 Aprenda com Filmes Jurídicos.
               </p>
            </div>
         </button>
