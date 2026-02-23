@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { Gavel, Scale, Send, MessageSquare, AlertCircle, TrendingUp, User, Trash2, CheckCircle, XCircle, Info, Plus } from 'lucide-react';
+import { Gavel, Scale, Send, MessageSquare, AlertCircle, TrendingUp, User, Trash2, CheckCircle, XCircle, Info, Plus, BrainCircuit } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
-import { JurisCase, JurisVote } from '../types';
+import { JurisCase, JurisVote, View } from '../types';
 
 interface JurisprudenceMuralProps {
   userId: string;
   userName: string;
+  onNavigate: (view: View) => void;
 }
 
 interface CaseWithStats extends JurisCase {
@@ -16,7 +17,7 @@ interface CaseWithStats extends JurisCase {
   userVote?: JurisVote;
 }
 
-const JurisprudenceMural: React.FC<JurisprudenceMuralProps> = ({ userId, userName }) => {
+const JurisprudenceMural: React.FC<JurisprudenceMuralProps> = ({ userId, userName, onNavigate }) => {
   const [cases, setCases] = useState<CaseWithStats[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -152,13 +153,22 @@ const JurisprudenceMural: React.FC<JurisprudenceMuralProps> = ({ userId, userNam
            <p className="text-slate-500 font-bold italic text-lg mt-2">Debate técnico e julgamentos simulados pela comunidade.</p>
         </div>
         
-        <button 
-          onClick={() => setShowForm(!showForm)}
-          className={`flex items-center gap-2 px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-xl ${showForm ? 'bg-slate-200 text-slate-600' : 'bg-sanfran-rubi text-white hover:bg-sanfran-rubiDark hover:scale-105'}`}
-        >
-           {showForm ? <Trash2 size={16} /> : <Plus size={16} />}
-           {showForm ? 'Cancelar' : 'Propor Caso'}
-        </button>
+        <div className="flex flex-wrap gap-4">
+          <button 
+            onClick={() => onNavigate(View.CaseAnalyzer)}
+            className="flex items-center gap-2 px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-xl bg-indigo-600 text-white hover:bg-indigo-700 hover:scale-105"
+          >
+             <BrainCircuit size={16} /> Analisador de Casos IA
+          </button>
+
+          <button 
+            onClick={() => setShowForm(!showForm)}
+            className={`flex items-center gap-2 px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-xl ${showForm ? 'bg-slate-200 text-slate-600' : 'bg-sanfran-rubi text-white hover:bg-sanfran-rubiDark hover:scale-105'}`}
+          >
+             {showForm ? <Trash2 size={16} /> : <Plus size={16} />}
+             {showForm ? 'Cancelar' : 'Propor Caso'}
+          </button>
+        </div>
       </header>
 
       {showForm && (

@@ -102,6 +102,7 @@ const SlangChallenge = React.lazy(() => import('./components/SlangChallenge'));
 const QuestionBank = React.lazy(() => import('./components/QuestionBank'));
 const IntelligentSummarizer = React.lazy(() => import('./components/IntelligentSummarizer'));
 const StudyBuddy = React.lazy(() => import('./components/StudyBuddy'));
+const CaseAnalyzer = React.lazy(() => import('./components/CaseAnalyzer'));
 
 // Loading Fallback Component com Estilo
 const PageLoader = () => (
@@ -552,7 +553,7 @@ const App: React.FC = () => {
   const isEssentialChild = [View.Calendar, View.Ranking, View.DeadArchive, View.Calculator, View.ErrorLog, View.CodeTracker, View.IracMethod, View.SpacedRepetition, View.AttendanceCalculator, View.SyllabusTracker, View.DeadlinePlanner, View.SpeedReader, View.Mnemonics, View.ReverseSchedule, View.Statistics].includes(currentView);
   
   // Helper to check if current view is a child of SanFran Community
-  const isCommunityChild = [View.Debate, View.ClassificadosPatio, View.JurisprudenceMural, View.Societies, View.Largo, View.StudyRoom, View.Mural, View.Mentorship, View.MockJury, View.PetitionWiki, View.StudyPact, View.LargoAuction, View.SocialEvents, View.TheVault, View.CaronasRepublicas, View.BalcaoEstagios, View.TribunalOpiniao, View.BussolaOptativas, View.AchadosPerdidos, View.PerolasTribuna, View.GuiaSobrevivencia, View.ClubeLivro, View.GuerraTurmas].includes(currentView);
+  const isCommunityChild = [View.Debate, View.ClassificadosPatio, View.JurisprudenceMural, View.CaseAnalyzer, View.Societies, View.Largo, View.StudyRoom, View.Mural, View.Mentorship, View.MockJury, View.PetitionWiki, View.StudyPact, View.LargoAuction, View.SocialEvents, View.TheVault, View.CaronasRepublicas, View.BalcaoEstagios, View.TribunalOpiniao, View.BussolaOptativas, View.AchadosPerdidos, View.PerolasTribuna, View.GuiaSobrevivencia, View.ClubeLivro, View.GuerraTurmas].includes(currentView);
 
   // Helper to check if current view is a child of SanFran Improvement
   const isImprovementChild = [View.Specialization, View.TypingChallenge, View.DominioJuridico, View.Timeline, View.LeiSeca, View.Library, View.OralArgument, View.QuestionBank, View.IntelligentSummarizer, View.StudyBuddy].includes(currentView);
@@ -755,7 +756,8 @@ const App: React.FC = () => {
                 {currentView === View.ClassificadosPatio && <ClassificadosPatio userId={session.user.id} userName={session.user.user_metadata?.full_name} studySessions={studySessions} />}
                 {currentView === View.Specialization && <SpecializationTree subjects={subjects} studySessions={studySessions} />}
                 {currentView === View.SumulaChallenge && <SumulaChallenge userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
-                {currentView === View.JurisprudenceMural && <JurisprudenceMural userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
+                {currentView === View.JurisprudenceMural && <JurisprudenceMural userId={session.user.id} userName={session.user.user_metadata?.full_name} onNavigate={setCurrentView} />}
+                {currentView === View.CaseAnalyzer && <CaseAnalyzer onBack={() => setCurrentView(View.JurisprudenceMural)} />}
                 {currentView === View.Societies && <Societies userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
                 {currentView === View.LeiSeca && <LeiSeca userId={session.user.id} />}
                 {currentView === View.CitationGenerator && <CitationGenerator />}

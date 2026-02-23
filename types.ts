@@ -93,7 +93,8 @@ export enum View {
   QuestionBank = 'question_bank',
   IntelligentSummarizer = 'intelligent_summarizer',
   Statistics = 'statistics',
-  StudyBuddy = 'study_buddy'
+  StudyBuddy = 'study_buddy',
+  CaseAnalyzer = 'case_analyzer'
 }
 
 export interface Folder {

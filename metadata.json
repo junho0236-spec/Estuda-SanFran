@@ -1,6 +1,6 @@
 {
   "name": "SanFran Academy - Hub de Aprendizado Jurídico",
-  "description": "Uma suíte de estudos abrangente com flashcards, timer Pomodoro e gestão de tarefas focada na excelência acadêmica jurídica.",
+  "description": "Uma suíte de estudos abrangente com IA para análise de casos, mentor de estudos, flashcards, timer Pomodoro e gestão de tarefas focada na excelência acadêmica jurídica.",
   "requestFramePermissions": [
     "microphone"
   ]
