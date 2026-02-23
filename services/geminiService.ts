@@ -161,6 +161,37 @@ export const simplifyLegalText = async (complexText: string) => {
 };
 
 /**
+ * Explica um termo jurídico específico dentro de um contexto.
+ */
+export const explainLegalTerm = async (term: string, context: string) => {
+  try {
+    const ai = getAiClient();
+    const apiKey = getApiKey();
+
+    if (!apiKey || apiKey === "missing_key") {
+      return "Erro: Chave de API não configurada.";
+    }
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Você é um glossário jurídico inteligente.
+      
+      O usuário selecionou o termo: "${term}"
+      Do seguinte texto: "${context}"
+      
+      1. Dê uma definição simples e direta deste termo (máximo 2 frases).
+      2. Sugira 2 ou 3 sinônimos ou expressões mais simples que poderiam substituí-lo neste contexto.
+      
+      Retorne a resposta em formato Markdown simples.`,
+    });
+    return response.text;
+  } catch (error) {
+    console.error("Erro ao explicar termo:", error);
+    return "Não foi possível explicar o termo no momento.";
+  }
+};
+
+/**
  * Gera um mnemônico criativo a partir de uma lista de requisitos ou palavras.
  */
 export const generateMnemonic = async (requirements: string) => {

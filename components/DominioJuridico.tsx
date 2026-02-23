@@ -55,7 +55,7 @@ const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessio
           if (status !== 'locked') conqueredTerritories++;
           return {
             ...sub,
-            hours: hours.toFixed(1),
+            hours: hours,
             status,
           };
         })
@@ -132,7 +132,7 @@ const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessio
                        <div 
                          key={sub.id} 
                          className={`group relative bg-white dark:bg-sanfran-rubiDark/40 p-4 rounded-2xl border-2 ${borderColor} shadow-lg transition-all hover:scale-105 ${opacity}`}
-                         title={`${sub.hours} horas estudadas`}
+                         title={`${Number(sub.hours).toFixed(1)} horas estudadas`}
                        >
                           <div className="flex justify-between items-start mb-2">
                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: sub.color }} />

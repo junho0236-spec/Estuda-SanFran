@@ -661,7 +661,7 @@ const LyricalVibes: React.FC<LyricalVibesProps> = ({ userId }) => {
                               <div className="relative inline-block group">
                                  <input 
                                    type="text"
-                                   ref={(el) => inputRefs.current[idx] = el}
+                                   ref={(el) => { if (el) inputRefs.current[idx] = el; }}
                                    value={inputs[idx] || ''}
                                    onChange={(e) => handleInputChange(idx, e.target.value)}
                                    onKeyDown={(e) => handleKeyDown(e, idx)}

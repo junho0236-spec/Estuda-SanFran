@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Sparkles, MessageSquare, ArrowRight, Copy, Check, Zap, History, Trash2 } from 'lucide-react';
-import { simplifyLegalText } from '../services/geminiService';
+import { Sparkles, MessageSquare, ArrowRight, Copy, Check, Zap, History, Trash2, BookOpen, X } from 'lucide-react';
+import { simplifyLegalText, explainLegalTerm } from '../services/geminiService';
 import Markdown from 'react-markdown';
 import { supabase } from '../services/supabaseClient';
 
@@ -23,6 +23,11 @@ const LegalSimplifier: React.FC<LegalSimplifierProps> = ({ userId }) => {
   const [copied, setCopied] = useState(false);
   const [history, setHistory] = useState<TranslationHistory[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+
+  // New state for term explanation
+  const [selectedTerm, setSelectedTerm] = useState<string | null>(null);
+  const [explanation, setExplanation] = useState<string | null>(null);
+  const [explaining, setExplaining] = useState(false);
 
   useEffect(() => {
     if (userId) {
@@ -97,6 +102,44 @@ const LegalSimplifier: React.FC<LegalSimplifierProps> = ({ userId }) => {
     }
   };
 
+  const handleTextSelect = (e: React.SyntheticEvent<HTMLTextAreaElement>) => {
+    const target = e.target as HTMLTextAreaElement;
+    const start = target.selectionStart;
+    const end = target.selectionEnd;
+    
+    if (start !== end) {
+      const text = target.value.substring(start, end);
+      if (text.trim().length > 0) {
+        setSelectedTerm(text);
+        // Reset explanation when new term is selected
+        if (explanation) setExplanation(null);
+      }
+    } else {
+      // Only clear if we are not currently viewing an explanation
+      if (!explanation) setSelectedTerm(null);
+    }
+  };
+
+  const handleExplainTerm = async () => {
+    if (!selectedTerm) return;
+    setExplaining(true);
+    setExplanation(null);
+    
+    try {
+      const result = await explainLegalTerm(selectedTerm, inputText);
+      setExplanation(result || "Não foi possível explicar o termo.");
+    } catch (error) {
+      setExplanation("Erro ao buscar explicação.");
+    } finally {
+      setExplaining(false);
+    }
+  };
+
+  const closeExplanation = () => {
+    setExplanation(null);
+    setSelectedTerm(null);
+  };
+
   return (
     <div className="h-full flex flex-col max-w-5xl mx-auto pb-20 px-4 md:px-0 animate-in fade-in duration-500">
       
@@ -160,16 +203,49 @@ const LegalSimplifier: React.FC<LegalSimplifierProps> = ({ userId }) => {
       <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 min-h-0">
          
          {/* INPUT */}
-         <div className="flex flex-col h-full bg-white dark:bg-sanfran-rubiDark/20 p-6 rounded-[2.5rem] border-2 border-slate-200 dark:border-sanfran-rubi/30 shadow-xl">
-            <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4 flex items-center gap-2">
-               <MessageSquare size={14} /> Texto Original
-            </label>
+         <div className="flex flex-col h-full bg-white dark:bg-sanfran-rubiDark/20 p-6 rounded-[2.5rem] border-2 border-slate-200 dark:border-sanfran-rubi/30 shadow-xl relative">
+            <div className="flex justify-between items-center mb-4">
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
+                 <MessageSquare size={14} /> Texto Original
+              </label>
+              {selectedTerm && !explanation && (
+                <button 
+                  onClick={handleExplainTerm}
+                  disabled={explaining}
+                  className="animate-in fade-in zoom-in px-3 py-1 bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 rounded-lg text-xs font-bold flex items-center gap-2 hover:bg-purple-200 dark:hover:bg-purple-900/60 transition-colors"
+                >
+                  <BookOpen size={12} />
+                  {explaining ? 'Analisando...' : 'Explicar Termo Selecionado'}
+                </button>
+              )}
+            </div>
+            
             <textarea 
                value={inputText}
                onChange={(e) => setInputText(e.target.value)}
+               onSelect={handleTextSelect}
                placeholder="Cole aqui aquele parágrafo impossível de entender..."
                className="flex-1 w-full bg-slate-50 dark:bg-black/20 border-2 border-slate-100 dark:border-white/5 rounded-2xl p-6 font-serif text-lg leading-relaxed text-slate-800 dark:text-slate-200 outline-none focus:border-purple-500 resize-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
             />
+            
+            {/* Term Explanation Modal/Overlay */}
+            {explanation && (
+              <div className="absolute inset-x-4 bottom-20 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-purple-200 dark:border-purple-800 p-4 animate-in slide-in-from-bottom-4 z-20">
+                <div className="flex justify-between items-start mb-2">
+                  <h4 className="text-sm font-black uppercase text-purple-600 dark:text-purple-400 flex items-center gap-2">
+                    <BookOpen size={14} />
+                    {selectedTerm}
+                  </h4>
+                  <button onClick={closeExplanation} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                    <X size={14} />
+                  </button>
+                </div>
+                <div className="text-sm text-slate-700 dark:text-slate-300 prose prose-sm prose-purple dark:prose-invert max-w-none">
+                  <Markdown>{explanation}</Markdown>
+                </div>
+              </div>
+            )}
+
             <div className="mt-4 flex justify-end">
                <button 
                   onClick={handleSimplify}
@@ -190,8 +266,12 @@ const LegalSimplifier: React.FC<LegalSimplifierProps> = ({ userId }) => {
                   <Sparkles size={14} /> Versão Didática
                </label>
                {outputText && (
-                  <button onClick={handleCopy} className="text-slate-400 hover:text-white transition-colors">
-                     {copied ? <Check size={16} /> : <Copy size={16} />}
+                  <button 
+                    onClick={handleCopy} 
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${copied ? 'bg-green-500/20 text-green-400' : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white'}`}
+                  >
+                     {copied ? <Check size={14} /> : <Copy size={14} />}
+                     {copied ? 'Copiado!' : 'Copiar Texto'}
                   </button>
                )}
             </div>
