@@ -90,33 +90,89 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
 
   useEffect(() => {
     fetchQuestions();
-    // Load favorites from local storage
-    const storedFavorites = localStorage.getItem(`sanfran_favorites_${userId}`);
-    if (storedFavorites) {
-      setFavorites(JSON.parse(storedFavorites));
-    }
-    
-    // Load wrong questions from local storage
-    const storedWrong = localStorage.getItem(`sanfran_wrong_${userId}`);
-    if (storedWrong) {
-      setWrongQuestions(JSON.parse(storedWrong));
-    }
-
-    // Load notes from local storage
-    const storedNotes = localStorage.getItem(`sanfran_notes_${userId}`);
-    if (storedNotes) {
-      setNotes(JSON.parse(storedNotes));
-    }
-
-    // Load stats from local storage
-    const storedCorrect = localStorage.getItem(`sanfran_correct_count_${userId}`);
-    if (storedCorrect) setCorrectCount(parseInt(storedCorrect));
-    
-    const storedWrongCount = localStorage.getItem(`sanfran_wrong_count_${userId}`);
-    if (storedWrongCount) setWrongCount(parseInt(storedWrongCount));
+    fetchUserProgress();
   }, [userId]);
 
-  const toggleFavorite = (questionId: string) => {
+  const fetchUserProgress = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_progress')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+        console.error('Error fetching user progress:', error);
+        return;
+      }
+
+      if (data) {
+        setFavorites(data.favorites || []);
+        setWrongQuestions(data.wrong_questions || []);
+        setNotes(data.notes || {});
+        setCorrectCount(data.correct_count || 0);
+        setWrongCount(data.wrong_count || 0);
+        
+        // Sync to local storage as backup
+        localStorage.setItem(`sanfran_favorites_${userId}`, JSON.stringify(data.favorites || []));
+        localStorage.setItem(`sanfran_wrong_${userId}`, JSON.stringify(data.wrong_questions || []));
+        localStorage.setItem(`sanfran_notes_${userId}`, JSON.stringify(data.notes || {}));
+        localStorage.setItem(`sanfran_correct_count_${userId}`, (data.correct_count || 0).toString());
+        localStorage.setItem(`sanfran_wrong_count_${userId}`, (data.wrong_count || 0).toString());
+      } else {
+        // Fallback to local storage if no DB data yet
+        const storedFavorites = localStorage.getItem(`sanfran_favorites_${userId}`);
+        if (storedFavorites) setFavorites(JSON.parse(storedFavorites));
+        
+        const storedWrong = localStorage.getItem(`sanfran_wrong_${userId}`);
+        if (storedWrong) setWrongQuestions(JSON.parse(storedWrong));
+        
+        const storedNotes = localStorage.getItem(`sanfran_notes_${userId}`);
+        if (storedNotes) setNotes(JSON.parse(storedNotes));
+
+        const storedCorrect = localStorage.getItem(`sanfran_correct_count_${userId}`);
+        if (storedCorrect) setCorrectCount(parseInt(storedCorrect));
+        
+        const storedWrongCount = localStorage.getItem(`sanfran_wrong_count_${userId}`);
+        if (storedWrongCount) setWrongCount(parseInt(storedWrongCount));
+      }
+    } catch (err) {
+      console.error('Failed to sync progress:', err);
+    }
+  };
+
+  const syncUserProgress = async (updates: any) => {
+    try {
+      // Get current state to ensure we don't overwrite with old data
+      const { data: current } = await supabase
+        .from('user_progress')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      const payload = {
+        user_id: userId,
+        favorites: updates.favorites !== undefined ? updates.favorites : (current?.favorites || favorites),
+        wrong_questions: updates.wrongQuestions !== undefined ? updates.wrongQuestions : (current?.wrong_questions || wrongQuestions),
+        notes: updates.notes !== undefined ? updates.notes : (current?.notes || notes),
+        correct_count: updates.correctCount !== undefined ? updates.correctCount : (current?.correct_count || correctCount),
+        wrong_count: updates.wrongCount !== undefined ? updates.wrongCount : (current?.wrong_count || wrongCount),
+        updated_at: new Date().toISOString()
+      };
+
+      const { error } = await supabase
+        .from('user_progress')
+        .upsert(payload, { onConflict: 'user_id' });
+
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error syncing to Supabase:', err);
+      // We don't show notification for background sync errors to avoid annoying the user
+      // but we keep local storage updated
+    }
+  };
+
+  const toggleFavorite = async (questionId: string) => {
     let newFavorites;
     if (favorites.includes(questionId)) {
       newFavorites = favorites.filter(id => id !== questionId);
@@ -127,6 +183,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
     }
     setFavorites(newFavorites);
     localStorage.setItem(`sanfran_favorites_${userId}`, JSON.stringify(newFavorites));
+    syncUserProgress({ favorites: newFavorites });
   };
 
   const fetchQuestions = async () => {
@@ -361,23 +418,27 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
       setCorrectCount(newCount);
       localStorage.setItem(`sanfran_correct_count_${userId}`, newCount.toString());
       
+      let newWrong = wrongQuestions;
       // If answered correctly, remove from wrong questions list if present
       if (wrongQuestions.includes(currentQuestion.id)) {
-        const newWrong = wrongQuestions.filter(id => id !== currentQuestion.id);
+        newWrong = wrongQuestions.filter(id => id !== currentQuestion.id);
         setWrongQuestions(newWrong);
         localStorage.setItem(`sanfran_wrong_${userId}`, JSON.stringify(newWrong));
       }
+      syncUserProgress({ correctCount: newCount, wrongQuestions: newWrong });
     } else {
       const newCount = wrongCount + 1;
       setWrongCount(newCount);
       localStorage.setItem(`sanfran_wrong_count_${userId}`, newCount.toString());
       
+      let newWrong = wrongQuestions;
       // If answered incorrectly, add to wrong questions list
       if (!wrongQuestions.includes(currentQuestion.id)) {
-        const newWrong = [...wrongQuestions, currentQuestion.id];
+        newWrong = [...wrongQuestions, currentQuestion.id];
         setWrongQuestions(newWrong);
         localStorage.setItem(`sanfran_wrong_${userId}`, JSON.stringify(newWrong));
       }
+      syncUserProgress({ wrongCount: newCount, wrongQuestions: newWrong });
     }
   };
 
@@ -390,6 +451,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
        const newNotes = { ...notes, [questionId]: noteText };
        setNotes(newNotes);
        localStorage.setItem(`sanfran_notes_${userId}`, JSON.stringify(newNotes));
+       syncUserProgress({ notes: newNotes });
        showNotification('Anotação salva com sucesso!', 'success');
     }
   };
@@ -400,6 +462,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
       setWrongCount(0);
       localStorage.removeItem(`sanfran_correct_count_${userId}`);
       localStorage.removeItem(`sanfran_wrong_count_${userId}`);
+      syncUserProgress({ correctCount: 0, wrongCount: 0 });
       showNotification('Estatísticas zeradas', 'success');
     }
   };
