@@ -702,7 +702,7 @@ const App: React.FC = () => {
                 {currentView === View.SanFranIdiomas && <SanFranIdiomas userId={session.user.id} />}
                 {currentView === View.LegalCinema && <LegalCinema userId={session.user.id} />}
                 {currentView === View.GeneralLanguages && <GeneralLanguages userId={session.user.id} />}
-                {currentView === View.LegalSimplifier && <LegalSimplifier />}
+                {currentView === View.LegalSimplifier && <LegalSimplifier userId={session.user.id} />}
                 {currentView === View.PronunciationLab && <PronunciationLab userId={session.user.id} />}
                 {currentView === View.LyricalVibes && <LyricalVibes userId={session.user.id} />}
                 {currentView === View.TheExchangeStudent && <TheExchangeStudent userId={session.user.id} />}

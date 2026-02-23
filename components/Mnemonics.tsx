@@ -15,11 +15,14 @@ import {
   Scroll,
   HelpCircle,
   Eye,
-  EyeOff
+  EyeOff,
+  Wand2,
+  Loader2
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { Mnemonic } from '../types';
 import confetti from 'canvas-confetti';
+import { generateMnemonic } from '../services/geminiService';
 
 interface MnemonicsProps {
   userId: string;
@@ -106,6 +109,10 @@ const Mnemonics: React.FC<MnemonicsProps> = ({ userId }) => {
   const [newDesc, setNewDesc] = useState('');
   // Simple expansion input: "L:Legalidade, I:Impessoalidade"
   const [expansionString, setExpansionString] = useState('');
+  
+  // AI Generation State
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [aiRequirements, setAiRequirements] = useState('');
 
   useEffect(() => {
     fetchMnemonics();
@@ -146,9 +153,28 @@ const Mnemonics: React.FC<MnemonicsProps> = ({ userId }) => {
       await supabase.from('mnemonics').insert(newMnemonic);
       setMnemonics(prev => [...prev, { ...newMnemonic, id: Math.random().toString() }]); // Optimistic
       setIsCreating(false);
-      setNewAcronym(''); setNewTitle(''); setExpansionString(''); setNewDesc('');
+      setNewAcronym(''); setNewTitle(''); setExpansionString(''); setNewDesc(''); setAiRequirements('');
     } catch (e) {
       alert("Erro ao salvar.");
+    }
+  };
+
+  const handleGenerateAI = async () => {
+    if (!aiRequirements.trim()) return;
+    setIsGenerating(true);
+    
+    try {
+      const generated = await generateMnemonic(aiRequirements);
+      setNewAcronym(generated.acronym);
+      setNewTitle(generated.title);
+      setNewDesc(generated.description);
+      
+      const expString = generated.expansion.map((e: any) => `${e.letter}:${e.meaning}`).join(', ');
+      setExpansionString(expString);
+    } catch (error) {
+      alert("Erro ao gerar mnemônico com IA.");
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -246,13 +272,41 @@ const Mnemonics: React.FC<MnemonicsProps> = ({ userId }) => {
 
             {/* Creation Form */}
             {isCreating && (
-               <div className="bg-slate-50 dark:bg-white/5 p-6 rounded-[2rem] border-2 border-dashed border-slate-200 dark:border-white/10 grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in">
-                  <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Título (ex: Princípios da Adm.)" className="p-3 rounded-xl bg-white dark:bg-black/20 text-xs font-bold border border-slate-200 dark:border-white/10" />
-                  <input value={newAcronym} onChange={e => setNewAcronym(e.target.value)} placeholder="Sigla (ex: LIMPE)" className="p-3 rounded-xl bg-white dark:bg-black/20 text-xs font-bold border border-slate-200 dark:border-white/10 uppercase" />
-                  <input value={expansionString} onChange={e => setExpansionString(e.target.value)} placeholder="Expansão (L:Legalidade, I:Impessoalidade...)" className="p-3 rounded-xl bg-white dark:bg-black/20 text-xs font-bold border border-slate-200 dark:border-white/10 md:col-span-2" />
-                  <div className="flex gap-2 md:col-span-2">
-                     <button onClick={() => setIsCreating(false)} className="flex-1 py-3 text-xs font-bold text-slate-500">Cancelar</button>
-                     <button onClick={handleCreate} className="flex-1 py-3 bg-amber-500 text-white rounded-xl text-xs font-bold shadow-lg">Criar Feitiço</button>
+               <div className="bg-slate-50 dark:bg-white/5 p-6 rounded-[2rem] border-2 border-dashed border-slate-200 dark:border-white/10 flex flex-col gap-6 animate-in fade-in">
+                  
+                  {/* AI Generation Section */}
+                  <div className="bg-amber-50 dark:bg-amber-900/10 p-4 rounded-2xl border border-amber-200 dark:border-amber-800/30 flex flex-col md:flex-row gap-4 items-center">
+                    <div className="flex-1 w-full">
+                      <label className="text-[10px] font-black uppercase text-amber-600 dark:text-amber-500 tracking-widest mb-2 flex items-center gap-2">
+                        <Wand2 size={14} /> Gerar com IA
+                      </label>
+                      <input 
+                        value={aiRequirements} 
+                        onChange={e => setAiRequirements(e.target.value)} 
+                        placeholder="Ex: Competência, Finalidade, Forma, Motivo, Objeto" 
+                        className="w-full p-3 rounded-xl bg-white dark:bg-black/20 text-xs font-bold border border-amber-200 dark:border-amber-800/50 outline-none focus:border-amber-500" 
+                      />
+                    </div>
+                    <button 
+                      onClick={handleGenerateAI}
+                      disabled={isGenerating || !aiRequirements}
+                      className="w-full md:w-auto mt-4 md:mt-6 px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
+                      {isGenerating ? 'Gerando...' : 'Criar Mnemônico'}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Título (ex: Princípios da Adm.)" className="p-3 rounded-xl bg-white dark:bg-black/20 text-xs font-bold border border-slate-200 dark:border-white/10" />
+                    <input value={newAcronym} onChange={e => setNewAcronym(e.target.value)} placeholder="Sigla (ex: LIMPE)" className="p-3 rounded-xl bg-white dark:bg-black/20 text-xs font-bold border border-slate-200 dark:border-white/10 uppercase" />
+                    <input value={expansionString} onChange={e => setExpansionString(e.target.value)} placeholder="Expansão (L:Legalidade, I:Impessoalidade...)" className="p-3 rounded-xl bg-white dark:bg-black/20 text-xs font-bold border border-slate-200 dark:border-white/10 md:col-span-2" />
+                    <input value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="Descrição ou frase engraçada (opcional)" className="p-3 rounded-xl bg-white dark:bg-black/20 text-xs font-bold border border-slate-200 dark:border-white/10 md:col-span-2" />
+                    
+                    <div className="flex gap-2 md:col-span-2 mt-2">
+                       <button onClick={() => setIsCreating(false)} className="flex-1 py-3 text-xs font-bold text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded-xl transition-colors">Cancelar</button>
+                       <button onClick={handleCreate} className="flex-1 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg hover:scale-[1.02] transition-transform">Salvar no Grimório</button>
+                    </div>
                   </div>
                </div>
             )}
