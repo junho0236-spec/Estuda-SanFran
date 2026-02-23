@@ -504,6 +504,25 @@ const App: React.FC = () => {
 
   const closeSidebar = () => setIsSidebarOpen(false);
 
+  const incrementCorrectQuestions = async () => {
+    const newCount = correctQuestionsCount + 1;
+    setCorrectQuestionsCount(newCount);
+    
+    if (isAuthenticated && session?.user) {
+      try {
+        await supabase
+          .from('user_progress')
+          .upsert({ 
+            user_id: session.user.id, 
+            correct_count: newCount,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'user_id' });
+      } catch (e) {
+        console.error("Erro ao sincronizar acertos:", e);
+      }
+    }
+  };
+
   if (!isAuthenticated) return <Login onLogin={() => setIsAuthenticated(true)} />;
 
   // ATUALIZAÇÃO DA NAV BAR - PROMOVENDO OS RAMOS ESSENCIAIS
@@ -769,7 +788,7 @@ const App: React.FC = () => {
                 {currentView === View.PronunciationLab && <PronunciationLab userId={session.user.id} />}
                 {currentView === View.LyricalVibes && <LyricalVibes userId={session.user.id} />}
                 {currentView === View.TheExchangeStudent && <TheExchangeStudent userId={session.user.id} />}
-                {currentView === View.QuestionBank && <QuestionBank userId={session.user.id} onCorrectAnswer={() => setCorrectQuestionsCount(prev => prev + 1)} />}
+                {currentView === View.QuestionBank && <QuestionBank userId={session.user.id} onCorrectAnswer={incrementCorrectQuestions} />}
                 {currentView === View.IntelligentSummarizer && <IntelligentSummarizer userId={session.user.id} />}
                 {currentView === View.VisualFlashcards && <VisualFlashcards userId={session.user.id} />}
                 {currentView === View.BilingualNews && <BilingualNews userId={session.user.id} />}
@@ -807,7 +826,7 @@ const App: React.FC = () => {
                     duel={activeDuel} 
                     userId={session.user.id} 
                     onFinished={() => { setActiveDuel(null); setCurrentView(View.Largo); }} 
-                    onCorrectAnswer={() => setCorrectQuestionsCount(prev => prev + 1)}
+                    onCorrectAnswer={incrementCorrectQuestions}
                   />
                 )}
                 
