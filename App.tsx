@@ -508,21 +508,23 @@ const App: React.FC = () => {
       {session?.user && <Scratchpad userId={session.user.id} isExtremeFocus={isExtremeFocus} />}
 
       {/* NOTIFICAÇÃO DE DUELO */}
-      {incomingDuel && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] w-full max-w-sm px-4 animate-in slide-in-from-top-10">
-           <div className="bg-white dark:bg-slate-900 rounded-[2rem] border-4 border-sanfran-rubi shadow-2xl p-6 flex flex-col items-center text-center">
-              <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-4 border-2 border-sanfran-rubi animate-pulse">
-                 <Sword className="text-sanfran-rubi w-8 h-8" />
-              </div>
-              <h4 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-1">Desafio Recebido!</h4>
-              <p className="text-xs text-slate-500 font-bold mb-6"><b>{incomingDuel.challenger_name}</b> convocou você para um Duelo de Jurisconsultos.</p>
-              <div className="grid grid-cols-2 gap-3 w-full">
-                 <button onClick={() => declineDuel(incomingDuel)} className="py-3 bg-slate-100 dark:bg-white/10 text-slate-500 rounded-xl font-black uppercase text-[10px] tracking-widest">Declinar</button>
-                 <button onClick={() => acceptDuel(incomingDuel)} className="py-3 bg-sanfran-rubi text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-red-900/20">Aceitar Lide</button>
-              </div>
-           </div>
-        </div>
-      )}
+      <div id="duel-notification-portal">
+        {incomingDuel && (
+          <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] w-full max-w-sm px-4 animate-in slide-in-from-top-10">
+             <div className="bg-white dark:bg-slate-900 rounded-[2rem] border-4 border-sanfran-rubi shadow-2xl p-6 flex flex-col items-center text-center">
+                <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-4 border-2 border-sanfran-rubi animate-pulse">
+                   <Sword className="text-sanfran-rubi w-8 h-8" />
+                </div>
+                <h4 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-1">Desafio Recebido!</h4>
+                <p className="text-xs text-slate-500 font-bold mb-6"><b>{incomingDuel.challenger_name}</b> convocou você para um Duelo de Jurisconsultos.</p>
+                <div className="grid grid-cols-2 gap-3 w-full">
+                   <button onClick={() => declineDuel(incomingDuel)} className="py-3 bg-slate-100 dark:bg-white/10 text-slate-500 rounded-xl font-black uppercase text-[10px] tracking-widest">Declinar</button>
+                   <button onClick={() => acceptDuel(incomingDuel)} className="py-3 bg-sanfran-rubi text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-red-900/20">Aceitar Lide</button>
+                </div>
+             </div>
+          </div>
+        )}
+      </div>
 
       {isSidebarOpen && !isExtremeFocus && (
         <div 

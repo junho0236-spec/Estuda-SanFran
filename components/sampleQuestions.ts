@@ -6,7 +6,9 @@ export const sampleQuestions = [
     options: ["As afirmativas I e II estão corretas", "As afirmativas I e II estão incorretas", "Apenas a afirmativa I está correta", "Apenas a afirmativa II está correta"],
     correct_answer: 0,
     explanation: "A afirmativa I apresenta uma definição precisa do Direito Administrativo. A afirmativa II apresenta uma definição abrangente da função administrativa.",
-    difficulty: "media"
+    difficulty: "media",
+    exam_board: "FGV",
+    year: 2023
   },
   {
     subject: "Direito Administrativo",
@@ -15,7 +17,9 @@ export const sampleQuestions = [
     options: ["Certo", "Errado"],
     correct_answer: 0,
     explanation: "De fato, tal escola conceitua o direito administrativo pela coerção e pelas prerrogativas inerentes aos atos de império.",
-    difficulty: "media"
+    difficulty: "media",
+    exam_board: "VUNESP",
+    year: 2022
   },
   {
     subject: "Direito Administrativo",
@@ -30,7 +34,9 @@ export const sampleQuestions = [
     ],
     correct_answer: 3,
     explanation: "O Direito Administrativo nasceu das Revoluções que acabaram com o velho regime absolutista que vinha da Idade Média (Estado Moderno).",
-    difficulty: "media"
+    difficulty: "media",
+    exam_board: "FCC",
+    year: 2021
   },
   {
     subject: "Direito Administrativo",
@@ -39,7 +45,9 @@ export const sampleQuestions = [
     options: ["Penal", "Privado", "Urbanístico", "Constitucional", "Administrativo"],
     correct_answer: 4,
     explanation: "Definição clássica de Hely Lopes Meirelles para o Direito Administrativo.",
-    difficulty: "facil"
+    difficulty: "facil",
+    exam_board: "CESPE",
+    year: 2024
   },
   {
     subject: "Direito Administrativo",

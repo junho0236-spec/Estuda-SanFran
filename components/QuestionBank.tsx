@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { sampleQuestions } from './sampleQuestions';
 import { GoogleGenAI, Type } from '@google/genai';
@@ -30,6 +30,8 @@ interface Question {
   correct_answer: number;
   explanation: string;
   difficulty: 'facil' | 'media' | 'dificil';
+  exam_board?: string;
+  year?: number;
 }
 
 interface QuestionBankProps {
@@ -46,25 +48,39 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
   // Filters
   const [subjects, setSubjects] = useState<string[]>([]);
   const [topics, setTopics] = useState<string[]>([]);
+  const [examBoards, setExamBoards] = useState<string[]>([]);
+  const [years, setYears] = useState<number[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [selectedTopic, setSelectedTopic] = useState<string>('');
+  const [selectedExamBoard, setSelectedExamBoard] = useState<string>('');
+  const [selectedYear, setSelectedYear] = useState<string>('');
   const [difficultyFilter, setDifficultyFilter] = useState<string>('');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'difficulty_asc' | 'difficulty_desc'>('newest');
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [wrongQuestions, setWrongQuestions] = useState<string[]>([]);
+  const [correctQuestions, setCorrectQuestions] = useState<string[]>([]);
   const [questionStatus, setQuestionStatus] = useState<'all' | 'resolved' | 'unresolved' | 'correct' | 'wrong'>('all');
   const [viewMode, setViewMode] = useState<'list' | 'single'>('list');
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const notificationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Stats
   const [correctCount, setCorrectCount] = useState(0);
 
   const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
+    if (notificationTimeoutRef.current) clearTimeout(notificationTimeoutRef.current);
     setNotification({ message, type });
-    setTimeout(() => setNotification(null), 3000);
+    notificationTimeoutRef.current = setTimeout(() => setNotification(null), 3000);
   };
+
+  useEffect(() => {
+    return () => {
+      if (notificationTimeoutRef.current) clearTimeout(notificationTimeoutRef.current);
+    };
+  }, []);
   const [wrongCount, setWrongCount] = useState(0);
 
   // Form for new question
@@ -84,7 +100,9 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
     options: ['', '', '', ''],
     correct_answer: 0,
     explanation: '',
-    difficulty: 'media'
+    difficulty: 'media',
+    exam_board: '',
+    year: new Date().getFullYear()
   });
 
   useEffect(() => {
@@ -108,6 +126,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
       if (data) {
         setFavorites(data.favorites || []);
         setWrongQuestions(data.wrong_questions || []);
+        setCorrectQuestions(data.correct_questions || []);
         setNotes(data.notes || {});
         setCorrectCount(data.correct_count || 0);
         setWrongCount(data.wrong_count || 0);
@@ -115,6 +134,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
         // Sync to local storage as backup
         localStorage.setItem(`sanfran_favorites_${userId}`, JSON.stringify(data.favorites || []));
         localStorage.setItem(`sanfran_wrong_${userId}`, JSON.stringify(data.wrong_questions || []));
+        localStorage.setItem(`sanfran_correct_${userId}`, JSON.stringify(data.correct_questions || []));
         localStorage.setItem(`sanfran_notes_${userId}`, JSON.stringify(data.notes || {}));
         localStorage.setItem(`sanfran_correct_count_${userId}`, (data.correct_count || 0).toString());
         localStorage.setItem(`sanfran_wrong_count_${userId}`, (data.wrong_count || 0).toString());
@@ -125,6 +145,9 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
         
         const storedWrong = localStorage.getItem(`sanfran_wrong_${userId}`);
         if (storedWrong) setWrongQuestions(JSON.parse(storedWrong));
+
+        const storedCorrectIds = localStorage.getItem(`sanfran_correct_${userId}`);
+        if (storedCorrectIds) setCorrectQuestions(JSON.parse(storedCorrectIds));
         
         const storedNotes = localStorage.getItem(`sanfran_notes_${userId}`);
         if (storedNotes) setNotes(JSON.parse(storedNotes));
@@ -153,6 +176,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
         user_id: userId,
         favorites: updates.favorites !== undefined ? updates.favorites : (current?.favorites || favorites),
         wrong_questions: updates.wrongQuestions !== undefined ? updates.wrongQuestions : (current?.wrong_questions || wrongQuestions),
+        correct_questions: updates.correctQuestions !== undefined ? updates.correctQuestions : (current?.correct_questions || correctQuestions),
         notes: updates.notes !== undefined ? updates.notes : (current?.notes || notes),
         correct_count: updates.correctCount !== undefined ? updates.correctCount : (current?.correct_count || correctCount),
         wrong_count: updates.wrongCount !== undefined ? updates.wrongCount : (current?.wrong_count || wrongCount),
@@ -210,6 +234,12 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
         
         const uniqueTopics = Array.from(new Set(data.map(q => q.topic))).filter(Boolean);
         setTopics(uniqueTopics);
+
+        const uniqueExamBoards = Array.from(new Set(data.map(q => q.exam_board))).filter(Boolean) as string[];
+        setExamBoards(uniqueExamBoards);
+
+        const uniqueYears = Array.from(new Set(data.map(q => q.year))).filter(Boolean) as number[];
+        setYears(uniqueYears.sort((a, b) => b - a));
       }
     } catch (error) {
       console.error('Error fetching questions:', error);
@@ -238,6 +268,12 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
         
         const newTopics = Array.from(new Set([...topics, ...data.map(q => q.topic)])).filter(Boolean);
         setTopics(newTopics);
+
+        const newExamBoards = Array.from(new Set([...examBoards, ...data.map(q => q.exam_board)])).filter(Boolean) as string[];
+        setExamBoards(newExamBoards);
+
+        const newYears = Array.from(new Set([...years, ...data.map(q => q.year)])).filter(Boolean) as number[];
+        setYears(newYears.sort((a, b) => b - a));
         
         setViewMode('list');
       }
@@ -280,7 +316,9 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
           options: ['', '', '', ''],
           correct_answer: 0,
           explanation: '',
-          difficulty: 'media'
+          difficulty: 'media',
+          exam_board: '',
+          year: new Date().getFullYear()
         });
         
         if (!subjects.includes(data.subject)) {
@@ -288,6 +326,12 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
         }
         if (data.topic && !topics.includes(data.topic)) {
           setTopics([...topics, data.topic]);
+        }
+        if (data.exam_board && !examBoards.includes(data.exam_board)) {
+          setExamBoards([...examBoards, data.exam_board]);
+        }
+        if (data.year && !years.includes(data.year)) {
+          setYears([...years, data.year].sort((a, b) => b - a));
         }
         
         setViewMode('list');
@@ -314,6 +358,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
       const prompt = `Crie ${aiConfig.count} questões de múltipla escolha de nível ${aiConfig.difficulty} sobre a matéria "${aiConfig.subject}" e tópico "${aiConfig.topic}".
       Cada questão deve ter 4 alternativas.
       A explicação deve ser detalhada, explicando por que a alternativa correta está certa e por que cada uma das outras alternativas está incorreta.
+      Inclua também uma banca fictícia ou real (ex: CESPE, FGV, FCC) e o ano atual.
       Retorne as questões no formato JSON.`;
 
       const response = await ai.models.generateContent({
@@ -336,9 +381,11 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
                 },
                 correct_answer: { type: Type.INTEGER, description: "O índice da alternativa correta (0 a 3)" },
                 explanation: { type: Type.STRING, description: "Explicação detalhada de cada alternativa" },
-                difficulty: { type: Type.STRING, description: "A dificuldade: 'facil', 'media' ou 'dificil'" }
+                difficulty: { type: Type.STRING, description: "A dificuldade: 'facil', 'media' ou 'dificil'" },
+                exam_board: { type: Type.STRING, description: "A banca examinadora (ex: FGV, CESPE)" },
+                year: { type: Type.INTEGER, description: "O ano da questão" }
               },
-              required: ["subject", "topic", "statement", "options", "correct_answer", "explanation", "difficulty"]
+              required: ["subject", "topic", "statement", "options", "correct_answer", "explanation", "difficulty", "exam_board", "year"]
             }
           }
         }
@@ -364,6 +411,12 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
           
           const newTopics = Array.from(new Set([...topics, ...data.map(q => q.topic)])).filter(Boolean);
           setTopics(newTopics);
+
+          const newExamBoards = Array.from(new Set([...examBoards, ...data.map(q => q.exam_board)])).filter(Boolean) as string[];
+          setExamBoards(newExamBoards);
+
+          const newYears = Array.from(new Set([...years, ...data.map(q => q.year)])).filter(Boolean) as number[];
+          setYears(newYears.sort((a, b) => b - a));
           
           setViewMode('list');
         }
@@ -389,19 +442,24 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
     const matchSubject = selectedSubject === '' || selectedSubject === 'Todos' || q.subject === selectedSubject;
     const matchTopic = selectedTopic === '' || selectedTopic === 'Todos' || q.topic === selectedTopic;
     const matchDifficulty = difficultyFilter === '' || difficultyFilter === 'Todos' || q.difficulty === difficultyFilter;
+    const matchExamBoard = selectedExamBoard === '' || selectedExamBoard === 'Todos' || q.exam_board === selectedExamBoard;
+    const matchYear = selectedYear === '' || selectedYear === 'Todos' || q.year?.toString() === selectedYear;
     
     let matchStatus = true;
     const isWrong = wrongQuestions.includes(q.id);
+    const isCorrect = correctQuestions.includes(q.id);
     
     if (questionStatus === 'wrong') {
       matchStatus = isWrong;
     } else if (questionStatus === 'correct') {
-      matchStatus = !isWrong; // Approximation
+      matchStatus = isCorrect;
     } else if (questionStatus === 'resolved') {
-      matchStatus = true; // Approximation
+      matchStatus = isWrong || isCorrect;
+    } else if (questionStatus === 'unresolved') {
+      matchStatus = !isWrong && !isCorrect;
     }
     
-    return matchSearch && matchSubject && matchTopic && matchDifficulty && matchStatus;
+    return matchSearch && matchSubject && matchTopic && matchDifficulty && matchExamBoard && matchYear && matchStatus;
   }).sort((a, b) => {
     if (sortBy === 'newest') return 0; // Already sorted by created_at desc from DB
     if (sortBy === 'oldest') return -1; // Reverse order
@@ -429,6 +487,13 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
       setCorrectCount(newCount);
       localStorage.setItem(`sanfran_correct_count_${userId}`, newCount.toString());
       
+      let newCorrect = [...correctQuestions];
+      if (!correctQuestions.includes(currentQuestion.id)) {
+        newCorrect.push(currentQuestion.id);
+        setCorrectQuestions(newCorrect);
+        localStorage.setItem(`sanfran_correct_${userId}`, JSON.stringify(newCorrect));
+      }
+
       let newWrong = wrongQuestions;
       // If answered correctly, remove from wrong questions list if present
       if (wrongQuestions.includes(currentQuestion.id)) {
@@ -436,16 +501,16 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
         setWrongQuestions(newWrong);
         localStorage.setItem(`sanfran_wrong_${userId}`, JSON.stringify(newWrong));
       }
-      syncUserProgress({ correctCount: newCount, wrongQuestions: newWrong });
+      syncUserProgress({ correctCount: newCount, wrongQuestions: newWrong, correctQuestions: newCorrect });
     } else {
       const newCount = wrongCount + 1;
       setWrongCount(newCount);
       localStorage.setItem(`sanfran_wrong_count_${userId}`, newCount.toString());
       
-      let newWrong = wrongQuestions;
+      let newWrong = [...wrongQuestions];
       // If answered incorrectly, add to wrong questions list
       if (!wrongQuestions.includes(currentQuestion.id)) {
-        newWrong = [...wrongQuestions, currentQuestion.id];
+        newWrong.push(currentQuestion.id);
         setWrongQuestions(newWrong);
         localStorage.setItem(`sanfran_wrong_${userId}`, JSON.stringify(newWrong));
       }
@@ -500,7 +565,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
     setSelectedOption(null);
     setShowExplanation(false);
     setViewMode('list');
-  }, [selectedSubject, selectedTopic, difficultyFilter, sortBy, showFavoritesOnly, showWrongOnly]);
+  }, [selectedSubject, selectedTopic, difficultyFilter, sortBy, searchTerm, selectedExamBoard, selectedYear, questionStatus]);
 
   if (loading) {
     return (
@@ -548,8 +613,9 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
         </div>
       </header>
 
-      {showAIGenerator && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div id="ai-generator-portal">
+        {showAIGenerator && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md animate-in zoom-in-95 duration-300">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -631,116 +697,140 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
           </div>
         </div>
       )}
+      </div>
 
-      {showAddForm ? (
-        <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-xl border border-slate-200 dark:border-slate-800">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Adicionar Nova Questão</h2>
-          
-          <form onSubmit={handleAddQuestion} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Matéria *</label>
-                <input
-                  type="text"
-                  required
-                  value={newQuestion.subject}
-                  onChange={e => setNewQuestion({...newQuestion, subject: e.target.value})}
-                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="Ex: Direito Civil"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Tópico</label>
-                <input
-                  type="text"
-                  value={newQuestion.topic}
-                  onChange={e => setNewQuestion({...newQuestion, topic: e.target.value})}
-                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="Ex: Contratos"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Enunciado *</label>
-              <textarea
-                required
-                rows={4}
-                value={newQuestion.statement}
-                onChange={e => setNewQuestion({...newQuestion, statement: e.target.value})}
-                className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
-                placeholder="Digite o enunciado da questão..."
-              />
-            </div>
-
-            <div className="space-y-4">
-              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">Alternativas *</label>
-              {newQuestion.options?.map((opt, idx) => (
-                <div key={idx} className="flex items-center gap-3">
-                  <input
-                    type="radio"
-                    name="correct_answer"
-                    checked={newQuestion.correct_answer === idx}
-                    onChange={() => setNewQuestion({...newQuestion, correct_answer: idx})}
-                    className="w-5 h-5 text-blue-600"
-                  />
+      <div id="add-form-portal">
+        {showAddForm ? (
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-xl border border-slate-200 dark:border-slate-800">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Adicionar Nova Questão</h2>
+            
+            <form onSubmit={handleAddQuestion} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Matéria *</label>
                   <input
                     type="text"
                     required
-                    value={opt}
-                    onChange={e => handleOptionChange(idx, e.target.value)}
-                    className="flex-1 p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
-                    placeholder={`Alternativa ${String.fromCharCode(65 + idx)}`}
+                    value={newQuestion.subject}
+                    onChange={e => setNewQuestion({...newQuestion, subject: e.target.value})}
+                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="Ex: Direito Civil"
                   />
                 </div>
-              ))}
-              <p className="text-xs text-slate-500">Selecione o botão ao lado da alternativa correta.</p>
-            </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Tópico</label>
+                  <input
+                    type="text"
+                    value={newQuestion.topic}
+                    onChange={e => setNewQuestion({...newQuestion, topic: e.target.value})}
+                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="Ex: Contratos"
+                  />
+                </div>
+              </div>
 
-            <div>
-              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Explicação (Opcional)</label>
-              <textarea
-                rows={3}
-                value={newQuestion.explanation}
-                onChange={e => setNewQuestion({...newQuestion, explanation: e.target.value})}
-                className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
-                placeholder="Explique por que a alternativa está correta..."
-              />
-            </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Enunciado *</label>
+                <textarea
+                  required
+                  rows={4}
+                  value={newQuestion.statement}
+                  onChange={e => setNewQuestion({...newQuestion, statement: e.target.value})}
+                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                  placeholder="Digite o enunciado da questão..."
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Dificuldade</label>
-              <select
-                value={newQuestion.difficulty}
-                onChange={e => setNewQuestion({...newQuestion, difficulty: e.target.value as any})}
-                className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
-              >
-                <option value="facil">Fácil</option>
-                <option value="media">Média</option>
-                <option value="dificil">Difícil</option>
-              </select>
-            </div>
+              <div className="space-y-4">
+                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">Alternativas *</label>
+                {newQuestion.options?.map((opt, idx) => (
+                  <div key={idx} className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      name="correct_answer"
+                      checked={newQuestion.correct_answer === idx}
+                      onChange={() => setNewQuestion({...newQuestion, correct_answer: idx})}
+                      className="w-5 h-5 text-blue-600"
+                    />
+                    <input
+                      type="text"
+                      required
+                      value={opt}
+                      onChange={e => handleOptionChange(idx, e.target.value)}
+                      className="flex-1 p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
+                      placeholder={`Alternativa ${String.fromCharCode(65 + idx)}`}
+                    />
+                  </div>
+                ))}
+                <p className="text-xs text-slate-500">Selecione o botão ao lado da alternativa correta.</p>
+              </div>
 
-            <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" /> Salvando...
-                  </>
-                ) : (
-                  'Salvar Questão'
-                )}
-              </button>
-            </div>
-          </form>
-        </div>
-      ) : (
-        <>
-          {/* Filters & Stats */}
+              <div>
+                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Explicação (Opcional)</label>
+                <textarea
+                  rows={3}
+                  value={newQuestion.explanation}
+                  onChange={e => setNewQuestion({...newQuestion, explanation: e.target.value})}
+                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                  placeholder="Explique por que a alternativa está correta..."
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Banca (Opcional)</label>
+                  <input
+                    type="text"
+                    value={newQuestion.exam_board}
+                    onChange={e => setNewQuestion({...newQuestion, exam_board: e.target.value})}
+                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="Ex: FGV, CESPE"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Ano (Opcional)</label>
+                  <input
+                    type="number"
+                    value={newQuestion.year}
+                    onChange={e => setNewQuestion({...newQuestion, year: parseInt(e.target.value) || new Date().getFullYear()})}
+                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="Ex: 2024"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Dificuldade</label>
+                  <select
+                    value={newQuestion.difficulty}
+                    onChange={e => setNewQuestion({...newQuestion, difficulty: e.target.value as any})}
+                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
+                  >
+                    <option value="facil">Fácil</option>
+                    <option value="media">Média</option>
+                    <option value="dificil">Difícil</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" /> Salvando...
+                    </>
+                  ) : (
+                    'Salvar Questão'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : (
+          <>
+            {/* Filters & Stats */}
           <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 mb-6 overflow-hidden">
             <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <div className="flex-1 relative">
@@ -760,7 +850,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
             </div>
             
             <div className="p-4 bg-slate-50 dark:bg-slate-800/50">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
                 <select
                   value={selectedSubject}
                   onChange={(e) => setSelectedSubject(e.target.value)}
@@ -780,6 +870,28 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
                   <option value="">Assunto</option>
                   {topics.map(t => (
                     <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={selectedExamBoard}
+                  onChange={(e) => setSelectedExamBoard(e.target.value)}
+                  className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
+                >
+                  <option value="">Banca</option>
+                  {examBoards.map(b => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                  className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
+                >
+                  <option value="">Ano</option>
+                  {years.map(y => (
+                    <option key={y} value={y.toString()}>{y}</option>
                   ))}
                 </select>
 
@@ -848,8 +960,9 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
           </div>
 
           {/* Question Area */}
-          {filteredQuestions.length > 0 && currentQuestion ? (
-            viewMode === 'list' ? (
+          <div key="question-area-container">
+            {filteredQuestions.length > 0 && currentQuestion ? (
+              viewMode === 'list' ? (
               <div className="grid grid-cols-1 gap-4">
                 {filteredQuestions.map((q, idx) => (
                   <div 
@@ -866,7 +979,8 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
                     </div>
                     
                     <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex gap-4 text-xs font-medium text-slate-500">
-                      <span>Ano: <span className="text-slate-900 dark:text-white">2024</span></span>
+                      <span>Ano: <span className="text-slate-900 dark:text-white">{q.year || 'N/A'}</span></span>
+                      <span>Banca: <span className="text-slate-900 dark:text-white">{q.exam_board || 'N/A'}</span></span>
                       <span>Dificuldade: <span className="text-slate-900 dark:text-white capitalize">{q.difficulty}</span></span>
                     </div>
                     
@@ -903,14 +1017,20 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
               {/* Question Header */}
               <div className="bg-slate-50 dark:bg-slate-800/50 p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
                 <div>
-                  <span className="inline-block px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold uppercase tracking-wider mb-2">
-                    {currentQuestion.subject}
-                  </span>
-                  {currentQuestion.topic && (
-                    <span className="inline-block ml-2 px-3 py-1 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-full text-xs font-bold uppercase tracking-wider mb-2">
-                      {currentQuestion.topic}
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    <span className="inline-block px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold uppercase tracking-wider">
+                      {currentQuestion.subject}
                     </span>
-                  )}
+                    {currentQuestion.topic && (
+                      <span className="inline-block px-3 py-1 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-full text-xs font-bold uppercase tracking-wider">
+                        {currentQuestion.topic}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-4 text-xs font-medium text-slate-500">
+                    <span>Ano: <span className="text-slate-900 dark:text-white">{currentQuestion.year || 'N/A'}</span></span>
+                    <span>Banca: <span className="text-slate-900 dark:text-white">{currentQuestion.exam_board || 'N/A'}</span></span>
+                  </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <button
@@ -1070,16 +1190,21 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
               )}
             </div>
           )}
-        </>
-      )}
-      {notification && (
-        <div className={`fixed bottom-6 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 z-50 animate-in slide-in-from-bottom-5 fade-in duration-300 ${
-          notification.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-        }`}>
-          {notification.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
-          <span className="font-bold text-sm">{notification.message}</span>
-        </div>
-      )}
+          </div>
+          </>
+        )}
+      </div>
+
+      <div id="notification-portal">
+        {notification && (
+          <div className={`fixed bottom-6 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 z-50 animate-in slide-in-from-bottom-5 fade-in duration-300 ${
+            notification.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+          }`}>
+            {notification.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
+            <span className="font-bold text-sm">{notification.message}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
