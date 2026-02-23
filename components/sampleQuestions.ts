@@ -1,8 +1,3 @@
-import { pdfQuestions } from './pdfQuestions';
-import { pdfQuestions2 } from './pdfQuestions2';
-import { pdfQuestions3 } from './pdfQuestions3';
-import { pdfQuestions4 } from './pdfQuestions4';
-
 export const sampleQuestions = [
   {
     subject: "Direito Administrativo",
@@ -124,9 +119,5 @@ export const sampleQuestions = [
     correct_answer: 1,
     explanation: "O Direito Administrativo se relaciona com diversos outros ramos, especialmente o Constitucional.",
     difficulty: "media"
-  },
-  ...pdfQuestions,
-  ...pdfQuestions2,
-  ...pdfQuestions3,
-  ...pdfQuestions4
+  }
 ];

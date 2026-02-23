@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabaseClient';
-import { Question, UserProgress } from '../types';
 import { sampleQuestions } from './sampleQuestions';
 import { GoogleGenAI, Type } from '@google/genai';
 import { 
@@ -21,6 +20,19 @@ import {
   X,
   RotateCcw
 } from 'lucide-react';
+
+interface Question {
+  id: string;
+  subject: string;
+  topic: string;
+  statement: string;
+  options: string[];
+  correct_answer: number;
+  explanation: string;
+  difficulty: 'facil' | 'media' | 'dificil';
+  exam_board?: string;
+  year?: number;
+}
 
 interface QuestionBankProps {
   userId: string;
@@ -206,59 +218,34 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
         .order('created_at', { ascending: false });
 
       if (error) {
-        // If table doesn't exist yet, we'll use samples
+        // If table doesn't exist yet, we'll just use empty array
         if (error.code === '42P01') {
-          console.log('Table questions does not exist yet, using samples');
-          const questionsWithIds = sampleQuestions.map((q, i) => ({
-            ...q,
-            id: (q as any).id || `sample-${i}`
-          })) as Question[];
-          setQuestions(questionsWithIds);
-          updateFilters(questionsWithIds);
+          console.log('Table questions does not exist yet');
+          setQuestions([]);
         } else {
           throw error;
         }
       } else if (data) {
-        if (data.length === 0) {
-          // Fallback to samples if DB is empty
-          const questionsWithIds = sampleQuestions.map((q, i) => ({
-            ...q,
-            id: (q as any).id || `sample-${i}`
-          })) as Question[];
-          setQuestions(questionsWithIds);
-          updateFilters(questionsWithIds);
-        } else {
-          setQuestions(data);
-          updateFilters(data);
-        }
+        setQuestions(data);
+        
+        // Extract unique subjects and topics
+        const uniqueSubjects = Array.from(new Set(data.map(q => q.subject))).filter(Boolean);
+        setSubjects(uniqueSubjects);
+        
+        const uniqueTopics = Array.from(new Set(data.map(q => q.topic))).filter(Boolean);
+        setTopics(uniqueTopics);
+
+        const uniqueExamBoards = Array.from(new Set(data.map(q => q.exam_board))).filter(Boolean) as string[];
+        setExamBoards(uniqueExamBoards);
+
+        const uniqueYears = Array.from(new Set(data.map(q => q.year))).filter(Boolean) as number[];
+        setYears(uniqueYears.sort((a, b) => b - a));
       }
     } catch (error) {
       console.error('Error fetching questions:', error);
-      // Final fallback
-      const questionsWithIds = sampleQuestions.map((q, i) => ({
-        ...q,
-        id: (q as any).id || `sample-${i}`
-      })) as Question[];
-      setQuestions(questionsWithIds);
-      updateFilters(questionsWithIds);
     } finally {
       setLoading(false);
     }
-  };
-
-  const updateFilters = (data: Question[]) => {
-    // Extract unique subjects and topics
-    const uniqueSubjects = Array.from(new Set(data.map(q => q.subject))).filter(Boolean);
-    setSubjects(uniqueSubjects);
-    
-    const uniqueTopics = Array.from(new Set(data.map(q => q.topic))).filter(Boolean);
-    setTopics(uniqueTopics);
-
-    const uniqueExamBoards = Array.from(new Set(data.map(q => q.exam_board))).filter(Boolean) as string[];
-    setExamBoards(uniqueExamBoards);
-
-    const uniqueYears = Array.from(new Set(data.map(q => q.year))).filter(Boolean) as number[];
-    setYears(uniqueYears.sort((a, b) => b - a));
   };
 
   const handleImportSamples = async () => {
@@ -603,12 +590,14 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId }) => {
         </div>
         
         <div className="flex gap-2">
-          <button
+          {questions.length === 0 && (
+            <button
               onClick={handleImportSamples}
               className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-sm transition-colors"
             >
               <Download size={16} /> Importar Exemplos
             </button>
+          )}
           <button
             onClick={() => setShowAIGenerator(true)}
             className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition-colors"
