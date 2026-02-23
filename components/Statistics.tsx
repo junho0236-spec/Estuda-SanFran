@@ -279,13 +279,7 @@ const Statistics: React.FC<StatisticsProps> = ({
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               {chartView === 'weekly' ? (
-                <AreaChart data={trendData}>
-                  <defs>
-                    <linearGradient id="colorMinutes" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#9B111E" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#9B111E" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
+                <BarChart data={trendData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
                   <XAxis 
                     dataKey="day" 
@@ -300,6 +294,7 @@ const Statistics: React.FC<StatisticsProps> = ({
                     tick={{fontSize: 10, fontWeight: 900, fill: '#94a3b8'}}
                   />
                   <Tooltip 
+                    cursor={{fill: 'rgba(155, 17, 30, 0.05)'}}
                     contentStyle={{ 
                       backgroundColor: '#fff', 
                       borderRadius: '12px', 
@@ -309,15 +304,8 @@ const Statistics: React.FC<StatisticsProps> = ({
                       fontWeight: 'bold'
                     }}
                   />
-                  <Area 
-                    type="monotone" 
-                    dataKey="minutes" 
-                    stroke="#9B111E" 
-                    strokeWidth={3}
-                    fillOpacity={1} 
-                    fill="url(#colorMinutes)" 
-                  />
-                </AreaChart>
+                  <Bar dataKey="minutes" fill="#9B111E" radius={[8, 8, 0, 0]} barSize={chartDays === 30 ? 15 : 40} />
+                </BarChart>
               ) : (
                 <BarChart data={last4Weeks}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
@@ -396,6 +384,53 @@ const Statistics: React.FC<StatisticsProps> = ({
                 <p className="text-[9px] font-bold text-slate-400 italic text-center mt-2">... e mais {sessionsBySubject.length - 5} matérias</p>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* NEW: Weekly Study Time Bar Chart */}
+        <div className="bg-white dark:bg-sanfran-rubiDark/20 p-8 rounded-[2rem] border border-slate-200 dark:border-sanfran-rubi/20 shadow-xl lg:col-span-2">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3">
+              <BarChart3 className="text-blue-500 w-5 h-5" />
+              <h3 className="text-lg font-black uppercase tracking-tight text-slate-900 dark:text-white">Tempo de Estudo Diário (Minutos)</h3>
+            </div>
+            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Detalhamento Semanal</span>
+          </div>
+          
+          <div className="h-[250px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={trendData.slice(-7)}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
+                <XAxis 
+                  dataKey="day" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{fontSize: 10, fontWeight: 900, fill: '#94a3b8'}}
+                  dy={10}
+                />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{fontSize: 10, fontWeight: 900, fill: '#94a3b8'}}
+                />
+                <Tooltip 
+                  cursor={{fill: 'rgba(59, 130, 246, 0.05)'}}
+                  contentStyle={{ 
+                    backgroundColor: '#fff', 
+                    borderRadius: '12px', 
+                    border: 'none', 
+                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                    fontSize: '12px',
+                    fontWeight: 'bold'
+                  }}
+                />
+                <Bar dataKey="minutes" fill="#3b82f6" radius={[6, 6, 0, 0]} barSize={30}>
+                  {trendData.slice(-7).map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.minutes > 60 ? '#3b82f6' : '#94a3b8'} opacity={0.8} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
