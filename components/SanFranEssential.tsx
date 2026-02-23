@@ -19,7 +19,8 @@ import {
   Hourglass,
   Eye,
   Key,
-  CalendarCheck
+  CalendarCheck,
+  Calculator as CalculatorIcon
 } from 'lucide-react';
 import { View } from '../types';
 

@@ -21,7 +21,7 @@ import {
   Archive
 } from 'lucide-react';
 import { Task, Subject, TaskPriority, TaskCategory } from '../types';
-import { supabase } from '../services/supabaseClient';
+import { dataService } from '../services/dataService';
 import { getBrasiliaDate, getBrasiliaISOString } from '../App';
 import { updateQuestProgress } from '../services/questService';
 
@@ -30,9 +30,10 @@ interface TasksProps {
   tasks: Task[];
   setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
   userId: string;
+  isOnline: boolean;
 }
 
-const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
+const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId, isOnline }) => {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
   const [selectedPriority, setSelectedPriority] = useState<TaskPriority>('normal');
@@ -54,22 +55,6 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
     const now = getBrasiliaISOString();
     
     try {
-      const dbPayload = {
-        id: newId,
-        user_id: userId,
-        title: newTaskTitle,
-        completed: false,
-        subject_id: selectedSubjectId || null,
-        due_date: today,
-        priority: selectedPriority,
-        category: selectedCategory,
-        created_at: now,
-        archived_at: null
-      };
-
-      const { error } = await supabase.from('tasks').insert(dbPayload);
-      if (error) throw error;
-
       const newTask: Task = {
         id: newId,
         title: newTaskTitle,
@@ -80,6 +65,8 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
         category: selectedCategory,
         archived_at: null
       };
+
+      await dataService.saveTask(newTask, userId, isOnline);
       
       setTasks(prev => [newTask, ...prev]);
       setNewTaskTitle('');
@@ -94,29 +81,21 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
     const isNowCompleted = !task.completed;
     const completionTimestamp = isNowCompleted ? getBrasiliaISOString() : null;
 
-    setTasks(prev => prev.map(t => t.id === task.id ? { 
-      ...t, 
+    const updatedTask = { 
+      ...task, 
       completed: isNowCompleted, 
       completedAt: completionTimestamp || undefined 
-    } : t));
+    };
+
+    setTasks(prev => prev.map(t => t.id === task.id ? updatedTask : t));
 
     try {
-      const { error } = await supabase
-        .from('tasks')
-        .update({ 
-          completed: isNowCompleted,
-          completed_at: completionTimestamp 
-        })
-        .eq('id', task.id)
-        .eq('user_id', userId);
+      await dataService.saveTask(updatedTask, userId, isOnline);
       
-      if (error) throw error;
-
       // UPDATE QUEST
       if (isNowCompleted) {
         await updateQuestProgress(userId, 'complete_task', 1);
       }
-
     } catch (err) {
       console.error("Erro na sentença:", err);
       setTasks(prev => prev.map(t => t.id === task.id ? task : t));
@@ -125,15 +104,8 @@ const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId }) => {
 
   const archiveTask = async (id: string) => {
     // Soft Delete (Arquivar)
-    const now = new Date().toISOString();
     try {
-      const { error } = await supabase
-        .from('tasks')
-        .update({ archived_at: now })
-        .eq('id', id)
-        .eq('user_id', userId);
-      
-      if (error) throw error;
+      await dataService.deleteTask(id, userId, isOnline);
       // Remove da visualização atual, mas não deleta
       setTasks(prev => prev.filter(t => t.id !== id));
     } catch (err) {

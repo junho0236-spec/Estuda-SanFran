@@ -6,6 +6,8 @@ import Login from './components/Login';
 import Atmosphere from './components/Atmosphere';
 import Scratchpad from './components/Scratchpad';
 import { supabase } from './services/supabaseClient';
+import { db } from './services/offlineService';
+import { dataService } from './services/dataService';
 
 // Lazy Load dos Componentes para Performance (Code Splitting)
 const Dashboard = React.lazy(() => import('./components/Dashboard'));
@@ -160,6 +162,8 @@ const BrasiliaClock: React.FC = () => {
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>(View.Dashboard);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [session, setSession] = useState<any>(null);
   const [presenceUsers, setPresenceUsers] = useState<PresenceUser[]>([]);
@@ -321,21 +325,8 @@ const App: React.FC = () => {
       start_time: brDate
     };
 
-    try {
-      const { error } = await supabase.from('study_sessions').insert({
-        id: newSession.id,
-        user_id: session.user.id,
-        duration: Number(duration),
-        subject_id: timerSelectedSubjectId || null,
-        reading_id: timerSelectedReadingId || null,
-        start_time: brDate
-      });
-      if (error) throw error;
-      setStudySessions(prev => [newSession, ...prev]);
-    } catch (e) {
-      console.error("Erro ao salvar sessão:", e);
-      setStudySessions(prev => [newSession, ...prev]);
-    }
+    await dataService.saveStudySession(newSession, session.user.id, isOnline);
+    setStudySessions(prev => [newSession, ...prev]);
   };
 
   const formatTime = (seconds: number) => {
@@ -384,49 +375,102 @@ const App: React.FC = () => {
     }
   }, [isAuthenticated, session]);
 
-  const loadUserData = async () => {
-    const userId = session.user.id;
-    try {
-      const [resSubs, resFlds, resCards, resTks, resSessions, resReadings] = await Promise.all([
-        supabase.from('subjects').select('*').eq('user_id', userId),
-        supabase.from('folders').select('*').eq('user_id', userId),
-        // Filter out archived items initially for performance in main views
-        supabase.from('flashcards').select('*').eq('user_id', userId).is('archived_at', null),
-        supabase.from('tasks').select('*').eq('user_id', userId).is('archived_at', null).order('created_at', { ascending: false }),
-        supabase.from('study_sessions').select('*').eq('user_id', userId).order('start_time', { ascending: false }),
-        supabase.from('readings').select('*').eq('user_id', userId).order('created_at', { ascending: false })
-      ]);
-      if (resSubs.data) setSubjects(resSubs.data);
-      if (resFlds.data) setFolders(resFlds.data.map(f => ({ id: f.id, name: f.name, parentId: f.parent_id })));
-      if (resCards.data) setFlashcards(resCards.data.map(c => ({
-        id: c.id, front: c.front, back: c.back, subjectId: c.subject_id, folderId: c.folder_id, nextReview: c.next_review, interval: c.interval, archived_at: c.archived_at
-      })));
-      if (resTks.data) setTasks(resTks.data.map(t => ({
-        id: t.id, title: t.title, completed: t.completed, subjectId: t.subject_id, dueDate: t.due_date, completedAt: t.completed_at,
-        priority: t.priority || 'normal', category: t.category || 'geral', archived_at: t.archived_at
-      })));
-      
-      if (resSessions.data) {
-        let sessions = resSessions.data;
-        // Mock de 1500h para o usuário TESTE ACADÊMICO
-        if (session.user?.user_metadata?.full_name === 'TESTE ACADÊMICO') {
-          sessions = [
-            ...sessions, 
-            {
-              id: 'mock-1500-hours',
-              user_id: userId,
-              duration: 1500 * 3600, // 1500 horas convertidas para segundos
-              subject_id: 'mock-subject',
-              start_time: new Date().toISOString()
-            }
-          ];
-        }
-        setStudySessions(sessions);
-      }
+  // --- Offline & Sync Logic ---
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
 
-      if (resReadings.data) setReadings(resReadings.data);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isOnline && isAuthenticated && session?.user) {
+      handleSync();
+    }
+  }, [isOnline, isAuthenticated, session]);
+
+  const handleSync = async () => {
+    if (!session?.user) return;
+    setIsSyncing(true);
+    try {
+      await dataService.syncOfflineData(session.user.id);
+      await loadUserData();
     } catch (err) {
-      console.error("Erro crítico no carregamento do protocolo acadêmico:", err);
+      console.error("Sync failed:", err);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const loadUserData = async () => {
+    if (!session?.user) return;
+    const userId = session.user.id;
+    
+    try {
+      if (isOnline) {
+        const [resSubs, resFlds, resCards, resTks, resSessions, resReadings] = await Promise.all([
+          supabase.from('subjects').select('*').eq('user_id', userId),
+          supabase.from('folders').select('*').eq('user_id', userId),
+          supabase.from('flashcards').select('*').eq('user_id', userId).is('archived_at', null),
+          supabase.from('tasks').select('*').eq('user_id', userId).is('archived_at', null).order('created_at', { ascending: false }),
+          supabase.from('study_sessions').select('*').eq('user_id', userId).order('start_time', { ascending: false }),
+          supabase.from('readings').select('*').eq('user_id', userId).order('created_at', { ascending: false })
+        ]);
+
+        if (resSubs.data) setSubjects(resSubs.data);
+        if (resFlds.data) setFolders(resFlds.data.map(f => ({ id: f.id, name: f.name, parentId: f.parent_id })));
+        
+        if (resCards.data) {
+          const formattedCards = resCards.data.map(c => ({
+            id: c.id, front: c.front, back: c.back, subjectId: c.subject_id, folderId: c.folder_id, nextReview: c.next_review, interval: c.interval, archived_at: c.archived_at
+          }));
+          setFlashcards(formattedCards);
+          await db.flashcards.bulkPut(formattedCards);
+        }
+
+        if (resTks.data) {
+          const formattedTasks = resTks.data.map(t => ({
+            id: t.id, title: t.title, completed: t.completed, subjectId: t.subject_id, dueDate: t.due_date, completedAt: t.completed_at,
+            priority: t.priority || 'normal', category: t.category || 'geral', archived_at: t.archived_at
+          }));
+          setTasks(formattedTasks);
+          await db.tasks.bulkPut(formattedTasks);
+        }
+        
+        if (resSessions.data) {
+          setStudySessions(resSessions.data);
+          await db.study_sessions.bulkPut(resSessions.data);
+        }
+
+        if (resReadings.data) setReadings(resReadings.data);
+      } else {
+        // Offline mode: Load from local DB
+        const [localCards, localTasks, localSessions] = await Promise.all([
+          db.flashcards.toArray(),
+          db.tasks.toArray(),
+          db.study_sessions.toArray()
+        ]);
+        setFlashcards(localCards);
+        setTasks(localTasks);
+        setStudySessions(localSessions);
+      }
+    } catch (err) {
+      console.error("Erro no carregamento dos dados:", err);
+      // Fallback to local DB
+      const [localCards, localTasks, localSessions] = await Promise.all([
+        db.flashcards.toArray(),
+        db.tasks.toArray(),
+        db.study_sessions.toArray()
+      ]);
+      setFlashcards(localCards);
+      setTasks(localTasks);
+      setStudySessions(localSessions);
     }
   };
 
@@ -642,6 +686,19 @@ const App: React.FC = () => {
         </header>
 
         <main className={`flex-1 overflow-y-auto ${isExtremeFocus ? 'p-0' : 'p-4 md:p-10'} relative transition-all duration-700`}>
+          {/* Offline Indicator */}
+          {!isOnline && (
+            <div className="fixed top-4 right-4 z-50 bg-amber-500 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2 animate-bounce">
+              <Zap size={16} fill="currentColor" />
+              <span className="text-[10px] font-black uppercase tracking-widest">Modo Offline Ativo</span>
+            </div>
+          )}
+          {isSyncing && (
+            <div className="fixed top-4 right-4 z-50 bg-blue-500 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
+              <div className="animate-spin w-3 h-3 border-2 border-white/30 border-t-white rounded-full"></div>
+              <span className="text-[10px] font-black uppercase tracking-widest">Sincronizando...</span>
+            </div>
+          )}
           <div className={`${isExtremeFocus ? 'max-w-none h-full flex items-center justify-center' : 'max-w-6xl mx-auto h-full'}`}>
              <Suspense fallback={<PageLoader />}>
                 {currentView === View.Dashboard && (
@@ -680,7 +737,7 @@ const App: React.FC = () => {
                 {currentView === View.Editais && <Editais userId={session.user.id} />}
                 {currentView === View.Timeline && <TimelineBuilder />}
                 {currentView === View.DeadArchive && <DeadArchive userId={session.user.id} />}
-                {currentView === View.Anki && <Anki subjects={subjects} flashcards={flashcards} setFlashcards={setFlashcards} folders={folders} setFolders={setFolders} userId={session.user.id} />}
+                {currentView === View.Anki && <Anki subjects={subjects} flashcards={flashcards} setFlashcards={setFlashcards} folders={folders} setFolders={setFolders} userId={session.user.id} isOnline={isOnline} />}
                 {currentView === View.Library && <Library readings={readings} setReadings={setReadings} subjects={subjects} userId={session.user.id} />}
                 {currentView === View.Largo && <Largo presenceUsers={presenceUsers} currentUserId={session.user.id} />}
                 {currentView === View.Mural && <Mural userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
@@ -784,7 +841,7 @@ const App: React.FC = () => {
                 {currentView === View.Calendar && <CalendarView subjects={subjects} tasks={tasks} userId={session.user.id} studySessions={studySessions} />}
                 {currentView === View.Ranking && <Ranking userId={session.user.id} session={session} />}
                 {currentView === View.Subjects && <Subjects subjects={subjects} setSubjects={setSubjects} userId={session.user.id} />}
-                {currentView === View.Tasks && <Tasks subjects={subjects} tasks={tasks} setTasks={setTasks} userId={session.user.id} />}
+                {currentView === View.Tasks && <Tasks subjects={subjects} tasks={tasks} setTasks={setTasks} userId={session.user.id} isOnline={isOnline} />}
              </Suspense>
           </div>
         </main>

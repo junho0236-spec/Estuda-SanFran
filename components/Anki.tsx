@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Flashcard, Subject, Folder } from '../types';
 import { supabase } from '../services/supabaseClient';
+import { dataService } from '../services/dataService';
 import { updateQuestProgress } from '../services/questService';
 import { generateFlashcards } from '../services/geminiService';
 
@@ -29,9 +30,10 @@ interface AnkiProps {
   folders: Folder[];
   setFolders: React.Dispatch<React.SetStateAction<Folder[]>>;
   userId: string;
+  isOnline: boolean;
 }
 
-const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folders, setFolders, userId }) => {
+const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folders, setFolders, userId, isOnline }) => {
   const [mode, setMode] = useState<'browse' | 'study' | 'create' | 'bulk' | 'ai_create'>('browse');
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(subjects[0]?.id || '');
@@ -91,15 +93,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
     try {
       const idsToArchive = Array.from(selectedCardIds);
-      const now = new Date().toISOString();
-      const { error } = await supabase
-        .from('flashcards')
-        .update({ archived_at: now })
-        .in('id', idsToArchive)
-        .eq('user_id', userId);
+      await Promise.all(idsToArchive.map(id => dataService.deleteFlashcard(id, userId, isOnline)));
       
-      if (error) throw error;
-
       // Update local state by removing archived cards from active view
       setFlashcards(prev => prev.filter(f => !selectedCardIds.has(f.id)));
       setSelectedCardIds(new Set());
@@ -113,14 +108,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     e.stopPropagation();
     // if (!confirm("Arquivar este card?")) return; // Optional confirmation
     try {
-      const now = new Date().toISOString();
-      const { error } = await supabase
-        .from('flashcards')
-        .update({ archived_at: now })
-        .eq('id', id)
-        .eq('user_id', userId);
-      
-      if (error) throw error;
+      await dataService.deleteFlashcard(id, userId, isOnline);
       setFlashcards(prev => prev.filter(f => f.id !== id));
       
       if (selectedCardIds.has(id)) {
@@ -176,8 +164,19 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
       if (cardsToInsert.length === 0) throw new Error("Formato inválido. Use: Pergunta | Resposta");
 
-      const { error } = await supabase.from('flashcards').insert(cardsToInsert);
-      if (error) throw error;
+      await Promise.all(cardsToInsert.map(c => {
+        const formattedCard: Flashcard = {
+          id: c.id, 
+          front: c.front, 
+          back: c.back, 
+          subjectId: c.subject_id, 
+          folderId: c.folder_id, 
+          nextReview: c.next_review, 
+          interval: c.interval,
+          archived_at: null
+        };
+        return dataService.saveFlashcard(formattedCard, userId, isOnline);
+      }));
 
       const formattedCards: Flashcard[] = cardsToInsert.map(c => ({
         id: c.id, 
@@ -232,10 +231,21 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         archived_at: null
       }));
 
-      const { error } = await supabase.from('flashcards').insert(cardsToInsert);
-      if (error) throw error;
+      await Promise.all(cardsToInsert.map((c: any) => {
+        const formattedCard: Flashcard = {
+          id: c.id,
+          front: c.front,
+          back: c.back,
+          subjectId: c.subject_id,
+          folderId: c.folder_id,
+          nextReview: c.next_review,
+          interval: c.interval,
+          archived_at: null
+        };
+        return dataService.saveFlashcard(formattedCard, userId, isOnline);
+      }));
 
-      const formattedCards: Flashcard[] = cardsToInsert.map(c => ({
+      const formattedCards: Flashcard[] = cardsToInsert.map((c: any) => ({
         id: c.id,
         front: c.front,
         back: c.back,
@@ -263,19 +273,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     if (!manualFront.trim() || !manualBack.trim()) return;
     const newId = Math.random().toString(36).substr(2, 9);
     try {
-      const { error } = await supabase.from('flashcards').insert({
-        id: newId, 
-        user_id: userId, 
-        front: manualFront, 
-        back: manualBack, 
-        subject_id: selectedSubjectId, 
-        folder_id: currentFolderId, 
-        next_review: Date.now(), 
-        interval: 0,
-        archived_at: null
-      });
-      if (error) throw error;
-      setFlashcards(prev => [...prev, { 
+      const newCard: Flashcard = { 
         id: newId, 
         front: manualFront, 
         back: manualBack, 
@@ -284,7 +282,11 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         nextReview: Date.now(), 
         interval: 0,
         archived_at: null
-      }]);
+      };
+
+      await dataService.saveFlashcard(newCard, userId, isOnline);
+      
+      setFlashcards(prev => [...prev, newCard]);
       setManualFront(''); 
       setManualBack(''); 
     } catch (err) { 
@@ -324,12 +326,10 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     const nextReview = Date.now() + newInterval * 24 * 60 * 60 * 1000;
     
     try {
-      await supabase.from('flashcards').update({ 
-        interval: newInterval, 
-        next_review: nextReview 
-      }).eq('id', card.id).eq('user_id', userId);
+      const updatedCard = { ...card, interval: newInterval, nextReview };
+      await dataService.saveFlashcard(updatedCard, userId, isOnline);
       
-      setFlashcards(prev => prev.map(f => f.id === card.id ? { ...f, interval: newInterval, nextReview } : f));
+      setFlashcards(prev => prev.map(f => f.id === card.id ? updatedCard : f));
       
       // TRIGGER QUEST UPDATE
       await updateQuestProgress(userId, 'review_cards', 1);

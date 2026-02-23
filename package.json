@@ -13,6 +13,8 @@
     "@google/genai": "latest",
     "@supabase/supabase-js": "2",
     "canvas-confetti": "1.9.3",
+    "dexie": "^4.3.0",
+    "dexie-react-hooks": "^4.2.0",
     "html2canvas": "1.4.1",
     "lucide-react": "0.564.0",
     "react": "18.3.1",
