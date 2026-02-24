@@ -143,7 +143,9 @@ const LeiSeca: React.FC<LeiSecaProps> = ({ userId }) => {
   const [modalOpen, setModalOpen] = useState(false);
   const [currentArticle, setCurrentArticle] = useState<string | null>(null);
   const [noteContent, setNoteContent] = useState('');
+  const [articleText, setArticleText] = useState('');
   const [noteColor, setNoteColor] = useState<'yellow' | 'green' | 'pink' | 'blue' | 'none'>('none');
+  const articleTextRef = React.useRef<HTMLDivElement>(null);
 
   // Fetch initial stats for dashboard
   useEffect(() => {
@@ -296,16 +298,39 @@ const LeiSeca: React.FC<LeiSecaProps> = ({ userId }) => {
   const openAnnotationModal = (articleId: string) => {
     setCurrentArticle(articleId);
     const existing = annotations[articleId];
-    setNoteContent(existing?.content || '');
+    if (existing?.content) {
+      try {
+        const parsed = JSON.parse(existing.content);
+        setNoteContent(parsed.notes || '');
+        setArticleText(parsed.articleText || '');
+      } catch (e) {
+        setNoteContent(existing.content);
+        setArticleText('');
+      }
+    } else {
+      setNoteContent('');
+      setArticleText('');
+    }
     setNoteColor(existing?.color || 'none');
     setModalOpen(true);
   };
 
+  useEffect(() => {
+    if (modalOpen && articleTextRef.current) {
+      articleTextRef.current.innerHTML = articleText;
+    }
+  }, [modalOpen]);
+
   const saveAnnotation = async () => {
     if (!selectedLaw || !currentArticle) return;
 
+    const combinedContent = JSON.stringify({
+      notes: noteContent,
+      articleText: articleText
+    });
+
     // Check if empty (delete)
-    if (!noteContent.trim() && noteColor === 'none') {
+    if (!noteContent.trim() && !articleText.trim() && noteColor === 'none') {
         const { error } = await supabase
             .from('user_annotations')
             .delete()
@@ -325,7 +350,7 @@ const LeiSeca: React.FC<LeiSecaProps> = ({ userId }) => {
         user_id: userId,
         law_id: selectedLaw.id,
         article_id: currentArticle,
-        content: noteContent,
+        content: combinedContent,
         color: noteColor
     };
 
@@ -360,6 +385,15 @@ const LeiSeca: React.FC<LeiSecaProps> = ({ userId }) => {
     } catch (e: any) {
         alert("Erro ao salvar anotação. Verifique se a tabela 'user_annotations' foi criada.");
         console.error(e);
+    }
+  };
+
+  const handleHighlightText = (color: string) => {
+    if (!document.execCommand('hiliteColor', false, color)) {
+      document.execCommand('backColor', false, color);
+    }
+    if (articleTextRef.current) {
+      setArticleText(articleTextRef.current.innerHTML);
     }
   };
 
@@ -410,7 +444,16 @@ const LeiSeca: React.FC<LeiSecaProps> = ({ userId }) => {
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         const matchesId = id.includes(query);
-        const matchesNote = hasNote && annotation.content.toLowerCase().includes(query);
+        let matchesNote = false;
+        if (hasNote) {
+           try {
+             const parsed = JSON.parse(annotation.content);
+             matchesNote = (parsed.notes && parsed.notes.toLowerCase().includes(query)) || 
+                           (parsed.articleText && parsed.articleText.toLowerCase().includes(query));
+           } catch (e) {
+             matchesNote = annotation.content.toLowerCase().includes(query);
+           }
+        }
         if (!matchesId && !matchesNote) continue;
       }
 
@@ -580,10 +623,33 @@ const LeiSeca: React.FC<LeiSecaProps> = ({ userId }) => {
                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6">Vade Mecum Pessoal</p>
 
                  <div className="space-y-6">
+                    {/* Article Text for Highlighting */}
+                    <div>
+                       <div className="flex items-center justify-between mb-3">
+                         <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
+                            <Book size={14} /> Texto da Lei (Cole aqui)
+                         </label>
+                         <div className="flex gap-1">
+                            <button onClick={() => handleHighlightText('#fef08a')} className="w-5 h-5 rounded-full bg-yellow-300 border border-yellow-500 hover:scale-110 transition-transform" title="Destacar Amarelo"></button>
+                            <button onClick={() => handleHighlightText('#86efac')} className="w-5 h-5 rounded-full bg-green-300 border border-green-500 hover:scale-110 transition-transform" title="Destacar Verde"></button>
+                            <button onClick={() => handleHighlightText('#93c5fd')} className="w-5 h-5 rounded-full bg-blue-300 border border-blue-500 hover:scale-110 transition-transform" title="Destacar Azul"></button>
+                            <button onClick={() => handleHighlightText('#f9a8d4')} className="w-5 h-5 rounded-full bg-pink-300 border border-pink-500 hover:scale-110 transition-transform" title="Destacar Rosa"></button>
+                            <button onClick={() => handleHighlightText('transparent')} className="w-5 h-5 rounded-full bg-white border border-slate-300 flex items-center justify-center hover:scale-110 transition-transform" title="Remover Destaque"><X size={10} /></button>
+                         </div>
+                       </div>
+                       <div 
+                          ref={articleTextRef}
+                          contentEditable
+                          onInput={(e) => setArticleText(e.currentTarget.innerHTML)}
+                          onBlur={(e) => setArticleText(e.currentTarget.innerHTML)}
+                          className="w-full min-h-[100px] max-h-[200px] overflow-y-auto p-4 bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-white/10 rounded-2xl font-serif text-lg text-slate-800 dark:text-slate-200 outline-none focus:border-sanfran-rubi empty:before:content-['Cole_o_texto_do_artigo_aqui_e_selecione_para_destacar...'] empty:before:text-slate-400 cursor-text"
+                       />
+                    </div>
+
                     {/* Color Picker */}
                     <div>
                        <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3 block flex items-center gap-2">
-                          <Highlighter size={14} /> Marca-texto
+                          <Highlighter size={14} /> Status do Artigo
                        </label>
                        <div className="flex gap-3">
                           {[
@@ -614,7 +680,7 @@ const LeiSeca: React.FC<LeiSecaProps> = ({ userId }) => {
                           value={noteContent}
                           onChange={(e) => setNoteContent(e.target.value)}
                           placeholder="Ex: Vide Súmula Vinculante 13..."
-                          className="w-full h-40 p-4 bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-white/10 rounded-2xl font-serif text-lg text-slate-800 dark:text-slate-200 outline-none focus:border-sanfran-rubi resize-none placeholder:text-slate-300 dark:placeholder:text-slate-600 leading-relaxed"
+                          className="w-full h-24 p-4 bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-white/10 rounded-2xl font-serif text-lg text-slate-800 dark:text-slate-200 outline-none focus:border-sanfran-rubi resize-none placeholder:text-slate-300 dark:placeholder:text-slate-600 leading-relaxed"
                        />
                     </div>
 
