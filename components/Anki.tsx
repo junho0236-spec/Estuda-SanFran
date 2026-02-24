@@ -279,6 +279,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         front: c.front,
         back: c.back,
         notes: c.notes || '',
+        tags: c.tags || [],
+        source: c.source || '',
         subjectId: selectedSubjectId,
         folderId: currentFolderId,
         nextReview: Date.now(),
@@ -310,7 +312,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     setAiGeneratedCardsPreview(prev => prev.filter((_, i) => i !== index));
   };
 
-  const updatePreviewCard = (index: number, field: 'front' | 'back' | 'notes', value: string) => {
+  const updatePreviewCard = (index: number, field: 'front' | 'back' | 'notes' | 'tags' | 'source', value: any) => {
     setAiGeneratedCardsPreview(prev => {
       const newCards = [...prev];
       newCards[index] = { ...newCards[index], [field]: value };
@@ -559,6 +561,19 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                     <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100 whitespace-pre-wrap">{reviewQueue[currentIndex].notes}</p>
                   </div>
                 )}
+                <div className="w-full mt-4 flex flex-wrap gap-2">
+                  {reviewQueue[currentIndex].source && (
+                    <div className="flex items-center gap-1 px-3 py-1 bg-slate-100 dark:bg-white/10 rounded-full text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-white/5">
+                      <Paperclip size={10} />
+                      {reviewQueue[currentIndex].source}
+                    </div>
+                  )}
+                  {reviewQueue[currentIndex].tags?.map((tag, idx) => (
+                    <div key={idx} className="px-3 py-1 bg-purple-50 dark:bg-purple-900/20 rounded-full text-[10px] font-black uppercase text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-purple-800/30">
+                      {tag}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -809,6 +824,32 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                              placeholder="Adicione mnemônicos ou observações..."
                              className="w-full h-16 p-3 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-700/30 rounded-xl font-medium resize-none outline-none focus:border-yellow-500" 
                            />
+                         </div>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           <div>
+                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Fonte / Artigo</label>
+                             <div className="flex items-center gap-2 p-3 bg-white dark:bg-black/50 border border-slate-200 dark:border-white/10 rounded-xl">
+                               <Paperclip size={14} className="text-slate-400" />
+                               <input 
+                                 value={card.source || ''} 
+                                 onChange={(e) => updatePreviewCard(index, 'source', e.target.value)} 
+                                 placeholder="Ex: Art. 5º, CF"
+                                 className="bg-transparent border-none outline-none flex-1 font-bold text-xs" 
+                               />
+                             </div>
+                           </div>
+                           <div>
+                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Tags (separadas por vírgula)</label>
+                             <div className="flex items-center gap-2 p-3 bg-white dark:bg-black/50 border border-slate-200 dark:border-white/10 rounded-xl">
+                               <Archive size={14} className="text-slate-400" />
+                               <input 
+                                 value={card.tags?.join(', ') || ''} 
+                                 onChange={(e) => updatePreviewCard(index, 'tags', e.target.value.split(',').map((t: string) => t.trim()))} 
+                                 placeholder="Ex: #prazos, #cpc"
+                                 className="bg-transparent border-none outline-none flex-1 font-bold text-xs" 
+                               />
+                             </div>
+                           </div>
                          </div>
                        </div>
                     </div>

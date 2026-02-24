@@ -113,6 +113,8 @@ export const generateFlashcards = async (
       
       - As perguntas (front) devem ser desafiadoras e claras.
       - As respostas (back) devem ser objetivas, didáticas e, se possível, citar o artigo de lei ou súmula pertinente.
+      - Para cada card, sugira de 2 a 4 tags relevantes (ex: #prazos, #recursos, #cpc-art-1003).
+      - Identifique a fonte ou artigo de lei específico citado no conteúdo para o campo "source".
       - Se o conteúdo fornecido for sem sentido ou insuficiente, retorne um array vazio.`
     });
 
@@ -160,6 +162,15 @@ export const generateFlashcards = async (
               back: {
                 type: Type.STRING,
                 description: 'A resposta correta, explicação doutrinária e fundamentação legal.',
+              },
+              tags: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+                description: 'Tags sugeridas para organização (ex: #prazos, #cpc).',
+              },
+              source: {
+                type: Type.STRING,
+                description: 'A fonte bibliográfica ou artigo de lei específico (ex: Art. 5º, CF).',
               },
             },
             required: ['front', 'back'],

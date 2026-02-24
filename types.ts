@@ -114,6 +114,8 @@ export interface Flashcard {
   nextReview: number;
   interval: number;
   archived_at?: string | null;
+  tags?: string[];
+  source?: string;
 }
 
 export interface Subject {
