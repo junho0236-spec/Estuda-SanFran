@@ -18,6 +18,30 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId, userId, isOnline, onBack
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
+  const modules = {
+    toolbar: [
+      [{ 'header': '1' }, { 'header': '2' }, { 'font': [] }],
+      [{ size: [] }],
+      ['bold', 'italic', 'underline', 'strike', 'blockquote'],
+      [{ 'list': 'ordered' }, { 'list': 'bullet' }, { 'indent': '-1' }, { 'indent': '+1' }],
+      ['link', 'image', 'video'],
+      [{ 'color': [] }, { 'background': [] }],
+      [{ 'align': [] }],
+      ['clean'],
+      ['code-block']
+    ],
+  };
+
+  const formats = [
+    'header', 'font', 'size',
+    'bold', 'italic', 'underline', 'strike', 'blockquote',
+    'list', 'bullet', 'indent',
+    'link', 'image', 'video',
+    'color', 'background',
+    'align',
+    'code-block'
+  ];
+
   const loadNote = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -87,11 +111,13 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId, userId, isOnline, onBack
           {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save size={18} />} Salvar
         </button>
       </header>
-      <div className="flex-1 overflow-y-auto bg-white dark:bg-[#181818] rounded-2xl shadow-xl p-6">
+      <div className="flex-1 overflow-y-auto bg-white dark:bg-[#181818] rounded-2xl shadow-xl">
         <ReactQuill 
           theme="snow" 
           value={noteContent} 
           onChange={setNoteContent}
+          modules={modules}
+          formats={formats}
           className="h-full min-h-[400px] quill-editor-custom" // Custom class for height
         />
       </div>
