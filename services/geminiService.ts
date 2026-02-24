@@ -47,7 +47,9 @@ export const generateFlashcards = async (
   cardType: string = 'Geral', 
   customInstructions: string = '',
   files: GeminiFile[] = [],
-  urls: string[] = []
+  urls: string[] = [],
+  difficulty: string = 'Graduação',
+  format: string = 'Básico'
 ) => {
   try {
     const ai = getAiClient();
@@ -78,15 +80,30 @@ export const generateFlashcards = async (
         typeInstruction = 'Foque em conceitos-chave, prazos, exceções ou princípios de forma equilibrada.';
     }
 
+    const formatInstruction = format === 'Cloze' 
+      ? 'Use o formato CLOZE (Omissão de Palavras). Na frente (front), coloque a frase com a palavra ou termo omitido entre colchetes, ex: "A prescrição ocorre em [...] anos.". No verso (back), coloque apenas o termo omitido.'
+      : 'Use o formato BÁSICO: Uma pergunta ou conceito na frente (front) e a resposta ou definição no verso (back).';
+
+    const difficultyInstruction = `O nível de complexidade deve ser: ${difficulty}. 
+      - Iniciante: Linguagem simples, conceitos fundamentais.
+      - Graduação: Linguagem técnica acadêmica, doutrina clássica.
+      - Concurso/OAB: Foco em "pegadinhas", letra da lei e jurisprudência pesada.`;
+
     const parts: any[] = [];
     
     // Adiciona o prompt principal
     parts.push({
-      text: `Você é um professor de Direito da USP. Sua tarefa é criar materiais de estudo ativo.
+      text: `Você é um professor de Direito da USP especialista em concursos e OAB. Sua tarefa é criar materiais de estudo ativo de alto nível.
       
       Analise o conteúdo fornecido (texto, arquivos ou URLs) sobre "${subjectName}":
       
-      Gere EXATAMENTE ${quantity} flashcards de alta qualidade no formato Pergunta e Resposta.
+      Gere EXATAMENTE ${quantity} flashcards de alta qualidade.
+      
+      Nível de Dificuldade:
+      ${difficultyInstruction}
+
+      Formato do Card:
+      ${formatInstruction}
       
       Diretriz de Foco (${cardType}):
       ${typeInstruction}

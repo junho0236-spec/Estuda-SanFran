@@ -65,6 +65,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [aiUrls, setAiUrls] = useState('');
   const [aiFiles, setAiFiles] = useState<{ data: string; mimeType: string; name: string }[]>([]);
+  const [aiDifficulty, setAiDifficulty] = useState('Graduação');
+  const [aiFormat, setAiFormat] = useState('Básico');
   
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set());
@@ -231,7 +233,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         aiCardType, 
         aiCustomInstructions,
         aiFiles.map(f => ({ data: f.data, mimeType: f.mimeType })),
-        urls
+        urls,
+        aiDifficulty,
+        aiFormat
       );
 
       if (!generatedCards || generatedCards.length === 0) {
@@ -655,6 +659,47 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                       <select value={selectedSubjectId} onChange={(e) => setSelectedSubjectId(e.target.value)} className="w-full p-4 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-2xl font-bold outline-none">
                          {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                       </select>
+                   </div>
+
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nível de Dificuldade</label>
+                      <div className="grid grid-cols-3 gap-2">
+                         {['Iniciante', 'Graduação', 'Concurso/OAB'].map(level => (
+                           <button
+                             key={level}
+                             onClick={() => setAiDifficulty(level)}
+                             className={`py-2 px-1 rounded-xl text-[10px] font-black uppercase border-2 transition-all ${
+                               aiDifficulty === level 
+                                 ? 'border-purple-500 bg-purple-500 text-white' 
+                                 : 'border-slate-200 text-slate-400 hover:border-purple-200'
+                             }`}
+                           >
+                             {level}
+                           </button>
+                         ))}
+                      </div>
+                   </div>
+
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Formato do Card</label>
+                      <div className="grid grid-cols-2 gap-2">
+                         {[
+                           { id: 'Básico', label: 'Básico (P/R)' },
+                           { id: 'Cloze', label: 'Cloze (Omissão)' }
+                         ].map(fmt => (
+                           <button
+                             key={fmt.id}
+                             onClick={() => setAiFormat(fmt.id)}
+                             className={`py-2 px-1 rounded-xl text-[10px] font-black uppercase border-2 transition-all ${
+                               aiFormat === fmt.id 
+                                 ? 'border-indigo-500 bg-indigo-500 text-white' 
+                                 : 'border-slate-200 text-slate-400 hover:border-indigo-200'
+                             }`}
+                           >
+                             {fmt.label}
+                           </button>
+                         ))}
+                      </div>
                    </div>
 
                    <div className="space-y-2">
