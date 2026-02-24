@@ -82,6 +82,7 @@ const SpeedReader = React.lazy(() => import('./components/SpeedReader'));
 const Mnemonics = React.lazy(() => import('./components/Mnemonics'));
 const ReverseStudyPlanner = React.lazy(() => import('./components/ReverseStudyPlanner')); 
 const Statistics = React.lazy(() => import('./components/Statistics'));
+const GlobalSearch = React.lazy(() => import('./components/GlobalSearch'));
 const SanFranEssential = React.lazy(() => import('./components/SanFranEssential'));
 const SanFranCommunity = React.lazy(() => import('./components/SanFranCommunity'));
 const SanFranImprovement = React.lazy(() => import('./components/SanFranImprovement'));
@@ -169,6 +170,7 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [session, setSession] = useState<any>(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [presenceUsers, setPresenceUsers] = useState<PresenceUser[]>([]);
 
   // DUEL STATES
@@ -576,6 +578,19 @@ const App: React.FC = () => {
   return (
     <div className={`flex h-screen overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#fcfcfc]'}`}>
       <Atmosphere isExtremeFocus={isExtremeFocus} />
+      
+      <Suspense fallback={null}>
+        <GlobalSearch 
+          isOpen={isSearchOpen}
+          onClose={() => setIsSearchOpen(false)}
+          flashcards={flashcards}
+          tasks={tasks}
+          readings={readings}
+          subjects={subjects}
+          onNavigate={setCurrentView}
+        />
+      </Suspense>
+
       {session?.user && <Scratchpad userId={session.user.id} isExtremeFocus={isExtremeFocus} />}
 
       {/* NOTIFICAÇÃO DE DUELO */}
@@ -636,6 +651,17 @@ const App: React.FC = () => {
             </button>
           </div>
           <BrasiliaClock />
+          
+          <button 
+            onClick={() => setIsSearchOpen(true)}
+            className="mt-4 w-full flex items-center gap-3 px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-sanfran-rubi hover:border-sanfran-rubi/50 transition-all group"
+          >
+            <Search className="w-4 h-4 group-hover:scale-110 transition-transform" />
+            <span>Pesquisar...</span>
+            <div className="ml-auto flex items-center gap-1 opacity-50">
+              <Command size={10} /> K
+            </div>
+          </button>
         </div>
         
         <nav className="p-4 space-y-1 flex-1 overflow-y-auto custom-scrollbar">
