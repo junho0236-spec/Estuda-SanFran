@@ -45,8 +45,10 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [isFlipped, setIsFlipped] = useState(false);
   const [manualFront, setManualFront] = useState('');
   const [manualBack, setManualBack] = useState('');
+  const [manualNotes, setManualNotes] = useState('');
   const [newFolderName, setNewFolderName] = useState('');
   const [showFolderInput, setShowFolderInput] = useState(false);
+  const [editingCard, setEditingCard] = useState<Flashcard | null>(null);
   
   // AI State
   const [aiSourceText, setAiSourceText] = useState('');
@@ -277,6 +279,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         id: newId, 
         front: manualFront, 
         back: manualBack, 
+        notes: manualNotes,
         subjectId: selectedSubjectId, 
         folderId: currentFolderId, 
         nextReview: Date.now(), 
@@ -289,8 +292,20 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setFlashcards(prev => [...prev, newCard]);
       setManualFront(''); 
       setManualBack(''); 
+      setManualNotes('');
     } catch (err) { 
       alert("Erro ao protocolar card."); 
+    }
+  };
+
+  const handleEditCard = async () => {
+    if (!editingCard) return;
+    try {
+      await dataService.saveFlashcard(editingCard, userId, isOnline);
+      setFlashcards(prev => prev.map(f => f.id === editingCard.id ? editingCard : f));
+      setEditingCard(null);
+    } catch (err) {
+      alert("Erro ao salvar alterações.");
     }
   };
 
@@ -444,8 +459,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
             return (
               <div 
                 key={card.id} 
-                onClick={() => isSelectionMode ? toggleCardSelection(card.id) : null}
-                className={`group bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2rem] border-2 shadow-xl flex flex-col justify-between h-[240px] border-l-[10px] transition-all relative ${isSelected ? 'border-sanfran-rubi bg-red-50/30 dark:bg-sanfran-rubi/10' : 'border-slate-200 dark:border-sanfran-rubi/40'} ${isSelectionMode ? 'cursor-pointer' : ''}`} 
+                onClick={() => isSelectionMode ? toggleCardSelection(card.id) : setEditingCard(card)}
+                className={`group bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2rem] border-2 shadow-xl flex flex-col justify-between h-[240px] border-l-[10px] transition-all relative cursor-pointer ${isSelected ? 'border-sanfran-rubi bg-red-50/30 dark:bg-sanfran-rubi/10' : 'border-slate-200 dark:border-sanfran-rubi/40 hover:border-sanfran-rubi/50'}`} 
                 style={{ borderLeftColor: isSelected ? undefined : (subject?.color || '#9B111E') }}
               >
                 {!isSelectionMode && (
@@ -488,9 +503,15 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 <span className="text-xs font-black text-sanfran-rubi uppercase tracking-[0.3em] mb-8">Questão</span>
                 <p className="text-2xl font-black text-slate-950 dark:text-white leading-tight">{reviewQueue[currentIndex].front}</p>
               </div>
-              <div className="absolute inset-0 w-full h-full bg-slate-50 dark:bg-black/80 border-[6px] border-usp-blue/40 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden rotate-y-180">
-                <span className="text-xs font-black text-usp-blue uppercase tracking-[0.3em] mb-8">Resposta</span>
-                <p className="text-2xl font-black text-slate-900 dark:text-white leading-tight">{reviewQueue[currentIndex].back}</p>
+              <div className="absolute inset-0 w-full h-full bg-slate-50 dark:bg-black/80 border-[6px] border-usp-blue/40 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden rotate-y-180 overflow-y-auto custom-scrollbar">
+                <span className="text-xs font-black text-usp-blue uppercase tracking-[0.3em] mb-4">Resposta</span>
+                <p className="text-2xl font-black text-slate-900 dark:text-white leading-tight mb-6">{reviewQueue[currentIndex].back}</p>
+                {reviewQueue[currentIndex].notes && (
+                  <div className="w-full mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-2xl text-left">
+                    <span className="text-[10px] font-black text-yellow-800 dark:text-yellow-500 uppercase tracking-widest block mb-2">Notas Pessoais</span>
+                    <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100 whitespace-pre-wrap">{reviewQueue[currentIndex].notes}</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -605,11 +626,61 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 </select>
             </div>
             <input value={manualFront} onChange={(e) => setManualFront(e.target.value)} placeholder="Enunciado / Pergunta" className="w-full p-6 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-2xl font-bold outline-none" />
-            <textarea value={manualBack} onChange={(e) => setManualBack(e.target.value)} placeholder="Doutrina / Resposta" className="w-full h-40 p-6 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-3xl font-bold resize-none outline-none" />
+            <textarea value={manualBack} onChange={(e) => setManualBack(e.target.value)} placeholder="Doutrina / Resposta" className="w-full h-32 p-6 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-3xl font-bold resize-none outline-none" />
+            <textarea value={manualNotes} onChange={(e) => setManualNotes(e.target.value)} placeholder="Notas Pessoais (Opcional) - Mnemônicos, dicas, etc." className="w-full h-24 p-6 bg-yellow-50 dark:bg-yellow-900/10 border-2 border-yellow-200 dark:border-yellow-700/30 rounded-3xl font-bold resize-none outline-none placeholder:text-yellow-600/50" />
             <button onClick={handleManualCreate} className="w-full py-6 bg-sanfran-rubi text-white rounded-[2rem] font-black uppercase text-lg shadow-xl flex items-center justify-center gap-3">
               <Gavel className="w-6 h-6" /> Protocolar Card
             </button>
             <p className="text-center text-[10px] font-black uppercase text-slate-400">Você pode criar vários cards seguidos. Clique no botão acima para salvar e continuar.</p>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT MODAL */}
+      {editingCard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-sanfran-rubiDark rounded-[3rem] p-8 w-full max-w-2xl shadow-2xl border-4 border-slate-100 dark:border-sanfran-rubi/30 relative overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="absolute top-0 right-0 p-6">
+              <button onClick={() => setEditingCard(null)} className="text-slate-400 hover:text-red-500 transition-colors">
+                <X size={24} />
+              </button>
+            </div>
+            
+            <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-6">Editar Flashcard</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Pergunta</label>
+                <input 
+                  value={editingCard.front} 
+                  onChange={(e) => setEditingCard({...editingCard, front: e.target.value})} 
+                  className="w-full p-4 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-2xl font-bold outline-none" 
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Resposta</label>
+                <textarea 
+                  value={editingCard.back} 
+                  onChange={(e) => setEditingCard({...editingCard, back: e.target.value})} 
+                  className="w-full h-32 p-4 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-2xl font-bold resize-none outline-none" 
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-yellow-600 dark:text-yellow-500 mb-2 block">Notas Pessoais</label>
+                <textarea 
+                  value={editingCard.notes || ''} 
+                  onChange={(e) => setEditingCard({...editingCard, notes: e.target.value})} 
+                  placeholder="Adicione mnemônicos, dicas ou observações..."
+                  className="w-full h-24 p-4 bg-yellow-50 dark:bg-yellow-900/10 border-2 border-yellow-200 dark:border-yellow-700/30 rounded-2xl font-bold resize-none outline-none" 
+                />
+              </div>
+              <button 
+                onClick={handleEditCard} 
+                className="w-full py-4 mt-4 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-sm shadow-xl hover:bg-sanfran-rubiDark transition-colors"
+              >
+                Salvar Alterações
+              </button>
+            </div>
           </div>
         </div>
       )}

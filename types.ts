@@ -107,6 +107,7 @@ export interface Flashcard {
   id: string;
   front: string;
   back: string;
+  notes?: string;
   subjectId: string;
   folderId: string | null;
   nextReview: number;
