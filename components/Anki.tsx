@@ -23,7 +23,9 @@ import {
   Image,
   Paperclip,
   History,
-  FileDown
+  FileDown,
+  ThumbsUp,
+  ThumbsDown
 } from 'lucide-react';
 import JSZip from 'jszip';
 import { Flashcard, Subject, Folder } from '../types';
@@ -66,6 +68,67 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [aiCustomInstructions, setAiCustomInstructions] = useState('');
   const [aiGeneratedCardsPreview, setAiGeneratedCardsPreview] = useState<any[]>([]);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [cardRatings, setCardRatings] = useState<Record<number, 'up' | 'down' | null>>({});
+
+  const handleRegenerateCard = async (index: number) => {
+    const card = aiGeneratedCardsPreview[index];
+    setIsLoading(true);
+    try {
+      const subjectName = subjects.find(s => s.id === selectedSubjectId)?.name || "Direito Geral";
+      const newCards = await generateFlashcards(
+        aiSourceText, 
+        subjectName, 
+        1, 
+        aiCardType, 
+        `O card anterior era: "${card.front} | ${card.back}". O usuário não gostou. Gere um novo card diferente e melhor sobre o mesmo tema.`,
+        aiFiles.map(f => ({ data: f.data, mimeType: f.mimeType })),
+        aiUrls.split('\n').filter(u => u.trim().startsWith('http')),
+        aiDifficulty,
+        aiFormat,
+        aiSourceType,
+        aiIncludeMnemonics
+      );
+
+      if (newCards && newCards.length > 0) {
+        const updatedPreview = [...aiGeneratedCardsPreview];
+        updatedPreview[index] = newCards[0];
+        setAiGeneratedCardsPreview(updatedPreview);
+        setCardRatings(prev => ({ ...prev, [index]: null }));
+      }
+    } catch (err: any) {
+      alert("Erro ao regenerar card: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePublishDeck = async () => {
+    if (aiGeneratedCardsPreview.length === 0) return;
+    
+    const deckName = prompt("Dê um nome para este deck público:", subjects.find(s => s.id === selectedSubjectId)?.name || "Novo Deck Jurídico");
+    if (!deckName) return;
+
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.from('public_decks').insert({
+        user_id: userId,
+        name: deckName,
+        subject_id: selectedSubjectId,
+        cards: aiGeneratedCardsPreview,
+        downloads: 0,
+        likes: 0,
+        created_at: new Date().toISOString()
+      });
+
+      if (error) throw error;
+      alert("Deck publicado com sucesso na Comunidade SanFran!");
+    } catch (err: any) {
+      console.error(err);
+      alert("Erro ao publicar deck. Certifique-se de estar online.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
   const [aiUrls, setAiUrls] = useState('');
   const [aiFiles, setAiFiles] = useState<{ data: string; mimeType: string; name: string }[]>([]);
   const [aiDifficulty, setAiDifficulty] = useState('Graduação');
