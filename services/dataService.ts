@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 import { db, addToSyncQueue } from './offlineService';
-import { Flashcard, Task, StudySession } from '../types';
+import { Flashcard, Task, StudySession, Note } from '../types';
 
 export const dataService = {
   // TASKS
@@ -83,6 +83,37 @@ export const dataService = {
       }
     } else {
       await addToSyncQueue({ table: 'study_sessions', action: 'insert', data: session });
+    }
+  },
+
+  // NOTES
+  async saveNote(note: Note, userId: string, isOnline: boolean) {
+    await db.notes.put(note);
+
+    if (isOnline) {
+      const { error } = await supabase.from('notes').upsert({
+        ...note,
+        user_id: userId,
+        subject_id: note.subject_id
+      });
+      if (error) {
+        console.error("Error syncing note to cloud, adding to queue", error);
+        await addToSyncQueue({ table: 'notes', action: 'update', data: note });
+      }
+    } else {
+      await addToSyncQueue({ table: 'notes', action: 'update', data: note });
+    }
+  },
+
+  async getNoteBySubjectId(subjectId: string, userId: string, isOnline: boolean): Promise<Note | null> {
+    if (isOnline) {
+      const { data, error } = await supabase.from('notes').select('*').eq('subject_id', subjectId).eq('user_id', userId).single();
+      if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+        console.error('Error fetching note from cloud:', error);
+      }
+      return data as Note | null;
+    } else {
+      return db.notes.where({ subject_id: subjectId, user_id: userId }).first() || null;
     }
   },
 

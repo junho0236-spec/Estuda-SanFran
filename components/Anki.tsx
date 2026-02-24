@@ -1,7 +1,5 @@
 // Anki.tsx - Community Features and Card Rating
 // Anki.tsx - Community Features and Card Rating
-// Anki.tsx - Community Features and Card Rating
-// Anki.tsx - Community Features and Card Rating
 
 import React, { useState } from 'react';
 import { 
@@ -728,7 +726,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
              <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
 
              <div className="flex items-center gap-4 mb-8 relative z-10">
-               <button onClick={() => setMode('browse')} className="p-3"><ArrowLeft className="w-8 h-8 text-slate-400" /></button>
+               <button onClick={() => setMode('browse')} className="p-3"><ArrowLeft className="w-8 h-8 text-slate-700 dark:text-slate-300" /></button>
                <div>
                   <div className="flex items-center gap-2">
                      <Sparkles className="text-purple-500 w-6 h-6 animate-pulse" />

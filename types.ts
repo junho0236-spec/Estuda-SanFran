@@ -95,7 +95,8 @@ export enum View {
   Statistics = 'statistics',
   StudyBuddy = 'study_buddy',
   CaseAnalyzer = 'case_analyzer',
-  Certificates = 'certificates'
+  Certificates = 'certificates',
+  NoteView = 'note_view'
 }
 
 export interface Folder {
@@ -174,7 +175,11 @@ export interface RankingEntry {
 }
 
 export interface Note {
+  id: string;
+  subject_id: string;
+  user_id: string;
   content: string;
+  updated_at: string;
 }
 
 export interface Badge {

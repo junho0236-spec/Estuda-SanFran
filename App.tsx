@@ -105,6 +105,7 @@ const IntelligentSummarizer = React.lazy(() => import('./components/IntelligentS
 const StudyBuddy = React.lazy(() => import('./components/StudyBuddy'));
 const CaseAnalyzer = React.lazy(() => import('./components/CaseAnalyzer'));
 const Certificates = React.lazy(() => import('./components/Certificates'));
+const NoteView = React.lazy(() => import('./components/NoteView'));
 
 // Loading Fallback Component com Estilo
 const PageLoader = () => (
@@ -190,6 +191,7 @@ const App: React.FC = () => {
   const [readings, setReadings] = useState<Reading[]>([]);
   const [studySessions, setStudySessions] = useState<StudySession[]>([]);
   const [correctQuestionsCount, setCorrectQuestionsCount] = useState(0);
+  const [selectedSubjectIdForNotes, setSelectedSubjectIdForNotes] = useState<string | null>(null);
 
   // --- Timer Global State (Pomodoro) ---
   const [timerIsActive, setTimerIsActive] = useState(false);
@@ -786,6 +788,14 @@ const App: React.FC = () => {
                 {currentView === View.SumulaChallenge && <SumulaChallenge userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
                 {currentView === View.JurisprudenceMural && <JurisprudenceMural userId={session.user.id} userName={session.user.user_metadata?.full_name} onNavigate={setCurrentView} />}
                 {currentView === View.CaseAnalyzer && <CaseAnalyzer onBack={() => setCurrentView(View.JurisprudenceMural)} />}
+                {currentView === View.NoteView && selectedSubjectIdForNotes && (
+                  <NoteView 
+                    subjectId={selectedSubjectIdForNotes} 
+                    userId={session.user.id} 
+                    isOnline={isOnline} 
+                    onBack={() => setCurrentView(View.Subjects)} 
+                  />
+                )}
                 {currentView === View.Societies && <Societies userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
                 {currentView === View.LeiSeca && <LeiSeca userId={session.user.id} />}
                 {currentView === View.CitationGenerator && <CitationGenerator />}
@@ -901,7 +911,17 @@ const App: React.FC = () => {
                 {currentView === View.OralArgument && <OralArgument />}
                 {currentView === View.Calendar && <CalendarView subjects={subjects} tasks={tasks} userId={session.user.id} studySessions={studySessions} />}
                 {currentView === View.Ranking && <Ranking userId={session.user.id} session={session} />}
-                {currentView === View.Subjects && <Subjects subjects={subjects} setSubjects={setSubjects} userId={session.user.id} />}
+                {currentView === View.Subjects && (
+                  <Subjects 
+                    subjects={subjects} 
+                    setSubjects={setSubjects} 
+                    userId={session.user.id} 
+                    onViewNotes={(subjectId) => {
+                      setSelectedSubjectIdForNotes(subjectId);
+                      setCurrentView(View.NoteView);
+                    }}
+                  />
+                )}
                 {currentView === View.Tasks && <Tasks subjects={subjects} tasks={tasks} setTasks={setTasks} userId={session.user.id} isOnline={isOnline} />}
              </Suspense>
           </div>

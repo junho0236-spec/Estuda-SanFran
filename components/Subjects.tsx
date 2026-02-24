@@ -8,9 +8,10 @@ interface SubjectsProps {
   subjects: Subject[];
   setSubjects: React.Dispatch<React.SetStateAction<Subject[]>>;
   userId: string;
+  onViewNotes: (subjectId: string) => void;
 }
 
-const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId }) => {
+const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId, onViewNotes }) => {
   const [newSubjectName, setNewSubjectName] = useState('');
   const [selectedColor, setSelectedColor] = useState('#9B111E');
   const [isSaving, setIsSaving] = useState(false);
@@ -92,7 +93,12 @@ const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId }) =>
 
         <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
           {subjects.map(subject => (
-            <div key={subject.id} className="bg-white dark:bg-[#181818] p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-between hover:shadow-xl transition-all border-l-8" style={{ borderLeftColor: subject.color }}>
+            <div 
+              key={subject.id} 
+              onClick={() => onViewNotes(subject.id)}
+              className="bg-white dark:bg-[#181818] p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-between hover:shadow-xl hover:scale-[1.02] transition-all border-l-8 cursor-pointer relative group" 
+              style={{ borderLeftColor: subject.color }}
+            >
               <div className="flex items-start justify-between">
                 <div className="p-3 rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-100 dark:border-slate-800" style={{ color: subject.color }}><BookOpen className="w-6 h-6" /></div>
                 <button onClick={() => removeSubject(subject.id)} className="p-2 text-slate-300 dark:text-slate-600 hover:text-[#9B111E] transition-colors"><Trash2 className="w-5 h-5" /></button>
