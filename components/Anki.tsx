@@ -21,7 +21,8 @@ import {
   Upload,
   Link,
   Image,
-  Paperclip
+  Paperclip,
+  History
 } from 'lucide-react';
 import { Flashcard, Subject, Folder } from '../types';
 import { supabase } from '../services/supabaseClient';
@@ -67,6 +68,15 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [aiFiles, setAiFiles] = useState<{ data: string; mimeType: string; name: string }[]>([]);
   const [aiDifficulty, setAiDifficulty] = useState('Graduação');
   const [aiFormat, setAiFormat] = useState('Básico');
+  const [aiGenerationHistory, setAiGenerationHistory] = useState<{
+    id: string;
+    text: string;
+    urls: string;
+    files: { data: string; mimeType: string; name: string }[];
+    timestamp: number;
+    subjectId: string;
+  }[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
   
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set());
@@ -225,6 +235,17 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     
     setIsLoading(true);
     try {
+      // Salva no histórico antes de gerar
+      const historyItem = {
+        id: Math.random().toString(36).substr(2, 9),
+        text: aiSourceText,
+        urls: aiUrls,
+        files: [...aiFiles],
+        timestamp: Date.now(),
+        subjectId: selectedSubjectId
+      };
+      setAiGenerationHistory(prev => [historyItem, ...prev].slice(0, 10)); // Mantém os últimos 10
+
       const subjectName = subjects.find(s => s.id === selectedSubjectId)?.name || "Direito Geral";
       const generatedCards = await generateFlashcards(
         aiSourceText, 
@@ -251,6 +272,14 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const restoreFromHistory = (item: any) => {
+    setAiSourceText(item.text);
+    setAiUrls(item.urls);
+    setAiFiles(item.files);
+    setSelectedSubjectId(item.subjectId);
+    setShowHistory(false);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -606,10 +635,50 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
              </div>
 
              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative z-10">
+                {showHistory && (
+                  <div className="md:col-span-3 bg-slate-50 dark:bg-black/30 p-6 rounded-[2rem] border-2 border-purple-200 dark:border-purple-900/30 animate-in slide-in-from-top duration-300">
+                     <div className="flex items-center justify-between mb-4">
+                       <h4 className="text-xs font-black uppercase tracking-[0.2em] text-purple-600">Últimas Gerações</h4>
+                       <button onClick={() => setShowHistory(false)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+                     </div>
+                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                       {aiGenerationHistory.map((item) => (
+                         <div 
+                           key={item.id} 
+                           onClick={() => restoreFromHistory(item)}
+                           className="p-4 bg-white dark:bg-black/50 border border-slate-200 dark:border-white/10 rounded-2xl cursor-pointer hover:border-purple-500 hover:shadow-md transition-all group"
+                         >
+                           <div className="flex items-center justify-between mb-2">
+                             <span className="text-[9px] font-black text-slate-400 uppercase">{new Date(item.timestamp).toLocaleTimeString()}</span>
+                             <span className="text-[9px] font-black text-purple-500 uppercase">{subjects.find(s => s.id === item.subjectId)?.name || 'Geral'}</span>
+                           </div>
+                           <p className="text-[11px] font-bold text-slate-600 dark:text-slate-300 line-clamp-2 mb-2">
+                             {item.text || (item.files.length > 0 ? `${item.files.length} arquivos anexados` : item.urls || 'Sem texto')}
+                           </p>
+                           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                             <span className="text-[9px] font-black text-purple-600 uppercase">Restaurar</span>
+                             <RotateCcw size={10} className="text-purple-600" />
+                           </div>
+                         </div>
+                       ))}
+                     </div>
+                  </div>
+                )}
                 <div className="md:col-span-2 space-y-4">
                     <div className="flex items-center justify-between">
                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Texto Base (Cole aqui)</label>
-                       <div className="flex items-center gap-4">
+                       <div className="flex items-center gap-2">
+                          {aiGenerationHistory.length > 0 && (
+                            <button 
+                              onClick={() => setShowHistory(!showHistory)}
+                              className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest transition-colors ${
+                                showHistory ? 'bg-purple-600 text-white' : 'bg-slate-100 dark:bg-white/5 text-slate-500 hover:bg-purple-100 hover:text-purple-600'
+                              }`}
+                            >
+                              <History size={12} />
+                              Histórico
+                            </button>
+                          )}
                           <div className="relative group">
                              <input 
                                type="file" 
