@@ -1,3 +1,7 @@
+// Anki.tsx - Community Features and Card Rating
+// Anki.tsx - Community Features and Card Rating
+// Anki.tsx - Community Features and Card Rating
+// Anki.tsx - Community Features and Card Rating
 
 import React, { useState } from 'react';
 import { 
