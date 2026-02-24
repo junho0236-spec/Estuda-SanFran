@@ -35,13 +35,34 @@ export const getSafeApiKey = (): string | null => {
 /**
  * Gera flashcards a partir de um texto jurídico ou acadêmico utilizando Gemini.
  */
-export const generateFlashcards = async (text: string, subjectName: string, quantity: number = 5) => {
+export const generateFlashcards = async (text: string, subjectName: string, quantity: number = 5, cardType: string = 'Geral', customInstructions: string = '') => {
   try {
     const ai = getAiClient();
     const apiKey = getApiKey();
     
     if (!apiKey || apiKey === "missing_key") {
         throw new Error("Chave de API não detectada. 1) Verifique se a variável 'VITE_API_KEY' está no painel da Vercel. 2) Se estiver, é OBRIGATÓRIO fazer um novo 'Redeploy' para que a alteração tenha efeito.");
+    }
+
+    let typeInstruction = '';
+    switch (cardType) {
+      case 'Conceitos':
+        typeInstruction = 'Foque estritamente em definir conceitos jurídicos, princípios e institutos mencionados no texto.';
+        break;
+      case 'Prazos e Números':
+        typeInstruction = 'Foque exclusivamente em prazos processuais, prescricionais, decadenciais, quóruns, maiorias e outros números relevantes.';
+        break;
+      case 'Exceções':
+        typeInstruction = 'Foque nas exceções à regra geral, ressalvas e casos especiais mencionados no texto.';
+        break;
+      case 'Súmulas e Jurisprudência':
+        typeInstruction = 'Foque no entendimento jurisprudencial, súmulas e teses fixadas mencionadas no texto.';
+        break;
+      case 'Casos Práticos':
+        typeInstruction = 'Crie pequenos casos práticos hipotéticos na pergunta (front) e dê a solução jurídica na resposta (back).';
+        break;
+      default:
+        typeInstruction = 'Foque em conceitos-chave, prazos, exceções ou princípios de forma equilibrada.';
     }
 
     const response = await ai.models.generateContent({
@@ -52,7 +73,14 @@ export const generateFlashcards = async (text: string, subjectName: string, quan
       "${text}"
       
       Gere EXATAMENTE ${quantity} flashcards de alta qualidade no formato Pergunta e Resposta.
-      - As perguntas (front) devem ser desafiadoras e focar em conceitos-chave, prazos, exceções ou princípios.
+      
+      Diretriz de Foco (${cardType}):
+      ${typeInstruction}
+      
+      Instruções Adicionais do Usuário:
+      ${customInstructions ? customInstructions : 'Nenhuma instrução adicional.'}
+      
+      - As perguntas (front) devem ser desafiadoras e claras.
       - As respostas (back) devem ser objetivas, didáticas e, se possível, citar o artigo de lei ou súmula pertinente.
       - Se o texto fornecido for sem sentido ou muito curto, retorne um array vazio.`,
       config: {

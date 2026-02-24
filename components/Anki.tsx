@@ -15,7 +15,8 @@ import {
   Check,
   Archive,
   Sparkles,
-  Zap
+  Zap,
+  Save
 } from 'lucide-react';
 import { Flashcard, Subject, Folder } from '../types';
 import { supabase } from '../services/supabaseClient';
@@ -53,6 +54,10 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   // AI State
   const [aiSourceText, setAiSourceText] = useState('');
   const [aiQuantity, setAiQuantity] = useState(5);
+  const [aiCardType, setAiCardType] = useState('Geral');
+  const [aiCustomInstructions, setAiCustomInstructions] = useState('');
+  const [aiGeneratedCardsPreview, setAiGeneratedCardsPreview] = useState<any[]>([]);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
   
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set());
@@ -215,53 +220,14 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     setIsLoading(true);
     try {
       const subjectName = subjects.find(s => s.id === selectedSubjectId)?.name || "Direito Geral";
-      const generatedCards = await generateFlashcards(aiSourceText, subjectName, aiQuantity);
+      const generatedCards = await generateFlashcards(aiSourceText, subjectName, aiQuantity, aiCardType, aiCustomInstructions);
 
       if (!generatedCards || generatedCards.length === 0) {
         throw new Error("A IA não conseguiu extrair perguntas do texto fornecido. Tente um texto mais técnico.");
       }
 
-      const cardsToInsert = generatedCards.map((c: any) => ({
-        id: Math.random().toString(36).substr(2, 9),
-        front: c.front,
-        back: c.back,
-        subject_id: selectedSubjectId,
-        folder_id: currentFolderId,
-        next_review: Date.now(),
-        interval: 0,
-        user_id: userId,
-        archived_at: null
-      }));
-
-      await Promise.all(cardsToInsert.map((c: any) => {
-        const formattedCard: Flashcard = {
-          id: c.id,
-          front: c.front,
-          back: c.back,
-          subjectId: c.subject_id,
-          folderId: c.folder_id,
-          nextReview: c.next_review,
-          interval: c.interval,
-          archived_at: null
-        };
-        return dataService.saveFlashcard(formattedCard, userId, isOnline);
-      }));
-
-      const formattedCards: Flashcard[] = cardsToInsert.map((c: any) => ({
-        id: c.id,
-        front: c.front,
-        back: c.back,
-        subjectId: c.subject_id,
-        folderId: c.folder_id,
-        nextReview: c.next_review,
-        interval: c.interval,
-        archived_at: null
-      }));
-
-      setFlashcards(prev => [...prev, ...formattedCards]);
-      setMode('browse');
-      setAiSourceText('');
-      alert(`Sucesso! ${cardsToInsert.length} cards gerados pela IA.`);
+      setAiGeneratedCardsPreview(generatedCards);
+      setIsPreviewMode(true);
 
     } catch (err: any) {
       console.error(err);
@@ -269,6 +235,53 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSaveAIGeneratedCards = async () => {
+    setIsLoading(true);
+    try {
+      const cardsToInsert = aiGeneratedCardsPreview.map((c: any) => ({
+        id: Math.random().toString(36).substr(2, 9),
+        front: c.front,
+        back: c.back,
+        notes: c.notes || '',
+        subjectId: selectedSubjectId,
+        folderId: currentFolderId,
+        nextReview: Date.now(),
+        interval: 0,
+        archived_at: null
+      }));
+
+      await Promise.all(cardsToInsert.map((c: any) => {
+        return dataService.saveFlashcard(c, userId, isOnline);
+      }));
+
+      setFlashcards(prev => [...prev, ...cardsToInsert]);
+      setMode('browse');
+      setAiSourceText('');
+      setAiCustomInstructions('');
+      setAiGeneratedCardsPreview([]);
+      setIsPreviewMode(false);
+      alert(`Sucesso! ${cardsToInsert.length} cards salvos.`);
+
+    } catch (err: any) {
+      console.error(err);
+      alert(`Erro ao salvar cards: ${err.message || "Tente novamente mais tarde."}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const removePreviewCard = (index: number) => {
+    setAiGeneratedCardsPreview(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updatePreviewCard = (index: number, field: 'front' | 'back' | 'notes', value: string) => {
+    setAiGeneratedCardsPreview(prev => {
+      const newCards = [...prev];
+      newCards[index] = { ...newCards[index], [field]: value };
+      return newCards;
+    });
   };
 
   const handleManualCreate = async () => {
@@ -527,7 +540,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       )}
 
       {/* --- AI GENERATION MODE --- */}
-      {mode === 'ai_create' && (
+      {mode === 'ai_create' && !isPreviewMode && (
          <div className="bg-white dark:bg-sanfran-rubiDark p-10 rounded-[3rem] border-4 border-purple-500 shadow-2xl relative overflow-hidden">
              {/* Background Decoration */}
              <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
@@ -537,7 +550,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                <div>
                   <div className="flex items-center gap-2">
                      <Sparkles className="text-purple-500 w-6 h-6 animate-pulse" />
-                     <h3 className="text-3xl font-black text-slate-950 dark:text-white uppercase">IA Generator</h3>
+                     <h3 className="text-3xl font-black text-slate-950 dark:text-white uppercase">IA Generator Avançado</h3>
                   </div>
                   <p className="text-sm font-bold text-slate-500">Criação automática baseada em doutrina ou lei.</p>
                </div>
@@ -552,6 +565,14 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                      placeholder="Cole aqui o artigo da lei, o resumo da aula ou trecho da doutrina..." 
                      className="w-full h-80 p-6 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-[2rem] font-bold resize-none outline-none focus:border-purple-500 custom-scrollbar" 
                    />
+                   
+                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-4 block">Instruções Adicionais (Opcional)</label>
+                   <textarea 
+                     value={aiCustomInstructions} 
+                     onChange={(e) => setAiCustomInstructions(e.target.value)} 
+                     placeholder="Ex: Foque apenas na teoria da imprevisão, ignore os exemplos..." 
+                     className="w-full h-24 p-4 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-[1.5rem] font-medium resize-none outline-none focus:border-purple-500 custom-scrollbar text-sm" 
+                   />
                 </div>
                 
                 <div className="space-y-6">
@@ -561,12 +582,24 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                          {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                       </select>
                    </div>
+
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Foco dos Cards</label>
+                      <select value={aiCardType} onChange={(e) => setAiCardType(e.target.value)} className="w-full p-4 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-2xl font-bold outline-none text-purple-700 dark:text-purple-300">
+                         <option value="Geral">Geral (Equilibrado)</option>
+                         <option value="Conceitos">Conceitos e Definições</option>
+                         <option value="Prazos e Números">Prazos e Números</option>
+                         <option value="Exceções">Exceções à Regra</option>
+                         <option value="Súmulas e Jurisprudência">Súmulas e Jurisprudência</option>
+                         <option value="Casos Práticos">Casos Práticos (Hipotéticos)</option>
+                      </select>
+                   </div>
                    
                    <div className="space-y-2">
                       <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Quantidade de Cards</label>
                       <div className="flex items-center gap-4 bg-slate-50 dark:bg-black/50 p-4 rounded-2xl border-2 border-slate-200">
                          <input 
-                           type="range" min="1" max="10" 
+                           type="range" min="1" max="15" 
                            value={aiQuantity} 
                            onChange={(e) => setAiQuantity(Number(e.target.value))} 
                            className="flex-1 accent-purple-500" 
@@ -580,15 +613,87 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                      disabled={isLoading} 
                      className="w-full py-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-[2rem] font-black uppercase text-lg shadow-xl hover:scale-105 transition-transform flex items-center justify-center gap-2 disabled:opacity-50"
                    >
-                     {isLoading ? <div className="animate-spin w-6 h-6 border-4 border-white/30 border-t-white rounded-full"></div> : <><Zap size={24} fill="currentColor" /> Gerar Cards</>}
+                     {isLoading ? <div className="animate-spin w-6 h-6 border-4 border-white/30 border-t-white rounded-full"></div> : <><Zap size={24} fill="currentColor" /> Gerar Preview</>}
                    </button>
                    
                    <div className="bg-purple-50 dark:bg-purple-900/10 p-4 rounded-2xl border border-purple-100 dark:border-purple-800/30">
                       <p className="text-[9px] font-bold text-purple-700 dark:text-purple-300 uppercase leading-relaxed">
-                         Dica: A IA funciona melhor com textos claros e bem formatados. Evite colar livros inteiros de uma vez.
+                         Dica: Você poderá revisar, editar e excluir os cards antes de salvá-los definitivamente.
                       </p>
                    </div>
                 </div>
+             </div>
+         </div>
+      )}
+
+      {/* --- AI PREVIEW MODE --- */}
+      {mode === 'ai_create' && isPreviewMode && (
+         <div className="bg-white dark:bg-sanfran-rubiDark p-10 rounded-[3rem] border-4 border-purple-500 shadow-2xl relative overflow-hidden">
+             <div className="flex items-center justify-between mb-8 relative z-10">
+               <div className="flex items-center gap-4">
+                 <button onClick={() => setIsPreviewMode(false)} className="p-3"><ArrowLeft className="w-8 h-8 text-slate-400" /></button>
+                 <div>
+                    <div className="flex items-center gap-2">
+                       <Sparkles className="text-purple-500 w-6 h-6" />
+                       <h3 className="text-3xl font-black text-slate-950 dark:text-white uppercase">Revisão de Cards</h3>
+                    </div>
+                    <p className="text-sm font-bold text-slate-500">Edite ou remova os cards gerados antes de salvar.</p>
+                 </div>
+               </div>
+               <button 
+                 onClick={handleSaveAIGeneratedCards} 
+                 disabled={isLoading || aiGeneratedCardsPreview.length === 0}
+                 className="py-4 px-8 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black uppercase text-sm shadow-xl hover:scale-105 transition-transform flex items-center gap-2 disabled:opacity-50"
+               >
+                 {isLoading ? <div className="animate-spin w-5 h-5 border-4 border-white/30 border-t-white rounded-full"></div> : <><Save size={18} /> Salvar {aiGeneratedCardsPreview.length} Cards</>}
+               </button>
+             </div>
+
+             <div className="space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">
+                {aiGeneratedCardsPreview.length === 0 ? (
+                  <div className="text-center py-12 text-slate-400">
+                    <p className="text-lg font-bold">Nenhum card para revisar.</p>
+                  </div>
+                ) : (
+                  aiGeneratedCardsPreview.map((card, index) => (
+                    <div key={index} className="bg-slate-50 dark:bg-black/30 p-6 rounded-[2rem] border-2 border-slate-200 dark:border-white/10 relative group">
+                       <button 
+                         onClick={() => removePreviewCard(index)}
+                         className="absolute top-4 right-4 p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"
+                         title="Remover Card"
+                       >
+                         <X size={20} />
+                       </button>
+                       <div className="space-y-4 pr-10">
+                         <div>
+                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Pergunta {index + 1}</label>
+                           <input 
+                             value={card.front} 
+                             onChange={(e) => updatePreviewCard(index, 'front', e.target.value)} 
+                             className="w-full p-3 bg-white dark:bg-black/50 border border-slate-200 dark:border-white/10 rounded-xl font-bold outline-none focus:border-purple-500" 
+                           />
+                         </div>
+                         <div>
+                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Resposta</label>
+                           <textarea 
+                             value={card.back} 
+                             onChange={(e) => updatePreviewCard(index, 'back', e.target.value)} 
+                             className="w-full h-24 p-3 bg-white dark:bg-black/50 border border-slate-200 dark:border-white/10 rounded-xl font-medium resize-none outline-none focus:border-purple-500" 
+                           />
+                         </div>
+                         <div>
+                           <label className="text-[10px] font-black uppercase tracking-widest text-yellow-600 dark:text-yellow-500 mb-1 block">Notas (Opcional)</label>
+                           <textarea 
+                             value={card.notes || ''} 
+                             onChange={(e) => updatePreviewCard(index, 'notes', e.target.value)} 
+                             placeholder="Adicione mnemônicos ou observações..."
+                             className="w-full h-16 p-3 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-700/30 rounded-xl font-medium resize-none outline-none focus:border-yellow-500" 
+                           />
+                         </div>
+                       </div>
+                    </div>
+                  ))
+                )}
              </div>
          </div>
       )}
