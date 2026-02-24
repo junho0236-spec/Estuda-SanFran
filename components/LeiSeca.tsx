@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Book, ChevronRight, CheckCircle2, Circle, ArrowLeft, BarChart3, Scale, Search, PenTool, Highlighter, Paperclip, X, Save, Trash2, Flame, Thermometer } from 'lucide-react';
+import { Book, ChevronRight, CheckCircle2, Circle, ArrowLeft, BarChart3, Scale, Search, PenTool, Highlighter, Paperclip, X, Save, Trash2, Flame, Thermometer, ExternalLink } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { ArticleAnnotation } from '../types';
 
@@ -16,6 +16,7 @@ interface LawStructure {
   nickname: string;
   totalArticles: number;
   color: string;
+  url: string;
   sections: LawSection[];
 }
 
@@ -27,6 +28,7 @@ const LAWS: LawStructure[] = [
     nickname: 'CRFB/88',
     totalArticles: 250,
     color: 'bg-usp-blue text-white',
+    url: 'https://www.planalto.gov.br/ccivil_03/constituicao/constituicao.htm',
     sections: [
       { title: 'Princípios Fundamentais', start: 1, end: 4 },
       { title: 'Direitos Fundamentais', start: 5, end: 17 },
@@ -43,6 +45,7 @@ const LAWS: LawStructure[] = [
     nickname: 'CC/02',
     totalArticles: 2046,
     color: 'bg-sanfran-rubi text-white',
+    url: 'https://www.planalto.gov.br/ccivil_03/leis/2002/l10406compilada.htm',
     sections: [
       { title: 'Parte Geral', start: 1, end: 232 },
       { title: 'Obrigações', start: 233, end: 965 },
@@ -58,6 +61,7 @@ const LAWS: LawStructure[] = [
     nickname: 'CPC/15',
     totalArticles: 1072,
     color: 'bg-emerald-600 text-white',
+    url: 'https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2015/lei/l13105.htm',
     sections: [
       { title: 'Parte Geral', start: 1, end: 317 },
       { title: 'Processo de Conhecimento', start: 318, end: 538 },
@@ -72,6 +76,7 @@ const LAWS: LawStructure[] = [
     nickname: 'CP',
     totalArticles: 361,
     color: 'bg-red-800 text-white',
+    url: 'https://www.planalto.gov.br/ccivil_03/decreto-lei/del2848compilado.htm',
     sections: [
       { title: 'Parte Geral', start: 1, end: 120 },
       { title: 'Pessoa', start: 121, end: 154 },
@@ -87,6 +92,7 @@ const LAWS: LawStructure[] = [
     nickname: 'CPP',
     totalArticles: 811,
     color: 'bg-slate-800 text-white',
+    url: 'https://www.planalto.gov.br/ccivil_03/decreto-lei/del3689compilado.htm',
     sections: [
       { title: 'Inquérito Policial', start: 4, end: 23 },
       { title: 'Ação Penal', start: 24, end: 62 },
@@ -103,6 +109,7 @@ const LAWS: LawStructure[] = [
     nickname: 'CLT',
     totalArticles: 922,
     color: 'bg-orange-600 text-white',
+    url: 'https://www.planalto.gov.br/ccivil_03/decreto-lei/del5452.htm',
     sections: [
       { title: 'Normas Gerais', start: 1, end: 56 },
       { title: 'Normas Especiais', start: 57, end: 510 },
@@ -130,6 +137,7 @@ const LeiSeca: React.FC<LeiSecaProps> = ({ userId }) => {
   // UI State
   const [loading, setLoading] = useState(false);
   const [isAnnotationMode, setIsAnnotationMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Modal State
   const [modalOpen, setModalOpen] = useState(false);
@@ -390,12 +398,23 @@ const LeiSeca: React.FC<LeiSecaProps> = ({ userId }) => {
   // Render Grid of Articles
   const renderGrid = (start: number, end: number) => {
     const articles = [];
+    let hasVisibleArticles = false;
+
     for (let i = start; i <= end; i++) {
       const id = i.toString();
       const isRead = readArticles.has(id);
       const annotation = annotations[id];
       const hasNote = annotation && annotation.content && annotation.content.trim().length > 0;
       
+      // Search filter logic
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const matchesId = id.includes(query);
+        const matchesNote = hasNote && annotation.content.toLowerCase().includes(query);
+        if (!matchesId && !matchesNote) continue;
+      }
+
+      hasVisibleArticles = true;
       const clickCount = heatmapData[id] || 0;
 
       let buttonClass = '';
@@ -432,6 +451,8 @@ const LeiSeca: React.FC<LeiSecaProps> = ({ userId }) => {
         </button>
       );
     }
+    
+    if (!hasVisibleArticles && searchQuery) return null;
     return articles;
   };
 
@@ -440,7 +461,7 @@ const LeiSeca: React.FC<LeiSecaProps> = ({ userId }) => {
       <div className="h-full flex flex-col animate-in fade-in duration-500 pb-20 px-2 md:px-0">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
           <div className="flex items-center gap-4">
-            <button onClick={() => setSelectedLaw(null)} className="p-3 bg-slate-100 dark:bg-white/10 rounded-full hover:bg-slate-200 dark:hover:bg-white/20 transition-colors">
+            <button onClick={() => { setSelectedLaw(null); setSearchQuery(''); }} className="p-3 bg-slate-100 dark:bg-white/10 rounded-full hover:bg-slate-200 dark:hover:bg-white/20 transition-colors">
               <ArrowLeft size={20} className="text-slate-600 dark:text-slate-200" />
             </button>
             <div>
@@ -448,11 +469,35 @@ const LeiSeca: React.FC<LeiSecaProps> = ({ userId }) => {
               <div className="flex items-center gap-2 mt-1">
                  <span className={`px-2 py-0.5 rounded text-[10px] font-black ${selectedLaw.color}`}>{selectedLaw.nickname}</span>
                  <span className="text-xs font-bold text-slate-400">{readArticles.size} / {selectedLaw.totalArticles} Lidos</span>
+                 <a 
+                   href={selectedLaw.url} 
+                   target="_blank" 
+                   rel="noopener noreferrer"
+                   className="ml-2 flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-sanfran-rubi hover:text-sanfran-rubiDark transition-colors"
+                 >
+                   <ExternalLink size={12} /> Texto Oficial
+                 </a>
               </div>
             </div>
           </div>
 
-          <div className="flex flex-col items-end gap-2">
+          <div className="flex flex-col items-end gap-3">
+             <div className="relative w-full md:w-64">
+               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+               <input
+                 type="text"
+                 placeholder="Buscar art. ou anotação..."
+                 value={searchQuery}
+                 onChange={(e) => setSearchQuery(e.target.value)}
+                 className="w-full pl-9 pr-4 py-2 bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold text-slate-900 dark:text-white outline-none focus:border-sanfran-rubi transition-colors"
+               />
+               {searchQuery && (
+                 <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                   <X size={14} />
+                 </button>
+               )}
+             </div>
+
              <div className="flex items-center gap-3">
                 {isHeatmapMode && (
                    <div className="flex items-center gap-1 bg-white dark:bg-black/20 px-3 py-1 rounded-full border border-slate-100 dark:border-white/5 shadow-sm">
@@ -493,16 +538,29 @@ const LeiSeca: React.FC<LeiSecaProps> = ({ userId }) => {
         </header>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar space-y-8 pr-2">
-          {selectedLaw.sections.map((section, idx) => (
-            <div key={idx} className="bg-white dark:bg-sanfran-rubiDark/20 rounded-[2rem] border border-slate-200 dark:border-sanfran-rubi/20 p-6 md:p-8 shadow-sm">
-               <h3 className="font-black text-slate-800 dark:text-slate-200 uppercase text-sm mb-6 flex items-center gap-2 border-b border-slate-100 dark:border-white/5 pb-2">
-                  <Book size={16} className="text-slate-400" /> {section.title}
-               </h3>
-               <div className="flex flex-wrap gap-3">
-                  {renderGrid(section.start, section.end)}
-               </div>
+          {selectedLaw.sections.map((section, idx) => {
+            const gridContent = renderGrid(section.start, section.end);
+            if (!gridContent) return null; // Hide section if no articles match search
+
+            return (
+              <div key={idx} className="bg-white dark:bg-sanfran-rubiDark/20 rounded-[2rem] border border-slate-200 dark:border-sanfran-rubi/20 p-6 md:p-8 shadow-sm">
+                 <h3 className="font-black text-slate-800 dark:text-slate-200 uppercase text-sm mb-6 flex items-center gap-2 border-b border-slate-100 dark:border-white/5 pb-2">
+                    <Book size={16} className="text-slate-400" /> {section.title}
+                 </h3>
+                 <div className="flex flex-wrap gap-3">
+                    {gridContent}
+                 </div>
+              </div>
+            );
+          })}
+          
+          {searchQuery && selectedLaw.sections.every(s => !renderGrid(s.start, s.end)) && (
+            <div className="text-center py-12 text-slate-400">
+              <Search size={48} className="mx-auto mb-4 opacity-20" />
+              <p className="text-sm font-black uppercase tracking-widest">Nenhum artigo encontrado</p>
+              <p className="text-[10px] font-bold mt-2">Tente buscar por outro número ou termo anotado.</p>
             </div>
-          ))}
+          )}
         </div>
 
         {/* --- MODAL DE ANOTAÇÃO --- */}
