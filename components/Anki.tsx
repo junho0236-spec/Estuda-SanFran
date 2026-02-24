@@ -16,7 +16,12 @@ import {
   Archive,
   Sparkles,
   Zap,
-  Save
+  Save,
+  FileText,
+  Upload,
+  Link,
+  Image,
+  Paperclip
 } from 'lucide-react';
 import { Flashcard, Subject, Folder } from '../types';
 import { supabase } from '../services/supabaseClient';
@@ -58,6 +63,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [aiCustomInstructions, setAiCustomInstructions] = useState('');
   const [aiGeneratedCardsPreview, setAiGeneratedCardsPreview] = useState<any[]>([]);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [aiUrls, setAiUrls] = useState('');
+  const [aiFiles, setAiFiles] = useState<{ data: string; mimeType: string; name: string }[]>([]);
   
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set());
@@ -207,23 +214,28 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   };
 
   const handleAIGenerate = async () => {
-    if (!aiSourceText.trim()) {
-      alert("Cole um texto para a IA analisar.");
-      return;
-    }
+    const urls = aiUrls.split('\n').filter(u => u.trim().startsWith('http'));
     
-    if (aiSourceText.length < 50) {
-      alert("Texto muito curto! Por favor, cole um parágrafo mais completo para que a IA possa extrair conceitos relevantes.");
+    if (!aiSourceText.trim() && aiFiles.length === 0 && urls.length === 0) {
+      alert("Forneça um texto, arquivo ou link para a IA analisar.");
       return;
     }
     
     setIsLoading(true);
     try {
       const subjectName = subjects.find(s => s.id === selectedSubjectId)?.name || "Direito Geral";
-      const generatedCards = await generateFlashcards(aiSourceText, subjectName, aiQuantity, aiCardType, aiCustomInstructions);
+      const generatedCards = await generateFlashcards(
+        aiSourceText, 
+        subjectName, 
+        aiQuantity, 
+        aiCardType, 
+        aiCustomInstructions,
+        aiFiles.map(f => ({ data: f.data, mimeType: f.mimeType })),
+        urls
+      );
 
       if (!generatedCards || generatedCards.length === 0) {
-        throw new Error("A IA não conseguiu extrair perguntas do texto fornecido. Tente um texto mais técnico.");
+        throw new Error("A IA não conseguiu extrair perguntas do conteúdo fornecido. Tente um conteúdo mais técnico.");
       }
 
       setAiGeneratedCardsPreview(generatedCards);
@@ -235,6 +247,24 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    
+    Array.from(files).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64 = (event.target?.result as string).split(',')[1];
+        setAiFiles(prev => [...prev, { data: base64, mimeType: file.type, name: file.name }]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeAiFile = (index: number) => {
+    setAiFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSaveAIGeneratedCards = async () => {
@@ -558,22 +588,66 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative z-10">
                 <div className="md:col-span-2 space-y-4">
-                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Texto Base (Cole aqui)</label>
-                   <textarea 
-                     value={aiSourceText} 
-                     onChange={(e) => setAiSourceText(e.target.value)} 
-                     placeholder="Cole aqui o artigo da lei, o resumo da aula ou trecho da doutrina..." 
-                     className="w-full h-80 p-6 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-[2rem] font-bold resize-none outline-none focus:border-purple-500 custom-scrollbar" 
-                   />
-                   
-                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-4 block">Instruções Adicionais (Opcional)</label>
-                   <textarea 
-                     value={aiCustomInstructions} 
-                     onChange={(e) => setAiCustomInstructions(e.target.value)} 
-                     placeholder="Ex: Foque apenas na teoria da imprevisão, ignore os exemplos..." 
-                     className="w-full h-24 p-4 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-[1.5rem] font-medium resize-none outline-none focus:border-purple-500 custom-scrollbar text-sm" 
-                   />
-                </div>
+                    <div className="flex items-center justify-between">
+                       <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Texto Base (Cole aqui)</label>
+                       <div className="flex items-center gap-4">
+                          <div className="relative group">
+                             <input 
+                               type="file" 
+                               multiple 
+                               accept=".pdf,.png,.jpg,.jpeg" 
+                               onChange={handleFileChange} 
+                               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                             />
+                             <button className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-white/5 rounded-full text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-purple-100 hover:text-purple-600 transition-colors">
+                                <Upload size={14} /> PDF / Imagem
+                             </button>
+                          </div>
+                       </div>
+                    </div>
+                    
+                    <textarea 
+                      value={aiSourceText} 
+                      onChange={(e) => setAiSourceText(e.target.value)} 
+                      placeholder="Cole aqui o artigo da lei, o resumo da aula ou trecho da doutrina..." 
+                      className="w-full h-64 p-6 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-[2rem] font-bold resize-none outline-none focus:border-purple-500 custom-scrollbar" 
+                    />
+
+                    {/* Lista de Arquivos Selecionados */}
+                    {aiFiles.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {aiFiles.map((file, idx) => (
+                          <div key={idx} className="flex items-center gap-2 px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-[10px] font-black uppercase border border-purple-200 dark:border-purple-800/50">
+                            {file.mimeType.startsWith('image/') ? <Image size={12} /> : <FileText size={12} />}
+                            <span className="max-w-[150px] truncate">{file.name}</span>
+                            <button onClick={() => removeAiFile(idx)} className="hover:text-red-500 transition-colors"><X size={12} /></button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Link de Legislação / Doutrina</label>
+                       <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-2xl focus-within:border-purple-500 transition-colors">
+                          <Link size={18} className="text-slate-400" />
+                          <input 
+                            type="text" 
+                            value={aiUrls} 
+                            onChange={(e) => setAiUrls(e.target.value)} 
+                            placeholder="Ex: https://www.planalto.gov.br/ccivil_03/constituicao/constituicao.htm" 
+                            className="bg-transparent border-none outline-none flex-1 font-bold text-sm text-slate-700 dark:text-slate-200" 
+                          />
+                       </div>
+                    </div>
+                    
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-4 block">Instruções Adicionais (Opcional)</label>
+                    <textarea 
+                      value={aiCustomInstructions} 
+                      onChange={(e) => setAiCustomInstructions(e.target.value)} 
+                      placeholder="Ex: Foque apenas na teoria da imprevisão, ignore os exemplos..." 
+                      className="w-full h-24 p-4 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-[1.5rem] font-medium resize-none outline-none focus:border-purple-500 custom-scrollbar text-sm" 
+                    />
+                 </div>
                 
                 <div className="space-y-6">
                    <div className="space-y-2">
@@ -618,7 +692,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                    
                    <div className="bg-purple-50 dark:bg-purple-900/10 p-4 rounded-2xl border border-purple-100 dark:border-purple-800/30">
                       <p className="text-[9px] font-bold text-purple-700 dark:text-purple-300 uppercase leading-relaxed">
-                         Dica: Você poderá revisar, editar e excluir os cards antes de salvá-los definitivamente.
+                         <Sparkles size={10} className="inline mr-1" />
+                         Dica: Suba PDFs de doutrina ou fotos do seu caderno para extração automática via OCR.
                       </p>
                    </div>
                 </div>

@@ -32,10 +32,23 @@ export const getSafeApiKey = (): string | null => {
   return key ? `${key.substring(0, 4)}...` : null;
 };
 
+export interface GeminiFile {
+  data: string; // base64 encoded string
+  mimeType: string;
+}
+
 /**
- * Gera flashcards a partir de um texto jurídico ou acadêmico utilizando Gemini.
+ * Gera flashcards a partir de um texto jurídico, arquivos ou URLs utilizando Gemini.
  */
-export const generateFlashcards = async (text: string, subjectName: string, quantity: number = 5, cardType: string = 'Geral', customInstructions: string = '') => {
+export const generateFlashcards = async (
+  text: string, 
+  subjectName: string, 
+  quantity: number = 5, 
+  cardType: string = 'Geral', 
+  customInstructions: string = '',
+  files: GeminiFile[] = [],
+  urls: string[] = []
+) => {
   try {
     const ai = getAiClient();
     const apiKey = getApiKey();
@@ -65,12 +78,13 @@ export const generateFlashcards = async (text: string, subjectName: string, quan
         typeInstruction = 'Foque em conceitos-chave, prazos, exceções ou princípios de forma equilibrada.';
     }
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview', 
-      contents: `Você é um professor de Direito da USP. Sua tarefa é criar materiais de estudo ativo.
+    const parts: any[] = [];
+    
+    // Adiciona o prompt principal
+    parts.push({
+      text: `Você é um professor de Direito da USP. Sua tarefa é criar materiais de estudo ativo.
       
-      Analise o seguinte texto jurídico sobre "${subjectName}":
-      "${text}"
+      Analise o conteúdo fornecido (texto, arquivos ou URLs) sobre "${subjectName}":
       
       Gere EXATAMENTE ${quantity} flashcards de alta qualidade no formato Pergunta e Resposta.
       
@@ -82,8 +96,40 @@ export const generateFlashcards = async (text: string, subjectName: string, quan
       
       - As perguntas (front) devem ser desafiadoras e claras.
       - As respostas (back) devem ser objetivas, didáticas e, se possível, citar o artigo de lei ou súmula pertinente.
-      - Se o texto fornecido for sem sentido ou muito curto, retorne um array vazio.`,
+      - Se o conteúdo fornecido for sem sentido ou insuficiente, retorne um array vazio.`
+    });
+
+    // Adiciona o texto se houver
+    if (text) {
+      parts.push({ text: `Texto Base:\n"${text}"` });
+    }
+
+    // Adiciona arquivos se houver
+    if (files && files.length > 0) {
+      files.forEach(file => {
+        parts.push({
+          inlineData: {
+            data: file.data,
+            mimeType: file.mimeType
+          }
+        });
+      });
+    }
+
+    // Adiciona URLs se houver (como texto no prompt se urlContext não for usado, 
+    // mas vamos tentar usar o tool se possível)
+    const tools: any[] = [];
+    if (urls && urls.length > 0) {
+      tools.push({ urlContext: {} });
+      // Também incluímos as URLs no texto para garantir que o modelo saiba quais processar
+      parts.push({ text: `URLs para consulta:\n${urls.join('\n')}` });
+    }
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview', 
+      contents: { parts },
       config: {
+        tools: tools.length > 0 ? tools : undefined,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
