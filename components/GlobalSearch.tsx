@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { Search, X, BookOpen, CheckSquare, Brain, ArrowRight, Command } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Search, X, BookOpen, CheckSquare, Brain, ArrowRight, Command, Mic, MicOff } from 'lucide-react';
 import { View, Flashcard, Task, Reading, Subject } from '../types';
 
 interface GlobalSearchProps {
@@ -32,6 +32,64 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({
   onNavigate 
 }) => {
   const [query, setQuery] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    // Initialize SpeechRecognition if available
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = true;
+      recognitionRef.current.lang = 'pt-BR'; // Default to Portuguese for SanFran
+
+      recognitionRef.current.onresult = (event: any) => {
+        let interimTranscript = '';
+        let finalTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          } else {
+            interimTranscript += event.results[i][0].transcript;
+          }
+        }
+
+        // Update query with final or interim transcript
+        const newQuery = finalTranscript || interimTranscript;
+        if (newQuery) {
+          setQuery(newQuery);
+        }
+      };
+
+      recognitionRef.current.onerror = (event: any) => {
+        console.error("Speech recognition error", event.error);
+        setIsListening(false);
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, []);
+
+  const toggleListening = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+    } else {
+      setQuery(''); // Clear previous query when starting new voice search
+      recognitionRef.current?.start();
+      setIsListening(true);
+    }
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -118,6 +176,15 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({
             className="flex-1 bg-transparent border-none outline-none text-lg font-bold text-slate-900 dark:text-white placeholder:text-slate-400"
           />
           <div className="flex items-center gap-2">
+            {recognitionRef.current && (
+              <button
+                onClick={toggleListening}
+                className={`p-2 rounded-xl transition-all ${isListening ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 animate-pulse' : 'text-slate-400 hover:text-sanfran-rubi hover:bg-slate-100 dark:hover:bg-white/10'}`}
+                title={isListening ? "Parar gravação" : "Pesquisa por voz"}
+              >
+                {isListening ? <MicOff size={20} /> : <Mic size={20} />}
+              </button>
+            )}
             <div className="hidden md:flex items-center gap-1 px-2 py-1 bg-slate-100 dark:bg-white/10 rounded-lg border border-slate-200 dark:border-white/10 text-[10px] font-black text-slate-400 uppercase">
               <Command size={10} /> K
             </div>
