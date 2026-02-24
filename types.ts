@@ -94,7 +94,8 @@ export enum View {
   IntelligentSummarizer = 'intelligent_summarizer',
   Statistics = 'statistics',
   StudyBuddy = 'study_buddy',
-  CaseAnalyzer = 'case_analyzer'
+  CaseAnalyzer = 'case_analyzer',
+  Certificates = 'certificates'
 }
 
 export interface Folder {

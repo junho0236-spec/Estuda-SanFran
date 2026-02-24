@@ -104,6 +104,7 @@ const QuestionBank = React.lazy(() => import('./components/QuestionBank'));
 const IntelligentSummarizer = React.lazy(() => import('./components/IntelligentSummarizer'));
 const StudyBuddy = React.lazy(() => import('./components/StudyBuddy'));
 const CaseAnalyzer = React.lazy(() => import('./components/CaseAnalyzer'));
+const Certificates = React.lazy(() => import('./components/Certificates'));
 
 // Loading Fallback Component com Estilo
 const PageLoader = () => (
@@ -559,7 +560,7 @@ const App: React.FC = () => {
   const isCommunityChild = [View.Debate, View.ClassificadosPatio, View.JurisprudenceMural, View.CaseAnalyzer, View.Societies, View.Largo, View.StudyRoom, View.Mural, View.Mentorship, View.MockJury, View.PetitionWiki, View.StudyPact, View.LargoAuction, View.SocialEvents, View.TheVault, View.CaronasRepublicas, View.BalcaoEstagios, View.TribunalOpiniao, View.BussolaOptativas, View.AchadosPerdidos, View.PerolasTribuna, View.GuiaSobrevivencia, View.ClubeLivro, View.GuerraTurmas].includes(currentView);
 
   // Helper to check if current view is a child of SanFran Improvement
-  const isImprovementChild = [View.Specialization, View.TypingChallenge, View.DominioJuridico, View.Timeline, View.LeiSeca, View.Library, View.OralArgument, View.QuestionBank, View.IntelligentSummarizer, View.StudyBuddy].includes(currentView);
+  const isImprovementChild = [View.Specialization, View.TypingChallenge, View.DominioJuridico, View.Timeline, View.LeiSeca, View.Library, View.OralArgument, View.QuestionBank, View.IntelligentSummarizer, View.StudyBuddy, View.Certificates].includes(currentView);
 
   // Helper to check if current view is a child of SanFran Languages
   const isLanguagesChild = [View.SanFranIdiomas, View.LegalCinema, View.GeneralLanguages, View.PronunciationLab, View.LyricalVibes, View.TheExchangeStudent, View.VisualFlashcards, View.BilingualNews, View.SlangChallenge].includes(currentView);
@@ -821,6 +822,7 @@ const App: React.FC = () => {
                 {currentView === View.QuestionBank && <QuestionBank userId={session.user.id} onCorrectAnswer={incrementCorrectQuestions} />}
                 {currentView === View.IntelligentSummarizer && <IntelligentSummarizer userId={session.user.id} />}
                 {currentView === View.StudyBuddy && <StudyBuddy userId={session.user.id} />}
+                {currentView === View.Certificates && <Certificates userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
                 {currentView === View.VisualFlashcards && <VisualFlashcards userId={session.user.id} />}
                 {currentView === View.BilingualNews && <BilingualNews userId={session.user.id} />}
                 {currentView === View.SlangChallenge && <SlangChallenge userId={session.user.id} />}
