@@ -156,6 +156,12 @@ export interface Reading {
   created_at?: string;
 }
 
+export enum StudyMode {
+  CLASSIC = 'classic',
+  FOCUSED = 'focused',
+  MARATHON = 'marathon',
+}
+
 export interface RankingEntry {
   user_id: string;
   name: string;
