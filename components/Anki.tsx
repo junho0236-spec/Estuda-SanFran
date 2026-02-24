@@ -68,6 +68,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [aiFiles, setAiFiles] = useState<{ data: string; mimeType: string; name: string }[]>([]);
   const [aiDifficulty, setAiDifficulty] = useState('Graduação');
   const [aiFormat, setAiFormat] = useState('Básico');
+  const [aiSourceType, setAiSourceType] = useState('Geral');
+  const [aiIncludeMnemonics, setAiIncludeMnemonics] = useState(false);
   const [aiGenerationHistory, setAiGenerationHistory] = useState<{
     id: string;
     text: string;
@@ -256,7 +258,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         aiFiles.map(f => ({ data: f.data, mimeType: f.mimeType })),
         urls,
         aiDifficulty,
-        aiFormat
+        aiFormat,
+        aiSourceType,
+        aiIncludeMnemonics
       );
 
       if (!generatedCards || generatedCards.length === 0) {
@@ -665,6 +669,22 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   </div>
                 )}
                 <div className="md:col-span-2 space-y-4">
+                    <div className="flex flex-wrap gap-2">
+                       {['Geral', 'Letra da Lei', 'Doutrina', 'Jurisprudência'].map(type => (
+                         <button
+                           key={type}
+                           onClick={() => setAiSourceType(type)}
+                           className={`px-4 py-2 rounded-full text-[10px] font-black uppercase border-2 transition-all ${
+                             aiSourceType === type 
+                               ? 'border-purple-500 bg-purple-500 text-white shadow-lg shadow-purple-500/20' 
+                                : 'border-slate-200 text-slate-400 hover:border-purple-200'
+                           }`}
+                         >
+                           {type}
+                         </button>
+                       ))}
+                    </div>
+
                     <div className="flex items-center justify-between">
                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Texto Base (Cole aqui)</label>
                        <div className="flex items-center gap-2">
@@ -700,6 +720,21 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                       placeholder="Cole aqui o artigo da lei, o resumo da aula ou trecho da doutrina..." 
                       className="w-full h-64 p-6 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-[2rem] font-bold resize-none outline-none focus:border-purple-500 custom-scrollbar" 
                     />
+
+                    <div className="flex items-center gap-3 p-4 bg-purple-50 dark:bg-purple-900/10 rounded-2xl border border-purple-100 dark:border-purple-800/30">
+                       <button 
+                         onClick={() => setAiIncludeMnemonics(!aiIncludeMnemonics)}
+                         className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
+                           aiIncludeMnemonics ? 'bg-purple-600 border-purple-600' : 'bg-white dark:bg-black/50 border-slate-300'
+                         }`}
+                       >
+                         {aiIncludeMnemonics && <Check size={14} className="text-white" />}
+                       </button>
+                       <div className="flex-1">
+                         <p className="text-[11px] font-black text-purple-700 dark:text-purple-300 uppercase">Tentar criar mnemônicos para listas</p>
+                         <p className="text-[9px] font-bold text-purple-500/70 uppercase">Ideal para decorar requisitos e princípios</p>
+                       </div>
+                    </div>
 
                     {/* Lista de Arquivos Selecionados */}
                     {aiFiles.length > 0 && (

@@ -49,7 +49,9 @@ export const generateFlashcards = async (
   files: GeminiFile[] = [],
   urls: string[] = [],
   difficulty: string = 'Graduação',
-  format: string = 'Básico'
+  format: string = 'Básico',
+  sourceType: string = 'Geral',
+  includeMnemonics: boolean = false
 ) => {
   try {
     const ai = getAiClient();
@@ -80,6 +82,21 @@ export const generateFlashcards = async (
         typeInstruction = 'Foque em conceitos-chave, prazos, exceções ou princípios de forma equilibrada.';
     }
 
+    let sourceInstruction = '';
+    switch (sourceType) {
+      case 'Letra da Lei':
+        sourceInstruction = 'O texto é "Letra da Lei". Foque intensamente em prazos, exceções, quóruns e palavras-chave restritivas ou ampliativas (ex: "salvo", "independentemente", "exclusivamente").';
+        break;
+      case 'Doutrina':
+        sourceInstruction = 'O texto é "Doutrina". Foque em teorias, classificações, divergências doutrinárias e conceitos acadêmicos.';
+        break;
+      case 'Jurisprudência':
+        sourceInstruction = 'O texto é "Jurisprudência/Acórdão". Foque na Tese Fixada, Ratio Decidendi, Súmulas relacionadas e o entendimento predominante dos tribunais superiores (STF/STJ).';
+        break;
+      default:
+        sourceInstruction = 'Trate o texto de forma equilibrada entre lei, doutrina e jurisprudência.';
+    }
+
     const formatInstruction = format === 'Cloze' 
       ? 'Use o formato CLOZE (Omissão de Palavras). Na frente (front), coloque a frase com a palavra ou termo omitido entre colchetes, ex: "A prescrição ocorre em [...] anos.". No verso (back), coloque apenas o termo omitido.'
       : 'Use o formato BÁSICO: Uma pergunta ou conceito na frente (front) e a resposta ou definição no verso (back).';
@@ -88,6 +105,10 @@ export const generateFlashcards = async (
       - Iniciante: Linguagem simples, conceitos fundamentais.
       - Graduação: Linguagem técnica acadêmica, doutrina clássica.
       - Concurso/OAB: Foco em "pegadinhas", letra da lei e jurisprudência pesada.`;
+
+    const mnemonicInstruction = includeMnemonics 
+      ? 'Sempre que houver uma lista de requisitos, princípios ou elementos, tente criar um mnemônico criativo (sigla ou frase) e inclua-o no final da resposta (back).'
+      : '';
 
     const parts: any[] = [];
     
@@ -104,9 +125,15 @@ export const generateFlashcards = async (
 
       Formato do Card:
       ${formatInstruction}
+
+      Tipo de Fonte:
+      ${sourceInstruction}
       
       Diretriz de Foco (${cardType}):
       ${typeInstruction}
+
+      Mnemônicos:
+      ${mnemonicInstruction}
       
       Instruções Adicionais do Usuário:
       ${customInstructions ? customInstructions : 'Nenhuma instrução adicional.'}
@@ -115,6 +142,7 @@ export const generateFlashcards = async (
       - As respostas (back) devem ser objetivas, didáticas e, se possível, citar o artigo de lei ou súmula pertinente.
       - Para cada card, sugira de 2 a 4 tags relevantes (ex: #prazos, #recursos, #cpc-art-1003).
       - Identifique a fonte ou artigo de lei específico citado no conteúdo para o campo "source".
+      - DETECÇÃO DE DESATUALIZAÇÃO: Se detectar que o texto cita leis revogadas ou normas antigas (ex: CPC/1973, Código Civil/1916), adicione um aviso claro no início da resposta (back) alertando sobre a desatualização e, se souber, a norma vigente equivalente.
       - Se o conteúdo fornecido for sem sentido ou insuficiente, retorne um array vazio.`
     });
 
