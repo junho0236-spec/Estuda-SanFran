@@ -1,7 +1,7 @@
 // Anki.tsx - Community Features and Card Rating
 // Anki.tsx - Community Features and Card Rating
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Plus, 
   BrainCircuit, 
@@ -49,6 +49,14 @@ interface AnkiProps {
 }
 
 const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folders, setFolders, userId, isOnline, initialText, setInitialText }) => {
+  if (subjects.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-slate-500 dark:text-slate-400">
+        <p>Por favor, crie uma disciplina primeiro para usar os Flashcards.</p>
+      </div>
+    );
+  }
+
   const [mode, setMode] = useState<'browse' | 'study' | 'create' | 'bulk' | 'ai_create'>('browse');
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(subjects.length > 0 ? subjects[0].id : '');

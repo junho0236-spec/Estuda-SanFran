@@ -809,7 +809,9 @@ const App: React.FC = () => {
                 {currentView === View.Editais && <Editais userId={session.user.id} />}
                 {currentView === View.Timeline && <TimelineBuilder />}
                 {currentView === View.DeadArchive && <DeadArchive userId={session.user.id} />}
-                {currentView === View.Anki && <Anki subjects={subjects} flashcards={flashcards} setFlashcards={setFlashcards} initialText={ankiTextToGenerate} setInitialText={setAnkiTextToGenerate} folders={folders} setFolders={setFolders} userId={session.user.id} isOnline={isOnline} />}
+                {currentView === View.Anki && subjects.length > 0 && (
+                  <Anki subjects={subjects} flashcards={flashcards} setFlashcards={setFlashcards} initialText={ankiTextToGenerate} setInitialText={setAnkiTextToGenerate} folders={folders} setFolders={setFolders} userId={session.user.id} isOnline={isOnline} />
+                )}
                 {currentView === View.Library && <Library readings={readings} setReadings={setReadings} subjects={subjects} userId={session.user.id} />}
                 {currentView === View.Largo && <Largo presenceUsers={presenceUsers} currentUserId={session.user.id} />}
                 {currentView === View.Mural && <Mural userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}

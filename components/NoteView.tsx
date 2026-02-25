@@ -1,11 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css'; // Import Quill styles
-import { ArrowLeft, Save, Loader2, FileText, BrainCircuit, Sparkles } from 'lucide-react';
-import { Note } from '../types';
-import { dataService } from '../services/dataService';
-import { summarizeText } from '../services/geminiService';
-
 import { ArrowLeft, Save, Loader2, FileText, BrainCircuit, Sparkles, Tag, Split, Download } from 'lucide-react';
 import { Note, Subject } from '../types';
 import { dataService } from '../services/dataService';
@@ -90,15 +85,6 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     loadNote();
   }, [loadNote]);
 
-  // Auto-save effect
-  useEffect(() => {
-    const autoSaveInterval = setInterval(() => {
-      saveNoteContent(true); // Call with isAuto = true
-    }, 30000); // Every 30 seconds
-
-    return () => clearInterval(autoSaveInterval);
-  }, [saveNoteContent]);
-
   const saveNoteContent = useCallback(async (isAuto: boolean = false) => {
     if (!noteContent.trim()) return; // Don't save empty notes
 
@@ -128,6 +114,15 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
       else setIsSaving(false);
     }
   }, [noteContent, noteId, selectedSubjectId, userId, isOnline]);
+
+  // Auto-save effect
+  useEffect(() => {
+    const autoSaveInterval = setInterval(() => {
+      saveNoteContent(true); // Call with isAuto = true
+    }, 30000); // Every 30 seconds
+
+    return () => clearInterval(autoSaveInterval);
+  }, [saveNoteContent]);
 
   const handleSaveNote = () => {
     saveNoteContent(false);
