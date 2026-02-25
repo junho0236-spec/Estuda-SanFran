@@ -192,6 +192,7 @@ const App: React.FC = () => {
   const [studySessions, setStudySessions] = useState<StudySession[]>([]);
   const [correctQuestionsCount, setCorrectQuestionsCount] = useState(0);
   const [selectedSubjectIdForNotes, setSelectedSubjectIdForNotes] = useState<string | null>(null);
+  const [ankiTextToGenerate, setAnkiTextToGenerate] = useState<string | null>(null);
 
   // --- Timer Global State (Pomodoro) ---
   const [timerIsActive, setTimerIsActive] = useState(false);
@@ -794,6 +795,10 @@ const App: React.FC = () => {
                     userId={session.user.id} 
                     isOnline={isOnline} 
                     onBack={() => setCurrentView(View.Subjects)} 
+                    onNavigateToAnki={(text) => {
+                      setAnkiTextToGenerate(text);
+                      setCurrentView(View.Anki);
+                    }}
                   />
                 )}
                 {currentView === View.Societies && <Societies userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
@@ -802,7 +807,7 @@ const App: React.FC = () => {
                 {currentView === View.Editais && <Editais userId={session.user.id} />}
                 {currentView === View.Timeline && <TimelineBuilder />}
                 {currentView === View.DeadArchive && <DeadArchive userId={session.user.id} />}
-                {currentView === View.Anki && <Anki subjects={subjects} flashcards={flashcards} setFlashcards={setFlashcards} folders={folders} setFolders={setFolders} userId={session.user.id} isOnline={isOnline} />}
+                {currentView === View.Anki && <Anki subjects={subjects} flashcards={flashcards} setFlashcards={setFlashcards} initialText={ankiTextToGenerate} setInitialText={setAnkiTextToGenerate} folders={folders} setFolders={setFolders} userId={session.user.id} isOnline={isOnline} />}
                 {currentView === View.Library && <Library readings={readings} setReadings={setReadings} subjects={subjects} userId={session.user.id} />}
                 {currentView === View.Largo && <Largo presenceUsers={presenceUsers} currentUserId={session.user.id} />}
                 {currentView === View.Mural && <Mural userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}

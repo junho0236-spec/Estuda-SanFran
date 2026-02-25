@@ -44,9 +44,11 @@ interface AnkiProps {
   setFolders: React.Dispatch<React.SetStateAction<Folder[]>>;
   userId: string;
   isOnline: boolean;
+  initialText: string | null;
+  setInitialText: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
-const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folders, setFolders, userId, isOnline }) => {
+const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folders, setFolders, userId, isOnline, initialText, setInitialText }) => {
   const [mode, setMode] = useState<'browse' | 'study' | 'create' | 'bulk' | 'ai_create'>('browse');
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(subjects[0]?.id || '');
@@ -64,13 +66,20 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [editingCard, setEditingCard] = useState<Flashcard | null>(null);
   
   // AI State
-  const [aiSourceText, setAiSourceText] = useState('');
+  const [aiSourceText, setAiSourceText] = useState(initialText || '');
   const [aiQuantity, setAiQuantity] = useState(5);
   const [aiCardType, setAiCardType] = useState('Geral');
   const [aiCustomInstructions, setAiCustomInstructions] = useState('');
   const [aiGeneratedCardsPreview, setAiGeneratedCardsPreview] = useState<any[]>([]);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [cardRatings, setCardRatings] = useState<Record<number, 'up' | 'down' | null>>({});
+
+  useEffect(() => {
+    if (initialText) {
+      setAiSourceText(initialText);
+      setInitialText(null); // Clear initialText after use
+    }
+  }, [initialText, setInitialText]);
 
   const handleRegenerateCard = async (index: number) => {
     const card = aiGeneratedCardsPreview[index];
