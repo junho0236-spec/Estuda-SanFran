@@ -287,11 +287,13 @@ const Statistics: React.FC<StatisticsProps> = ({
                     tickLine={false} 
                     tick={{fontSize: 10, fontWeight: 900, fill: '#94a3b8'}}
                     dy={10}
+                    xAxisId={0}
                   />
                   <YAxis 
                     axisLine={false} 
                     tickLine={false} 
                     tick={{fontSize: 10, fontWeight: 900, fill: '#94a3b8'}}
+                    yAxisId={0}
                   />
                   <Tooltip 
                     cursor={{fill: 'rgba(155, 17, 30, 0.05)'}}
@@ -315,11 +317,13 @@ const Statistics: React.FC<StatisticsProps> = ({
                     tickLine={false} 
                     tick={{fontSize: 10, fontWeight: 900, fill: '#94a3b8'}}
                     dy={10}
+                    xAxisId={0}
                   />
                   <YAxis 
                     axisLine={false} 
                     tickLine={false} 
                     tick={{fontSize: 10, fontWeight: 900, fill: '#94a3b8'}}
+                    yAxisId={0}
                   />
                   <Tooltip 
                     cursor={{fill: 'rgba(155, 17, 30, 0.05)'}}
@@ -407,11 +411,13 @@ const Statistics: React.FC<StatisticsProps> = ({
                   tickLine={false} 
                   tick={{fontSize: 10, fontWeight: 900, fill: '#94a3b8'}}
                   dy={10}
+                  xAxisId={0}
                 />
                 <YAxis 
                   axisLine={false} 
                   tickLine={false} 
                   tick={{fontSize: 10, fontWeight: 900, fill: '#94a3b8'}}
+                  yAxisId={0}
                 />
                 <Tooltip 
                   cursor={{fill: 'rgba(59, 130, 246, 0.05)'}}
