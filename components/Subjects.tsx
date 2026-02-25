@@ -23,6 +23,8 @@ const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId, onVi
   const [endDate, setEndDate] = useState('');
   const [absences, setAbsences] = useState(0);
   const [maxAbsences, setMaxAbsences] = useState(20);
+  const [semesterYear, setSemesterYear] = useState('');
+  const [workload, setWorkload] = useState(0);
 
   const colors = [
     '#9B111E', '#1094ab', '#fcb421', '#1a1a1a', 
@@ -38,7 +40,9 @@ const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId, onVi
       semester_start_date: startDate || null,
       semester_end_date: endDate || null,
       absences: absences,
-      max_absences: maxAbsences
+      max_absences: maxAbsences,
+      semester_year: semesterYear || null,
+      workload: workload
     };
 
     try {
@@ -66,6 +70,8 @@ const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId, onVi
       setEndDate('');
       setAbsences(0);
       setMaxAbsences(20);
+      setSemesterYear('');
+      setWorkload(0);
 
     } catch (err) {
       console.error(err);
@@ -95,6 +101,8 @@ const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId, onVi
     setEndDate(subject.semester_end_date || '');
     setAbsences(subject.absences || 0);
     setMaxAbsences(subject.max_absences || 20);
+    setSemesterYear(subject.semester_year || '');
+    setWorkload(subject.workload || 0);
   };
 
   const getNextDeadline = (subjectId: string) => {
@@ -144,6 +152,10 @@ const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId, onVi
                   <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Nome da Cadeira</label>
                   <input type="text" value={newSubjectName} onChange={(e) => setNewSubjectName(e.target.value)} placeholder="Ex: Teoria Geral do Estado" className="w-full p-4 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-slate-800 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-[#9B111E] text-slate-800 dark:text-slate-100" />
                 </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Semestre / Ano</label>
+                  <input type="text" value={semesterYear} onChange={(e) => setSemesterYear(e.target.value)} placeholder="Ex: 1º Semestre / 2026" className="w-full p-4 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-slate-800 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-[#9B111E] text-slate-800 dark:text-slate-100" />
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Início do Semestre</label>
@@ -165,6 +177,10 @@ const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId, onVi
                   </div>
                 </div>
                 <div>
+                  <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Carga Horária (horas)</label>
+                  <input type="number" value={workload} onChange={(e) => setWorkload(parseInt(e.target.value))} placeholder="Ex: 60" className="w-full p-4 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-slate-800 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-[#9B111E] text-slate-800 dark:text-slate-100" />
+                </div>
+                <div>
                   <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Selo de Identificação</label>
                   <div className="grid grid-cols-4 gap-2">
                     {colors.map(color => (
@@ -180,7 +196,7 @@ const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId, onVi
                   <Plus className="w-5 h-5" /> {isSaving ? 'Salvando...' : (editingSubject ? 'Atualizar Cadeira' : 'Adicionar Cadeira')}
                 </button>
                 {editingSubject && (
-                  <button onClick={() => { setEditingSubject(null); setNewSubjectName(''); setSelectedColor('#9B111E'); setStartDate(''); setEndDate(''); setAbsences(0); setMaxAbsences(20); }} className="w-full text-center text-xs text-slate-400 font-bold mt-2">Cancelar Edição</button>
+                  <button onClick={() => { setEditingSubject(null); setNewSubjectName(''); setSelectedColor('#9B111E'); setStartDate(''); setEndDate(''); setAbsences(0); setMaxAbsences(20); setSemesterYear(''); setWorkload(0); }} className="w-full text-center text-xs text-slate-400 font-bold mt-2">Cancelar Edição</button>
                 )}
               </div>
             </div>
