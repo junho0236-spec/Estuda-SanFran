@@ -27,7 +27,9 @@ import {
   History,
   FileDown,
   ThumbsUp,
-  ThumbsDown
+  ThumbsDown,
+  MoreVertical,
+  Edit2
 } from 'lucide-react';
 import JSZip from 'jszip';
 import { Flashcard, Subject, Folder } from '../types';
@@ -72,6 +74,15 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [newFolderName, setNewFolderName] = useState('');
   const [showFolderInput, setShowFolderInput] = useState(false);
   const [editingCard, setEditingCard] = useState<Flashcard | null>(null);
+  const [activeMenuFolderId, setActiveMenuFolderId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = () => setActiveMenuFolderId(null);
+    if (activeMenuFolderId) {
+      window.addEventListener('click', handleClickOutside);
+    }
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, [activeMenuFolderId]);
   
   // AI State
   const [aiSourceText, setAiSourceText] = useState(initialText || '');
@@ -233,8 +244,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     }
   };
 
-  const deleteFolder = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const deleteFolder = async (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (!confirm("Deseja eliminar esta pasta? Todos os flashcards nela contidos ficarão órfãos de categoria.")) return;
     try {
       const { error } = await supabase.from('folders').delete().eq('id', id).eq('user_id', userId);
@@ -246,8 +257,88 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       if (currentFolderId === id) {
         setCurrentFolderId(null);
       }
+      setActiveMenuFolderId(null);
     } catch (err) {
       alert("Erro ao eliminar pasta.");
+    }
+  };
+
+  const handleRenameFolder = async (id: string, currentName: string) => {
+    const newName = prompt("Novo nome para a pasta:", currentName);
+    if (!newName || newName === currentName) return;
+
+    try {
+      const { error } = await supabase.from('folders').update({ name: newName }).eq('id', id).eq('user_id', userId);
+      if (error) throw error;
+      
+      setFolders(prev => prev.map(f => f.id === id ? { ...f, name: newName } : f));
+      setActiveMenuFolderId(null);
+    } catch (err) {
+      alert("Erro ao renomear pasta.");
+    }
+  };
+
+  const handleResetFolderProgress = async (folderId: string) => {
+    if (!confirm("Deseja zerar o progresso de todos os cards nesta pasta? Eles voltarão ao status de 'Novos'.")) return;
+    
+    try {
+      const subfolderIds = getSubfolderIds(folderId);
+      const cardsToReset = activeFlashcards.filter(f => subfolderIds.includes(f.folderId as string));
+      
+      await Promise.all(cardsToReset.map(card => {
+        const updatedCard = { ...card, interval: 0, nextReview: Date.now() };
+        return dataService.saveFlashcard(updatedCard, userId, isOnline);
+      }));
+      
+      setFlashcards(prev => prev.map(f => {
+        if (subfolderIds.includes(f.folderId as string)) {
+          return { ...f, interval: 0, nextReview: Date.now() };
+        }
+        return f;
+      }));
+      
+      setActiveMenuFolderId(null);
+      alert("Progresso zerado com sucesso!");
+    } catch (err) {
+      alert("Erro ao zerar progresso.");
+    }
+  };
+
+  const handleExportFolder = async (folderId: string, folderName: string) => {
+    setIsLoading(true);
+    try {
+      const subfolderIds = getSubfolderIds(folderId);
+      const cardsToExport = activeFlashcards.filter(f => subfolderIds.includes(f.folderId as string));
+      
+      if (cardsToExport.length === 0) {
+        alert("Não há cards nesta pasta para exportar.");
+        return;
+      }
+
+      const zip = new JSZip();
+      const deckData = {
+        name: folderName,
+        cards: cardsToExport.map(c => ({
+          front: c.front,
+          back: c.back,
+          notes: c.notes,
+          tags: c.tags
+        }))
+      };
+
+      zip.file("deck.json", JSON.stringify(deckData, null, 2));
+      const content = await zip.generateAsync({ type: "blob" });
+      
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(content);
+      link.download = `${folderName.replace(/\s+/g, '_')}.apkg`; // Simulating .apkg with a zip containing json
+      link.click();
+      
+      setActiveMenuFolderId(null);
+    } catch (err) {
+      alert("Erro ao exportar deck.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -612,27 +703,54 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   </button>
                   
                   {/* BOTÃO GERAR COM IA */}
-                  <button 
-                    onClick={() => setMode('ai_create')} 
-                    className="flex items-center gap-2 px-6 py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:scale-105 transition-all"
-                  >
-                    <Sparkles className="w-5 h-5" /> Gerar com IA
-                  </button>
+                  <div className="relative group">
+                    <button 
+                      onClick={() => setMode('ai_create')} 
+                      className="flex items-center gap-2 px-6 py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:scale-105 transition-all"
+                    >
+                      <Sparkles className="w-5 h-5" /> Gerar com IA
+                    </button>
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1 bg-slate-900 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
+                      Criar cards automaticamente com IA
+                    </div>
+                  </div>
 
-                  <button onClick={() => {setMode('create');}} className="flex items-center gap-2 px-6 py-3.5 bg-white dark:bg-sanfran-rubiDark text-sanfran-rubi dark:text-white border-2 border-sanfran-rubi rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-50 shadow-xl">
-                    <Plus className="w-5 h-5" /> Novo Card
-                  </button>
+                  <div className="relative group">
+                    <button onClick={() => {setMode('create');}} className="flex items-center gap-2 px-6 py-3.5 bg-white dark:bg-sanfran-rubiDark text-sanfran-rubi dark:text-white border-2 border-sanfran-rubi rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-50 shadow-xl">
+                      <Plus className="w-5 h-5" /> Novo Card
+                    </button>
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1 bg-slate-900 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
+                      Criar card manualmente
+                    </div>
+                  </div>
                   
                   {/* Botões Secundários em Dropdown ou Compactos */}
-                  <button onClick={() => setMode('bulk')} className="p-3.5 bg-usp-blue text-white rounded-2xl shadow-xl" title="Importação em Lote">
-                    <FolderPlus className="w-5 h-5" />
-                  </button>
-                  <button onClick={() => setIsSelectionMode(true)} className="p-3.5 bg-white dark:bg-sanfran-rubiDark text-slate-500 border-2 border-slate-200 rounded-2xl shadow-xl" title="Seleção">
-                    <CheckSquare className="w-5 h-5" />
-                  </button>
-                  <button onClick={() => setShowFolderInput(true)} className="p-3.5 bg-white dark:bg-sanfran-rubiDark text-sanfran-rubi border-2 border-slate-200 rounded-2xl shadow-sm" title="Nova Pasta">
-                    <Plus className="w-6 h-6" />
-                  </button>
+                  <div className="relative group">
+                    <button onClick={() => setMode('bulk')} className="p-3.5 bg-usp-blue text-white rounded-2xl shadow-xl">
+                      <FolderPlus className="w-5 h-5" />
+                    </button>
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1 bg-slate-900 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
+                      Importação em Lote
+                    </div>
+                  </div>
+
+                  <div className="relative group">
+                    <button onClick={() => setIsSelectionMode(true)} className="p-3.5 bg-white dark:bg-sanfran-rubiDark text-slate-500 border-2 border-slate-200 rounded-2xl shadow-xl">
+                      <CheckSquare className="w-5 h-5" />
+                    </button>
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1 bg-slate-900 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
+                      Modo Seleção
+                    </div>
+                  </div>
+
+                  <div className="relative group">
+                    <button onClick={() => setShowFolderInput(true)} className="p-3.5 bg-white dark:bg-sanfran-rubiDark text-sanfran-rubi border-2 border-slate-200 rounded-2xl shadow-sm">
+                      <Plus className="w-6 h-6" />
+                    </button>
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1 bg-slate-900 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
+                      Nova Pasta
+                    </div>
+                  </div>
                 </>
               )}
             </>
@@ -659,12 +777,49 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
             const stats = getFolderStats(folder.id);
             return (
               <div key={folder.id} onClick={() => setCurrentFolderId(folder.id)} className="group bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2rem] border-2 border-slate-200 dark:border-sanfran-rubi/40 shadow-xl cursor-pointer hover:border-usp-gold border-l-[10px] border-l-usp-gold transition-all relative">
-                <button 
-                  onClick={(e) => deleteFolder(folder.id, e)} 
-                  className="absolute top-4 right-4 p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="absolute top-4 right-4 flex items-center gap-1">
+                  <div className="relative">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveMenuFolderId(activeMenuFolderId === folder.id ? null : folder.id);
+                      }}
+                      className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-full hover:bg-slate-100 dark:hover:bg-white/10 transition-all"
+                    >
+                      <MoreVertical className="w-5 h-5" />
+                    </button>
+                    
+                    {activeMenuFolderId === folder.id && (
+                      <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-white/10 z-50 overflow-hidden animate-in fade-in zoom-in duration-200">
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleRenameFolder(folder.id, folder.name); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-left text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 transition-all"
+                        >
+                          <Edit2 className="w-4 h-4 text-blue-500" /> Renomear
+                        </button>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleExportFolder(folder.id, folder.name); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-left text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 transition-all"
+                        >
+                          <FileDown className="w-4 h-4 text-emerald-500" /> Exportar (.apkg)
+                        </button>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleResetFolderProgress(folder.id); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-left text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 transition-all"
+                        >
+                          <RotateCcw className="w-4 h-4 text-orange-500" /> Zerar Progresso
+                        </button>
+                        <div className="h-px bg-slate-100 dark:bg-white/10 mx-2"></div>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); deleteFolder(folder.id, e); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-left text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+                        >
+                          <Trash2 className="w-4 h-4" /> Excluir
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
                 <FolderIcon className="text-usp-gold w-8 h-8 mb-4" />
                 <h4 className="font-black text-slate-950 dark:text-white uppercase tracking-tight mb-2">{folder.name}</h4>
                 
