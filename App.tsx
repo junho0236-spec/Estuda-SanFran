@@ -920,6 +920,7 @@ const App: React.FC = () => {
                       setSelectedSubjectIdForNotes(subjectId);
                       setCurrentView(View.NoteView);
                     }}
+                    tasks={tasks}
                   />
                 )}
                 {currentView === View.Tasks && <Tasks subjects={subjects} tasks={tasks} setTasks={setTasks} userId={session.user.id} isOnline={isOnline} />}
