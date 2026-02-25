@@ -42,10 +42,15 @@ import {
   Settings2,
   Activity,
   Volume2,
-  ZapOff
+  ZapOff,
+  Star,
+  ShieldCheck,
+  Eye,
+  AlertCircle,
+  ArrowRight
 } from 'lucide-react';
 import JSZip from 'jszip';
-import { Flashcard, Subject, Folder } from '../types';
+import { Flashcard, Subject, Folder, DeckRequest } from '../types';
 import { supabase } from '../services/supabaseClient';
 import { dataService } from '../services/dataService';
 import { updateQuestProgress } from '../services/questService';
@@ -102,6 +107,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [isCramMode, setIsCramMode] = useState(false);
   const [isAudioMode, setIsAudioMode] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [audioSpeed, setAudioSpeed] = useState(1);
 
   useEffect(() => {
     const handleClickOutside = () => setActiveMenuFolderId(null);
@@ -119,6 +125,15 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [aiGeneratedCardsPreview, setAiGeneratedCardsPreview] = useState<any[]>([]);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [cardRatings, setCardRatings] = useState<Record<number, 'up' | 'down' | null>>({});
+
+  // Community Hub State
+  const [deckRequests, setDeckRequests] = useState<DeckRequest[]>([]);
+  const [newRequestTopic, setNewRequestTopic] = useState('');
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+  const [isCollaborativeModalOpen, setIsCollaborativeModalOpen] = useState(false);
+  const [newCollaborativeDeckName, setNewCollaborativeDeckName] = useState('');
+  const [previewDeck, setPreviewDeck] = useState<any | null>(null);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
 
   useEffect(() => {
     if (initialText) {
@@ -426,11 +441,14 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     try {
       // 1. Create a folder for the imported deck
       const folderId = Math.random().toString(36).substr(2, 9);
+      const folderName = `${deck.name} (Cópia)`;
       const { error: folderError } = await supabase.from('folders').insert({
         id: folderId,
         user_id: userId,
-        name: `Importado: ${deck.name}`,
-        parent_id: null
+        name: folderName,
+        parent_id: null,
+        original_deck_id: deck.id,
+        version: deck.version || 1
       });
 
       if (folderError) throw folderError;
@@ -446,13 +464,21 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         folderId: folderId,
         nextReview: Date.now(),
         interval: 0,
-        archived_at: null
+        archived_at: null,
+        is_suspended: false // Ensure cards are not suspended when forked
       }));
 
       await Promise.all(cardsToInsert.map(c => dataService.saveFlashcard(c, userId, isOnline)));
 
       // 3. Update local state
-      setFolders(prev => [...prev, { id: folderId, name: `Importado: ${deck.name}`, parentId: null }]);
+      setFolders(prev => [...prev, { 
+        id: folderId, 
+        name: folderName, 
+        parentId: null, 
+        user_id: userId,
+        original_deck_id: deck.id,
+        version: deck.version || 1
+      }]);
       setFlashcards(prev => [...prev, ...cardsToInsert]);
 
       // 4. Increment download count
@@ -760,6 +786,84 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     }
   };
 
+  const fetchDeckRequests = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('deck_requests')
+        .select('*')
+        .order('votes', { ascending: false });
+      if (error) throw error;
+      setDeckRequests(data);
+    } catch (err) {
+      console.error("Erro ao carregar pedidos de decks:", err);
+    }
+  };
+
+  const handleCreateDeckRequest = async () => {
+    if (!newRequestTopic.trim()) { alert("O tópico do pedido não pode ser vazio."); return; }
+    if (!userId) { alert("Você precisa estar logado para fazer pedidos."); return; }
+
+    try {
+      const { error } = await supabase.from('deck_requests').insert({
+        id: Math.random().toString(36).substr(2, 9),
+        user_id: userId,
+        topic: newRequestTopic,
+        votes: 0,
+      });
+      if (error) throw error;
+      setNewRequestTopic('');
+      setIsRequestModalOpen(false);
+      fetchDeckRequests(); // Refresh the list
+    } catch (err) {
+      alert("Erro ao criar pedido de deck.");
+    }
+  };
+
+  const handleVoteDeckRequest = async (requestId: string) => {
+    if (!userId) { alert("Você precisa estar logado para votar."); return; }
+
+    try {
+      // Check if user already voted (simple client-side check for now)
+      // In a real app, this would involve a separate 'votes' table
+      const request = deckRequests.find(req => req.id === requestId);
+      if (request) {
+        const { error } = await supabase.from('deck_requests').update({ votes: request.votes + 1 }).eq('id', requestId);
+        if (error) throw error;
+        fetchDeckRequests(); // Refresh the list
+      }
+    } catch (err) {
+      alert("Erro ao votar no pedido.");
+    }
+  };
+
+  const handleCreateCollaborativeDeck = async () => {
+    if (!newCollaborativeDeckName.trim()) { alert("O nome do deck não pode ser vazio."); return; }
+    if (!userId) { alert("Você precisa estar logado para criar decks colaborativos."); return; }
+
+    try {
+      const newFolderId = Math.random().toString(36).substr(2, 9);
+      const { error } = await supabase.from('folders').insert({
+        id: newFolderId,
+        user_id: userId,
+        name: newCollaborativeDeckName,
+        parent_id: null,
+        shared: true, // Mark as shared
+      });
+      if (error) throw error;
+      setNewCollaborativeDeckName('');
+      setIsCollaborativeModalOpen(false);
+      setFolders(prev => [...prev, { id: newFolderId, name: newCollaborativeDeckName, parentId: null, user_id: userId, shared: true }]);
+      alert(`Deck colaborativo '${newCollaborativeDeckName}' criado! Outros usuários podem ser convidados a contribuir.`);
+    } catch (err) {
+      alert("Erro ao criar deck colaborativo.");
+    }
+  };
+
+  useEffect(() => {
+    fetchDeckRequests();
+    fetchPublicDecks();
+  }, []); // Fetch requests and public decks on component mount
+
   const getFolderStats = (folderId: string) => {
     const subfolderIds = getSubfolderIds(folderId);
     const folderCards = activeFlashcards.filter(f => subfolderIds.includes(f.folderId as string));
@@ -833,10 +937,11 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       // Speak Front
       const frontUtterance = new SpeechSynthesisUtterance(card.front);
       frontUtterance.lang = 'pt-BR';
+      frontUtterance.rate = audioSpeed;
       window.speechSynthesis.speak(frontUtterance);
 
       frontUtterance.onend = () => {
-        // Wait 3 seconds
+        // Wait 4 seconds (average of 3-5)
         setTimeout(() => {
           if (!isAudioMode) {
             setIsSpeaking(false);
@@ -848,6 +953,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
           // Speak Back
           const backUtterance = new SpeechSynthesisUtterance(card.back);
           backUtterance.lang = 'pt-BR';
+          backUtterance.rate = audioSpeed;
           window.speechSynthesis.speak(backUtterance);
 
           backUtterance.onend = () => {
@@ -869,7 +975,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               }
             }, 2000);
           };
-        }, 3000);
+        }, 4000);
       };
     };
 
@@ -878,7 +984,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     return () => {
       window.speechSynthesis.cancel();
     };
-  }, [isAudioMode, mode, currentIndex, reviewQueue]);
+  }, [isAudioMode, mode, currentIndex, reviewQueue, audioSpeed]);
 
   const handleReview = async (quality: number) => {
     const card = reviewQueue[currentIndex];
@@ -976,7 +1082,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                     </div>
                   </div>
 
-                  <div className="relative group">
+                  <div className="relative group flex items-center gap-2">
                     <button 
                       onClick={() => {
                         setIsAudioMode(!isAudioMode);
@@ -990,6 +1096,18 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                     >
                       <Volume2 className="w-5 h-5" /> {isAudioMode ? 'Parar Áudio' : 'Modo Áudio'}
                     </button>
+                    {isAudioMode && (
+                      <select 
+                        value={audioSpeed} 
+                        onChange={(e) => setAudioSpeed(parseFloat(e.target.value))}
+                        className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border-2 border-emerald-600 rounded-xl px-2 py-3 text-[10px] font-black outline-none"
+                      >
+                        <option value="1">1x</option>
+                        <option value="1.25">1.25x</option>
+                        <option value="1.5">1.5x</option>
+                        <option value="2">2x</option>
+                      </select>
+                    )}
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1 bg-slate-900 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
                       Estudo por voz (TTS)
                     </div>
@@ -1156,18 +1274,27 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               {publicDecks
                 .filter(d => d.name.toLowerCase().includes(communitySearch.toLowerCase()))
                 .map(deck => (
-                <div key={deck.id} className="group bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2.5rem] border-2 border-slate-200 dark:border-white/5 shadow-xl hover:border-purple-500 transition-all flex flex-col justify-between h-[320px] relative overflow-hidden">
+                <div key={deck.id} className="group bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2.5rem] border-2 border-slate-200 dark:border-white/5 shadow-xl hover:border-purple-500 transition-all flex flex-col justify-between h-[400px] relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-3xl -mr-10 -mt-10"></div>
                   
-                  <div>
+                  {deck.is_verified && (
+                    <div className="absolute top-6 left-6 z-10">
+                      <div className="flex items-center gap-1.5 px-3 py-1 bg-usp-gold/10 border border-usp-gold/30 rounded-full">
+                        <ShieldCheck size={14} className="text-usp-gold" />
+                        <span className="text-[10px] font-black text-usp-gold uppercase tracking-widest">Curadoria SanFran</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className={deck.is_verified ? 'mt-8' : ''}>
                     <div className="flex items-center justify-between mb-4">
                       <span className="px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-full text-[10px] font-black uppercase tracking-wider">
                         {deck.cards?.length || 0} Cards
                       </span>
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1 text-slate-400">
-                          <ThumbsUp size={14} className="cursor-pointer hover:text-purple-500 transition-colors" onClick={(e) => { e.stopPropagation(); handleLikeDeck(deck); }} />
-                          <span className="text-[10px] font-black">{deck.likes || 0}</span>
+                          <Star size={14} className={`transition-colors ${deck.rating >= 4 ? 'text-usp-gold fill-usp-gold' : ''}`} />
+                          <span className="text-[10px] font-black">{deck.rating || 'N/A'}</span>
                         </div>
                         <div className="flex items-center gap-1 text-slate-400">
                           <FileDown size={14} />
@@ -1175,21 +1302,33 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                         </div>
                       </div>
                     </div>
-                    <h3 className="text-xl font-black text-slate-950 dark:text-white uppercase leading-tight mb-2">{deck.name}</h3>
+                    <h3 className="text-xl font-black text-slate-950 dark:text-white uppercase leading-tight mb-1">{deck.name}</h3>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
+                      Criado por: <span className="text-slate-600 dark:text-slate-300">{deck.author_name || 'Anônimo'}</span> {deck.author_year && `• ${deck.author_year}`}
+                    </p>
                     <p className="text-xs font-bold text-slate-500 dark:text-slate-400 line-clamp-3">
-                      Deck colaborativo criado para auxiliar nos estudos de {subjects.find(s => s.id === deck.subject_id)?.name || 'Direito'}.
+                      {deck.description || `Deck colaborativo criado para auxiliar nos estudos de ${subjects.find(s => s.id === deck.subject_id)?.name || 'Direito'}.`}
                     </p>
                   </div>
 
-                  <div className="mt-6 flex items-center gap-3">
-                    <button 
-                      onClick={() => handleDownloadDeck(deck)}
-                      className="flex-1 flex items-center justify-center gap-2 py-4 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-purple-500/20 transition-all"
-                    >
-                      <Download size={16} /> Baixar Deck
-                    </button>
-                    <button className="p-4 bg-slate-100 dark:bg-white/5 text-slate-500 rounded-2xl hover:text-purple-500 transition-all">
-                      <Link size={18} />
+                  <div className="mt-6 flex flex-col gap-3">
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={() => handleDownloadDeck(deck)}
+                        className="flex-1 flex items-center justify-center gap-2 py-4 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-purple-500/20 transition-all"
+                      >
+                        <Download size={16} /> Baixar Deck
+                      </button>
+                      <button 
+                        onClick={() => { setPreviewDeck(deck); setIsPreviewModalOpen(true); }}
+                        className="p-4 bg-slate-100 dark:bg-white/5 text-slate-500 rounded-2xl hover:text-purple-500 transition-all group/preview"
+                        title="Ver Amostra"
+                      >
+                        <Eye size={18} className="group-hover/preview:scale-110 transition-transform" />
+                      </button>
+                    </div>
+                    <button className="w-full py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-purple-500 transition-colors flex items-center justify-center gap-2">
+                      <Link size={12} /> Copiar Link Permanente
                     </button>
                   </div>
                 </div>
@@ -1306,8 +1445,18 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
           {currentFolders.map(folder => {
             const stats = getFolderStats(folder.id);
+            const hasUpdate = folder.original_deck_id && publicDecks.some(pd => pd.id === folder.original_deck_id && (pd.version || 1) > (folder.version || 1));
+            
             return (
               <div key={folder.id} onClick={() => setCurrentFolderId(folder.id)} className="group bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2rem] border-2 border-slate-200 dark:border-sanfran-rubi/40 shadow-xl cursor-pointer hover:border-usp-gold border-l-[10px] border-l-usp-gold transition-all relative">
+                {hasUpdate && (
+                  <div className="absolute -top-3 -right-3 z-20 animate-bounce">
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 text-white rounded-full shadow-lg border-2 border-white dark:border-slate-900">
+                      <AlertCircle size={12} />
+                      <span className="text-[9px] font-black uppercase tracking-widest">Atualização Disponível</span>
+                    </div>
+                  </div>
+                )}
                 <div className="absolute top-4 right-4 flex items-center gap-1">
                   <div className="relative">
                     <button 
@@ -1546,10 +1695,45 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
             </div>
           </div>
           {isFlipped && (
-            <div className="mt-12 grid grid-cols-3 gap-6 w-full max-w-2xl">
-              <button onClick={() => handleReview(0)} className="p-6 bg-red-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Difícil</button>
-              <button onClick={() => handleReview(3)} className="p-6 bg-usp-gold text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Médio</button>
-              <button onClick={() => handleReview(5)} className="p-6 bg-usp-blue text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Fácil</button>
+            <div className="mt-12 w-full max-w-2xl flex flex-col items-center gap-6">
+              {isCramMode ? (
+                <button 
+                  onClick={() => {
+                    if (currentIndex < reviewQueue.length - 1) {
+                      setCurrentIndex(prev => prev + 1);
+                      setIsFlipped(false);
+                    } else {
+                      setMode('browse');
+                    }
+                  }} 
+                  className="w-full p-6 bg-orange-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3"
+                >
+                  Próximo Card <ArrowRight size={18} />
+                </button>
+              ) : (
+                <div className="grid grid-cols-3 gap-6 w-full">
+                  <button onClick={() => handleReview(0)} className="p-6 bg-red-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Difícil</button>
+                  <button onClick={() => handleReview(3)} className="p-6 bg-usp-gold text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Médio</button>
+                  <button onClick={() => handleReview(5)} className="p-6 bg-usp-blue text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Fácil</button>
+                </div>
+              )}
+
+              {isAudioMode && (
+                <div className="flex items-center gap-4 bg-slate-100 dark:bg-white/5 p-4 rounded-2xl border border-slate-200 dark:border-white/10">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Velocidade:</span>
+                  <div className="flex gap-2">
+                    {[1, 1.25, 1.5, 2].map(speed => (
+                      <button 
+                        key={speed}
+                        onClick={() => setAudioSpeed(speed)}
+                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${audioSpeed === speed ? 'bg-emerald-600 text-white' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}
+                      >
+                        {speed}x
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
           <button onClick={() => setMode('browse')} className="mt-12 text-slate-400 font-black text-xs uppercase underline">Sair da Audiência</button>
@@ -2023,6 +2207,76 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 className="w-full py-4 mt-4 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-sm shadow-xl hover:bg-sanfran-rubiDark transition-colors"
               >
                 Salvar Alterações
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* PREVIEW MODAL */}
+      {isPreviewModalOpen && previewDeck && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-sanfran-rubiDark rounded-[3.5rem] w-full max-w-3xl shadow-2xl border-4 border-purple-500/30 relative overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
+            <div className="p-10 border-b border-slate-100 dark:border-white/5 bg-gradient-to-br from-purple-600 to-indigo-700 text-white">
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Eye className="w-6 h-6 text-purple-200" />
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-purple-200">Amostra Grátis</span>
+                  </div>
+                  <h3 className="text-3xl font-black uppercase tracking-tighter">{previewDeck.name}</h3>
+                  <p className="text-purple-100 font-bold text-sm">Visualizando 5 cards aleatórios para conferência de estilo.</p>
+                </div>
+                <button onClick={() => setIsPreviewModalOpen(false)} className="p-3 bg-white/10 hover:bg-white/20 rounded-full transition-colors">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              
+              <div className="flex flex-wrap gap-4">
+                <div className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-2xl border border-white/20">
+                  <Star size={14} className="text-usp-gold fill-usp-gold" />
+                  <span className="text-xs font-black">{previewDeck.rating || 'N/A'}</span>
+                </div>
+                <div className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-2xl border border-white/20">
+                  <FileDown size={14} />
+                  <span className="text-xs font-black">{previewDeck.downloads || 0} Downloads</span>
+                </div>
+                {previewDeck.is_verified && (
+                  <div className="flex items-center gap-2 px-4 py-2 bg-usp-gold/20 rounded-2xl border border-usp-gold/40">
+                    <ShieldCheck size={14} className="text-usp-gold" />
+                    <span className="text-xs font-black text-usp-gold uppercase tracking-widest">Verificado</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-10 space-y-6 custom-scrollbar">
+              {(previewDeck.cards?.slice(0, 5) || []).map((card: any, idx: number) => (
+                <div key={idx} className="p-8 bg-slate-50 dark:bg-white/5 rounded-[2rem] border-2 border-slate-100 dark:border-white/5 relative group">
+                  <span className="absolute top-6 right-8 text-[10px] font-black text-slate-300 uppercase">Card {idx + 1}</span>
+                  <div className="mb-4">
+                    <span className="text-[9px] font-black text-purple-500 uppercase tracking-widest block mb-2">Pergunta</span>
+                    <p className="text-lg font-black text-slate-900 dark:text-white leading-tight">{card.front}</p>
+                  </div>
+                  <div className="pt-4 border-t border-slate-200 dark:border-white/10">
+                    <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest block mb-2">Resposta</span>
+                    <p className="text-sm font-bold text-slate-600 dark:text-slate-300 leading-relaxed">{card.back}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-10 bg-slate-50 dark:bg-black/20 border-t border-slate-100 dark:border-white/5 flex gap-4">
+              <button 
+                onClick={() => setIsPreviewModalOpen(false)}
+                className="flex-1 py-5 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-[2rem] font-black uppercase text-xs tracking-widest border-2 border-slate-200 dark:border-white/10"
+              >
+                Voltar
+              </button>
+              <button 
+                onClick={() => { handleDownloadDeck(previewDeck); setIsPreviewModalOpen(false); }}
+                className="flex-[2] py-5 bg-purple-600 text-white rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl shadow-purple-500/20"
+              >
+                Gostei, Baixar Agora
               </button>
             </div>
           </div>

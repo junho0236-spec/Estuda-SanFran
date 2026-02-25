@@ -103,6 +103,18 @@ export interface Folder {
   id: string;
   name: string;
   parentId: string | null;
+  user_id?: string; // Optional for public/community decks
+  shared?: boolean; // New: Indicates if this is a collaborative deck
+  original_deck_id?: string; // For update alerts
+  version?: number; // For versioning
+}
+
+export interface DeckRequest {
+  id: string;
+  user_id: string;
+  topic: string;
+  votes: number;
+  created_at: string;
 }
 
 export interface Flashcard {
