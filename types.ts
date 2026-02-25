@@ -186,6 +186,7 @@ export interface Note {
   user_id: string;
   content: string;
   updated_at: string;
+  tags?: string[];
 }
 
 export interface Badge {

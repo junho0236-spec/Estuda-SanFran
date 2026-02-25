@@ -799,6 +799,8 @@ const App: React.FC = () => {
                       setAnkiTextToGenerate(text);
                       setCurrentView(View.Anki);
                     }}
+                    subjects={subjects}
+                    onToggleSidebar={setIsSidebarOpen}
                   />
                 )}
                 {currentView === View.Societies && <Societies userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
