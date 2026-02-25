@@ -123,6 +123,10 @@ export interface Subject {
   id: string;
   name: string;
   color: string;
+  semester_start_date?: string;
+  semester_end_date?: string;
+  absences?: number;
+  max_absences?: number;
 }
 
 export type TaskPriority = 'urgente' | 'alta' | 'normal';
