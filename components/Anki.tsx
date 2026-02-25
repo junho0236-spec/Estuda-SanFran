@@ -47,7 +47,9 @@ import {
   ShieldCheck,
   Eye,
   AlertCircle,
-  ArrowRight
+  ArrowRight,
+  Maximize2,
+  Clock
 } from 'lucide-react';
 import JSZip from 'jszip';
 import { Flashcard, Subject, Folder, DeckRequest } from '../types';
@@ -108,6 +110,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [isAudioMode, setIsAudioMode] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [audioSpeed, setAudioSpeed] = useState(1);
+  const [isFocusMode, setIsFocusMode] = useState(false);
+  const [cardTimer, setCardTimer] = useState(0);
+  const [cardStartTime, setCardStartTime] = useState(Date.now());
 
   useEffect(() => {
     const handleClickOutside = () => setActiveMenuFolderId(null);
@@ -986,9 +991,62 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     };
   }, [isAudioMode, mode, currentIndex, reviewQueue, audioSpeed]);
 
+  useEffect(() => {
+    if (mode !== 'study' || reviewQueue.length === 0) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        setIsFlipped(prev => !prev);
+      }
+
+      if (isFlipped && !isCramMode) {
+        if (e.key === '1') handleReview(0);
+        if (e.key === '2') handleReview(2);
+        if (e.key === '3') handleReview(3);
+        if (e.key === '4') handleReview(5);
+      } else if (isFlipped && isCramMode) {
+        if (e.key === 'Enter' || e.key === 'Space' || e.key === 'ArrowRight') {
+          if (currentIndex < reviewQueue.length - 1) {
+            setCurrentIndex(prev => prev + 1);
+            setIsFlipped(false);
+          } else {
+            setMode('browse');
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mode, isFlipped, isCramMode, currentIndex, reviewQueue]);
+
+  useEffect(() => {
+    if (mode === 'study') {
+      setCardStartTime(Date.now());
+      setCardTimer(0);
+      
+      const interval = setInterval(() => {
+        setCardTimer(prev => Math.min(prev + 1, 15));
+      }, 1000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [mode, currentIndex]);
+
   const handleReview = async (quality: number) => {
     const card = reviewQueue[currentIndex];
-    const newInterval = quality === 0 ? 0 : (card.interval === 0 ? 1 : card.interval * 2);
+    
+    // Timer penalty: if > 15s, cap quality at 3 (Good)
+    let finalQuality = quality;
+    if (Date.now() - cardStartTime > 15000 && quality > 3) {
+      finalQuality = 3;
+    }
+
+    const newInterval = finalQuality === 0 ? 0 : (card.interval === 0 ? 1 : Math.ceil(card.interval * (finalQuality === 2 ? 1.2 : finalQuality === 3 ? 2.5 : 4)));
     const nextReview = Date.now() + newInterval * 24 * 60 * 60 * 1000;
     
     try {
@@ -1014,8 +1072,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   };
 
   return (
-    <div className="space-y-10 max-w-5xl mx-auto pb-20 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+    <div className={`space-y-10 max-w-5xl mx-auto pb-20 animate-in fade-in duration-500 ${isFocusMode && mode === 'study' ? 'fixed inset-0 z-[200] bg-slate-950 flex flex-col items-center justify-center p-4 space-y-0 max-w-none' : ''}`}>
+      {(!isFocusMode || mode !== 'study') && (
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <div className="flex items-center gap-3">
              {currentFolderId && mode === 'browse' && (
@@ -1662,14 +1721,44 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       )}
 
       {mode === 'study' && reviewQueue.length > 0 && (
-        <div className="flex flex-col items-center py-10 animate-in fade-in zoom-in">
-          <div className="relative w-full max-w-2xl h-[400px] preserve-3d" onClick={() => setIsFlipped(!isFlipped)}>
-            <div className={`absolute inset-0 w-full h-full cursor-pointer transition-transform duration-700 preserve-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
-              <div className="absolute inset-0 w-full h-full bg-white dark:bg-sanfran-rubiDark border-[6px] border-slate-200 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden">
+        <div className={`flex flex-col items-center animate-in fade-in zoom-in ${isFocusMode ? 'w-full max-w-4xl' : 'py-10'}`}>
+          <div className="w-full max-w-2xl mb-8 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={() => setIsFocusMode(!isFocusMode)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all ${isFocusMode ? 'bg-white text-slate-950' : 'bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-slate-700'}`}
+              >
+                <Maximize2 size={14} /> {isFocusMode ? 'Sair do Foco' : 'Modo Foco'}
+              </button>
+              <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                <Clock size={14} /> {currentIndex + 1} / {reviewQueue.length}
+              </div>
+            </div>
+            {!isFocusMode && (
+              <button onClick={() => setMode('browse')} className="text-slate-400 hover:text-red-500 transition-colors">
+                <X size={24} />
+              </button>
+            )}
+          </div>
+
+          <div className="relative w-full max-w-2xl h-[450px] preserve-3d group/card">
+            {/* Subtle Timer Bar */}
+            <div className="absolute -top-4 left-0 w-full h-1.5 bg-slate-200 dark:bg-white/5 rounded-full overflow-hidden z-10">
+              <div 
+                className={`h-full transition-all duration-1000 ${cardTimer >= 15 ? 'bg-red-500' : cardTimer >= 10 ? 'bg-orange-500' : 'bg-emerald-500'}`}
+                style={{ width: `${(cardTimer / 15) * 100}%` }}
+              ></div>
+            </div>
+
+            <div className={`absolute inset-0 w-full h-full cursor-pointer transition-transform duration-700 preserve-3d ${isFlipped ? 'rotate-y-180' : ''}`} onClick={() => setIsFlipped(!isFlipped)}>
+              <div className="absolute inset-0 w-full h-full bg-white dark:bg-sanfran-rubiDark border-[6px] border-slate-200 dark:border-white/10 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden">
                 <span className="text-xs font-black text-sanfran-rubi uppercase tracking-[0.3em] mb-8">Questão</span>
                 <p className="text-2xl font-black text-slate-950 dark:text-white leading-tight">{reviewQueue[currentIndex].front}</p>
+                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 opacity-0 group-hover/card:opacity-100 transition-opacity">
+                  <span className="px-4 py-2 bg-slate-100 dark:bg-white/5 rounded-full text-[9px] font-black text-slate-400 uppercase tracking-widest">Pressione Espaço para virar</span>
+                </div>
               </div>
-              <div className="absolute inset-0 w-full h-full bg-slate-50 dark:bg-black/80 border-[6px] border-usp-blue/40 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden rotate-y-180 overflow-y-auto custom-scrollbar">
+              <div className="absolute inset-0 w-full h-full bg-slate-50 dark:bg-black border-[6px] border-usp-blue/40 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden rotate-y-180 overflow-y-auto custom-scrollbar">
                 <span className="text-xs font-black text-usp-blue uppercase tracking-[0.3em] mb-4">Resposta</span>
                 <p className="text-2xl font-black text-slate-900 dark:text-white leading-tight mb-6">{reviewQueue[currentIndex].back}</p>
                 {reviewQueue[currentIndex].notes && (
@@ -1678,7 +1767,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                     <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100 whitespace-pre-wrap">{reviewQueue[currentIndex].notes}</p>
                   </div>
                 )}
-                <div className="w-full mt-4 flex flex-wrap gap-2">
+                <div className="w-full mt-4 flex flex-wrap gap-2 justify-center">
                   {reviewQueue[currentIndex].source && (
                     <div className="flex items-center gap-1 px-3 py-1 bg-slate-100 dark:bg-white/10 rounded-full text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-white/5">
                       <Paperclip size={10} />
@@ -1706,15 +1795,32 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                       setMode('browse');
                     }
                   }} 
-                  className="w-full p-6 bg-orange-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3"
+                  className="w-full p-6 bg-orange-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3 hover:scale-105 transition-transform"
                 >
                   Próximo Card <ArrowRight size={18} />
                 </button>
               ) : (
-                <div className="grid grid-cols-3 gap-6 w-full">
-                  <button onClick={() => handleReview(0)} className="p-6 bg-red-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Difícil</button>
-                  <button onClick={() => handleReview(3)} className="p-6 bg-usp-gold text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Médio</button>
-                  <button onClick={() => handleReview(5)} className="p-6 bg-usp-blue text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Fácil</button>
+                <div className="grid grid-cols-4 gap-4 w-full">
+                  <button onClick={() => handleReview(0)} className="flex flex-col items-center gap-2 p-4 bg-red-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform">
+                    <span>Errei</span>
+                    <span className="px-2 py-0.5 bg-black/20 rounded text-[8px]">1</span>
+                  </button>
+                  <button onClick={() => handleReview(2)} className="flex flex-col items-center gap-2 p-4 bg-orange-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform">
+                    <span>Difícil</span>
+                    <span className="px-2 py-0.5 bg-black/20 rounded text-[8px]">2</span>
+                  </button>
+                  <button onClick={() => handleReview(3)} className="flex flex-col items-center gap-2 p-4 bg-usp-gold text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform">
+                    <span>Bom</span>
+                    <span className="px-2 py-0.5 bg-black/20 rounded text-[8px]">3</span>
+                  </button>
+                  <button 
+                    onClick={() => handleReview(5)} 
+                    disabled={cardTimer >= 15}
+                    className={`flex flex-col items-center gap-2 p-4 bg-usp-blue text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform disabled:opacity-50 disabled:grayscale`}
+                  >
+                    <span>Fácil</span>
+                    <span className="px-2 py-0.5 bg-black/20 rounded text-[8px]">4</span>
+                  </button>
                 </div>
               )}
 
@@ -1736,7 +1842,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               )}
             </div>
           )}
-          <button onClick={() => setMode('browse')} className="mt-12 text-slate-400 font-black text-xs uppercase underline">Sair da Audiência</button>
+          {!isFocusMode && (
+            <button onClick={() => setMode('browse')} className="mt-12 text-slate-400 font-black text-xs uppercase underline hover:text-red-500 transition-colors">Sair da Audiência</button>
+          )}
         </div>
       )}
 
