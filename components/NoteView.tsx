@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css'; // Import Quill styles
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import Quill from 'quill';
+import 'quill/dist/quill.snow.css'; // Import Quill styles
 import { ArrowLeft, Save, Loader2, FileText, BrainCircuit, Sparkles, Tag, Split, Download } from 'lucide-react';
 import { Note, Subject } from '../types';
 import { dataService } from '../services/dataService';
@@ -29,6 +29,8 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   const [isSplitView, setIsSplitView] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(initialSubjectId);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const quillRef = useRef<Quill | null>(null);
 
   const modules = {
     toolbar: [
@@ -43,6 +45,29 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
       ['code-block']
     ],
   };
+
+  useEffect(() => {
+    if (editorRef.current && !quillRef.current) {
+      quillRef.current = new Quill(editorRef.current, {
+        theme: 'snow',
+        modules: modules,
+      });
+
+      quillRef.current.on('text-change', () => {
+        const html = editorRef.current?.querySelector('.ql-editor')?.innerHTML || '';
+        setNoteContent(html);
+      });
+    }
+  }, []);
+
+  // Sync content from state to editor when note is loaded
+  useEffect(() => {
+    if (quillRef.current && noteContent !== quillRef.current.root.innerHTML) {
+      // Use clipboard to safely set HTML content
+      const delta = quillRef.current.clipboard.convert({ html: noteContent });
+      quillRef.current.setContents(delta, 'silent');
+    }
+  }, [isLoading]); // Only sync when loading finishes or noteId changes
 
   const templates = {
     doutrina: '<h2>Referência Bibliográfica</h2><p><br></p><h2>Conceitos Principais</h2><p><br></p><h2>Citações Importantes</h2><p><br></p><h2>Crítica Pessoal</h2><p><br></p>',
@@ -129,7 +154,12 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   };
 
   const applyTemplate = (template: keyof typeof templates) => {
-    setNoteContent(noteContent + templates[template]);
+    const newContent = noteContent + templates[template];
+    setNoteContent(newContent);
+    if (quillRef.current) {
+      const delta = quillRef.current.clipboard.convert({ html: newContent });
+      quillRef.current.setContents(delta, 'silent');
+    }
     setIsTemplateMenuOpen(false);
   };
 
@@ -187,7 +217,12 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     setIsSummarizing(true);
     try {
       const summary = await summarizeText(plainText);
-      setNoteContent(summary?.replace(/\n/g, '<br/>') || '');
+      const htmlSummary = summary?.replace(/\n/g, '<br/>') || '';
+      setNoteContent(htmlSummary);
+      if (quillRef.current) {
+        const delta = quillRef.current.clipboard.convert({ html: htmlSummary });
+        quillRef.current.setContents(delta, 'silent');
+      }
     } catch (error) {
       console.error("Error summarizing text:", error);
       alert("Ocorreu um erro ao tentar resumir o texto.");
@@ -296,14 +331,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
         </div>
       </header>
       <div className="flex-1 overflow-y-auto bg-white dark:bg-[#181818] rounded-2xl shadow-xl">
-        <ReactQuill 
-          theme="snow" 
-          value={noteContent} 
-          onChange={setNoteContent}
-          modules={modules}
-          formats={formats}
-          className="h-full min-h-[400px] quill-editor-custom" // Custom class for height
-        />
+        <div ref={editorRef} className="h-full min-h-[400px] quill-editor-custom" />
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
         {(noteContent.match(/#(\w+)/g) || []).map((tag, index) => (
