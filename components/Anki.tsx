@@ -32,7 +32,15 @@ import {
   Edit2,
   Filter,
   Loader2,
-  Download
+  Download,
+  Search,
+  Calendar,
+  LayoutGrid,
+  List,
+  Play,
+  Pause,
+  Settings2,
+  Activity
 } from 'lucide-react';
 import JSZip from 'jszip';
 import { Flashcard, Subject, Folder } from '../types';
@@ -83,6 +91,11 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [showFolderInput, setShowFolderInput] = useState(false);
   const [editingCard, setEditingCard] = useState<Flashcard | null>(null);
   const [activeMenuFolderId, setActiveMenuFolderId] = useState<string | null>(null);
+  const [isTableView, setIsTableView] = useState(false);
+  const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
+  const [selectedFolderIdsForSession, setSelectedFolderIdsForSession] = useState<Set<string>>(new Set());
+  const [studyHistory, setStudyHistory] = useState<Record<string, number>>({});
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     const handleClickOutside = () => setActiveMenuFolderId(null);
@@ -205,6 +218,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
   // Filter out archived cards from the main view
   const activeFlashcards = flashcards.filter(f => !f.archived_at);
+  const studyableFlashcards = activeFlashcards.filter(f => !f.is_suspended);
 
   const getSubfolderIds = (folderId: string | null): string[] => {
     let ids: string[] = folderId ? [folderId] : [];
@@ -215,7 +229,10 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     return ids;
   };
 
-  const currentCards = activeFlashcards.filter(f => f.folderId === currentFolderId);
+  const currentCards = activeFlashcards.filter(f => 
+    f.folderId === currentFolderId && 
+    (searchQuery === '' || f.front.toLowerCase().includes(searchQuery.toLowerCase()) || f.back.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
 
   const toggleCardSelection = (id: string) => {
     const newSelection = new Set(selectedCardIds);
@@ -225,6 +242,20 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       newSelection.add(id);
     }
     setSelectedCardIds(newSelection);
+  };
+
+  const toggleSuspension = async (cardId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const card = flashcards.find(f => f.id === cardId);
+    if (!card) return;
+    
+    const updatedCard = { ...card, is_suspended: !card.is_suspended };
+    try {
+      await dataService.saveFlashcard(updatedCard, userId, isOnline);
+      setFlashcards(prev => prev.map(f => f.id === cardId ? updatedCard : f));
+    } catch (err) {
+      alert("Erro ao alterar status do card.");
+    }
   };
 
   const selectAllInFolder = () => {
@@ -738,12 +769,45 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     return { newCount, learningCount, reviewCount, mastery };
   };
 
+  useEffect(() => {
+    const fetchStudyHistory = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('study_sessions')
+          .select('start_time')
+          .eq('user_id', userId);
+        
+        if (error) throw error;
+        
+        const history: Record<string, number> = {};
+        data.forEach(session => {
+          const date = new Date(session.start_time).toISOString().split('T')[0];
+          history[date] = (history[date] || 0) + 1;
+        });
+        setStudyHistory(history);
+      } catch (err) {
+        console.error("Erro ao carregar histórico de estudos:", err);
+      }
+    };
+    fetchStudyHistory();
+  }, [userId]);
+
   const currentFolders = folders.filter(f => f.parentId === currentFolderId);
   const currentContextIds = getSubfolderIds(currentFolderId);
-  const reviewQueue = activeFlashcards.filter(f => 
-    f.nextReview <= Date.now() && 
-    (currentFolderId === null ? true : currentContextIds.includes(f.folderId as string))
-  );
+  
+  const reviewQueue = studyableFlashcards.filter(f => {
+    const isDue = f.nextReview <= Date.now();
+    if (!isDue) return false;
+    
+    // If we have selected folders for a custom session, only include cards from those folders
+    if (selectedFolderIdsForSession.size > 0) {
+      const allSessionFolderIds = Array.from(selectedFolderIdsForSession).flatMap(id => getSubfolderIds(id));
+      return allSessionFolderIds.includes(f.folderId as string);
+    }
+    
+    // Otherwise, use the current folder context
+    return (currentFolderId === null ? true : currentContextIds.includes(f.folderId as string));
+  });
 
   const handleReview = async (quality: number) => {
     const card = reviewQueue[currentIndex];
@@ -821,6 +885,39 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   <button onClick={() => { setMode('study'); setCurrentIndex(0); setIsFlipped(false); }} disabled={reviewQueue.length === 0} className="flex items-center gap-2 px-8 py-3.5 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest disabled:opacity-50 hover:bg-sanfran-rubiDark shadow-xl">
                     <RotateCcw className="w-5 h-5" /> Estudar ({reviewQueue.length})
                   </button>
+
+                  {/* HEATMAP / STREAK */}
+                  <div className="hidden lg:flex items-center gap-1 bg-white dark:bg-white/5 p-2 rounded-2xl border border-slate-200 dark:border-white/10">
+                    <div className="grid grid-cols-7 gap-1">
+                      {Array.from({ length: 21 }).map((_, i) => {
+                        const date = new Date();
+                        date.setDate(date.getDate() - (20 - i));
+                        const dateStr = date.toISOString().split('T')[0];
+                        const count = studyHistory[dateStr] || 0;
+                        return (
+                          <div 
+                            key={i} 
+                            className={`w-3 h-3 rounded-sm ${
+                              count > 5 ? 'bg-emerald-600' : 
+                              count > 2 ? 'bg-emerald-400' : 
+                              count > 0 ? 'bg-emerald-200' : 
+                              'bg-slate-100 dark:bg-white/5'
+                            }`}
+                            title={`${dateStr}: ${count} sessões`}
+                          />
+                        );
+                      })}
+                    </div>
+                    <div className="flex flex-col ml-2">
+                      <span className="text-[8px] font-black uppercase text-slate-400">Constância</span>
+                      <div className="flex items-center gap-1">
+                        <Zap className="w-3 h-3 text-usp-gold fill-usp-gold" />
+                        <span className="text-[10px] font-black text-slate-700 dark:text-white">
+                          {Object.keys(studyHistory).length} Dias
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                   
                   {/* BOTÃO GERAR COM IA */}
                   <div className="relative group">
@@ -851,6 +948,24 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                     </button>
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1 bg-slate-900 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
                       Importação em Lote
+                    </div>
+                  </div>
+
+                  <div className="relative group">
+                    <button onClick={() => setIsSessionModalOpen(true)} className="p-3.5 bg-indigo-600 text-white rounded-2xl shadow-xl hover:bg-indigo-700 transition-all">
+                      <Activity className="w-5 h-5" />
+                    </button>
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1 bg-slate-900 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
+                      Sessão de Revisão (Mix)
+                    </div>
+                  </div>
+
+                  <div className="relative group">
+                    <button onClick={() => setIsTableView(!isTableView)} className={`p-3.5 rounded-2xl shadow-xl transition-all ${isTableView ? 'bg-sanfran-rubi text-white' : 'bg-white dark:bg-sanfran-rubiDark text-slate-500 border-2 border-slate-200'}`}>
+                      {isTableView ? <LayoutGrid className="w-5 h-5" /> : <List className="w-5 h-5" />}
+                    </button>
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1 bg-slate-900 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
+                      {isTableView ? 'Ver em Grade' : 'Ver em Tabela'}
                     </div>
                   </div>
 
@@ -983,7 +1098,91 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       )}
 
       {mode === 'browse' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
+        <div className="space-y-6">
+          {isTableView && (
+            <div className="flex items-center gap-4 mb-6 animate-in slide-in-from-left-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                <input 
+                  type="text" 
+                  placeholder="Pesquisar cards neste deck..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full p-4 pl-12 bg-white dark:bg-white/5 border-2 border-slate-200 dark:border-white/10 rounded-2xl font-bold outline-none focus:border-sanfran-rubi transition-all"
+                />
+              </div>
+            </div>
+          )}
+
+          {isTableView ? (
+            <div className="bg-white dark:bg-sanfran-rubiDark/50 rounded-[2rem] border-2 border-slate-200 dark:border-sanfran-rubi/40 shadow-xl overflow-hidden animate-in fade-in duration-500">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 dark:bg-white/5 border-b-2 border-slate-100 dark:border-white/5">
+                      <th className="p-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Frente</th>
+                      <th className="p-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Verso</th>
+                      <th className="p-6 text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">Status</th>
+                      <th className="p-6 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {currentCards.map(card => (
+                      <tr key={card.id} className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/5 transition-colors group">
+                        <td className="p-6">
+                          <p className="font-bold text-slate-900 dark:text-white text-sm line-clamp-2">{card.front}</p>
+                        </td>
+                        <td className="p-6">
+                          <p className="text-slate-600 dark:text-slate-400 text-sm line-clamp-2">{card.back}</p>
+                        </td>
+                        <td className="p-6 text-center">
+                          {card.is_suspended ? (
+                            <span className="px-3 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-full text-[9px] font-black uppercase">Suspenso</span>
+                          ) : (
+                            <span className="px-3 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-full text-[9px] font-black uppercase">Ativo</span>
+                          )}
+                        </td>
+                        <td className="p-6 text-right">
+                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button 
+                              onClick={() => setEditingCard(card)}
+                              className="p-2 text-slate-400 hover:text-blue-500 transition-colors"
+                              title="Editar"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={(e) => toggleSuspension(card.id, e)}
+                              className={`p-2 transition-colors ${card.is_suspended ? 'text-emerald-500 hover:text-emerald-600' : 'text-orange-500 hover:text-orange-600'}`}
+                              title={card.is_suspended ? 'Reativar' : 'Suspender'}
+                            >
+                              {card.is_suspended ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+                            </button>
+                            <button 
+                              onClick={(e) => archiveCard(card.id, e)}
+                              className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                              title="Arquivar"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {currentCards.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="p-20 text-center">
+                          <Search className="w-12 h-12 text-slate-100 dark:text-white/5 mx-auto mb-4" />
+                          <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Nenhum card encontrado.</p>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
           {currentFolders.map(folder => {
             const stats = getFolderStats(folder.id);
             return (
@@ -1105,13 +1304,84 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               </div>
             );
           })}
-          
-          {currentCards.length === 0 && currentFolders.length === 0 && (
-            <div className="col-span-full py-20 text-center border-4 border-dashed border-slate-100 dark:border-white/5 rounded-[3rem]">
-               <BrainCircuit className="w-16 h-16 text-slate-100 dark:text-white/5 mx-auto mb-4" />
-               <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Nenhum card ou pasta neste nível.</p>
+        </div>
+      )}
+    </div>
+  )}
+
+      {/* MODAL SESSÃO DE REVISÃO */}
+      {isSessionModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[100] flex items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[3rem] shadow-2xl border-2 border-slate-200 dark:border-white/10 overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="p-10 border-b border-slate-100 dark:border-white/5 bg-gradient-to-br from-indigo-600 to-purple-700 text-white">
+              <div className="flex justify-between items-center mb-4">
+                <Activity className="w-10 h-10 text-white/20" />
+                <button onClick={() => setIsSessionModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <h3 className="text-3xl font-black uppercase tracking-tighter">Sessão de Revisão Mix</h3>
+              <p className="text-indigo-100 font-bold">Selecione as pastas que deseja revisar hoje. O sistema irá embaralhar todos os cards pendentes.</p>
             </div>
-          )}
+            
+            <div className="p-10 max-h-[400px] overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {folders.filter(f => !f.parentId).map(folder => {
+                  const isSelected = selectedFolderIdsForSession.has(folder.id);
+                  const stats = getFolderStats(folder.id);
+                  return (
+                    <div 
+                      key={folder.id} 
+                      onClick={() => {
+                        const next = new Set(selectedFolderIdsForSession);
+                        if (isSelected) next.delete(folder.id);
+                        else next.add(folder.id);
+                        setSelectedFolderIdsForSession(next);
+                      }}
+                      className={`p-6 rounded-2xl border-2 cursor-pointer transition-all flex items-center justify-between ${
+                        isSelected ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-100 dark:border-white/5 hover:border-indigo-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <FolderIcon className={isSelected ? 'text-indigo-600' : 'text-slate-400'} />
+                        <div>
+                          <p className={`font-black uppercase text-xs tracking-tight ${isSelected ? 'text-indigo-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>
+                            {folder.name}
+                          </p>
+                          <p className="text-[10px] font-bold text-slate-400">{stats.reviewCount} cards pendentes</p>
+                        </div>
+                      </div>
+                      {isSelected ? <CheckSquare className="text-indigo-600" /> : <Square className="text-slate-200" />}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="p-10 bg-slate-50 dark:bg-white/5 flex gap-4">
+              <button 
+                onClick={() => {
+                  setSelectedFolderIdsForSession(new Set());
+                  setIsSessionModalOpen(false);
+                }}
+                className="flex-1 py-4 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-black uppercase text-xs tracking-widest border-2 border-slate-200 dark:border-white/10"
+              >
+                Cancelar
+              </button>
+              <button 
+                disabled={selectedFolderIdsForSession.size === 0}
+                onClick={() => {
+                  setMode('study');
+                  setCurrentIndex(0);
+                  setIsFlipped(false);
+                  setIsSessionModalOpen(false);
+                }}
+                className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-indigo-500/20 disabled:opacity-50"
+              >
+                Iniciar Sessão Mix
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

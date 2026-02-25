@@ -115,6 +115,7 @@ export interface Flashcard {
   nextReview: number;
   interval: number;
   archived_at?: string | null;
+  is_suspended?: boolean;
   tags?: string[];
   source?: string;
 }
