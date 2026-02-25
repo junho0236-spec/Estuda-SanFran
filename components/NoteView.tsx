@@ -126,7 +126,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId, userId, isOnline, onBack
     setIsSummarizing(true);
     try {
       const summary = await summarizeText(plainText);
-      setNoteContent(noteContent + `<h2>Resumo (IA)</h2><p>${summary?.replace(/\n/g, '<br/>')}</p>`);
+      setNoteContent(summary?.replace(/\n/g, '<br/>') || '');
     } catch (error) {
       console.error("Error summarizing text:", error);
       alert("Ocorreu um erro ao tentar resumir o texto.");
