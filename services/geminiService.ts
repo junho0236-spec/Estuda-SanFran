@@ -1,4 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
+import { supabase } from '../services/supabaseClient';
 
 // Inicializa o cliente Google GenAI de forma preguiçosa (lazy)
 let aiInstance: GoogleGenAI | null = null;
