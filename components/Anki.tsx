@@ -40,7 +40,9 @@ import {
   Play,
   Pause,
   Settings2,
-  Activity
+  Activity,
+  Volume2,
+  ZapOff
 } from 'lucide-react';
 import JSZip from 'jszip';
 import { Flashcard, Subject, Folder } from '../types';
@@ -96,6 +98,10 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [selectedFolderIdsForSession, setSelectedFolderIdsForSession] = useState<Set<string>>(new Set());
   const [studyHistory, setStudyHistory] = useState<Record<string, number>>({});
   const [searchQuery, setSearchQuery] = useState('');
+  const [isGlobalSearch, setIsGlobalSearch] = useState(false);
+  const [isCramMode, setIsCramMode] = useState(false);
+  const [isAudioMode, setIsAudioMode] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   useEffect(() => {
     const handleClickOutside = () => setActiveMenuFolderId(null);
@@ -230,7 +236,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   };
 
   const currentCards = activeFlashcards.filter(f => 
-    f.folderId === currentFolderId && 
+    (isGlobalSearch || f.folderId === currentFolderId) && 
     (searchQuery === '' || f.front.toLowerCase().includes(searchQuery.toLowerCase()) || f.back.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
@@ -797,7 +803,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   
   const reviewQueue = studyableFlashcards.filter(f => {
     const isDue = f.nextReview <= Date.now();
-    if (!isDue) return false;
+    
+    // In Cram Mode, we ignore the due date
+    if (!isDue && !isCramMode) return false;
     
     // If we have selected folders for a custom session, only include cards from those folders
     if (selectedFolderIdsForSession.size > 0) {
@@ -808,6 +816,69 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     // Otherwise, use the current folder context
     return (currentFolderId === null ? true : currentContextIds.includes(f.folderId as string));
   });
+
+  useEffect(() => {
+    if (!isAudioMode || mode !== 'study' || reviewQueue.length === 0) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+
+    const speak = async () => {
+      if (isSpeaking) return;
+      setIsSpeaking(true);
+
+      const card = reviewQueue[currentIndex];
+      
+      // Speak Front
+      const frontUtterance = new SpeechSynthesisUtterance(card.front);
+      frontUtterance.lang = 'pt-BR';
+      window.speechSynthesis.speak(frontUtterance);
+
+      frontUtterance.onend = () => {
+        // Wait 3 seconds
+        setTimeout(() => {
+          if (!isAudioMode) {
+            setIsSpeaking(false);
+            return;
+          }
+          
+          setIsFlipped(true);
+          
+          // Speak Back
+          const backUtterance = new SpeechSynthesisUtterance(card.back);
+          backUtterance.lang = 'pt-BR';
+          window.speechSynthesis.speak(backUtterance);
+
+          backUtterance.onend = () => {
+            // Wait 2 seconds before next card
+            setTimeout(() => {
+              if (!isAudioMode) {
+                setIsSpeaking(false);
+                return;
+              }
+              
+              if (currentIndex < reviewQueue.length - 1) {
+                setCurrentIndex(prev => prev + 1);
+                setIsFlipped(false);
+                setIsSpeaking(false);
+              } else {
+                setMode('browse');
+                setIsAudioMode(false);
+                setIsSpeaking(false);
+              }
+            }, 2000);
+          };
+        }, 3000);
+      };
+    };
+
+    speak();
+
+    return () => {
+      window.speechSynthesis.cancel();
+    };
+  }, [isAudioMode, mode, currentIndex, reviewQueue]);
 
   const handleReview = async (quality: number) => {
     const card = reviewQueue[currentIndex];
@@ -885,6 +956,44 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   <button onClick={() => { setMode('study'); setCurrentIndex(0); setIsFlipped(false); }} disabled={reviewQueue.length === 0} className="flex items-center gap-2 px-8 py-3.5 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest disabled:opacity-50 hover:bg-sanfran-rubiDark shadow-xl">
                     <RotateCcw className="w-5 h-5" /> Estudar ({reviewQueue.length})
                   </button>
+
+                  <div className="relative group">
+                    <button 
+                      onClick={() => {
+                        setIsCramMode(!isCramMode);
+                        if (!isCramMode) {
+                          setMode('study');
+                          setCurrentIndex(0);
+                          setIsFlipped(false);
+                        }
+                      }} 
+                      className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all ${isCramMode ? 'bg-orange-600 text-white' : 'bg-white dark:bg-sanfran-rubiDark text-orange-600 border-2 border-orange-600 hover:bg-orange-50'}`}
+                    >
+                      <ZapOff className="w-5 h-5" /> {isCramMode ? 'Parar Emergência' : 'Revisão de Emergência'}
+                    </button>
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1 bg-slate-900 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
+                      Ignorar algoritmo e estudar tudo
+                    </div>
+                  </div>
+
+                  <div className="relative group">
+                    <button 
+                      onClick={() => {
+                        setIsAudioMode(!isAudioMode);
+                        if (!isAudioMode) {
+                          setMode('study');
+                          setCurrentIndex(0);
+                          setIsFlipped(false);
+                        }
+                      }} 
+                      className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all ${isAudioMode ? 'bg-emerald-600 text-white' : 'bg-white dark:bg-sanfran-rubiDark text-emerald-600 border-2 border-emerald-600 hover:bg-emerald-50'}`}
+                    >
+                      <Volume2 className="w-5 h-5" /> {isAudioMode ? 'Parar Áudio' : 'Modo Áudio'}
+                    </button>
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1 bg-slate-900 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
+                      Estudo por voz (TTS)
+                    </div>
+                  </div>
 
                   {/* HEATMAP / STREAK */}
                   <div className="hidden lg:flex items-center gap-1 bg-white dark:bg-white/5 p-2 rounded-2xl border border-slate-200 dark:border-white/10">
@@ -1099,20 +1208,24 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
       {mode === 'browse' && (
         <div className="space-y-6">
-          {isTableView && (
-            <div className="flex items-center gap-4 mb-6 animate-in slide-in-from-left-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                <input 
-                  type="text" 
-                  placeholder="Pesquisar cards neste deck..." 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full p-4 pl-12 bg-white dark:bg-white/5 border-2 border-slate-200 dark:border-white/10 rounded-2xl font-bold outline-none focus:border-sanfran-rubi transition-all"
-                />
-              </div>
+          <div className="flex flex-col md:flex-row items-center gap-4 mb-6 animate-in slide-in-from-left-4">
+            <div className="relative flex-1 w-full">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+              <input 
+                type="text" 
+                placeholder={isGlobalSearch ? "Busca Global em todo o acervo..." : "Pesquisar cards nesta pasta..."} 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full p-4 pl-12 bg-white dark:bg-white/5 border-2 border-slate-200 dark:border-white/10 rounded-2xl font-bold outline-none focus:border-sanfran-rubi transition-all"
+              />
             </div>
-          )}
+            <button 
+              onClick={() => setIsGlobalSearch(!isGlobalSearch)}
+              className={`px-6 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all border-2 ${isGlobalSearch ? 'bg-sanfran-rubi border-sanfran-rubi text-white shadow-lg' : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500'}`}
+            >
+              {isGlobalSearch ? 'Busca Global Ativa' : 'Ativar Busca Global'}
+            </button>
+          </div>
 
           {isTableView ? (
             <div className="bg-white dark:bg-sanfran-rubiDark/50 rounded-[2rem] border-2 border-slate-200 dark:border-sanfran-rubi/40 shadow-xl overflow-hidden animate-in fade-in duration-500">
@@ -1122,6 +1235,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                     <tr className="bg-slate-50 dark:bg-white/5 border-b-2 border-slate-100 dark:border-white/5">
                       <th className="p-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Frente</th>
                       <th className="p-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Verso</th>
+                      {isGlobalSearch && <th className="p-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Pasta</th>}
                       <th className="p-6 text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">Status</th>
                       <th className="p-6 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Ações</th>
                     </tr>
@@ -1135,6 +1249,13 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                         <td className="p-6">
                           <p className="text-slate-600 dark:text-slate-400 text-sm line-clamp-2">{card.back}</p>
                         </td>
+                        {isGlobalSearch && (
+                          <td className="p-6">
+                            <span className="text-[10px] font-black uppercase text-slate-400">
+                              {folders.find(f => f.id === card.folderId)?.name || 'Raiz'}
+                            </span>
+                          </td>
+                        )}
                         <td className="p-6 text-center">
                           {card.is_suspended ? (
                             <span className="px-3 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-full text-[9px] font-black uppercase">Suspenso</span>
@@ -1297,6 +1418,12 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   </div>
                 )}
                 <p className="font-black text-slate-900 dark:text-white line-clamp-4 leading-tight">{card.front}</p>
+                {isGlobalSearch && (
+                  <div className="mt-2 flex items-center gap-1 text-[9px] font-black text-slate-400 uppercase">
+                    <FolderIcon size={10} />
+                    {folders.find(f => f.id === card.folderId)?.name || 'Raiz'}
+                  </div>
+                )}
                 <div className="flex justify-between items-center mt-4">
                   <span className="text-[9px] font-black uppercase text-slate-400">PRAZO: {new Date(card.nextReview).toLocaleDateString()}</span>
                   <BrainCircuit className="w-5 h-5 text-sanfran-rubi opacity-40" />
