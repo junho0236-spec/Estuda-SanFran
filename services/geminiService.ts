@@ -38,7 +38,144 @@ export interface GeminiFile {
 }
 
 /**
+ * Gera um hash SHA-256 para uma string (usado para cache).
+ */
+const generateHash = async (text: string): Promise<string> => {
+  const msgUint8 = new TextEncoder().encode(text);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return hashHex;
+};
+
+const buildFlashcardPromptParts = (
+  text: string, 
+  subjectName: string, 
+  quantity: number, 
+  cardType: string, 
+  customInstructions: string,
+  files: GeminiFile[],
+  urls: string[],
+  difficulty: string,
+  format: string,
+  sourceType: string,
+  includeMnemonics: boolean
+) => {
+  let typeInstruction = '';
+  switch (cardType) {
+    case 'Conceitos':
+      typeInstruction = 'Foque estritamente em definir conceitos jurídicos, princípios e institutos mencionados no texto.';
+      break;
+    case 'Prazos e Números':
+      typeInstruction = 'Foque exclusivamente em prazos processuais, prescricionais, decadenciais, quóruns, maiorias e outros números relevantes.';
+      break;
+    case 'Exceções':
+      typeInstruction = 'Foque nas exceções à regra geral, ressalvas e casos especiais mencionados no texto.';
+      break;
+    case 'Súmulas e Jurisprudência':
+      typeInstruction = 'Foque no entendimento jurisprudencial, súmulas e teses fixadas mencionadas no texto.';
+      break;
+    case 'Casos Práticos':
+      typeInstruction = 'Crie pequenos casos práticos hipotéticos na pergunta (front) e dê a solução jurídica na resposta (back).';
+      break;
+    default:
+      typeInstruction = 'Foque em conceitos-chave, prazos, exceções ou princípios de forma equilibrada.';
+  }
+
+  let sourceInstruction = '';
+  switch (sourceType) {
+    case 'Letra da Lei':
+      sourceInstruction = 'O texto é "Letra da Lei". Foque intensamente em prazos, exceções, quóruns e palavras-chave restritivas ou ampliativas (ex: "salvo", "independentemente", "exclusivamente").';
+      break;
+    case 'Doutrina':
+      sourceInstruction = 'O texto é "Doutrina". Foque em teorias, classificações, divergências doutrinárias e conceitos acadêmicos.';
+      break;
+    case 'Jurisprudência':
+      sourceInstruction = 'O texto é "Jurisprudência/Acórdão". Foque na Tese Fixada, Ratio Decidendi, Súmulas relacionadas e o entendimento predominante dos tribunais superiores (STF/STJ).';
+      break;
+    default:
+      sourceInstruction = 'Trate o texto de forma equilibrada entre lei, doutrina e jurisprudência.';
+  }
+
+  const formatInstruction = format === 'Cloze' 
+    ? 'Use o formato CLOZE (Omissão de Palavras). Na frente (front), coloque a frase com a palavra ou termo omitido entre colchetes, ex: "A prescrição ocorre em [...] anos.". No verso (back), coloque apenas o termo omitido.'
+    : 'Use o formato BÁSICO: Uma pergunta ou conceito na frente (front) e a resposta ou definição no verso (back).';
+
+  const difficultyInstruction = `O nível de complexidade deve ser: ${difficulty}. 
+    - Iniciante: Linguagem simples, conceitos fundamentais.
+    - Graduação: Linguagem técnica acadêmica, doutrina clássica.
+    - Concurso/OAB: Foco em "pegadinhas", letra da lei e jurisprudência pesada.`;
+
+  const mnemonicInstruction = includeMnemonics 
+    ? 'Sempre que houver uma lista de requisitos, princípios ou elementos, tente criar um mnemônico criativo (sigla ou frase) e inclua-o no final da resposta (back).'
+    : '';
+
+  const parts: any[] = [];
+  
+  // Adiciona o prompt principal
+  parts.push({
+    text: `Você é um professor de Direito da USP especialista em concursos e OAB. Sua tarefa é criar materiais de estudo ativo de alto nível.
+    
+    Analise o conteúdo fornecido (texto, arquivos ou URLs) sobre "${subjectName}":
+    
+    Gere EXATAMENTE ${quantity} flashcards de alta qualidade.
+    
+    Nível de Dificuldade:
+    ${difficultyInstruction}
+
+    Formato do Card:
+    ${formatInstruction}
+
+    Tipo de Fonte:
+    ${sourceInstruction}
+    
+    Diretriz de Foco (${cardType}):
+    ${typeInstruction}
+
+    Mnemônicos:
+    ${mnemonicInstruction}
+    
+    Instruções Adicionais do Usuário:
+    ${customInstructions ? customInstructions : 'Nenhuma instrução adicional.'}
+    
+    - As perguntas (front) devem ser desafiadoras e claras.
+    - As respostas (back) devem ser objetivas, didáticas e, se possível, citar o artigo de lei ou súmula pertinente.
+    - Para cada card, sugira de 2 a 4 tags relevantes (ex: #prazos, #recursos, #cpc-art-1003).
+    - Identifique a fonte ou artigo de lei específico citado no conteúdo para o campo "source".
+    - DETECÇÃO DE DESATUALIZAÇÃO: Se detectar que o texto cita leis revogadas ou normas antigas (ex: CPC/1973, Código Civil/1916), adicione um aviso claro no início da resposta (back) alertando sobre a desatualização e, se souber, a norma vigente equivalente.
+    - Se o conteúdo fornecido for sem sentido ou insuficiente, retorne um array vazio.`
+  });
+
+  // Adiciona o texto se houver
+  if (text) {
+    parts.push({ text: `Texto Base:\n"${text}"` });
+  }
+
+  // Adiciona arquivos se houver
+  if (files && files.length > 0) {
+    files.forEach(file => {
+      parts.push({
+        inlineData: {
+          data: file.data,
+          mimeType: file.mimeType
+        }
+      });
+    });
+  }
+
+  // Adiciona URLs se houver
+  const tools: any[] = [];
+  if (urls && urls.length > 0) {
+    tools.push({ urlContext: {} });
+    parts.push({ text: `URLs para consulta:\n${urls.join('\n')}` });
+  }
+
+  return { parts, tools };
+};
+
+/**
  * Gera flashcards a partir de um texto jurídico, arquivos ou URLs utilizando Gemini.
+ * Agora inclui suporte a cache para textos comuns.
  */
 export const generateFlashcards = async (
   text: string, 
@@ -54,6 +191,29 @@ export const generateFlashcards = async (
   includeMnemonics: boolean = false
 ) => {
   try {
+    // Lógica de Cache
+    const cacheKey = await generateHash(JSON.stringify({
+      text, subjectName, quantity, cardType, customInstructions, 
+      urls, difficulty, format, sourceType, includeMnemonics,
+      fileCount: files.length
+    }));
+
+    // Tenta buscar no cache do Supabase
+    try {
+      const { data: cachedData, error: cacheError } = await supabase
+        .from('flashcard_cache')
+        .select('cards')
+        .eq('hash', cacheKey)
+        .single();
+
+      if (cachedData && !cacheError) {
+        console.log("Gemini Service: Retornando flashcards do cache.");
+        return cachedData.cards;
+      }
+    } catch (e) {
+      console.warn("Gemini Service: Erro ao acessar a tabela de cache. Continuando sem cache.", e);
+    }
+
     const ai = getAiClient();
     const apiKey = getApiKey();
     
@@ -61,116 +221,10 @@ export const generateFlashcards = async (
         throw new Error("Chave de API não detectada. 1) Verifique se a variável 'VITE_API_KEY' está no painel da Vercel. 2) Se estiver, é OBRIGATÓRIO fazer um novo 'Redeploy' para que a alteração tenha efeito.");
     }
 
-    let typeInstruction = '';
-    switch (cardType) {
-      case 'Conceitos':
-        typeInstruction = 'Foque estritamente em definir conceitos jurídicos, princípios e institutos mencionados no texto.';
-        break;
-      case 'Prazos e Números':
-        typeInstruction = 'Foque exclusivamente em prazos processuais, prescricionais, decadenciais, quóruns, maiorias e outros números relevantes.';
-        break;
-      case 'Exceções':
-        typeInstruction = 'Foque nas exceções à regra geral, ressalvas e casos especiais mencionados no texto.';
-        break;
-      case 'Súmulas e Jurisprudência':
-        typeInstruction = 'Foque no entendimento jurisprudencial, súmulas e teses fixadas mencionadas no texto.';
-        break;
-      case 'Casos Práticos':
-        typeInstruction = 'Crie pequenos casos práticos hipotéticos na pergunta (front) e dê a solução jurídica na resposta (back).';
-        break;
-      default:
-        typeInstruction = 'Foque em conceitos-chave, prazos, exceções ou princípios de forma equilibrada.';
-    }
-
-    let sourceInstruction = '';
-    switch (sourceType) {
-      case 'Letra da Lei':
-        sourceInstruction = 'O texto é "Letra da Lei". Foque intensamente em prazos, exceções, quóruns e palavras-chave restritivas ou ampliativas (ex: "salvo", "independentemente", "exclusivamente").';
-        break;
-      case 'Doutrina':
-        sourceInstruction = 'O texto é "Doutrina". Foque em teorias, classificações, divergências doutrinárias e conceitos acadêmicos.';
-        break;
-      case 'Jurisprudência':
-        sourceInstruction = 'O texto é "Jurisprudência/Acórdão". Foque na Tese Fixada, Ratio Decidendi, Súmulas relacionadas e o entendimento predominante dos tribunais superiores (STF/STJ).';
-        break;
-      default:
-        sourceInstruction = 'Trate o texto de forma equilibrada entre lei, doutrina e jurisprudência.';
-    }
-
-    const formatInstruction = format === 'Cloze' 
-      ? 'Use o formato CLOZE (Omissão de Palavras). Na frente (front), coloque a frase com a palavra ou termo omitido entre colchetes, ex: "A prescrição ocorre em [...] anos.". No verso (back), coloque apenas o termo omitido.'
-      : 'Use o formato BÁSICO: Uma pergunta ou conceito na frente (front) e a resposta ou definição no verso (back).';
-
-    const difficultyInstruction = `O nível de complexidade deve ser: ${difficulty}. 
-      - Iniciante: Linguagem simples, conceitos fundamentais.
-      - Graduação: Linguagem técnica acadêmica, doutrina clássica.
-      - Concurso/OAB: Foco em "pegadinhas", letra da lei e jurisprudência pesada.`;
-
-    const mnemonicInstruction = includeMnemonics 
-      ? 'Sempre que houver uma lista de requisitos, princípios ou elementos, tente criar um mnemônico criativo (sigla ou frase) e inclua-o no final da resposta (back).'
-      : '';
-
-    const parts: any[] = [];
-    
-    // Adiciona o prompt principal
-    parts.push({
-      text: `Você é um professor de Direito da USP especialista em concursos e OAB. Sua tarefa é criar materiais de estudo ativo de alto nível.
-      
-      Analise o conteúdo fornecido (texto, arquivos ou URLs) sobre "${subjectName}":
-      
-      Gere EXATAMENTE ${quantity} flashcards de alta qualidade.
-      
-      Nível de Dificuldade:
-      ${difficultyInstruction}
-
-      Formato do Card:
-      ${formatInstruction}
-
-      Tipo de Fonte:
-      ${sourceInstruction}
-      
-      Diretriz de Foco (${cardType}):
-      ${typeInstruction}
-
-      Mnemônicos:
-      ${mnemonicInstruction}
-      
-      Instruções Adicionais do Usuário:
-      ${customInstructions ? customInstructions : 'Nenhuma instrução adicional.'}
-      
-      - As perguntas (front) devem ser desafiadoras e claras.
-      - As respostas (back) devem ser objetivas, didáticas e, se possível, citar o artigo de lei ou súmula pertinente.
-      - Para cada card, sugira de 2 a 4 tags relevantes (ex: #prazos, #recursos, #cpc-art-1003).
-      - Identifique a fonte ou artigo de lei específico citado no conteúdo para o campo "source".
-      - DETECÇÃO DE DESATUALIZAÇÃO: Se detectar que o texto cita leis revogadas ou normas antigas (ex: CPC/1973, Código Civil/1916), adicione um aviso claro no início da resposta (back) alertando sobre a desatualização e, se souber, a norma vigente equivalente.
-      - Se o conteúdo fornecido for sem sentido ou insuficiente, retorne um array vazio.`
-    });
-
-    // Adiciona o texto se houver
-    if (text) {
-      parts.push({ text: `Texto Base:\n"${text}"` });
-    }
-
-    // Adiciona arquivos se houver
-    if (files && files.length > 0) {
-      files.forEach(file => {
-        parts.push({
-          inlineData: {
-            data: file.data,
-            mimeType: file.mimeType
-          }
-        });
-      });
-    }
-
-    // Adiciona URLs se houver (como texto no prompt se urlContext não for usado, 
-    // mas vamos tentar usar o tool se possível)
-    const tools: any[] = [];
-    if (urls && urls.length > 0) {
-      tools.push({ urlContext: {} });
-      // Também incluímos as URLs no texto para garantir que o modelo saiba quais processar
-      parts.push({ text: `URLs para consulta:\n${urls.join('\n')}` });
-    }
+    const { parts, tools } = buildFlashcardPromptParts(
+      text, subjectName, quantity, cardType, customInstructions,
+      files, urls, difficulty, format, sourceType, includeMnemonics
+    );
 
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview', 
@@ -218,6 +272,24 @@ export const generateFlashcards = async (
         if (!Array.isArray(parsed)) {
             throw new Error("Formato de resposta inválido (não é lista).");
         }
+
+        // Salva no cache para uso futuro
+        try {
+          const cacheKey = await generateHash(JSON.stringify({
+            text, subjectName, quantity, cardType, customInstructions, 
+            urls, difficulty, format, sourceType, includeMnemonics,
+            fileCount: files.length
+          }));
+          
+          await supabase.from('flashcard_cache').upsert({
+            hash: cacheKey,
+            cards: parsed,
+            created_at: new Date().toISOString()
+          });
+        } catch (cacheSaveError) {
+          console.warn("Gemini Service: Falha ao salvar no cache.", cacheSaveError);
+        }
+
         return parsed;
     } catch (parseError) {
         console.error("JSON Parse Error:", resultText);
@@ -237,6 +309,135 @@ export const generateFlashcards = async (
         throw new Error("Muitas requisições. O modelo está sobrecarregado. Aguarde um momento.");
     }
     
+    throw error;
+  }
+};
+
+/**
+ * Gera flashcards em modo STREAMING.
+ * Útil para o efeito "máquina de escrever" na UI.
+ */
+export const generateFlashcardsStream = async (
+  text: string, 
+  subjectName: string, 
+  quantity: number = 5, 
+  cardType: string = 'Geral', 
+  customInstructions: string = '',
+  files: GeminiFile[] = [],
+  urls: string[] = [],
+  difficulty: string = 'Graduação',
+  format: string = 'Básico',
+  sourceType: string = 'Geral',
+  includeMnemonics: boolean = false,
+  onChunk: (cards: any[]) => void
+) => {
+  try {
+    // Lógica de Cache
+    const cacheKey = await generateHash(JSON.stringify({
+      text, subjectName, quantity, cardType, customInstructions, 
+      urls, difficulty, format, sourceType, includeMnemonics,
+      fileCount: files.length
+    }));
+
+    try {
+      const { data: cachedData, error: cacheError } = await supabase
+        .from('flashcard_cache')
+        .select('cards')
+        .eq('hash', cacheKey)
+        .single();
+
+      if (cachedData && !cacheError) {
+        console.log("Gemini Service (Stream): Retornando flashcards do cache.");
+        onChunk(cachedData.cards);
+        return cachedData.cards;
+      }
+    } catch (e) {
+      console.warn("Gemini Service (Stream): Erro ao acessar a tabela de cache.", e);
+    }
+
+    const ai = getAiClient();
+    const apiKey = getApiKey();
+    
+    if (!apiKey || apiKey === "missing_key") {
+        throw new Error("Chave de API não detectada.");
+    }
+
+    const { parts, tools } = buildFlashcardPromptParts(
+      text, subjectName, quantity, cardType, customInstructions,
+      files, urls, difficulty, format, sourceType, includeMnemonics
+    );
+
+    const responseStream = await ai.models.generateContentStream({
+      model: 'gemini-3-flash-preview',
+      contents: { parts },
+      config: {
+        tools: tools.length > 0 ? tools : undefined,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              front: { type: Type.STRING },
+              back: { type: Type.STRING },
+              tags: { type: Type.ARRAY, items: { type: Type.STRING } },
+              source: { type: Type.STRING },
+            },
+            required: ['front', 'back'],
+          },
+        },
+      },
+    });
+
+    let fullText = "";
+    for await (const chunk of responseStream) {
+      fullText += chunk.text;
+      
+      // Tenta extrair cards parciais do JSON incompleto
+      // Isso é complexo. Uma alternativa simples é esperar o JSON fechar um objeto.
+      try {
+        // Tenta encontrar objetos completos no array JSON
+        // Ex: [{"a":1}, {"b":2} ...
+        // Procuramos por }, { ou ] no final
+        const lastBracket = fullText.lastIndexOf('}');
+        if (lastBracket !== -1) {
+          let partialJson = fullText.substring(0, lastBracket + 1);
+          if (!partialJson.endsWith(']')) partialJson += ']';
+          if (!partialJson.startsWith('[')) partialJson = '[' + partialJson;
+          
+          const parsed = JSON.parse(partialJson);
+          if (Array.isArray(parsed)) {
+            onChunk(parsed);
+          }
+        }
+      } catch (e) {
+        // JSON ainda incompleto para parse, ignora
+      }
+    }
+
+    // Parse final
+    try {
+      const finalParsed = JSON.parse(fullText);
+      onChunk(finalParsed);
+
+      // Salva no cache para uso futuro
+      try {
+        await supabase.from('flashcard_cache').upsert({
+          hash: cacheKey,
+          cards: finalParsed,
+          created_at: new Date().toISOString()
+        });
+      } catch (cacheSaveError) {
+        console.warn("Gemini Service (Stream): Falha ao salvar no cache.", cacheSaveError);
+      }
+
+      return finalParsed;
+    } catch (e) {
+      console.error("Erro no parse final do stream", e);
+    }
+
+  } catch (error) {
+    console.error("Erro no streaming de flashcards:", error);
     throw error;
   }
 };

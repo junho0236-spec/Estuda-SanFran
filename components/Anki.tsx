@@ -34,7 +34,7 @@ import { Flashcard, Subject, Folder } from '../types';
 import { supabase } from '../services/supabaseClient';
 import { dataService } from '../services/dataService';
 import { updateQuestProgress } from '../services/questService';
-import { generateFlashcards } from '../services/geminiService';
+import { generateFlashcards, generateFlashcardsStream } from '../services/geminiService';
 
 interface AnkiProps {
   subjects: Subject[];
@@ -334,6 +334,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     }
     
     setIsLoading(true);
+    setAiGeneratedCardsPreview([]); // Limpa o preview para o efeito de streaming
+    setIsPreviewMode(true); // Mostra o modo de preview imediatamente
+
     try {
       // Salva no histórico antes de gerar
       const historyItem = {
@@ -344,10 +347,12 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         timestamp: Date.now(),
         subjectId: selectedSubjectId
       };
-      setAiGenerationHistory(prev => [historyItem, ...prev].slice(0, 10)); // Mantém os últimos 10
+      setAiGenerationHistory(prev => [historyItem, ...prev].slice(0, 10));
 
       const subjectName = subjects.find(s => s.id === selectedSubjectId)?.name || "Direito Geral";
-      const generatedCards = await generateFlashcards(
+      
+      // Tenta usar o streaming
+      await generateFlashcardsStream(
         aiSourceText, 
         subjectName, 
         aiQuantity, 
@@ -358,19 +363,17 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         aiDifficulty,
         aiFormat,
         aiSourceType,
-        aiIncludeMnemonics
+        aiIncludeMnemonics,
+        (partialCards) => {
+          // Atualiza o preview conforme os cards chegam
+          setAiGeneratedCardsPreview(partialCards);
+        }
       );
-
-      if (!generatedCards || generatedCards.length === 0) {
-        throw new Error("A IA não conseguiu extrair perguntas do conteúdo fornecido. Tente um conteúdo mais técnico.");
-      }
-
-      setAiGeneratedCardsPreview(generatedCards);
-      setIsPreviewMode(true);
 
     } catch (err: any) {
       console.error(err);
       alert(`Erro na geração com IA: ${err.message || "Tente novamente mais tarde."}`);
+      setIsPreviewMode(false);
     } finally {
       setIsLoading(false);
     }
