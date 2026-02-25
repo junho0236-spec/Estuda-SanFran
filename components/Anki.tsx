@@ -51,7 +51,7 @@ interface AnkiProps {
 const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folders, setFolders, userId, isOnline, initialText, setInitialText }) => {
   const [mode, setMode] = useState<'browse' | 'study' | 'create' | 'bulk' | 'ai_create'>('browse');
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string>(subjects[0]?.id || '');
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>(subjects.length > 0 ? subjects[0].id : '');
   
   // States comuns
   const [bulkInput, setBulkInput] = useState('');
