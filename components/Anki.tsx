@@ -528,6 +528,21 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     }
   };
 
+  const getFolderStats = (folderId: string) => {
+    const subfolderIds = getSubfolderIds(folderId);
+    const folderCards = activeFlashcards.filter(f => subfolderIds.includes(f.folderId as string));
+    
+    const now = Date.now();
+    const newCount = folderCards.filter(f => f.interval === 0).length;
+    const learningCount = folderCards.filter(f => f.interval > 0 && f.interval < 3).length;
+    const reviewCount = folderCards.filter(f => f.interval >= 3 && f.nextReview <= now).length;
+    
+    const matureCards = folderCards.filter(f => f.interval >= 21).length;
+    const mastery = folderCards.length > 0 ? Math.round((matureCards / folderCards.length) * 100) : 0;
+    
+    return { newCount, learningCount, reviewCount, mastery };
+  };
+
   const currentFolders = folders.filter(f => f.parentId === currentFolderId);
   const currentContextIds = getSubfolderIds(currentFolderId);
   const reviewQueue = activeFlashcards.filter(f => 
@@ -640,18 +655,51 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
       {mode === 'browse' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
-          {currentFolders.map(folder => (
-            <div key={folder.id} onClick={() => setCurrentFolderId(folder.id)} className="group bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2rem] border-2 border-slate-200 dark:border-sanfran-rubi/40 shadow-xl cursor-pointer hover:border-usp-gold border-l-[10px] border-l-usp-gold transition-all relative">
-              <button 
-                onClick={(e) => deleteFolder(folder.id, e)} 
-                className="absolute top-4 right-4 p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-              <FolderIcon className="text-usp-gold w-8 h-8 mb-4" />
-              <h4 className="font-black text-slate-950 dark:text-white uppercase tracking-tight">{folder.name}</h4>
-            </div>
-          ))}
+          {currentFolders.map(folder => {
+            const stats = getFolderStats(folder.id);
+            return (
+              <div key={folder.id} onClick={() => setCurrentFolderId(folder.id)} className="group bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2rem] border-2 border-slate-200 dark:border-sanfran-rubi/40 shadow-xl cursor-pointer hover:border-usp-gold border-l-[10px] border-l-usp-gold transition-all relative">
+                <button 
+                  onClick={(e) => deleteFolder(folder.id, e)} 
+                  className="absolute top-4 right-4 p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+                <FolderIcon className="text-usp-gold w-8 h-8 mb-4" />
+                <h4 className="font-black text-slate-950 dark:text-white uppercase tracking-tight mb-2">{folder.name}</h4>
+                
+                {/* Anki Style Metrics */}
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-blue-500 uppercase">Novos</span>
+                    <span className="text-sm font-black text-blue-600">{stats.newCount}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-orange-500 uppercase">Aprendendo</span>
+                    <span className="text-sm font-black text-orange-600">{stats.learningCount}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-emerald-500 uppercase">Revisar</span>
+                    <span className="text-sm font-black text-emerald-600">{stats.reviewCount}</span>
+                  </div>
+                </div>
+
+                {/* Mastery Bar */}
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[9px] font-black text-slate-400 uppercase">Domínio</span>
+                    <span className="text-[9px] font-black text-slate-600 dark:text-slate-300">{stats.mastery}%</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-usp-gold to-yellow-500 transition-all duration-500" 
+                      style={{ width: `${stats.mastery}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
           {currentCards.map(card => {
             const subject = subjects.find(s => s.id === card.subjectId);
             const isSelected = selectedCardIds.has(card.id);
