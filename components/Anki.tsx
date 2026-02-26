@@ -56,7 +56,7 @@ import { Flashcard, Subject, Folder, DeckRequest } from '../types';
 import { supabase } from '../services/supabaseClient';
 import { dataService } from '../services/dataService';
 import { updateQuestProgress } from '../services/questService';
-import { generateFlashcards, generateFlashcardsStream } from '../services/geminiService';
+import { generateFlashcards, generateFlashcardsStream, evaluateDissertativeAnswer } from '../services/geminiService';
 
 interface AnkiProps {
   subjects: Subject[];
@@ -96,6 +96,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [manualFront, setManualFront] = useState('');
   const [manualBack, setManualBack] = useState('');
   const [manualNotes, setManualNotes] = useState('');
+  const [manualImage, setManualImage] = useState<string | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
   const [showFolderInput, setShowFolderInput] = useState(false);
   const [editingCard, setEditingCard] = useState<Flashcard | null>(null);
@@ -113,6 +114,12 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [cardTimer, setCardTimer] = useState(0);
   const [cardStartTime, setCardStartTime] = useState(Date.now());
+
+  // Dissertative Mode State
+  const [isDissertativeMode, setIsDissertativeMode] = useState(false);
+  const [userWrittenAnswer, setUserWrittenAnswer] = useState('');
+  const [aiEvaluation, setAiEvaluation] = useState<{ score: number; feedback: string; missing_keywords: string[]; is_perfect: boolean } | null>(null);
+  const [isEvaluating, setIsEvaluating] = useState(false);
 
   useEffect(() => {
     const handleClickOutside = () => setActiveMenuFolderId(null);
@@ -734,6 +741,33 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     });
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setManualImage(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const blob = items[i].getAsFile();
+        if (blob) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            setManualImage(event.target?.result as string);
+          };
+          reader.readAsDataURL(blob);
+        }
+      }
+    }
+  };
+
   const handleManualCreate = async () => {
     if (!manualFront.trim() || !manualBack.trim()) return;
     const newId = Math.random().toString(36).substr(2, 9);
@@ -743,6 +777,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         front: manualFront, 
         back: manualBack, 
         notes: manualNotes,
+        image: manualImage || undefined,
         subjectId: selectedSubjectId, 
         folderId: currentFolderId, 
         nextReview: Date.now(), 
@@ -756,6 +791,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setManualFront(''); 
       setManualBack(''); 
       setManualNotes('');
+      setManualImage(null);
     } catch (err) { 
       alert("Erro ao protocolar card."); 
     }
@@ -1037,6 +1073,21 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     }
   }, [mode, currentIndex]);
 
+  const handleEvaluateDissertative = async () => {
+    if (!userWrittenAnswer.trim()) return;
+    setIsEvaluating(true);
+    try {
+      const currentCard = reviewQueue[currentIndex];
+      const evaluation = await evaluateDissertativeAnswer(currentCard.front, currentCard.back, userWrittenAnswer);
+      setAiEvaluation(evaluation);
+      setIsFlipped(true); // Flip to show the feedback and correct answer
+    } catch (err) {
+      alert("Erro ao avaliar resposta. Tente novamente.");
+    } finally {
+      setIsEvaluating(false);
+    }
+  };
+
   const handleReview = async (quality: number) => {
     const card = reviewQueue[currentIndex];
     
@@ -1057,6 +1108,10 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       
       // TRIGGER QUEST UPDATE
       await updateQuestProgress(userId, 'review_cards', 1);
+
+      setUserWrittenAnswer('');
+      setAiEvaluation(null);
+      setIsDissertativeMode(false);
 
       if (currentIndex < reviewQueue.length - 1) { 
         setCurrentIndex(prev => prev + 1); 
@@ -1278,8 +1333,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
           )}
         </div>
       </div>
+    )}
 
-      {showFolderInput && (
+      {/* {showFolderInput && (
         <div className="flex gap-2 animate-in slide-in-from-top-4">
            <input 
             value={newFolderName} 
@@ -1290,7 +1346,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
            <button onClick={handleCreateFolder} className="p-4 bg-sanfran-rubi text-white rounded-2xl font-black"><Check className="w-6 h-6" /></button>
            <button onClick={() => setShowFolderInput(false)} className="p-4 bg-slate-200 text-slate-500 rounded-2xl font-black"><X className="w-6 h-6" /></button>
         </div>
-      )}
+      )} */}
 
       {mode === 'community' && (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -1741,7 +1797,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
             )}
           </div>
 
-          <div className="relative w-full max-w-2xl h-[450px] preserve-3d group/card">
+          <div className="relative w-full max-w-2xl min-h-[550px] preserve-3d group/card">
             {/* Subtle Timer Bar */}
             <div className="absolute -top-4 left-0 w-full h-1.5 bg-slate-200 dark:bg-white/5 rounded-full overflow-hidden z-10">
               <div 
@@ -1750,17 +1806,92 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               ></div>
             </div>
 
-            <div className={`absolute inset-0 w-full h-full cursor-pointer transition-transform duration-700 preserve-3d ${isFlipped ? 'rotate-y-180' : ''}`} onClick={() => setIsFlipped(!isFlipped)}>
+            <div className={`absolute inset-0 w-full h-full cursor-pointer transition-transform duration-700 preserve-3d ${isFlipped ? 'rotate-y-180' : ''}`} onClick={() => !isDissertativeMode && setIsFlipped(!isFlipped)}>
               <div className="absolute inset-0 w-full h-full bg-white dark:bg-sanfran-rubiDark border-[6px] border-slate-200 dark:border-white/10 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden">
                 <span className="text-xs font-black text-sanfran-rubi uppercase tracking-[0.3em] mb-8">Questão</span>
                 <p className="text-2xl font-black text-slate-950 dark:text-white leading-tight">{reviewQueue[currentIndex].front}</p>
+                
+                {isDissertativeMode ? (
+                  <div className="w-full mt-8 space-y-4 animate-in slide-in-from-bottom-4" onClick={(e) => e.stopPropagation()}>
+                    <textarea 
+                      value={userWrittenAnswer}
+                      onChange={(e) => setUserWrittenAnswer(e.target.value)}
+                      placeholder="Digite sua resposta dissertativa aqui..."
+                      className="w-full h-32 p-4 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-2xl font-bold resize-none outline-none focus:border-sanfran-rubi"
+                    />
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => setIsDissertativeMode(false)}
+                        className="px-4 py-4 bg-slate-100 dark:bg-white/5 text-slate-500 rounded-2xl font-black uppercase text-[10px] tracking-widest"
+                      >
+                        Cancelar
+                      </button>
+                      <button 
+                        onClick={handleEvaluateDissertative}
+                        disabled={isEvaluating || !userWrittenAnswer.trim()}
+                        className="flex-1 py-4 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {isEvaluating ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
+                        {isEvaluating ? 'Avaliando...' : 'Enviar para Correção IA'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setIsDissertativeMode(true); }}
+                    className="mt-8 px-6 py-3 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-sanfran-rubi hover:text-white transition-all flex items-center gap-2"
+                  >
+                    <Edit2 size={14} /> Responder por Escrito
+                  </button>
+                )}
+
                 <div className="absolute bottom-8 left-1/2 -translate-x-1/2 opacity-0 group-hover/card:opacity-100 transition-opacity">
                   <span className="px-4 py-2 bg-slate-100 dark:bg-white/5 rounded-full text-[9px] font-black text-slate-400 uppercase tracking-widest">Pressione Espaço para virar</span>
                 </div>
               </div>
               <div className="absolute inset-0 w-full h-full bg-slate-50 dark:bg-black border-[6px] border-usp-blue/40 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden rotate-y-180 overflow-y-auto custom-scrollbar">
-                <span className="text-xs font-black text-usp-blue uppercase tracking-[0.3em] mb-4">Resposta</span>
-                <p className="text-2xl font-black text-slate-900 dark:text-white leading-tight mb-6">{reviewQueue[currentIndex].back}</p>
+                {aiEvaluation ? (
+                  <div className="w-full mb-8 animate-in fade-in duration-500">
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-xs font-black text-purple-600 uppercase tracking-[0.3em]">Avaliação IA</span>
+                      <div className="flex items-center gap-2 px-4 py-1 bg-purple-600 text-white rounded-full text-lg font-black">
+                        {aiEvaluation.score.toFixed(1)} / 10
+                      </div>
+                    </div>
+                    <div className="p-6 bg-white dark:bg-slate-900 rounded-3xl border-2 border-purple-500/30 text-left shadow-xl">
+                      <div className="mb-4 pb-4 border-b border-slate-100 dark:border-white/5">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Sua Resposta:</span>
+                        <p className="text-sm font-medium text-slate-600 dark:text-slate-400 italic">"{userWrittenAnswer}"</p>
+                      </div>
+                      <p className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-relaxed mb-4">{aiEvaluation.feedback}</p>
+                      {aiEvaluation.missing_keywords.length > 0 && (
+                        <div className="space-y-2">
+                          <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">O que faltou:</span>
+                          <div className="flex flex-wrap gap-2">
+                            {aiEvaluation.missing_keywords.map((kw, i) => (
+                              <span key={i} className="px-2 py-1 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-[10px] font-black border border-red-100 dark:border-red-800/30">
+                                {kw}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <span className="text-xs font-black text-usp-blue uppercase tracking-[0.3em] mb-4">Resposta</span>
+                )}
+                
+                {reviewQueue[currentIndex].image && (
+                  <div className="w-full mb-6">
+                    <img src={reviewQueue[currentIndex].image} alt="Flashcard" className="max-w-full h-auto rounded-2xl border border-slate-200 dark:border-white/10 mx-auto shadow-lg" />
+                  </div>
+                )}
+                
+                <div className="w-full text-left">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Gabarito Oficial</span>
+                  <p className="text-2xl font-black text-slate-900 dark:text-white leading-tight mb-6">{reviewQueue[currentIndex].back}</p>
+                </div>
                 {reviewQueue[currentIndex].notes && (
                   <div className="w-full mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-2xl text-left">
                     <span className="text-[10px] font-black text-yellow-800 dark:text-yellow-500 uppercase tracking-widest block mb-2">Notas Pessoais</span>
@@ -1788,6 +1919,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               {isCramMode ? (
                 <button 
                   onClick={() => {
+                    setUserWrittenAnswer('');
+                    setAiEvaluation(null);
+                    setIsDissertativeMode(false);
                     if (currentIndex < reviewQueue.length - 1) {
                       setCurrentIndex(prev => prev + 1);
                       setIsFlipped(false);
@@ -1897,7 +2031,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 )}
                 <div className="md:col-span-2 space-y-4">
                     <div className="flex flex-wrap gap-2">
-                       {['Geral', 'Letra da Lei', 'Doutrina', 'Jurisprudência'].map(type => (
+                       {['Geral', 'Letra da Lei', 'Doutrina', 'Jurisprudência', 'Casos Hipotéticos'].map(type => (
                          <button
                            key={type}
                            onClick={() => setAiSourceType(type)}
@@ -2070,14 +2204,28 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
                    <div className="space-y-2">
                       <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Foco dos Cards</label>
-                      <select value={aiCardType} onChange={(e) => setAiCardType(e.target.value)} className="w-full p-4 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-2xl font-bold outline-none text-purple-700 dark:text-purple-300">
-                         <option value="Geral">Geral (Equilibrado)</option>
-                         <option value="Conceitos">Conceitos e Definições</option>
-                         <option value="Prazos e Números">Prazos e Números</option>
-                         <option value="Exceções">Exceções à Regra</option>
-                         <option value="Súmulas e Jurisprudência">Súmulas e Jurisprudência</option>
-                         <option value="Casos Práticos">Casos Práticos (Hipotéticos)</option>
-                      </select>
+                      <div className="grid grid-cols-2 gap-2">
+                         {[
+                           { id: 'Geral', label: 'Geral' },
+                           { id: 'Conceitos', label: 'Conceitos' },
+                           { id: 'Prazos e Números', label: 'Prazos' },
+                           { id: 'Exceções', label: 'Exceções' },
+                           { id: 'Súmulas e Jurisprudência', label: 'Jurisprudência' },
+                           { id: 'Casos Hipotéticos', label: 'Casos Hipotéticos (OAB)' }
+                         ].map(type => (
+                           <button
+                             key={type.id}
+                             onClick={() => setAiCardType(type.id)}
+                             className={`py-2 px-1 rounded-xl text-[10px] font-black uppercase border-2 transition-all ${
+                               aiCardType === type.id 
+                                 ? 'border-purple-500 bg-purple-500 text-white shadow-md' 
+                                 : 'border-slate-200 text-slate-400 hover:border-purple-200'
+                             }`}
+                           >
+                             {type.label}
+                           </button>
+                         ))}
+                      </div>
                    </div>
                    
                    <div className="space-y-2">
@@ -2254,7 +2402,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
             <button onClick={() => setMode('browse')} className="p-3"><ArrowLeft className="w-8 h-8 text-slate-400" /></button>
             <h3 className="text-3xl font-black text-slate-950 dark:text-white uppercase tracking-tight">Criação Manual</h3>
           </div>
-          <div className="space-y-6">
+          <div className="space-y-6" onPaste={handlePaste}>
             <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Disciplina</label>
                 <select value={selectedSubjectId} onChange={(e) => setSelectedSubjectId(e.target.value)} className="w-full p-4 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-2xl font-bold">
@@ -2262,7 +2410,24 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 </select>
             </div>
             <input value={manualFront} onChange={(e) => setManualFront(e.target.value)} placeholder="Enunciado / Pergunta" className="w-full p-6 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-2xl font-bold outline-none" />
-            <textarea value={manualBack} onChange={(e) => setManualBack(e.target.value)} placeholder="Doutrina / Resposta" className="w-full h-32 p-6 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-3xl font-bold resize-none outline-none" />
+            <div className="relative">
+              <textarea value={manualBack} onChange={(e) => setManualBack(e.target.value)} placeholder="Doutrina / Resposta, Fluxograma, Tabela..." className="w-full h-32 p-6 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-3xl font-bold resize-none outline-none" />
+              <div className="absolute bottom-4 right-4 text-[9px] font-black text-slate-400 uppercase tracking-widest pointer-events-none">
+                Dica: Você pode colar (Ctrl+V) uma imagem aqui
+              </div>
+            </div>
+            {manualImage && (
+              <div className="relative mt-4">
+                <img src={manualImage} alt="Uploaded" className="max-w-full h-auto rounded-xl border border-slate-200 dark:border-white/10" />
+                <button onClick={() => setManualImage(null)} className="absolute top-2 right-2 p-1 bg-black/50 text-white rounded-full"><X size={16} /></button>
+              </div>
+            )}
+            <input 
+              type="file" 
+              accept="image/*" 
+              onChange={handleImageUpload} 
+              className="mt-4 w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-sanfran-rubi file:text-white hover:file:bg-sanfran-rubiDark"
+            />
             <textarea value={manualNotes} onChange={(e) => setManualNotes(e.target.value)} placeholder="Notas Pessoais (Opcional) - Mnemônicos, dicas, etc." className="w-full h-24 p-6 bg-yellow-50 dark:bg-yellow-900/10 border-2 border-yellow-200 dark:border-yellow-700/30 rounded-3xl font-bold resize-none outline-none placeholder:text-yellow-600/50" />
             <button onClick={handleManualCreate} className="w-full py-6 bg-sanfran-rubi text-white rounded-[2rem] font-black uppercase text-lg shadow-xl flex items-center justify-center gap-3">
               <Gavel className="w-6 h-6" /> Protocolar Card
@@ -2301,6 +2466,38 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   className="w-full h-32 p-4 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-2xl font-bold resize-none outline-none" 
                 />
               </div>
+              
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Imagem (Opcional)</label>
+                {editingCard.image ? (
+                  <div className="relative mb-2">
+                    <img src={editingCard.image} alt="Card" className="max-h-40 rounded-xl border border-slate-200 dark:border-white/10" />
+                    <button 
+                      onClick={() => setEditingCard({...editingCard, image: undefined})} 
+                      className="absolute top-2 left-2 p-1 bg-red-500 text-white rounded-full shadow-lg"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          setEditingCard({...editingCard, image: event.target?.result as string});
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }} 
+                    className="text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
+                  />
+                )}
+              </div>
+
               <div>
                 <label className="text-[10px] font-black uppercase tracking-widest text-yellow-600 dark:text-yellow-500 mb-2 block">Notas Pessoais</label>
                 <textarea 

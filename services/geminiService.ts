@@ -76,8 +76,9 @@ const buildFlashcardPromptParts = (
     case 'Súmulas e Jurisprudência':
       typeInstruction = 'Foque no entendimento jurisprudencial, súmulas e teses fixadas mencionadas no texto.';
       break;
+    case 'Casos Hipotéticos':
     case 'Casos Práticos':
-      typeInstruction = 'Crie pequenos casos práticos hipotéticos na pergunta (front) e dê a solução jurídica na resposta (back).';
+      typeInstruction = 'Crie casos práticos hipotéticos complexos no estilo da prova da OAB ou concursos de alto nível. A pergunta (front) deve apresentar uma situação fática detalhada ("Mévio fez X, Tício fez Y...") e questionar a consequência jurídica. A resposta (back) deve dar a solução fundamentada na lei e jurisprudência.';
       break;
     default:
       typeInstruction = 'Foque em conceitos-chave, prazos, exceções ou princípios de forma equilibrada.';
@@ -664,5 +665,65 @@ export const generateMindMap = async (text: string) => {
   } catch (error) {
     console.error("Erro ao gerar mapa mental:", error);
     return "Não foi possível gerar o mapa mental no momento.";
+  }
+};
+
+/**
+ * Avalia uma resposta dissertativa comparando-a com o gabarito.
+ */
+export const evaluateDissertativeAnswer = async (question: string, correctAnswer: string, userAnswer: string) => {
+  try {
+    const ai = getAiClient();
+    const apiKey = getApiKey();
+
+    if (!apiKey || apiKey === "missing_key") {
+      throw new Error("Chave de API não configurada.");
+    }
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Você é um professor avaliador da Faculdade de Direito do Largo São Francisco (USP).
+      Sua tarefa é avaliar a resposta dissertativa de um aluno para um flashcard jurídico.
+      
+      Pergunta/Enunciado: "${question}"
+      Gabarito Esperado (Doutrina/Lei): "${correctAnswer}"
+      Resposta do Aluno: "${userAnswer}"
+      
+      Diretrizes de Avaliação:
+      1. Atribua uma nota de 0.0 a 10.0.
+      2. Seja rigoroso tecnicamente, mas didático.
+      3. Verifique se o aluno mencionou palavras-chave, artigos de lei ou teorias essenciais presentes no gabarito.
+      4. Aponte o que faltou ou o que foi citado incorretamente.
+      5. Dê um feedback construtivo curto (máximo 3 parágrafos).
+      
+      Retorne a resposta EXATAMENTE no formato JSON:
+      {
+        "score": 8.5,
+        "feedback": "Seu feedback aqui...",
+        "missing_keywords": ["Art. 5º", "Teoria X"],
+        "is_perfect": false
+      }`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            score: { type: Type.NUMBER },
+            feedback: { type: Type.STRING },
+            missing_keywords: { type: Type.ARRAY, items: { type: Type.STRING } },
+            is_perfect: { type: Type.BOOLEAN }
+          },
+          required: ['score', 'feedback', 'missing_keywords', 'is_perfect']
+        }
+      }
+    });
+
+    const resultText = response.text;
+    if (!resultText) throw new Error("Resposta vazia da IA.");
+    
+    return JSON.parse(resultText);
+  } catch (error) {
+    console.error("Erro ao avaliar resposta dissertativa:", error);
+    throw error;
   }
 };

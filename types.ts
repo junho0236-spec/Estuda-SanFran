@@ -130,6 +130,7 @@ export interface Flashcard {
   is_suspended?: boolean;
   tags?: string[];
   source?: string;
+  image?: string; // Base64 image data
 }
 
 export interface Subject {
