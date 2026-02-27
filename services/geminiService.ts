@@ -727,3 +727,33 @@ export const evaluateDissertativeAnswer = async (question: string, correctAnswer
     throw error;
   }
 };
+
+/**
+ * Busca o conteúdo de uma referência legal (Artigo, Súmula, etc.) usando IA.
+ */
+export const fetchLegalReference = async (reference: string) => {
+  try {
+    const ai = getAiClient();
+    const apiKey = getApiKey();
+
+    if (!apiKey || apiKey === "missing_key") {
+      return "Erro: Chave de API não configurada.";
+    }
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Você é um Vade Mecum inteligente. 
+      O usuário quer saber o conteúdo da seguinte referência legal: "${reference}".
+      
+      1. Forneça o texto literal da norma (se for um artigo ou súmula).
+      2. Se for um artigo longo, forneça o caput e os parágrafos mais importantes.
+      3. Adicione uma breve explicação (1 frase) do que esse dispositivo trata.
+      
+      Retorne a resposta em Markdown simples e conciso.`,
+    });
+    return response.text || "Conteúdo não encontrado.";
+  } catch (error) {
+    console.error("Erro ao buscar referência legal:", error);
+    return "Não foi possível carregar o conteúdo da lei no momento.";
+  }
+};

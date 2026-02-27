@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css'; // Import Quill styles
-import { ArrowLeft, Save, Loader2, FileText, BrainCircuit, Sparkles, Tag, Split, Download } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, FileText, BrainCircuit, Sparkles, Tag, Split, Download, Gavel } from 'lucide-react';
 import { Note, Subject } from '../types';
 import { dataService } from '../services/dataService';
 import { summarizeText } from '../services/geminiService';
 import html2pdf from 'html2pdf.js';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
+import { SmartText } from './SmartVadeMecum';
 
 interface NoteViewProps {
   subjectId: string; // Initial subject ID, can be changed
@@ -27,6 +28,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [isSplitView, setIsSplitView] = useState(false);
+  const [isVadeMecumMode, setIsVadeMecumMode] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(initialSubjectId);
   const editorRef = useRef<HTMLDivElement>(null);
@@ -269,6 +271,14 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
           >
             <Split size={18} /> {isSplitView ? 'Sair do Split' : 'Split View'}
           </button>
+          {/* Vade Mecum Mode Button */}
+          <button
+            onClick={() => setIsVadeMecumMode(!isVadeMecumMode)}
+            className={`py-2 px-4 rounded-xl font-bold flex items-center gap-2 transition-colors ${isVadeMecumMode ? 'bg-sanfran-rubi text-white' : 'bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-300'}`}
+          >
+            <Gavel size={18} /> {isVadeMecumMode ? 'Sair do Vade Mecum' : 'Modo Vade Mecum'}
+          </button>
+
           {/* AI Summarize Button */}
           <button 
             onClick={handleSummarize}
@@ -330,8 +340,14 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
           </button>
         </div>
       </header>
-      <div className="flex-1 overflow-y-auto bg-white dark:bg-[#181818] rounded-2xl shadow-xl">
-        <div ref={editorRef} className="h-full min-h-[400px] quill-editor-custom" />
+      <div className="flex-1 overflow-y-auto bg-white dark:bg-[#181818] rounded-2xl shadow-xl p-8">
+        {isVadeMecumMode ? (
+          <div className="prose dark:prose-invert max-w-none font-serif text-lg leading-relaxed">
+            <SmartText text={new DOMParser().parseFromString(noteContent, 'text/html').body.textContent || ''} />
+          </div>
+        ) : (
+          <div ref={editorRef} className="h-full min-h-[400px] quill-editor-custom" />
+        )}
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
         {(noteContent.match(/#(\w+)/g) || []).map((tag, index) => (

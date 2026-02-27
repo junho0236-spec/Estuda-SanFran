@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Search, X, BookOpen, CheckSquare, Brain, ArrowRight, Command, Mic, MicOff } from 'lucide-react';
 import { View, Flashcard, Task, Reading, Subject } from '../types';
+import { SmartText } from './SmartVadeMecum';
 
 interface GlobalSearchProps {
   isOpen: boolean;
@@ -239,12 +240,12 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({
                       </span>
                     </div>
                     <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight truncate">
-                      {result.title}
+                      <SmartText text={result.title} />
                     </h4>
                     {result.content && (
-                      <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
-                        {result.content}
-                      </p>
+                      <div className="text-[10px] font-medium text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
+                        <SmartText text={result.content} />
+                      </div>
                     )}
                   </div>
 

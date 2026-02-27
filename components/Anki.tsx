@@ -57,6 +57,7 @@ import { supabase } from '../services/supabaseClient';
 import { dataService } from '../services/dataService';
 import { updateQuestProgress } from '../services/questService';
 import { generateFlashcards, generateFlashcardsStream, evaluateDissertativeAnswer } from '../services/geminiService';
+import { SmartText } from './SmartVadeMecum';
 
 interface AnkiProps {
   subjects: Subject[];
@@ -1681,7 +1682,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                     {isSelected ? <CheckSquare className="w-6 h-6 text-sanfran-rubi" /> : <Square className="w-6 h-6 text-slate-300" />}
                   </div>
                 )}
-                <p className="font-black text-slate-900 dark:text-white line-clamp-4 leading-tight">{card.front}</p>
+                <div className="font-black text-slate-900 dark:text-white line-clamp-4 leading-tight">
+                  <SmartText text={card.front} />
+                </div>
                 {isGlobalSearch && (
                   <div className="mt-2 flex items-center gap-1 text-[9px] font-black text-slate-400 uppercase">
                     <FolderIcon size={10} />
@@ -1809,7 +1812,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
             <div className={`absolute inset-0 w-full h-full cursor-pointer transition-transform duration-700 preserve-3d ${isFlipped ? 'rotate-y-180' : ''}`} onClick={() => !isDissertativeMode && setIsFlipped(!isFlipped)}>
               <div className="absolute inset-0 w-full h-full bg-white dark:bg-sanfran-rubiDark border-[6px] border-slate-200 dark:border-white/10 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden">
                 <span className="text-xs font-black text-sanfran-rubi uppercase tracking-[0.3em] mb-8">Questão</span>
-                <p className="text-2xl font-black text-slate-950 dark:text-white leading-tight">{reviewQueue[currentIndex].front}</p>
+                <div className="text-2xl font-black text-slate-950 dark:text-white leading-tight">
+                  <SmartText text={reviewQueue[currentIndex].front} />
+                </div>
                 
                 {isDissertativeMode ? (
                   <div className="w-full mt-8 space-y-4 animate-in slide-in-from-bottom-4" onClick={(e) => e.stopPropagation()}>
@@ -1890,12 +1895,16 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 
                 <div className="w-full text-left">
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Gabarito Oficial</span>
-                  <p className="text-2xl font-black text-slate-900 dark:text-white leading-tight mb-6">{reviewQueue[currentIndex].back}</p>
+                  <div className="text-2xl font-black text-slate-900 dark:text-white leading-tight mb-6">
+                    <SmartText text={reviewQueue[currentIndex].back} />
+                  </div>
                 </div>
                 {reviewQueue[currentIndex].notes && (
                   <div className="w-full mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-2xl text-left">
                     <span className="text-[10px] font-black text-yellow-800 dark:text-yellow-500 uppercase tracking-widest block mb-2">Notas Pessoais</span>
-                    <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100 whitespace-pre-wrap">{reviewQueue[currentIndex].notes}</p>
+                    <div className="text-sm font-medium text-yellow-900 dark:text-yellow-100 whitespace-pre-wrap">
+                      <SmartText text={reviewQueue[currentIndex].notes} />
+                    </div>
                   </div>
                 )}
                 <div className="w-full mt-4 flex flex-wrap gap-2 justify-center">

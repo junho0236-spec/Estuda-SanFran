@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Book, ChevronRight, CheckCircle2, Circle, ArrowLeft, BarChart3, Scale, Search, PenTool, Highlighter, Paperclip, X, Save, Trash2, Flame, Thermometer, ExternalLink } from 'lucide-react';
+import { Book, ChevronRight, CheckCircle2, Circle, ArrowLeft, BarChart3, Scale, Search, PenTool, Highlighter, Paperclip, X, Save, Trash2, Flame, Thermometer, ExternalLink, Eye } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { ArticleAnnotation } from '../types';
+import { SmartText } from './SmartVadeMecum';
 
 interface LawSection {
   title: string;
@@ -145,6 +146,7 @@ const LeiSeca: React.FC<LeiSecaProps> = ({ userId }) => {
   const [noteContent, setNoteContent] = useState('');
   const [articleText, setArticleText] = useState('');
   const [noteColor, setNoteColor] = useState<'yellow' | 'green' | 'pink' | 'blue' | 'none'>('none');
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
   const articleTextRef = React.useRef<HTMLDivElement>(null);
 
   // Fetch initial stats for dashboard
@@ -673,15 +675,29 @@ const LeiSeca: React.FC<LeiSecaProps> = ({ userId }) => {
 
                     {/* Text Area */}
                     <div>
-                       <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3 block flex items-center gap-2">
-                          <Paperclip size={14} /> Remissões e Notas
-                       </label>
-                       <textarea 
-                          value={noteContent}
-                          onChange={(e) => setNoteContent(e.target.value)}
-                          placeholder="Ex: Vide Súmula Vinculante 13..."
-                          className="w-full h-24 p-4 bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-white/10 rounded-2xl font-serif text-lg text-slate-800 dark:text-slate-200 outline-none focus:border-sanfran-rubi resize-none placeholder:text-slate-300 dark:placeholder:text-slate-600 leading-relaxed"
-                       />
+                       <div className="flex items-center justify-between mb-3">
+                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
+                             <Paperclip size={14} /> Remissões e Notas
+                          </label>
+                          <button 
+                            onClick={() => setIsPreviewMode(!isPreviewMode)}
+                            className="text-[9px] font-black uppercase text-sanfran-rubi hover:underline flex items-center gap-1"
+                          >
+                            <Eye size={12} /> {isPreviewMode ? 'Editar' : 'Visualizar Links'}
+                          </button>
+                       </div>
+                       {isPreviewMode ? (
+                          <div className="w-full min-h-[96px] p-4 bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-white/10 rounded-2xl font-serif text-lg text-slate-800 dark:text-slate-200 overflow-y-auto">
+                             <SmartText text={noteContent} />
+                          </div>
+                       ) : (
+                          <textarea 
+                             value={noteContent}
+                             onChange={(e) => setNoteContent(e.target.value)}
+                             placeholder="Ex: Vide Súmula Vinculante 13..."
+                             className="w-full h-24 p-4 bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-white/10 rounded-2xl font-serif text-lg text-slate-800 dark:text-slate-200 outline-none focus:border-sanfran-rubi resize-none placeholder:text-slate-300 dark:placeholder:text-slate-600 leading-relaxed"
+                          />
+                       )}
                     </div>
 
                     {/* Actions */}

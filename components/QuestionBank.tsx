@@ -19,7 +19,9 @@ import {
   LayoutList,
   Sparkles,
   X,
-  RotateCcw
+  RotateCcw,
+  EyeOff,
+  Eye
 } from 'lucide-react';
 
 interface QuestionBankProps {
@@ -54,6 +56,8 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer }) 
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
+  const [eliminatedOptions, setEliminatedOptions] = useState<Record<string, number[]>>({});
   const notificationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Stats
@@ -490,29 +494,32 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer }) 
 
   const currentQuestion = filteredQuestions[currentIndex];
 
-  const handleAnswer = (index: number) => {
-    if (showExplanation) return; // Already answered
+  const handleAnswer = (index: number, questionOverride?: Question) => {
+    const targetQuestion = questionOverride || currentQuestion;
+    if (showExplanation && !questionOverride) return; // Already answered in single view
+    // For inline view, we might need a separate state if we allow multiple answered questions in list
+    // But for now let's keep it simple: if it's the expanded one, we use the same states
     
     setSelectedOption(index);
     setShowExplanation(true);
     
-    if (index === currentQuestion.correct_answer) {
+    if (index === targetQuestion.correct_answer) {
       const newCount = correctCount + 1;
       setCorrectCount(newCount);
       if (onCorrectAnswer) onCorrectAnswer();
       localStorage.setItem(`sanfran_correct_count_${userId}`, newCount.toString());
       
       let newCorrect = [...correctQuestions];
-      if (!correctQuestions.includes(currentQuestion.id)) {
-        newCorrect.push(currentQuestion.id);
+      if (!correctQuestions.includes(targetQuestion.id)) {
+        newCorrect.push(targetQuestion.id);
         setCorrectQuestions(newCorrect);
         localStorage.setItem(`sanfran_correct_${userId}`, JSON.stringify(newCorrect));
       }
 
       let newWrong = wrongQuestions;
       // If answered correctly, remove from wrong questions list if present
-      if (wrongQuestions.includes(currentQuestion.id)) {
-        newWrong = wrongQuestions.filter(id => id !== currentQuestion.id);
+      if (wrongQuestions.includes(targetQuestion.id)) {
+        newWrong = wrongQuestions.filter(id => id !== targetQuestion.id);
         setWrongQuestions(newWrong);
         localStorage.setItem(`sanfran_wrong_${userId}`, JSON.stringify(newWrong));
       }
@@ -524,13 +531,24 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer }) 
       
       let newWrong = [...wrongQuestions];
       // If answered incorrectly, add to wrong questions list
-      if (!wrongQuestions.includes(currentQuestion.id)) {
-        newWrong.push(currentQuestion.id);
+      if (!wrongQuestions.includes(targetQuestion.id)) {
+        newWrong.push(targetQuestion.id);
         setWrongQuestions(newWrong);
         localStorage.setItem(`sanfran_wrong_${userId}`, JSON.stringify(newWrong));
       }
       syncUserProgress({ wrongCount: newCount, wrongQuestions: newWrong });
     }
+  };
+
+  const toggleElimination = (questionId: string, optionIndex: number) => {
+    setEliminatedOptions(prev => {
+      const current = prev[questionId] || [];
+      if (current.includes(optionIndex)) {
+        return { ...prev, [questionId]: current.filter(i => i !== optionIndex) };
+      } else {
+        return { ...prev, [questionId]: [...current, optionIndex] };
+      }
+    });
   };
 
   const handleSaveNote = (questionId: string, noteText: string) => {
@@ -1002,18 +1020,123 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer }) 
                         {q.statement}
                       </p>
                       
-                      <button
-                        onClick={() => {
-                          setCurrentIndex(idx);
-                          setViewMode('single');
-                          setSelectedOption(null);
-                          setShowExplanation(false);
-                          window.scrollTo({ top: 0, behavior: 'smooth' });
-                        }}
-                        className="px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 rounded-md text-sm font-bold transition-colors"
-                      >
-                        Resolver Questão
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => {
+                            if (expandedQuestionId === q.id) {
+                              setExpandedQuestionId(null);
+                            } else {
+                              setExpandedQuestionId(q.id);
+                              setCurrentIndex(idx);
+                              setSelectedOption(null);
+                              setShowExplanation(false);
+                            }
+                          }}
+                          className={`px-4 py-2 rounded-md text-sm font-bold transition-all flex items-center gap-2 ${
+                            expandedQuestionId === q.id 
+                              ? 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200' 
+                              : 'bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50'
+                          }`}
+                        >
+                          {expandedQuestionId === q.id ? 'Fechar Questão' : 'Resolver Questão'}
+                        </button>
+                        
+                        <button
+                          onClick={() => {
+                            setCurrentIndex(idx);
+                            setViewMode('single');
+                            setSelectedOption(null);
+                            setShowExplanation(false);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                          className="px-4 py-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold transition-colors"
+                        >
+                          Modo Foco
+                        </button>
+                      </div>
+
+                      {/* Expanded Accordion Content */}
+                      {expandedQuestionId === q.id && (
+                        <div className="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-4 duration-300">
+                          <div className="space-y-3">
+                            {q.options.map((option, optIdx) => {
+                              const isSelected = selectedOption === optIdx;
+                              const isCorrect = q.correct_answer === optIdx;
+                              const showStatus = showExplanation;
+                              const isEliminated = (eliminatedOptions[q.id] || []).includes(optIdx);
+                              
+                              let btnClass = "w-full text-left p-4 rounded-2xl border-2 transition-all duration-200 flex items-start gap-4 relative group ";
+                              
+                              if (!showStatus) {
+                                btnClass += isEliminated 
+                                  ? "border-slate-100 dark:border-slate-800 opacity-40 grayscale" 
+                                  : "border-slate-200 dark:border-slate-700 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/10";
+                              } else {
+                                if (isCorrect) {
+                                  btnClass += "border-green-500 bg-green-50 dark:bg-green-900/10";
+                                } else if (isSelected && !isCorrect) {
+                                  btnClass += "border-red-500 bg-red-50 dark:bg-red-900/10";
+                                } else {
+                                  btnClass += "border-slate-200 dark:border-slate-800 opacity-50";
+                                }
+                              }
+
+                              return (
+                                <div key={optIdx} className="relative">
+                                  <button
+                                    onClick={() => handleAnswer(optIdx, q)}
+                                    onContextMenu={(e) => {
+                                      e.preventDefault();
+                                      toggleElimination(q.id, optIdx);
+                                    }}
+                                    disabled={showExplanation}
+                                    className={btnClass}
+                                  >
+                                    <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center font-bold text-sm ${
+                                      showStatus && isCorrect ? 'bg-green-500 text-white' :
+                                      showStatus && isSelected && !isCorrect ? 'bg-red-500 text-white' :
+                                      'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                                    }`}>
+                                      {String.fromCharCode(65 + optIdx)}
+                                    </div>
+                                    <div className={`flex-1 pt-1 text-slate-700 dark:text-slate-300 ${isEliminated && !showStatus ? 'line-through' : ''}`}>
+                                      {option}
+                                    </div>
+                                    {showStatus && isCorrect && <CheckCircle2 className="text-green-500 shrink-0 mt-1" />}
+                                    {showStatus && isSelected && !isCorrect && <XCircle className="text-red-500 shrink-0 mt-1" />}
+                                  </button>
+                                  
+                                  {!showStatus && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleElimination(q.id, optIdx);
+                                      }}
+                                      className={`absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 ${
+                                        isEliminated ? 'text-orange-500 bg-orange-50 dark:bg-orange-900/20 opacity-100' : 'text-slate-300 hover:text-orange-400'
+                                      }`}
+                                      title={isEliminated ? "Restaurar alternativa" : "Riscar alternativa (Botão Direito)"}
+                                    >
+                                      {isEliminated ? <Eye size={16} /> : <EyeOff size={16} />}
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {showExplanation && q.explanation && (
+                            <div className="mt-8 p-6 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30 animate-in slide-in-from-bottom-4">
+                              <h4 className="font-bold text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
+                                <BookOpen size={18} /> Explicação
+                              </h4>
+                              <p className="text-blue-900/80 dark:text-blue-200/80 leading-relaxed text-sm whitespace-pre-wrap">
+                                {q.explanation}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1077,11 +1200,14 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer }) 
                     const isSelected = selectedOption === idx;
                     const isCorrect = currentQuestion.correct_answer === idx;
                     const showStatus = showExplanation;
+                    const isEliminated = (eliminatedOptions[currentQuestion.id] || []).includes(idx);
                     
-                    let btnClass = "w-full text-left p-4 rounded-2xl border-2 transition-all duration-200 flex items-start gap-4 ";
+                    let btnClass = "w-full text-left p-4 rounded-2xl border-2 transition-all duration-200 flex items-start gap-4 relative group ";
                     
                     if (!showStatus) {
-                      btnClass += "border-slate-200 dark:border-slate-700 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/10";
+                      btnClass += isEliminated 
+                        ? "border-slate-100 dark:border-slate-800 opacity-40 grayscale" 
+                        : "border-slate-200 dark:border-slate-700 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/10";
                     } else {
                       if (isCorrect) {
                         btnClass += "border-green-500 bg-green-50 dark:bg-green-900/10";
@@ -1093,25 +1219,45 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer }) 
                     }
 
                     return (
-                      <button
-                        key={idx}
-                        onClick={() => handleAnswer(idx)}
-                        disabled={showExplanation}
-                        className={btnClass}
-                      >
-                        <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center font-bold text-sm ${
-                          showStatus && isCorrect ? 'bg-green-500 text-white' :
-                          showStatus && isSelected && !isCorrect ? 'bg-red-500 text-white' :
-                          'bg-slate-100 dark:bg-slate-800 text-slate-500'
-                        }`}>
-                          {String.fromCharCode(65 + idx)}
-                        </div>
-                        <div className="flex-1 pt-1 text-slate-700 dark:text-slate-300">
-                          {option}
-                        </div>
-                        {showStatus && isCorrect && <CheckCircle2 className="text-green-500 shrink-0 mt-1" />}
-                        {showStatus && isSelected && !isCorrect && <XCircle className="text-red-500 shrink-0 mt-1" />}
-                      </button>
+                      <div key={idx} className="relative">
+                        <button
+                          onClick={() => handleAnswer(idx)}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            toggleElimination(currentQuestion.id, idx);
+                          }}
+                          disabled={showExplanation}
+                          className={btnClass}
+                        >
+                          <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center font-bold text-sm ${
+                            showStatus && isCorrect ? 'bg-green-500 text-white' :
+                            showStatus && isSelected && !isCorrect ? 'bg-red-500 text-white' :
+                            'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                          }`}>
+                            {String.fromCharCode(65 + idx)}
+                          </div>
+                          <div className={`flex-1 pt-1 text-slate-700 dark:text-slate-300 ${isEliminated && !showStatus ? 'line-through' : ''}`}>
+                            {option}
+                          </div>
+                          {showStatus && isCorrect && <CheckCircle2 className="text-green-500 shrink-0 mt-1" />}
+                          {showStatus && isSelected && !isCorrect && <XCircle className="text-red-500 shrink-0 mt-1" />}
+                        </button>
+                        
+                        {!showStatus && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleElimination(currentQuestion.id, idx);
+                            }}
+                            className={`absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 ${
+                              isEliminated ? 'text-orange-500 bg-orange-50 dark:bg-orange-900/20 opacity-100' : 'text-slate-300 hover:text-orange-400'
+                            }`}
+                            title={isEliminated ? "Restaurar alternativa" : "Riscar alternativa (Botão Direito)"}
+                          >
+                            {isEliminated ? <Eye size={16} /> : <EyeOff size={16} />}
+                          </button>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
