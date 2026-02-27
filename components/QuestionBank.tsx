@@ -23,7 +23,9 @@ import {
   RotateCcw,
   EyeOff,
   Eye,
-  PlusSquare
+  PlusSquare,
+  NotebookText,
+  MessageSquareText
 } from 'lucide-react';
 
 interface QuestionBankProps {
@@ -82,6 +84,27 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer }) 
       if (notificationTimeoutRef.current) clearTimeout(notificationTimeoutRef.current);
     };
   }, []);
+
+  // Effect to capture text selection for Juridiquês Translator
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const selection = window.getSelection();
+      if (selection && selection.toString().length > 0) {
+        setSelectedText(selection.toString());
+      } else {
+        setSelectedText('');
+      }
+    };
+
+    document.addEventListener('mouseup', handleSelectionChange);
+    document.addEventListener('keyup', handleSelectionChange);
+
+    return () => {
+      document.removeEventListener('mouseup', handleSelectionChange);
+      document.removeEventListener('keyup', handleSelectionChange);
+    };
+  }, []);
+
   const [wrongCount, setWrongCount] = useState(0);
 
   // Form for new question
@@ -196,6 +219,76 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer }) 
     }
   };
 
+  const fetchNotebooks = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('notebooks')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setNotebooks(data || []);
+    } catch (error) {
+      console.error('Error fetching notebooks:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotebooks();
+  }, [userId]);
+
+  const toggleQuestionSelection = (questionId: string) => {
+    setSelectedQuestionsForNotebook(prev => {
+      const newSelection = new Set(prev);
+      if (newSelection.has(questionId)) {
+        newSelection.delete(questionId);
+      } else {
+        newSelection.add(questionId);
+      }
+      return newSelection;
+    });
+  };
+
+  const handleCreateNotebook = async () => {
+    if (newNotebookName.trim() === '') {
+      showNotification('O nome do caderno não pode ser vazio.', 'error');
+      return;
+    }
+    if (selectedQuestionsForNotebook.size === 0) {
+      showNotification('Selecione pelo menos uma questão para criar um caderno.', 'error');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const { data, error } = await supabase
+        .from('notebooks')
+        .insert({
+          user_id: userId,
+          name: newNotebookName.trim(),
+          question_ids: Array.from(selectedQuestionsForNotebook),
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setNotebooks(prev => [data, ...prev]);
+        showNotification(`Caderno '${data.name}' criado com sucesso!`, 'success');
+        setNewNotebookName('');
+        setSelectedQuestionsForNotebook(new Set());
+        setShowNotebookCreationMode(false);
+      }
+    } catch (error: any) {
+      console.error('Error creating notebook:', error);
+      showNotification(`Erro ao criar caderno: ${error.message || JSON.stringify(error)}`, 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const toggleFavorite = async (questionId: string) => {
     let newFavorites;
     if (favorites.includes(questionId)) {
@@ -227,9 +320,53 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer }) 
     navigate('/anki', { state: { newFlashcard: flashcardData } });
   };
 
+  const handleJuridiquesTranslate = async () => {
+    if (selectedText.trim() === '') {
+      showNotification('Selecione um trecho de texto para traduzir.', 'error');
+      return;
+    }
+
+    try {
+      setLoadingJuridiquesExplanation(true);
+      setShowJuridiquesModal(true);
+      setJuridiquesExplanation(null); // Clear previous explanation
+
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const prompt = `Explique o seguinte trecho de texto jurídico em termos simples, como se estivesse explicando para um estudante do 1º semestre de Direito. Foque na clareza e evite jargões complexos, a menos que os explique imediatamente:
+
+"""
+${selectedText}
+"""
+
+Forneça a explicação de forma concisa e didática.`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+      });
+
+      if (response.text) {
+        setJuridiquesExplanation(response.text);
+      } else {
+        setJuridiquesExplanation('Não foi possível gerar uma explicação. Tente novamente.');
+      }
+    } catch (error: any) {
+      console.error('Error translating juridiques:', error);
+      setJuridiquesExplanation(`Erro ao traduzir: ${error.message || JSON.stringify(error)}`);
+    } finally {
+      setLoadingJuridiquesExplanation(false);
+    }
+  };
+
   // AI Commented Answer State
   const [aiCommentary, setAiCommentary] = useState<string | null>(null);
   const [loadingAiCommentary, setLoadingAiCommentary] = useState(false);
+
+  // Juridiquês Translator States
+  const [selectedText, setSelectedText] = useState<string>('');
+  const [juridiquesExplanation, setJuridiquesExplanation] = useState<string | null>(null);
+  const [loadingJuridiquesExplanation, setLoadingJuridiquesExplanation] = useState(false);
+  const [showJuridiquesModal, setShowJuridiquesModal] = useState(false);
 
     try {
       setLoading(true);
@@ -669,6 +806,12 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer }) 
           >
             {showAddForm ? 'Voltar para Questões' : <><Plus size={16} /> Nova Questão</>}
           </button>
+          <button
+            onClick={() => setShowNotebookCreationMode(prev => !prev)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${showNotebookCreationMode ? 'bg-orange-600 hover:bg-orange-700 text-white' : 'bg-orange-100 dark:bg-orange-800 hover:bg-orange-200 dark:hover:bg-orange-700 text-orange-700 dark:text-orange-300'}`}
+          >
+            <NotebookText size={16} /> {showNotebookCreationMode ? 'Sair do Modo Caderno' : 'Criar Caderno'}
+          </button>
         </div>
       </header>
 
@@ -891,6 +1034,56 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer }) 
           <>
             {/* Filters & Stats */}
           <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 mb-6 overflow-hidden">
+            {/* Quick Stats */}
+            <div className="p-4 grid grid-cols-3 gap-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+              <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white dark:bg-slate-900 shadow-sm">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">{correctCount + wrongCount}</span>
+                <span className="text-xs text-slate-500 font-medium">Questões Hoje</span>
+              </div>
+              <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white dark:bg-slate-900 shadow-sm">
+                <span className="text-2xl font-bold text-green-600 dark:text-green-400">{correctCount}</span>
+                <span className="text-xs text-slate-500 font-medium">Acertos</span>
+              </div>
+              <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white dark:bg-slate-900 shadow-sm">
+                <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {correctCount + wrongCount > 0 ? ((correctCount / (correctCount + wrongCount)) * 100).toFixed(0) : 0}%
+                </span>
+                <span className="text-xs text-slate-500 font-medium">Aproveitamento</span>
+              </div>
+            </div>
+            {showNotebookCreationMode && (
+              <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-row items-center gap-4 bg-orange-50 dark:bg-orange-900/20 animate-in fade-in duration-300">
+                <h3 className="text-lg font-bold text-orange-800 dark:text-orange-200 flex items-center gap-2">
+                  <NotebookText size={20} /> Criar Novo Caderno
+                </h3>
+                <input
+                  type="text"
+                  placeholder="Nome do Caderno (Ex: Reta Final OAB - Ética)"
+                  value={newNotebookName}
+                  onChange={(e) => setNewNotebookName(e.target.value)}
+                  className="flex-1 p-3 rounded-xl bg-white dark:bg-slate-800 border border-orange-200 dark:border-orange-700 focus:ring-2 focus:ring-orange-500 outline-none text-slate-900 dark:text-white"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleCreateNotebook}
+                    disabled={selectedQuestionsForNotebook.size === 0 || newNotebookName.trim() === '' || isSubmitting}
+                    className="px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm transition-colors flex items-center gap-2"
+                  >
+                    {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus size={16} />} Criar
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowNotebookCreationMode(false);
+                      setSelectedQuestionsForNotebook(new Set());
+                      setNewNotebookName('');
+                    }}
+                    className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-sm transition-colors"
+                  >
+                    <X size={16} /> Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <div className="flex-1 relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -1029,6 +1222,14 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer }) 
                     className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden"
                   >
                     <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2 text-sm">
+                      {showNotebookCreationMode && (
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 accent-orange-500"
+                          checked={selectedQuestionsForNotebook.has(q.id)}
+                          onChange={() => toggleQuestionSelection(q.id)}
+                        />
+                      )}
                       <span className="font-bold text-slate-900 dark:text-white">{idx + 1}</span>
                       <span className="text-blue-600 dark:text-blue-400 font-medium">{q.id.substring(0, 8)}</span>
                       <span className="text-slate-400 mx-1">•</span>
