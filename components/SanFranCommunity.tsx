@@ -25,7 +25,9 @@ import {
   Quote,
   MapPin,
   Trophy,
-  BookType
+  BookType,
+  BrainCircuit,
+  ShieldCheck
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -86,6 +88,23 @@ const SanFranCommunity: React.FC<SanFranCommunityProps> = ({ onNavigate }) => {
                 <ArrowUpRight size={24} />
              </div>
           </div>
+        </button>
+
+        {/* CARD: COMUNIDADE ANKI - NOVO */}
+        <button
+          onClick={() => onNavigate(View.Anki)}
+          className="group relative col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-indigo-400 transition-all flex flex-col justify-between h-full hover:shadow-indigo-500/10"
+        >
+           <div className="flex justify-between items-start">
+              <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 rounded-2xl">
+                 <BrainCircuit size={20} />
+              </div>
+              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-indigo-500 transition-colors" />
+           </div>
+           <div className="text-left mt-4">
+              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Decks da Comunidade</h4>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Compartilhe & Baixe Flashcards</p>
+           </div>
         </button>
 
         {/* CARD 2: SALAS DE ESTUDO (Tall) */}

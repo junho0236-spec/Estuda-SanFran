@@ -9,6 +9,15 @@ if (!rootElement) {
   throw new Error("Não foi possível encontrar o elemento root para montar o app.");
 }
 
+// Suprime avisos de defaultProps do Recharts que são comuns no React 18.3+
+const originalError = console.error;
+console.error = (...args) => {
+  if (typeof args[0] === 'string' && args[0].includes('Support for defaultProps will be removed from function components')) {
+    return;
+  }
+  originalError(...args);
+};
+
 const showError = (message: any) => {
   const errorMsg = message instanceof Error ? message.message : String(message);
   

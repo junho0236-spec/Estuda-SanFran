@@ -65,7 +65,7 @@ const SanFranOAB: React.FC<SanFranOABProps> = ({ onNavigate }) => {
              <div>
                 <h3 className="text-4xl md:text-6xl font-black tracking-tight leading-none text-white mb-2">Foco OAB</h3>
                 <p className="text-base md:text-xl font-medium text-red-100/90 max-w-lg leading-relaxed">
-                  Contagem regressiva, estratégia de estudo por fase e análise de prioridades baseada no edital.
+                   Contagem regressiva, estratégia de estudo por fase e análise de prioridades baseada no edital.
                 </p>
              </div>
              
@@ -81,6 +81,23 @@ const SanFranOAB: React.FC<SanFranOABProps> = ({ onNavigate }) => {
                 <ArrowUpRight size={28} />
              </div>
           </div>
+        </button>
+
+        {/* CARD: ANKI OAB - NOVO */}
+        <button
+          onClick={() => onNavigate(View.Anki)}
+          className="group relative col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-sanfran-rubi transition-all flex flex-col justify-between h-full"
+        >
+           <div className="flex justify-between items-start">
+              <div className="p-3 bg-red-50 dark:bg-red-900/20 text-sanfran-rubi rounded-2xl">
+                 <BookOpen size={20} />
+              </div>
+              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-sanfran-rubi transition-colors" />
+           </div>
+           <div className="text-left mt-4">
+              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Flashcards OAB</h4>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Memorização de Ética & Civil</p>
+           </div>
         </button>
 
         {/* CARD 2: SIMULADOS (Placeholder Vertical) */}
