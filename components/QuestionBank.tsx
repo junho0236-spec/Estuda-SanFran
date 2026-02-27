@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
 import { Question, UserProgress } from '../types';
 import { sampleQuestions } from './sampleQuestions';
@@ -21,7 +22,8 @@ import {
   X,
   RotateCcw,
   EyeOff,
-  Eye
+  Eye,
+  PlusSquare
 } from 'lucide-react';
 
 interface QuestionBankProps {
@@ -202,7 +204,27 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer }) 
     syncUserProgress({ favorites: newFavorites });
   };
 
-  const fetchQuestions = async () => {
+  const handleCreateFlashcardFromError = (question: Question) => {
+    const front = question.statement;
+    const correctOptionText = question.options[question.correct_answer];
+    const back = `Resposta Correta: ${String.fromCharCode(65 + question.correct_answer)}) ${correctOptionText}\n\nExplicação: ${question.explanation || 'Nenhuma explicação fornecida.'}`;
+
+    // Encode the flashcard data to be passed via URL state
+    const flashcardData = {
+      front,
+      back,
+      subject: question.subject,
+      topic: question.topic,
+    };
+
+    // Navigate to Anki and pass the flashcard data in state
+    navigate('/anki', { state: { newFlashcard: flashcardData } });
+  };
+
+  // AI Commented Answer State
+  const [aiCommentary, setAiCommentary] = useState<string | null>(null);
+  const [loadingAiCommentary, setLoadingAiCommentary] = useState(false);
+
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -1133,6 +1155,13 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer }) 
                               <p className="text-blue-900/80 dark:text-blue-200/80 leading-relaxed text-sm whitespace-pre-wrap">
                                 {q.explanation}
                               </p>
+                              <button
+                                onClick={() => handleCreateFlashcardFromError(q)}
+                                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 hover:bg-blue-700 transition-colors"
+                              >
+                                <PlusSquare size={16} /> Criar Flashcard do Erro
+                              </button>
+                            </div>
                             </div>
                           )}
                         </div>

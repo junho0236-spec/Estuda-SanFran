@@ -2,6 +2,8 @@
 // Anki.tsx - Community Features and Card Rating
 
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { useLocation } from 'react-router-dom';
 import { 
   Plus, 
   BrainCircuit, 
@@ -49,7 +51,9 @@ import {
   AlertCircle,
   ArrowRight,
   Maximize2,
-  Clock
+  Clock,
+  Minimize2,
+  Smartphone
 } from 'lucide-react';
 import JSZip from 'jszip';
 import { Flashcard, Subject, Folder, DeckRequest } from '../types';
@@ -72,6 +76,21 @@ interface AnkiProps {
 }
 
 const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folders, setFolders, userId, isOnline, initialText, setInitialText }) => {
+  const location = useLocation();
+  const { state } = location;
+
+  useEffect(() => {
+    if (state && (state as any).newFlashcard) {
+      const { newFlashcard } = state as any;
+      setManualFront(newFlashcard.front);
+      setManualBack(newFlashcard.back);
+      setSelectedSubjectId(subjects.find(s => s.name === newFlashcard.subject)?.id || selectedSubjectId);
+      setMode('create');
+      // Clear the state so it doesn't persist on subsequent visits
+      window.history.replaceState({}, document.title, location.pathname);
+    }
+  }, [state, subjects, selectedSubjectId, setManualFront, setManualBack, setSelectedSubjectId, setMode, location.pathname]);
+
   if (subjects.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-slate-500 dark:text-slate-400">
@@ -121,6 +140,48 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [userWrittenAnswer, setUserWrittenAnswer] = useState('');
   const [aiEvaluation, setAiEvaluation] = useState<{ score: number; feedback: string; missing_keywords: string[]; is_perfect: boolean } | null>(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
+  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
+
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (mode !== 'study' || isDissertativeMode) return;
+      
+      // Space to flip
+      if (e.code === 'Space') {
+        e.preventDefault();
+        setIsFlipped(prev => !prev);
+      }
+      
+      // 1, 2, 3, 4 for ratings (if flipped)
+      if (isFlipped && !isCramMode) {
+        if (e.key === '1') handleReview(0);
+        if (e.key === '2') handleReview(1);
+        if (e.key === '3') handleReview(2);
+        if (e.key === '4') handleReview(3);
+      }
+
+      // Enter for next in Cram Mode (if flipped)
+      if (isFlipped && isCramMode && e.key === 'Enter') {
+        handleNextCram();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mode, isFlipped, isDissertativeMode, isCramMode]);
+
+  const handleNextCram = () => {
+    setUserWrittenAnswer('');
+    setAiEvaluation(null);
+    setIsDissertativeMode(false);
+    if (currentIndex < reviewQueue.length - 1) {
+      setCurrentIndex(prev => prev + 1);
+      setIsFlipped(false);
+    } else {
+      setMode('browse');
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = () => setActiveMenuFolderId(null);
@@ -1781,17 +1842,22 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
       {mode === 'study' && reviewQueue.length > 0 && (
         <div className={`flex flex-col items-center animate-in fade-in zoom-in ${isFocusMode ? 'w-full max-w-4xl' : 'py-10'}`}>
-          <div className="w-full max-w-2xl mb-8 flex items-center justify-between">
+          <div className={`w-full max-w-2xl mb-8 flex items-center justify-between ${isFocusMode ? 'opacity-0 hover:opacity-100 transition-opacity duration-500' : ''}`}>
             <div className="flex items-center gap-4">
               <button 
                 onClick={() => setIsFocusMode(!isFocusMode)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all ${isFocusMode ? 'bg-white text-slate-950' : 'bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-slate-700'}`}
               >
-                <Maximize2 size={14} /> {isFocusMode ? 'Sair do Foco' : 'Modo Foco'}
+                {isFocusMode ? <Minimize2 size={14} /> : <Maximize2 size={14} />} {isFocusMode ? 'Sair do Foco' : 'Modo Foco'}
               </button>
               <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 <Clock size={14} /> {currentIndex + 1} / {reviewQueue.length}
               </div>
+              {isCramMode && (
+                <div className="flex items-center gap-2 px-3 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-full text-[9px] font-black uppercase tracking-widest">
+                  <Smartphone size={12} /> Tinder Mode
+                </div>
+              )}
             </div>
             {!isFocusMode && (
               <button onClick={() => setMode('browse')} className="text-slate-400 hover:text-red-500 transition-colors">
@@ -1809,138 +1875,156 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               ></div>
             </div>
 
-            <div className={`absolute inset-0 w-full h-full cursor-pointer transition-transform duration-700 preserve-3d ${isFlipped ? 'rotate-y-180' : ''}`} onClick={() => !isDissertativeMode && setIsFlipped(!isFlipped)}>
-              <div className="absolute inset-0 w-full h-full bg-white dark:bg-sanfran-rubiDark border-[6px] border-slate-200 dark:border-white/10 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden">
-                <span className="text-xs font-black text-sanfran-rubi uppercase tracking-[0.3em] mb-8">Questão</span>
-                <div className="text-2xl font-black text-slate-950 dark:text-white leading-tight">
-                  <SmartText text={reviewQueue[currentIndex].front} />
-                </div>
-                
-                {isDissertativeMode ? (
-                  <div className="w-full mt-8 space-y-4 animate-in slide-in-from-bottom-4" onClick={(e) => e.stopPropagation()}>
-                    <textarea 
-                      value={userWrittenAnswer}
-                      onChange={(e) => setUserWrittenAnswer(e.target.value)}
-                      placeholder="Digite sua resposta dissertativa aqui..."
-                      className="w-full h-32 p-4 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-2xl font-bold resize-none outline-none focus:border-sanfran-rubi"
-                    />
-                    <div className="flex gap-2">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={reviewQueue[currentIndex].id}
+                initial={{ opacity: 0, scale: 0.9, x: swipeDirection === 'left' ? 300 : swipeDirection === 'right' ? -300 : 0 }}
+                animate={{ opacity: 1, scale: 1, x: 0 }}
+                exit={{ 
+                  opacity: 0, 
+                  scale: 0.9, 
+                  x: swipeDirection === 'left' ? -300 : swipeDirection === 'right' ? 300 : 0,
+                  rotate: swipeDirection === 'left' ? -20 : swipeDirection === 'right' ? 20 : 0
+                }}
+                transition={{ type: 'spring', damping: 20, stiffness: 100 }}
+                drag={isCramMode ? "x" : false}
+                dragConstraints={{ left: 0, right: 0 }}
+                onDragEnd={(_, info) => {
+                  if (info.offset.x > 100) {
+                    setSwipeDirection('right');
+                    handleNextCram();
+                  } else if (info.offset.x < -100) {
+                    setSwipeDirection('left');
+                    handleNextCram();
+                  }
+                }}
+                className="absolute inset-0 w-full h-full"
+              >
+                <div className={`relative w-full h-full cursor-pointer transition-transform duration-700 preserve-3d ${isFlipped ? 'rotate-y-180' : ''}`} onClick={() => !isDissertativeMode && setIsFlipped(!isFlipped)}>
+                  <div className="absolute inset-0 w-full h-full bg-white dark:bg-sanfran-rubiDark border-[6px] border-slate-200 dark:border-white/10 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden">
+                    <span className="text-xs font-black text-sanfran-rubi uppercase tracking-[0.3em] mb-8">Questão</span>
+                    <div className="text-2xl font-black text-slate-950 dark:text-white leading-tight">
+                      <SmartText text={reviewQueue[currentIndex].front} />
+                    </div>
+                    
+                    {isDissertativeMode ? (
+                      <div className="w-full mt-8 space-y-4 animate-in slide-in-from-bottom-4" onClick={(e) => e.stopPropagation()}>
+                        <textarea 
+                          value={userWrittenAnswer}
+                          onChange={(e) => setUserWrittenAnswer(e.target.value)}
+                          placeholder="Digite sua resposta dissertativa aqui..."
+                          className="w-full h-32 p-4 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-2xl font-bold resize-none outline-none focus:border-sanfran-rubi"
+                        />
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => setIsDissertativeMode(false)}
+                            className="px-4 py-4 bg-slate-100 dark:bg-white/5 text-slate-500 rounded-2xl font-black uppercase text-[10px] tracking-widest"
+                          >
+                            Cancelar
+                          </button>
+                          <button 
+                            onClick={handleEvaluateDissertative}
+                            disabled={isEvaluating || !userWrittenAnswer.trim()}
+                            className="flex-1 py-4 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
+                          >
+                            {isEvaluating ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
+                            {isEvaluating ? 'Avaliando...' : 'Enviar para Correção IA'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
                       <button 
-                        onClick={() => setIsDissertativeMode(false)}
-                        className="px-4 py-4 bg-slate-100 dark:bg-white/5 text-slate-500 rounded-2xl font-black uppercase text-[10px] tracking-widest"
+                        onClick={(e) => { e.stopPropagation(); setIsDissertativeMode(true); }}
+                        className="mt-8 px-6 py-3 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-sanfran-rubi hover:text-white transition-all flex items-center gap-2"
                       >
-                        Cancelar
+                        <Edit2 size={14} /> Responder por Escrito
                       </button>
-                      <button 
-                        onClick={handleEvaluateDissertative}
-                        disabled={isEvaluating || !userWrittenAnswer.trim()}
-                        className="flex-1 py-4 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
-                      >
-                        {isEvaluating ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
-                        {isEvaluating ? 'Avaliando...' : 'Enviar para Correção IA'}
-                      </button>
+                    )}
+
+                    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 opacity-0 group-hover/card:opacity-100 transition-opacity">
+                      <span className="px-4 py-2 bg-slate-100 dark:bg-white/5 rounded-full text-[9px] font-black text-slate-400 uppercase tracking-widest">Pressione Espaço para virar</span>
                     </div>
                   </div>
-                ) : (
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); setIsDissertativeMode(true); }}
-                    className="mt-8 px-6 py-3 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-sanfran-rubi hover:text-white transition-all flex items-center gap-2"
-                  >
-                    <Edit2 size={14} /> Responder por Escrito
-                  </button>
-                )}
-
-                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 opacity-0 group-hover/card:opacity-100 transition-opacity">
-                  <span className="px-4 py-2 bg-slate-100 dark:bg-white/5 rounded-full text-[9px] font-black text-slate-400 uppercase tracking-widest">Pressione Espaço para virar</span>
-                </div>
-              </div>
-              <div className="absolute inset-0 w-full h-full bg-slate-50 dark:bg-black border-[6px] border-usp-blue/40 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden rotate-y-180 overflow-y-auto custom-scrollbar">
-                {aiEvaluation ? (
-                  <div className="w-full mb-8 animate-in fade-in duration-500">
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-xs font-black text-purple-600 uppercase tracking-[0.3em]">Avaliação IA</span>
-                      <div className="flex items-center gap-2 px-4 py-1 bg-purple-600 text-white rounded-full text-lg font-black">
-                        {aiEvaluation.score.toFixed(1)} / 10
-                      </div>
-                    </div>
-                    <div className="p-6 bg-white dark:bg-slate-900 rounded-3xl border-2 border-purple-500/30 text-left shadow-xl">
-                      <div className="mb-4 pb-4 border-b border-slate-100 dark:border-white/5">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Sua Resposta:</span>
-                        <p className="text-sm font-medium text-slate-600 dark:text-slate-400 italic">"{userWrittenAnswer}"</p>
-                      </div>
-                      <p className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-relaxed mb-4">{aiEvaluation.feedback}</p>
-                      {aiEvaluation.missing_keywords.length > 0 && (
-                        <div className="space-y-2">
-                          <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">O que faltou:</span>
-                          <div className="flex flex-wrap gap-2">
-                            {aiEvaluation.missing_keywords.map((kw, i) => (
-                              <span key={i} className="px-2 py-1 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-[10px] font-black border border-red-100 dark:border-red-800/30">
-                                {kw}
-                              </span>
-                            ))}
+                  <div className="absolute inset-0 w-full h-full bg-slate-50 dark:bg-black border-[6px] border-usp-blue/40 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden rotate-y-180 overflow-y-auto custom-scrollbar">
+                    {aiEvaluation ? (
+                      <div className="w-full mb-8 animate-in fade-in duration-500">
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-xs font-black text-purple-600 uppercase tracking-[0.3em]">Avaliação IA</span>
+                          <div className="flex items-center gap-2 px-4 py-1 bg-purple-600 text-white rounded-full text-lg font-black">
+                            {aiEvaluation.score.toFixed(1)} / 10
                           </div>
                         </div>
+                        <div className="p-6 bg-white dark:bg-slate-900 rounded-3xl border-2 border-purple-500/30 text-left shadow-xl">
+                          <div className="mb-4 pb-4 border-b border-slate-100 dark:border-white/5">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Sua Resposta:</span>
+                            <p className="text-sm font-medium text-slate-600 dark:text-slate-400 italic">"{userWrittenAnswer}"</p>
+                          </div>
+                          <p className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-relaxed mb-4">{aiEvaluation.feedback}</p>
+                          {aiEvaluation.missing_keywords.length > 0 && (
+                            <div className="space-y-2">
+                              <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">O que faltou:</span>
+                              <div className="flex flex-wrap gap-2">
+                                {aiEvaluation.missing_keywords.map((kw, i) => (
+                                  <span key={i} className="px-2 py-1 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-[10px] font-black border border-red-100 dark:border-red-800/30">
+                                    {kw}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-xs font-black text-usp-blue uppercase tracking-[0.3em] mb-4">Resposta</span>
+                    )}
+                    
+                    {reviewQueue[currentIndex].image && (
+                      <div className="w-full mb-6">
+                        <img src={reviewQueue[currentIndex].image} alt="Flashcard" className="max-w-full h-auto rounded-2xl border border-slate-200 dark:border-white/10 mx-auto shadow-lg" />
+                      </div>
+                    )}
+                    
+                    <div className="w-full text-left">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Gabarito Oficial</span>
+                      <div className="text-2xl font-black text-slate-900 dark:text-white leading-tight mb-6">
+                        <SmartText text={reviewQueue[currentIndex].back} />
+                      </div>
+                    </div>
+                    {reviewQueue[currentIndex].notes && (
+                      <div className="w-full mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-2xl text-left">
+                        <span className="text-[10px] font-black text-yellow-800 dark:text-yellow-500 uppercase tracking-widest block mb-2">Notas Pessoais</span>
+                        <div className="text-sm font-medium text-yellow-900 dark:text-yellow-100 whitespace-pre-wrap">
+                          <SmartText text={reviewQueue[currentIndex].notes} />
+                        </div>
+                      </div>
+                    )}
+                    <div className="w-full mt-4 flex flex-wrap gap-2 justify-center">
+                      {reviewQueue[currentIndex].source && (
+                        <div className="flex items-center gap-1 px-3 py-1 bg-slate-100 dark:bg-white/10 rounded-full text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-white/5">
+                          <Paperclip size={10} />
+                          {reviewQueue[currentIndex].source}
+                        </div>
                       )}
+                      {reviewQueue[currentIndex].tags?.map((tag, idx) => (
+                        <div key={idx} className="px-3 py-1 bg-purple-50 dark:bg-purple-900/20 rounded-full text-[10px] font-black uppercase text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-purple-800/30">
+                          {tag}
+                        </div>
+                      ))}
                     </div>
-                  </div>
-                ) : (
-                  <span className="text-xs font-black text-usp-blue uppercase tracking-[0.3em] mb-4">Resposta</span>
-                )}
-                
-                {reviewQueue[currentIndex].image && (
-                  <div className="w-full mb-6">
-                    <img src={reviewQueue[currentIndex].image} alt="Flashcard" className="max-w-full h-auto rounded-2xl border border-slate-200 dark:border-white/10 mx-auto shadow-lg" />
-                  </div>
-                )}
-                
-                <div className="w-full text-left">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Gabarito Oficial</span>
-                  <div className="text-2xl font-black text-slate-900 dark:text-white leading-tight mb-6">
-                    <SmartText text={reviewQueue[currentIndex].back} />
                   </div>
                 </div>
-                {reviewQueue[currentIndex].notes && (
-                  <div className="w-full mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-2xl text-left">
-                    <span className="text-[10px] font-black text-yellow-800 dark:text-yellow-500 uppercase tracking-widest block mb-2">Notas Pessoais</span>
-                    <div className="text-sm font-medium text-yellow-900 dark:text-yellow-100 whitespace-pre-wrap">
-                      <SmartText text={reviewQueue[currentIndex].notes} />
-                    </div>
-                  </div>
-                )}
-                <div className="w-full mt-4 flex flex-wrap gap-2 justify-center">
-                  {reviewQueue[currentIndex].source && (
-                    <div className="flex items-center gap-1 px-3 py-1 bg-slate-100 dark:bg-white/10 rounded-full text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-white/5">
-                      <Paperclip size={10} />
-                      {reviewQueue[currentIndex].source}
-                    </div>
-                  )}
-                  {reviewQueue[currentIndex].tags?.map((tag, idx) => (
-                    <div key={idx} className="px-3 py-1 bg-purple-50 dark:bg-purple-900/20 rounded-full text-[10px] font-black uppercase text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-purple-800/30">
-                      {tag}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+              </motion.div>
+            </AnimatePresence>
           </div>
           {isFlipped && (
-            <div className="mt-12 w-full max-w-2xl flex flex-col items-center gap-6">
+            <div className={`mt-12 w-full max-w-2xl flex flex-col items-center gap-6 ${isFocusMode ? 'opacity-0 hover:opacity-100 transition-opacity duration-500' : ''}`}>
               {isCramMode ? (
                 <button 
-                  onClick={() => {
-                    setUserWrittenAnswer('');
-                    setAiEvaluation(null);
-                    setIsDissertativeMode(false);
-                    if (currentIndex < reviewQueue.length - 1) {
-                      setCurrentIndex(prev => prev + 1);
-                      setIsFlipped(false);
-                    } else {
-                      setMode('browse');
-                    }
-                  }} 
+                  onClick={handleNextCram} 
                   className="w-full p-6 bg-orange-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3 hover:scale-105 transition-transform"
                 >
                   Próximo Card <ArrowRight size={18} />
+                  <span className="px-2 py-0.5 bg-black/20 rounded text-[8px] ml-2">Enter</span>
                 </button>
               ) : (
                 <div className="grid grid-cols-4 gap-4 w-full">
