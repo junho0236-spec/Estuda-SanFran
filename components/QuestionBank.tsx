@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
-import { Question, UserProgress } from '../types';
+import { Question, UserProgress, Notebook } from '../types';
 import { sampleQuestions } from './sampleQuestions';
 import { GoogleGenAI, Type } from '@google/genai';
 import { 
@@ -58,6 +58,12 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer }) 
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notes, setNotes] = useState<Record<string, string>>({});
+  // Notebooks and Selection States
+  const [selectedQuestionsForNotebook, setSelectedQuestionsForNotebook] = useState<Set<string>>(new Set());
+  const [showNotebookCreationMode, setShowNotebookCreationMode] = useState(false);
+  const [newNotebookName, setNewNotebookName] = useState('');
+  const [notebooks, setNotebooks] = useState<Notebook[]>([]);
+
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
   const [eliminatedOptions, setEliminatedOptions] = useState<Record<string, number[]>>({});
   const notificationTimeoutRef = useRef<NodeJS.Timeout | null>(null);

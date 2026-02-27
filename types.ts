@@ -355,6 +355,14 @@ export interface Question {
   created_at?: string;
 }
 
+export interface Notebook {
+  id: string;
+  user_id: string;
+  name: string;
+  question_ids: string[];
+  created_at: string;
+}
+
 export interface DuelQuestion {
   id: string;
   question: string;
