@@ -10,5 +10,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     detectSessionInUrl: true,
     storageKey: 'sb-sanfran-auth-token', // Custom storage key to avoid conflicts
+    // No-op lock implementation to avoid timeouts in iframe/preview environments
+    lock: async (name: string, acquireTimeout: number, fn: () => Promise<any>) => {
+      return await fn();
+    },
   },
 });

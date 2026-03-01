@@ -23,6 +23,12 @@ const showError = (message: any) => {
   
   // Ignora erros de ResizeObserver que são comuns e inofensivos
   if (errorMsg.includes('ResizeObserver loop')) return;
+  
+  // Ignora erro de timeout do LockManager do Supabase (comum em iframes/previews)
+  if (errorMsg.includes('LockManager lock') && errorMsg.includes('timed out')) {
+    console.warn('Supabase LockManager timeout ignorado:', errorMsg);
+    return;
+  }
 
   rootElement.innerHTML = `
     <div style="padding: 40px; color: #9B111E; font-family: sans-serif; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background-color: #fcfcfc;">
