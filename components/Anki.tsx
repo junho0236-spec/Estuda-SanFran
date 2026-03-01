@@ -79,18 +79,6 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const location = useLocation();
   const { state } = location;
 
-  useEffect(() => {
-    if (state && (state as any).newFlashcard) {
-      const { newFlashcard } = state as any;
-      setManualFront(newFlashcard.front);
-      setManualBack(newFlashcard.back);
-      setSelectedSubjectId(subjects.find(s => s.name === newFlashcard.subject)?.id || selectedSubjectId);
-      setMode('create');
-      // Clear the state so it doesn't persist on subsequent visits
-      window.history.replaceState({}, document.title, location.pathname);
-    }
-  }, [state, subjects, selectedSubjectId, setManualFront, setManualBack, setSelectedSubjectId, setMode, location.pathname]);
-
   if (subjects.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-slate-500 dark:text-slate-400">
@@ -118,6 +106,18 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [manualNotes, setManualNotes] = useState('');
   const [manualImage, setManualImage] = useState<string | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
+
+  useEffect(() => {
+    if (state && (state as any).newFlashcard) {
+      const { newFlashcard } = state as any;
+      setManualFront(newFlashcard.front);
+      setManualBack(newFlashcard.back);
+      setSelectedSubjectId(subjects.find(s => s.name === newFlashcard.subject)?.id || selectedSubjectId);
+      setMode('create');
+      // Clear the state so it doesn't persist on subsequent visits
+      window.history.replaceState({}, document.title, location.pathname);
+    }
+  }, [state, subjects, selectedSubjectId, setManualFront, setManualBack, setSelectedSubjectId, setMode, location.pathname]);
   const [showFolderInput, setShowFolderInput] = useState(false);
   const [editingCard, setEditingCard] = useState<Flashcard | null>(null);
   const [activeMenuFolderId, setActiveMenuFolderId] = useState<string | null>(null);

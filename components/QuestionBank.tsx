@@ -34,6 +34,7 @@ interface QuestionBankProps {
 }
 
 const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer }) => {
+  const navigate = useNavigate();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -65,6 +66,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer }) 
   const [showNotebookCreationMode, setShowNotebookCreationMode] = useState(false);
   const [newNotebookName, setNewNotebookName] = useState('');
   const [notebooks, setNotebooks] = useState<Notebook[]>([]);
+  const [selectedNotebookId, setSelectedNotebookId] = useState<string>('');
 
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
   const [eliminatedOptions, setEliminatedOptions] = useState<Record<string, number[]>>({});
@@ -368,6 +370,7 @@ Forneça a explicação de forma concisa e didática.`;
   const [loadingJuridiquesExplanation, setLoadingJuridiquesExplanation] = useState(false);
   const [showJuridiquesModal, setShowJuridiquesModal] = useState(false);
 
+  const fetchQuestions = async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -628,6 +631,12 @@ Forneça a explicação de forma concisa e didática.`;
     const matchExamBoard = selectedExamBoard === '' || selectedExamBoard === 'Todos' || q.exam_board === selectedExamBoard;
     const matchYear = selectedYear === '' || selectedYear === 'Todos' || q.year?.toString() === selectedYear;
     
+    let matchNotebook = true;
+    if (selectedNotebookId) {
+      const notebook = notebooks.find(n => n.id === selectedNotebookId);
+      matchNotebook = notebook ? notebook.question_ids.includes(q.id) : true;
+    }
+    
     let matchStatus = true;
     const isWrong = wrongQuestions.includes(q.id);
     const isCorrect = correctQuestions.includes(q.id);
@@ -642,7 +651,7 @@ Forneça a explicação de forma concisa e didática.`;
       matchStatus = !isWrong && !isCorrect;
     }
     
-    return matchSearch && matchSubject && matchTopic && matchDifficulty && matchExamBoard && matchYear && matchStatus;
+    return matchSearch && matchSubject && matchTopic && matchDifficulty && matchExamBoard && matchYear && matchNotebook && matchStatus;
   }).sort((a, b) => {
     if (sortBy === 'newest') return 0; // Already sorted by created_at desc from DB
     if (sortBy === 'oldest') return -1; // Reverse order
@@ -763,7 +772,7 @@ Forneça a explicação de forma concisa e didática.`;
     setSelectedOption(null);
     setShowExplanation(false);
     setViewMode('list');
-  }, [selectedSubject, selectedTopic, difficultyFilter, sortBy, searchTerm, selectedExamBoard, selectedYear, questionStatus]);
+  }, [selectedSubject, selectedTopic, difficultyFilter, sortBy, searchTerm, selectedExamBoard, selectedYear, questionStatus, selectedNotebookId]);
 
   if (loading) {
     return (
@@ -1157,6 +1166,19 @@ Forneça a explicação de forma concisa e didática.`;
                   <option value="media">Média</option>
                   <option value="dificil">Difícil</option>
                 </select>
+
+                {notebooks.length > 0 && (
+                  <select
+                    value={selectedNotebookId}
+                    onChange={(e) => setSelectedNotebookId(e.target.value)}
+                    className="block w-full pl-3 pr-10 py-2 text-base border-orange-200 dark:border-orange-800 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm rounded-md bg-orange-50/50 dark:bg-orange-900/10 text-orange-800 dark:text-orange-200"
+                  >
+                    <option value="">Meus Cadernos</option>
+                    {notebooks.map(n => (
+                      <option key={n.id} value={n.id}>{n.name} ({n.question_ids.length})</option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div className="flex flex-col gap-4">
@@ -1199,6 +1221,7 @@ Forneça a explicação de forma concisa e didática.`;
                     setSelectedTopic('');
                     setDifficultyFilter('');
                     setQuestionStatus('all');
+                    setSelectedNotebookId('');
                   }}
                   className="text-sm font-medium text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                 >
@@ -1245,9 +1268,18 @@ Forneça a explicação de forma concisa e didática.`;
                     </div>
                     
                     <div className="p-6">
-                      <p className="text-slate-800 dark:text-slate-200 leading-relaxed mb-6">
+                      <p className="text-slate-800 dark:text-slate-200 leading-relaxed mb-4">
                         {q.statement}
                       </p>
+                      {selectedText && (
+                        <button
+                          onClick={handleJuridiquesTranslate}
+                          disabled={loadingJuridiquesExplanation}
+                          className="mb-4 flex items-center gap-2 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-bold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {loadingJuridiquesExplanation ? <Loader2 className="w-3 h-3 animate-spin" /> : <MessageSquareText size={14} />} Traduzir Juridiquês
+                        </button>
+                      )}
                       
                       <div className="flex items-center gap-3">
                         <button
@@ -1369,7 +1401,6 @@ Forneça a explicação de forma concisa e didática.`;
                                 <PlusSquare size={16} /> Criar Flashcard do Erro
                               </button>
                             </div>
-                            </div>
                           )}
                         </div>
                       )}
@@ -1427,9 +1458,18 @@ Forneça a explicação de forma concisa e didática.`;
 
               {/* Question Body */}
               <div className="p-6 md:p-8">
-                <div className="text-lg md:text-xl text-slate-800 dark:text-slate-200 font-medium leading-relaxed mb-8 whitespace-pre-wrap">
+                <div className="text-lg md:text-xl text-slate-800 dark:text-slate-200 font-medium leading-relaxed mb-4 whitespace-pre-wrap">
                   {currentQuestion.statement}
                 </div>
+                {selectedText && (
+                  <button
+                    onClick={handleJuridiquesTranslate}
+                    disabled={loadingJuridiquesExplanation}
+                    className="mb-6 flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-bold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loadingJuridiquesExplanation ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageSquareText size={18} />} Traduzir Juridiquês
+                  </button>
+                )}
 
                 <div className="space-y-3">
                   {currentQuestion.options.map((option, idx) => {
@@ -1600,6 +1640,55 @@ Forneça a explicação de forma concisa e didática.`;
           </div>
         )}
       </div>
+
+      {/* Juridiquês Translator Modal */}
+      {showJuridiquesModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-2xl animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <MessageSquareText className="text-blue-500" />
+                Tradutor de Juridiquês
+              </h2>
+              <button onClick={() => setShowJuridiquesModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">Trecho Selecionado</h3>
+                <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-400 italic">
+                  "{selectedText}"
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-xs font-black uppercase tracking-widest text-blue-500 mb-2">Explicação Simples</h3>
+                {loadingJuridiquesExplanation ? (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-4" />
+                    <p className="text-sm text-slate-500">A IA está simplificando o texto para você...</p>
+                  </div>
+                ) : (
+                  <div className="p-6 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800 text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">
+                    {juridiquesExplanation}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800">
+              <button
+                onClick={() => setShowJuridiquesModal(false)}
+                className="w-full py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold transition-colors"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
