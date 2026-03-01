@@ -164,6 +164,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   }, [mode, isFlipped, isDissertativeMode, isCramMode]);
 
   const handleNextCram = () => {
+    if (!currentCard) return;
     setUserWrittenAnswer('');
     setAiEvaluation(null);
     setIsDissertativeMode(false);
@@ -1023,6 +1024,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     }
   }, [reviewQueue.length, currentIndex, mode]);
 
+  // Derived state for safe card access
+  const currentCard = reviewQueue[currentIndex] || null;
+
   useEffect(() => {
     if (!isAudioMode || mode !== 'study' || reviewQueue.length === 0) {
       window.speechSynthesis.cancel();
@@ -1155,7 +1159,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   };
 
   const handleReview = async (quality: number) => {
-    const card = reviewQueue[currentIndex];
+    if (!currentCard) return;
+    const card = currentCard;
     
     // Timer penalty: if > 15s, cap quality at 3 (Good)
     let finalQuality = quality;
@@ -1893,9 +1898,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
             </div>
 
             <AnimatePresence mode="wait">
-              {reviewQueue[currentIndex] && (
+              {currentCard && (
                 <motion.div
-                  key={reviewQueue[currentIndex].id}
+                  key={currentCard.id}
                   initial={{ opacity: 0, scale: 0.9, x: swipeDirection === 'left' ? 300 : swipeDirection === 'right' ? -300 : 0 }}
                   animate={{ opacity: 1, scale: 1, x: 0 }}
                   exit={{ 
@@ -1922,7 +1927,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                     <div className="absolute inset-0 w-full h-full bg-white dark:bg-sanfran-rubiDark border-[6px] border-slate-200 dark:border-white/10 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden">
                       <span className="text-xs font-black text-sanfran-rubi uppercase tracking-[0.3em] mb-8">Questão</span>
                       <div className="text-2xl font-black text-slate-950 dark:text-white leading-tight">
-                        <SmartText text={reviewQueue[currentIndex].front} />
+                        <SmartText text={currentCard.front} />
                       </div>
                       
                       {isDissertativeMode ? (
@@ -1996,34 +2001,34 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                         <span className="text-xs font-black text-usp-blue uppercase tracking-[0.3em] mb-4">Resposta</span>
                       )}
                       
-                      {reviewQueue[currentIndex].image && (
+                      {currentCard.image && (
                         <div className="w-full mb-6">
-                          <img src={reviewQueue[currentIndex].image} alt="Flashcard" className="max-w-full h-auto rounded-2xl border border-slate-200 dark:border-white/10 mx-auto shadow-lg" />
+                          <img src={currentCard.image} alt="Flashcard" className="max-w-full h-auto rounded-2xl border border-slate-200 dark:border-white/10 mx-auto shadow-lg" />
                         </div>
                       )}
                       
                       <div className="w-full text-left">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Gabarito Oficial</span>
                         <div className="text-2xl font-black text-slate-900 dark:text-white leading-tight mb-6">
-                          <SmartText text={reviewQueue[currentIndex].back} />
+                          <SmartText text={currentCard.back} />
                         </div>
                       </div>
-                      {reviewQueue[currentIndex].notes && (
+                      {currentCard.notes && (
                         <div className="w-full mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-2xl text-left">
                           <span className="text-[10px] font-black text-yellow-800 dark:text-yellow-500 uppercase tracking-widest block mb-2">Notas Pessoais</span>
                           <div className="text-sm font-medium text-yellow-900 dark:text-yellow-100 whitespace-pre-wrap">
-                            <SmartText text={reviewQueue[currentIndex].notes} />
+                            <SmartText text={currentCard.notes} />
                           </div>
                         </div>
                       )}
                       <div className="w-full mt-4 flex flex-wrap gap-2 justify-center">
-                        {reviewQueue[currentIndex].source && (
+                        {currentCard.source && (
                           <div className="flex items-center gap-1 px-3 py-1 bg-slate-100 dark:bg-white/10 rounded-full text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-white/5">
                             <Paperclip size={10} />
-                            {reviewQueue[currentIndex].source}
+                            {currentCard.source}
                           </div>
                         )}
-                        {reviewQueue[currentIndex].tags?.map((tag, idx) => (
+                        {currentCard.tags?.map((tag, idx) => (
                           <div key={idx} className="px-3 py-1 bg-purple-50 dark:bg-purple-900/20 rounded-full text-[10px] font-black uppercase text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-purple-800/30">
                             {tag}
                           </div>
