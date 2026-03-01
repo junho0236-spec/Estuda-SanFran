@@ -110,6 +110,12 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       window.history.replaceState({}, document.title, location.pathname);
     }
   }, [state, subjects, selectedSubjectId, setManualFront, setManualBack, setSelectedSubjectId, setMode, location.pathname]);
+
+  useEffect(() => {
+    if (!selectedSubjectId && subjects && subjects.length > 0) {
+      setSelectedSubjectId(subjects[0].id);
+    }
+  }, [subjects, selectedSubjectId]);
   const [showFolderInput, setShowFolderInput] = useState(false);
   const [editingCard, setEditingCard] = useState<Flashcard | null>(null);
   const [activeMenuFolderId, setActiveMenuFolderId] = useState<string | null>(null);

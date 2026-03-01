@@ -223,17 +223,19 @@ const App: React.FC = () => {
         const state = channel.presenceState();
         const users: PresenceUser[] = [];
         Object.keys(state).forEach((key) => {
-          const userState = state[key][0] as any;
-          users.push({
-            user_id: userState.user_id,
-            name: userState.name,
-            view: userState.view,
-            subject_name: userState.subject_name,
-            is_timer_active: userState.is_timer_active,
-            last_seen: userState.last_seen,
-            study_room_id: userState.study_room_id,
-            study_start_time: userState.study_start_time
-          });
+          const userState = state[key] && state[key].length > 0 ? (state[key][0] as any) : null;
+          if (userState) {
+            users.push({
+              user_id: userState.user_id,
+              name: userState.name,
+              view: userState.view,
+              subject_name: userState.subject_name,
+              is_timer_active: userState.is_timer_active,
+              last_seen: userState.last_seen,
+              study_room_id: userState.study_room_id,
+              study_start_time: userState.study_start_time
+            });
+          }
         });
         setPresenceUsers(users);
       })
