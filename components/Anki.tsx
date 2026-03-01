@@ -81,7 +81,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
   const [mode, setMode] = useState<'browse' | 'study' | 'create' | 'bulk' | 'ai_create' | 'community'>('browse');
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string>(subjects.length > 0 ? subjects[0].id : '');
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>((subjects && subjects.length > 0) ? subjects[0].id : '');
   
   // Community State
   const [publicDecks, setPublicDecks] = useState<any[]>([]);
@@ -104,7 +104,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       const { newFlashcard } = state as any;
       setManualFront(newFlashcard.front);
       setManualBack(newFlashcard.back);
-      setSelectedSubjectId(subjects.find(s => s.name === newFlashcard.subject)?.id || selectedSubjectId);
+      setSelectedSubjectId((subjects || []).find(s => s.name === newFlashcard.subject)?.id || selectedSubjectId);
       setMode('create');
       // Clear the state so it doesn't persist on subsequent visits
       window.history.replaceState({}, document.title, location.pathname);
@@ -213,7 +213,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     const card = aiGeneratedCardsPreview[index];
     setIsLoading(true);
     try {
-      const subjectName = subjects.find(s => s.id === selectedSubjectId)?.name || "Direito Geral";
+      const subjectName = (subjects || []).find(s => s.id === selectedSubjectId)?.name || "Direito Geral";
       const newCards = await generateFlashcards(
         aiSourceText, 
         subjectName, 
@@ -252,7 +252,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     } else {
       if (aiGeneratedCardsPreview.length === 0) return;
       cardsToPublish = aiGeneratedCardsPreview;
-      deckName = subjects.find(s => s.id === selectedSubjectId)?.name || "Novo Deck Jurídico";
+      deckName = (subjects || []).find(s => s.id === selectedSubjectId)?.name || "Novo Deck Jurídico";
     }
 
     if (cardsToPublish.length === 0) {
@@ -305,12 +305,12 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set());
 
   // Filter out archived cards from the main view
-  const activeFlashcards = flashcards.filter(f => !f.archived_at);
+  const activeFlashcards = (flashcards || []).filter(f => !f.archived_at);
   const studyableFlashcards = activeFlashcards.filter(f => !f.is_suspended);
 
   const getSubfolderIds = (folderId: string | null): string[] => {
     let ids: string[] = folderId ? [folderId] : [];
-    const children = folders.filter(f => f.parentId === folderId);
+    const children = (folders || []).filter(f => f.parentId === folderId);
     children.forEach(child => {
       ids = [...ids, ...getSubfolderIds(child.id)];
     });
@@ -334,7 +334,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
   const toggleSuspension = async (cardId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    const card = flashcards.find(f => f.id === cardId);
+    const card = (flashcards || []).find(f => f.id === cardId);
     if (!card) return;
     
     const updatedCard = { ...card, is_suspended: !card.is_suspended };
@@ -691,7 +691,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       };
       setAiGenerationHistory(prev => [historyItem, ...prev].slice(0, 10));
 
-      const subjectName = subjects.find(s => s.id === selectedSubjectId)?.name || "Direito Geral";
+      const subjectName = (subjects || []).find(s => s.id === selectedSubjectId)?.name || "Direito Geral";
       
       // Tenta usar o streaming
       await generateFlashcardsStream(
@@ -998,7 +998,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     fetchStudyHistory();
   }, [userId]);
 
-  const currentFolders = folders.filter(f => f.parentId === currentFolderId);
+  const currentFolders = (folders || []).filter(f => f.parentId === currentFolderId);
   const currentContextIds = getSubfolderIds(currentFolderId);
   
   const reviewQueue = studyableFlashcards.filter(f => {
@@ -1197,7 +1197,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     }
   };
 
-  if (subjects.length === 0) {
+  if (!subjects || subjects.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-slate-500 dark:text-slate-400 min-h-[400px]">
         <div className="text-center space-y-4">
@@ -1217,7 +1217,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         <div>
           <div className="flex items-center gap-3">
              {currentFolderId && mode === 'browse' && (
-               <button onClick={() => setCurrentFolderId(folders.find(f => f.id === currentFolderId)?.parentId || null)} className="p-2 bg-slate-100 dark:bg-white/5 rounded-full hover:text-sanfran-rubi">
+               <button onClick={() => setCurrentFolderId((folders || []).find(f => f.id === currentFolderId)?.parentId || null)} className="p-2 bg-slate-100 dark:bg-white/5 rounded-full hover:text-sanfran-rubi">
                   <ArrowLeft className="w-5 h-5" />
                </button>
              )}
@@ -1239,7 +1239,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 </button>
              </div>
           </div>
-          <p className="text-slate-700 dark:text-slate-300 font-bold text-lg mt-1">Acervo Jurídico {currentFolderId ? `• ${folders.find(f => f.id === currentFolderId)?.name}` : ''}</p>
+          <p className="text-slate-700 dark:text-slate-300 font-bold text-lg mt-1">Acervo Jurídico {currentFolderId ? `• ${(folders || []).find(f => f.id === currentFolderId)?.name}` : ''}</p>
         </div>
         <div className="flex flex-wrap gap-3">
           {mode === 'browse' && (
@@ -1506,7 +1506,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                       Criado por: <span className="text-slate-600 dark:text-slate-300">{deck.author_name || 'Anônimo'}</span> {deck.author_year && `• ${deck.author_year}`}
                     </p>
                     <p className="text-xs font-bold text-slate-500 dark:text-slate-400 line-clamp-3">
-                      {deck.description || `Deck colaborativo criado para auxiliar nos estudos de ${subjects.find(s => s.id === deck.subject_id)?.name || 'Direito'}.`}
+                      {deck.description || `Deck colaborativo criado para auxiliar nos estudos de ${(subjects || []).find(s => s.id === deck.subject_id)?.name || 'Direito'}.`}
                     </p>
                   </div>
 
@@ -1590,7 +1590,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                         {isGlobalSearch && (
                           <td className="p-6">
                             <span className="text-[10px] font-black uppercase text-slate-400">
-                              {folders.find(f => f.id === card.folderId)?.name || 'Raiz'}
+                              {(folders || []).find(f => f.id === card.folderId)?.name || 'Raiz'}
                             </span>
                           </td>
                         )}
@@ -1741,7 +1741,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
             );
           })}
           {currentCards.map(card => {
-            const subject = subjects.find(s => s.id === card.subjectId);
+            const subject = (subjects || []).find(s => s.id === card.subjectId);
             const isSelected = selectedCardIds.has(card.id);
             
             return (
@@ -1771,7 +1771,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 {isGlobalSearch && (
                   <div className="mt-2 flex items-center gap-1 text-[9px] font-black text-slate-400 uppercase">
                     <FolderIcon size={10} />
-                    {folders.find(f => f.id === card.folderId)?.name || 'Raiz'}
+                    {(folders || []).find(f => f.id === card.folderId)?.name || 'Raiz'}
                   </div>
                 )}
                 <div className="flex justify-between items-center mt-4">
@@ -1803,7 +1803,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
             
             <div className="p-10 max-h-[400px] overflow-y-auto">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {folders.filter(f => !f.parentId).map(folder => {
+                {(folders || []).filter(f => !f.parentId).map(folder => {
                   const isSelected = selectedFolderIdsForSession.has(folder.id);
                   const stats = getFolderStats(folder.id);
                   return (
@@ -2132,7 +2132,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                          >
                            <div className="flex items-center justify-between mb-2">
                              <span className="text-[9px] font-black text-slate-400 uppercase">{new Date(item.timestamp).toLocaleTimeString()}</span>
-                             <span className="text-[9px] font-black text-purple-500 uppercase">{subjects.find(s => s.id === item.subjectId)?.name || 'Geral'}</span>
+                             <span className="text-[9px] font-black text-purple-500 uppercase">{(subjects || []).find(s => s.id === item.subjectId)?.name || 'Geral'}</span>
                            </div>
                            <p className="text-[11px] font-bold text-slate-600 dark:text-slate-300 line-clamp-2 mb-2">
                              {item.text || (item.files.length > 0 ? `${item.files.length} arquivos anexados` : item.urls || 'Sem texto')}
@@ -2274,7 +2274,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                    <div className="space-y-2">
                       <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Disciplina</label>
                       <select value={selectedSubjectId} onChange={(e) => setSelectedSubjectId(e.target.value)} className="w-full p-4 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-2xl font-bold outline-none">
-                         {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                         {(subjects || []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                       </select>
                    </div>
 
@@ -2523,7 +2523,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
             <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Disciplina</label>
                 <select value={selectedSubjectId} onChange={(e) => setSelectedSubjectId(e.target.value)} className="w-full p-4 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-2xl font-bold">
-                   {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                   {(subjects || []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
             </div>
             <input value={manualFront} onChange={(e) => setManualFront(e.target.value)} placeholder="Enunciado / Pergunta" className="w-full p-6 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-2xl font-bold outline-none" />
