@@ -2,12 +2,17 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css'; // Import Quill styles
 import { ArrowLeft, Save, Loader2, FileText, BrainCircuit, Sparkles, Tag, Split, Download, Gavel, Plus, Trash2, Edit3 } from 'lucide-react';
-import { Note, Subject } from '../types';
+import { Note, Subject, SubjectFile } from '../types';
 import { dataService } from '../services/dataService';
 import { summarizeText } from '../services/geminiService';
 import html2pdf from 'html2pdf.js';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { SmartText } from './SmartVadeMecum';
+import * as pdfjsLib from 'pdfjs-dist';
+import { Folder, Upload, File, CheckCircle2, AlertCircle } from 'lucide-react';
+
+// Set up pdfjs worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 interface NoteViewProps {
   subjectId: string; // Initial subject ID, can be changed
@@ -21,10 +26,14 @@ interface NoteViewProps {
 
 const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId, isOnline, onBack, onNavigateToAnki, subjects, onToggleSidebar }) => {
   const [notes, setNotes] = useState<Note[]>([]);
+  const [files, setFiles] = useState<SubjectFile[]>([]);
+  const [activeTab, setActiveTab] = useState<'notes' | 'repository' | 'assignments'>('notes');
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
+  const [selectedFile, setSelectedFile] = useState<SubjectFile | null>(null);
   const [noteContent, setNoteContent] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [isTemplateMenuOpen, setIsTemplateMenuOpen] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
@@ -36,6 +45,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   const [newTitle, setNewTitle] = useState('');
   
   const quillRef = useRef<Quill | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const modules = {
     toolbar: [
@@ -113,22 +123,26 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     'code-block'
   ];
 
-  const loadNotes = useCallback(async () => {
+  const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const subjectNotes = await dataService.getNotesBySubjectId(selectedSubjectId, userId, isOnline);
+      const [subjectNotes, subjectFiles] = await Promise.all([
+        dataService.getNotesBySubjectId(selectedSubjectId, userId, isOnline),
+        dataService.getFilesBySubjectId(selectedSubjectId, userId, isOnline)
+      ]);
       setNotes(subjectNotes);
+      setFiles(subjectFiles);
     } catch (error) {
-      console.error('Error loading notes:', error);
-      alert('Erro ao carregar anotações.');
+      console.error('Error loading data:', error);
+      alert('Erro ao carregar dados.');
     } finally {
       setIsLoading(false);
     }
   }, [selectedSubjectId, userId, isOnline]);
 
   useEffect(() => {
-    loadNotes();
-  }, [loadNotes]);
+    loadData();
+  }, [loadData]);
 
   // Handle initial selection or subject change
   useEffect(() => {
@@ -283,6 +297,74 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     setIsTemplateMenuOpen(false);
   };
 
+  const extractTextFromPdf = async (file: File): Promise<string> => {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let fullText = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items.map((item: any) => item.str).join(' ');
+      fullText += pageText + '\n';
+    }
+    return fullText;
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const path = `${userId}/${selectedSubjectId}/${Date.now()}_${file.name}`;
+      const publicUrl = await dataService.uploadFile(file, path);
+      
+      if (!publicUrl) throw new Error("Upload failed");
+
+      let extractedText = '';
+      if (file.type === 'application/pdf') {
+        try {
+          extractedText = await extractTextFromPdf(file);
+        } catch (err) {
+          console.error("PDF extraction failed:", err);
+        }
+      }
+
+      const newFile: SubjectFile = {
+        id: Math.random().toString(36).substr(2, 9),
+        user_id: userId,
+        subject_id: selectedSubjectId,
+        name: file.name,
+        type: activeTab === 'repository' ? 'repository' : 'assignment',
+        file_url: publicUrl,
+        content: extractedText,
+        created_at: new Date().toISOString()
+      };
+
+      await dataService.saveFile(newFile, userId, isOnline);
+      setFiles(prev => [newFile, ...prev]);
+      alert("Arquivo enviado com sucesso!");
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      alert("Erro ao enviar arquivo.");
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const deleteFile = async (id: string) => {
+    if (!confirm("Deseja realmente excluir este arquivo?")) return;
+    try {
+      await dataService.deleteFile(id, userId, isOnline);
+      setFiles(prev => prev.filter(f => f.id !== id));
+      if (selectedFile?.id === id) setSelectedFile(null);
+    } catch (error) {
+      console.error("Error deleting file:", error);
+      alert("Erro ao excluir arquivo.");
+    }
+  };
+
   const handleGenerateFlashcards = () => {
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = noteContent;
@@ -293,6 +375,14 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
       return;
     }
     onNavigateToAnki(plainText);
+  };
+
+  const handleGenerateFlashcardsFromFile = (file: SubjectFile) => {
+    if (!file.content || file.content.trim().length < 50) {
+      alert("Este arquivo não possui texto suficiente para gerar flashcards.");
+      return;
+    }
+    onNavigateToAnki(file.content);
   };
 
   const handleExportPdf = () => {
@@ -490,65 +580,191 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
       </header>
 
       <div className="flex-1 flex gap-6 overflow-hidden">
-        {/* Sidebar for Notes */}
-        <div className="w-64 flex flex-col bg-slate-50 dark:bg-black/20 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden">
-          <div className="p-4 border-bottom border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Documentos</h3>
-            <button onClick={createNewNote} className="p-1 text-purple-500 hover:bg-purple-50 rounded-lg transition-colors">
-              <Plus size={20} />
+        {/* Sidebar for Notes and Files */}
+        <div className="w-72 flex flex-col bg-slate-50 dark:bg-black/20 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden">
+          {/* Tabs */}
+          <div className="flex border-b border-slate-100 dark:border-slate-800">
+            <button 
+              onClick={() => setActiveTab('notes')}
+              className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-colors ${activeTab === 'notes' ? 'text-purple-600 bg-white dark:bg-slate-800 border-b-2 border-purple-600' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              Notas
+            </button>
+            <button 
+              onClick={() => setActiveTab('repository')}
+              className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-colors ${activeTab === 'repository' ? 'text-blue-600 bg-white dark:bg-slate-800 border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              Repositório
+            </button>
+            <button 
+              onClick={() => setActiveTab('assignments')}
+              className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-colors ${activeTab === 'assignments' ? 'text-green-600 bg-white dark:bg-slate-800 border-b-2 border-green-600' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              Entregas
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {notes.map(note => (
-              <div 
-                key={note.id}
-                onClick={() => {
-                  setSelectedNote(note);
-                  setNoteContent(note.content);
-                  if (quillRef.current) {
-                    const delta = quillRef.current.clipboard.convert({ html: note.content });
-                    quillRef.current.setContents(delta, 'silent');
-                  }
-                }}
-                className={`group p-3 rounded-xl cursor-pointer transition-all flex items-center justify-between ${selectedNote?.id === note.id ? 'bg-white dark:bg-slate-800 shadow-md border-l-4 border-purple-500' : 'hover:bg-white/50 dark:hover:bg-white/5'}`}
+
+          <div className="p-4 border-bottom border-slate-100 dark:border-slate-800 flex items-center justify-between">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+              {activeTab === 'notes' ? 'Documentos' : activeTab === 'repository' ? 'PDFs / Textos' : 'Trabalhos'}
+            </h3>
+            {activeTab === 'notes' ? (
+              <button onClick={createNewNote} className="p-1 text-purple-500 hover:bg-purple-50 rounded-lg transition-colors">
+                <Plus size={20} />
+              </button>
+            ) : (
+              <button 
+                onClick={() => fileInputRef.current?.click()} 
+                disabled={isUploading}
+                className={`p-1 rounded-lg transition-colors ${activeTab === 'repository' ? 'text-blue-500 hover:bg-blue-50' : 'text-green-500 hover:bg-green-50'}`}
               >
-                <div className="flex items-center gap-3 overflow-hidden">
-                  <FileText size={16} className={selectedNote?.id === note.id ? 'text-purple-500' : 'text-slate-400'} />
-                  <span className={`text-sm font-bold truncate ${selectedNote?.id === note.id ? 'text-slate-800 dark:text-slate-100' : 'text-slate-500'}`}>
-                    {note.title || 'Documento sem título'}
-                  </span>
-                </div>
-                <button 
-                  onClick={(e) => { e.stopPropagation(); deleteNote(note.id); }}
-                  className="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-red-500 transition-all"
+                {isUploading ? <Loader2 size={20} className="animate-spin" /> : <Upload size={20} />}
+              </button>
+            )}
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleFileUpload} 
+              className="hidden" 
+              accept=".pdf,.doc,.docx,.txt"
+            />
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-2 space-y-1">
+            {activeTab === 'notes' ? (
+              notes.map(note => (
+                <div 
+                  key={note.id}
+                  onClick={() => {
+                    setSelectedNote(note);
+                    setSelectedFile(null);
+                    setNoteContent(note.content);
+                    if (quillRef.current) {
+                      const delta = quillRef.current.clipboard.convert({ html: note.content });
+                      quillRef.current.setContents(delta, 'silent');
+                    }
+                  }}
+                  className={`group p-3 rounded-xl cursor-pointer transition-all flex items-center justify-between ${selectedNote?.id === note.id ? 'bg-white dark:bg-slate-800 shadow-md border-l-4 border-purple-500' : 'hover:bg-white/50 dark:hover:bg-white/5'}`}
                 >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            ))}
-            {notes.length === 0 && !isLoading && (
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <FileText size={16} className={selectedNote?.id === note.id ? 'text-purple-500' : 'text-slate-400'} />
+                    <span className={`text-sm font-bold truncate ${selectedNote?.id === note.id ? 'text-slate-800 dark:text-slate-100' : 'text-slate-500'}`}>
+                      {note.title || 'Documento sem título'}
+                    </span>
+                  </div>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); deleteNote(note.id); }}
+                    className="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-red-500 transition-all"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))
+            ) : (
+              files.filter(f => f.type === (activeTab === 'repository' ? 'repository' : 'assignment')).map(file => (
+                <div 
+                  key={file.id}
+                  onClick={() => {
+                    setSelectedFile(file);
+                    setSelectedNote(null);
+                  }}
+                  className={`group p-3 rounded-xl cursor-pointer transition-all flex items-center justify-between ${selectedFile?.id === file.id ? 'bg-white dark:bg-slate-800 shadow-md border-l-4 ' + (activeTab === 'repository' ? 'border-blue-500' : 'border-green-500') : 'hover:bg-white/50 dark:hover:bg-white/5'}`}
+                >
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <File size={16} className={selectedFile?.id === file.id ? (activeTab === 'repository' ? 'text-blue-500' : 'text-green-500') : 'text-slate-400'} />
+                    <span className={`text-sm font-bold truncate ${selectedFile?.id === file.id ? 'text-slate-800 dark:text-slate-100' : 'text-slate-500'}`}>
+                      {file.name}
+                    </span>
+                  </div>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); deleteFile(file.id); }}
+                    className="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-red-500 transition-all"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))
+            )}
+            
+            {((activeTab === 'notes' && notes.length === 0) || (activeTab !== 'notes' && files.filter(f => f.type === (activeTab === 'repository' ? 'repository' : 'assignment')).length === 0)) && !isLoading && (
               <div className="text-center py-8 px-4">
-                <p className="text-xs text-slate-400 font-medium italic">Nenhum documento criado.</p>
+                <p className="text-xs text-slate-400 font-medium italic">Nenhum item encontrado.</p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Editor Area */}
+        {/* Editor Area or File Preview */}
         <div className="flex-1 flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto bg-white dark:bg-[#181818] rounded-2xl shadow-xl p-8 relative">
-            {!selectedNote ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 space-y-4">
-                <FileText size={64} className="opacity-20" />
-                <p className="font-medium">Selecione ou crie um novo documento para começar.</p>
-                <button onClick={createNewNote} className="px-6 py-2 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-colors">Criar Documento</button>
-              </div>
-            ) : isVadeMecumMode ? (
-              <div className="prose dark:prose-invert max-w-none font-serif text-lg leading-relaxed">
-                <SmartText text={new DOMParser().parseFromString(noteContent, 'text/html').body.textContent || ''} />
-              </div>
+            {activeTab === 'notes' ? (
+              !selectedNote ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 space-y-4">
+                  <FileText size={64} className="opacity-20" />
+                  <p className="font-medium">Selecione ou crie um novo documento para começar.</p>
+                  <button onClick={createNewNote} className="px-6 py-2 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-colors">Criar Documento</button>
+                </div>
+              ) : isVadeMecumMode ? (
+                <div className="prose dark:prose-invert max-w-none font-serif text-lg leading-relaxed">
+                  <SmartText text={new DOMParser().parseFromString(noteContent, 'text/html').body.textContent || ''} />
+                </div>
+              ) : (
+                <div ref={onEditorRef} className="h-full min-h-[400px] quill-editor-custom" />
+              )
             ) : (
-              <div ref={onEditorRef} className="h-full min-h-[400px] quill-editor-custom" />
+              !selectedFile ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 space-y-4">
+                  <Folder size={64} className="opacity-20" />
+                  <p className="font-medium">Selecione um arquivo para visualizar.</p>
+                  <button onClick={() => fileInputRef.current?.click()} className={`px-6 py-2 text-white rounded-xl font-bold transition-colors ${activeTab === 'repository' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'}`}>
+                    Enviar Arquivo
+                  </button>
+                </div>
+              ) : (
+                <div className="h-full flex flex-col">
+                  <div className="flex items-center justify-between mb-8 p-6 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-4">
+                      <div className={`p-3 rounded-xl ${activeTab === 'repository' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'}`}>
+                        <File size={32} />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">{selectedFile.name}</h3>
+                        <p className="text-sm text-slate-500">Enviado em {new Date(selectedFile.created_at).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <a 
+                        href={selectedFile.file_url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="py-2 px-4 bg-slate-200 dark:bg-white/10 text-slate-700 dark:text-slate-200 rounded-xl font-bold hover:bg-slate-300 transition-colors"
+                      >
+                        Abrir Arquivo
+                      </a>
+                      <button 
+                        onClick={() => handleGenerateFlashcardsFromFile(selectedFile)}
+                        className="py-2 px-4 bg-blue-500 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-blue-600 transition-colors"
+                      >
+                        <BrainCircuit size={18} /> Gerar Flashcards
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex-1 bg-slate-50 dark:bg-black/20 rounded-2xl p-6 overflow-y-auto">
+                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">Conteúdo Extraído (IA)</h4>
+                    {selectedFile.content ? (
+                      <div className="prose dark:prose-invert max-w-none text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap">
+                        {selectedFile.content}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-12 text-slate-400 italic">
+                        <AlertCircle size={32} className="mb-2 opacity-20" />
+                        <p>Nenhum texto extraído deste arquivo.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
             )}
           </div>
           {selectedNote && (

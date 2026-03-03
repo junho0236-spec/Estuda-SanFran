@@ -204,6 +204,17 @@ export interface Note {
   tags?: string[];
 }
 
+export interface SubjectFile {
+  id: string;
+  user_id: string;
+  subject_id: string;
+  name: string;
+  type: 'repository' | 'assignment';
+  file_url: string;
+  content?: string; // Extracted text for AI
+  created_at: string;
+}
+
 export interface Badge {
   id: string;
   name: string;

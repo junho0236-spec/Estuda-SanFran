@@ -1,8 +1,62 @@
 import { supabase } from './supabaseClient';
 import { db, addToSyncQueue } from './offlineService';
-import { Flashcard, Task, StudySession, Note } from '../types';
+import { Flashcard, Task, StudySession, Note, SubjectFile } from '../types';
 
 export const dataService = {
+  // FILES
+  async saveFile(file: SubjectFile, userId: string, isOnline: boolean) {
+    await db.subject_files.put(file);
+    if (isOnline) {
+      const { error } = await supabase.from('subject_files').upsert({
+        ...file,
+        user_id: userId
+      });
+      if (error) {
+        await addToSyncQueue({ table: 'subject_files', action: 'update', data: file });
+      }
+    } else {
+      await addToSyncQueue({ table: 'subject_files', action: 'update', data: file });
+    }
+  },
+
+  async getFilesBySubjectId(subjectId: string, userId: string, isOnline: boolean): Promise<SubjectFile[]> {
+    const localFiles = await db.subject_files.where('subject_id').equals(subjectId).filter(f => f.user_id === userId).toArray();
+    if (isOnline) {
+      try {
+        const { data, error } = await supabase.from('subject_files').select('*').eq('subject_id', subjectId).eq('user_id', userId);
+        if (error) throw error;
+        if (data) {
+          await db.subject_files.bulkPut(data as SubjectFile[]);
+          return data as SubjectFile[];
+        }
+      } catch (err) {
+        console.error("Error fetching files:", err);
+      }
+    }
+    return localFiles;
+  },
+
+  async deleteFile(id: string, userId: string, isOnline: boolean) {
+    await db.subject_files.delete(id);
+    if (isOnline) {
+      const { error } = await supabase.from('subject_files').delete().eq('id', id).eq('user_id', userId);
+      if (error) {
+        await addToSyncQueue({ table: 'subject_files', action: 'delete', data: { id } });
+      }
+    } else {
+      await addToSyncQueue({ table: 'subject_files', action: 'delete', data: { id } });
+    }
+  },
+
+  async uploadFile(file: File, path: string): Promise<string | null> {
+    const { data, error } = await supabase.storage.from('subject-files').upload(path, file);
+    if (error) {
+      console.error("Upload error:", error);
+      return null;
+    }
+    const { data: { publicUrl } } = supabase.storage.from('subject-files').getPublicUrl(data.path);
+    return publicUrl;
+  },
   // TASKS
   async saveTask(task: any, userId: string, isOnline: boolean) {
     // Optimistic update in local DB
@@ -192,6 +246,11 @@ export const dataService = {
           
           if (item.table === 'notes') {
             // Ensure correct mapping if needed, though Note is already snake_case
+            payload.subject_id = payload.subject_id || payload.subjectId;
+            delete payload.subjectId;
+          }
+
+          if (item.table === 'subject_files') {
             payload.subject_id = payload.subject_id || payload.subjectId;
             delete payload.subjectId;
           }
