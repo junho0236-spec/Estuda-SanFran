@@ -55,6 +55,13 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
 
   const onEditorRef = useCallback((node: HTMLDivElement | null) => {
     if (node !== null) {
+      // Evita duplicidade: Remove qualquer barra de ferramentas (ql-toolbar) que tenha ficado órfã no container pai
+      const parent = node.parentElement;
+      if (parent) {
+        const existingToolbars = parent.querySelectorAll('.ql-toolbar');
+        existingToolbars.forEach(tb => tb.remove());
+      }
+
       if (!quillRef.current) {
         quillRef.current = new Quill(node, {
           theme: 'snow',
@@ -66,9 +73,9 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
           setNoteContent(html);
         });
 
-        // If we already have content, set it once
-        if (noteContent && !contentInitializedRef.current) {
-          const delta = quillRef.current.clipboard.convert({ html: noteContent });
+        // Inicializa o conteúdo se já tivermos uma nota selecionada
+        if (selectedNoteRef.current && !contentInitializedRef.current) {
+          const delta = quillRef.current.clipboard.convert({ html: selectedNoteRef.current.content });
           quillRef.current.setContents(delta, 'silent');
           contentInitializedRef.current = true;
         }
@@ -77,16 +84,18 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
       quillRef.current = null;
       contentInitializedRef.current = false;
     }
-  }, [selectedNote, isVadeMecumMode]);
+  }, []); // Dependências vazias para manter a função estável
 
-  // Sync content from state to editor when note is loaded
+  // Sync content from state to editor when note is loaded or changed
   useEffect(() => {
-    if (quillRef.current && noteContent !== quillRef.current.root.innerHTML) {
-      // Use clipboard to safely set HTML content
-      const delta = quillRef.current.clipboard.convert({ html: noteContent });
-      quillRef.current.setContents(delta, 'silent');
+    if (quillRef.current && selectedNote && !isLoading) {
+      // Only update if the content is actually different to avoid cursor jumping
+      if (quillRef.current.root.innerHTML !== selectedNote.content) {
+        const delta = quillRef.current.clipboard.convert({ html: selectedNote.content });
+        quillRef.current.setContents(delta, 'silent');
+      }
     }
-  }, [isLoading]); // Only sync when loading finishes or noteId changes
+  }, [selectedNote?.id, isLoading, isVadeMecumMode]);
 
   const templates = {
     doutrina: '<h2>Referência Bibliográfica</h2><p><br></p><h2>Conceitos Principais</h2><p><br></p><h2>Citações Importantes</h2><p><br></p><h2>Crítica Pessoal</h2><p><br></p>',
