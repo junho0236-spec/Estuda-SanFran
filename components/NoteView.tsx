@@ -35,7 +35,6 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   const [isRenaming, setIsRenaming] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   
-  const editorRef = useRef<HTMLDivElement>(null);
   const quillRef = useRef<Quill | null>(null);
 
   const modules = {
@@ -52,19 +51,33 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     ],
   };
 
-  useEffect(() => {
-    if (editorRef.current && !quillRef.current) {
-      quillRef.current = new Quill(editorRef.current, {
-        theme: 'snow',
-        modules: modules,
-      });
+  const contentInitializedRef = useRef(false);
 
-      quillRef.current.on('text-change', () => {
-        const html = editorRef.current?.querySelector('.ql-editor')?.innerHTML || '';
-        setNoteContent(html);
-      });
+  const onEditorRef = useCallback((node: HTMLDivElement | null) => {
+    if (node !== null) {
+      if (!quillRef.current) {
+        quillRef.current = new Quill(node, {
+          theme: 'snow',
+          modules: modules,
+        });
+
+        quillRef.current.on('text-change', () => {
+          const html = node.querySelector('.ql-editor')?.innerHTML || '';
+          setNoteContent(html);
+        });
+
+        // If we already have content, set it once
+        if (noteContent && !contentInitializedRef.current) {
+          const delta = quillRef.current.clipboard.convert({ html: noteContent });
+          quillRef.current.setContents(delta, 'silent');
+          contentInitializedRef.current = true;
+        }
+      }
+    } else {
+      quillRef.current = null;
+      contentInitializedRef.current = false;
     }
-  }, []);
+  }, [selectedNote, isVadeMecumMode]);
 
   // Sync content from state to editor when note is loaded
   useEffect(() => {
@@ -507,7 +520,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                 <SmartText text={new DOMParser().parseFromString(noteContent, 'text/html').body.textContent || ''} />
               </div>
             ) : (
-              <div ref={editorRef} className="h-full min-h-[400px] quill-editor-custom" />
+              <div ref={onEditorRef} className="h-full min-h-[400px] quill-editor-custom" />
             )}
           </div>
           {selectedNote && (
