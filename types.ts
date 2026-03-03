@@ -198,6 +198,7 @@ export interface Note {
   id: string;
   subject_id: string;
   user_id: string;
+  title?: string;
   content: string;
   updated_at: string;
   tags?: string[];

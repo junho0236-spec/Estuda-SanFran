@@ -105,15 +105,28 @@ export const dataService = {
     }
   },
 
-  async getNoteBySubjectId(subjectId: string, userId: string, isOnline: boolean): Promise<Note | null> {
+  async getNotesBySubjectId(subjectId: string, userId: string, isOnline: boolean): Promise<Note[]> {
     if (isOnline) {
-      const { data, error } = await supabase.from('notes').select('*').eq('subject_id', subjectId).eq('user_id', userId).single();
-      if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
-        console.error('Error fetching note from cloud:', error);
+      const { data, error } = await supabase.from('notes').select('*').eq('subject_id', subjectId).eq('user_id', userId).order('updated_at', { ascending: false });
+      if (error) {
+        console.error('Error fetching notes from cloud:', error);
       }
-      return data as Note | null;
+      return (data || []) as Note[];
     } else {
-      return db.notes.where({ subject_id: subjectId, user_id: userId }).first() || null;
+      return db.notes.where({ subject_id: subjectId, user_id: userId }).toArray();
+    }
+  },
+
+  async deleteNote(id: string, userId: string, isOnline: boolean) {
+    await db.notes.delete(id);
+
+    if (isOnline) {
+      const { error } = await supabase.from('notes').delete().eq('id', id).eq('user_id', userId);
+      if (error) {
+        await addToSyncQueue({ table: 'notes', action: 'delete', data: { id } });
+      }
+    } else {
+      await addToSyncQueue({ table: 'notes', action: 'delete', data: { id } });
     }
   },
 
