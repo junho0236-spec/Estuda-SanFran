@@ -143,6 +143,8 @@ export interface Subject {
   max_absences?: number;
   semester_year?: string;
   workload?: number;
+  p1_date?: string;
+  p2_date?: string;
 }
 
 export type TaskPriority = 'urgente' | 'alta' | 'normal';

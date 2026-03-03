@@ -25,6 +25,8 @@ const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId, onVi
   const [maxAbsences, setMaxAbsences] = useState(20);
   const [semesterYear, setSemesterYear] = useState('');
   const [workload, setWorkload] = useState(0);
+  const [p1Date, setP1Date] = useState('');
+  const [p2Date, setP2Date] = useState('');
 
   const colors = [
     '#9B111E', '#1094ab', '#fcb421', '#1a1a1a', 
@@ -42,7 +44,9 @@ const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId, onVi
       absences: absences,
       max_absences: maxAbsences,
       semester_year: semesterYear || null,
-      workload: workload
+      workload: workload,
+      p1_date: p1Date || null,
+      p2_date: p2Date || null
     };
 
     try {
@@ -72,6 +76,8 @@ const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId, onVi
       setMaxAbsences(20);
       setSemesterYear('');
       setWorkload(0);
+      setP1Date('');
+      setP2Date('');
 
     } catch (err) {
       console.error(err);
@@ -103,6 +109,8 @@ const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId, onVi
     setMaxAbsences(subject.max_absences || 20);
     setSemesterYear(subject.semester_year || '');
     setWorkload(subject.workload || 0);
+    setP1Date(subject.p1_date || '');
+    setP2Date(subject.p2_date || '');
   };
 
   const getNextDeadline = (subjectId: string) => {
@@ -136,6 +144,50 @@ const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId, onVi
     return (current / total) * 100;
   };
 
+  const getRemainingClasses = (subject: Subject) => {
+    if (!subject.workload || !subject.semester_start_date || !subject.semester_end_date) return null;
+    const progress = getSemesterProgress(subject.semester_start_date, subject.semester_end_date);
+    const totalClasses = Math.ceil(subject.workload / 2); // Assume 2h per class
+    const classesElapsed = Math.floor((progress / 100) * totalClasses);
+    const remaining = totalClasses - classesElapsed;
+    return remaining > 0 ? remaining : 0;
+  };
+
+  const ExamTimeline = () => {
+    const allExams = subjects
+      .flatMap(s => [
+        { subject: s.name, color: s.color, date: s.p1_date, type: 'P1' },
+        { subject: s.name, color: s.color, date: s.p2_date, type: 'P2' }
+      ])
+      .filter(e => e.date)
+      .sort((a, b) => new Date(a.date!).getTime() - new Date(b.date!).getTime());
+
+    if (allExams.length === 0) return null;
+
+    return (
+      <div className="bg-white dark:bg-[#181818] p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm mb-8">
+        <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2">
+          <BookOpen size={14} /> Linha do Tempo de Provas
+        </h3>
+        <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+          {allExams.map((exam, idx) => {
+            const date = new Date(exam.date!);
+            const isSoon = (date.getTime() - new Date().getTime()) < (7 * 24 * 60 * 60 * 1000);
+            return (
+              <div key={idx} className={`flex-shrink-0 p-4 rounded-2xl border ${isSoon ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' : 'bg-slate-50 dark:bg-black/20 border-slate-100 dark:border-slate-800'} min-w-[160px]`}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: exam.color }}>{exam.type}</span>
+                  <span className="text-[10px] font-bold text-slate-400">{date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</span>
+                </div>
+                <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{exam.subject}</p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
 
   return (
     <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
@@ -143,6 +195,8 @@ const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId, onVi
         <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-100">Cadeiras Acadêmicas</h2>
         <p className="text-slate-500 dark:text-slate-400">Organize sua vida jurídica por disciplinas.</p>
       </header>
+
+      <ExamTimeline />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-1 space-y-6">
@@ -179,6 +233,16 @@ const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId, onVi
                 <div>
                   <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Carga Horária (horas)</label>
                   <input type="number" value={workload} onChange={(e) => setWorkload(parseInt(e.target.value))} placeholder="Ex: 60" className="w-full p-4 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-slate-800 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-[#9B111E] text-slate-800 dark:text-slate-100" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Data P1 (Prova)</label>
+                    <input type="date" value={p1Date} onChange={(e) => setP1Date(e.target.value)} className="w-full p-4 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-slate-800 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-[#9B111E] text-slate-800 dark:text-slate-100" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Data P2 (Prova)</label>
+                    <input type="date" value={p2Date} onChange={(e) => setP2Date(e.target.value)} className="w-full p-4 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-slate-800 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-[#9B111E] text-slate-800 dark:text-slate-100" />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Selo de Identificação</label>
@@ -243,6 +307,12 @@ const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId, onVi
                             <div className="bg-green-500 h-2.5 rounded-full" style={{ width: `${progress}%` }}></div>
                           </div>
                         </div>
+                        {getRemainingClasses(subject) !== null && (
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Aulas Restantes</span>
+                            <span className="text-sm font-bold text-slate-700 dark:text-slate-200">~{getRemainingClasses(subject)} aulas</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
