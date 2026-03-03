@@ -202,26 +202,45 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     }
   };
 
+  // Refs to keep track of latest state for auto-save without re-triggering effects
+  const noteContentRef = useRef(noteContent);
+  const selectedNoteRef = useRef(selectedNote);
+
+  useEffect(() => {
+    noteContentRef.current = noteContent;
+  }, [noteContent]);
+
+  useEffect(() => {
+    selectedNoteRef.current = selectedNote;
+  }, [selectedNote]);
+
   const saveNoteContent = useCallback(async (isAuto: boolean = false) => {
-    if (!selectedNote) return;
-    if (!noteContent.trim() && !selectedNote.content.trim()) return; 
+    const currentNote = selectedNoteRef.current;
+    const currentContent = noteContentRef.current;
+
+    if (!currentNote) return;
+    // Don't save if content is empty and it was already empty
+    if (!currentContent.trim() && !currentNote.content.trim()) return; 
 
     if (isAuto) setIsAutoSaving(true);
     else setIsSaving(true);
 
     try {
-      const extractedTags = (noteContent.match(/#(\w+)/g) || []).map(tag => tag.substring(1));
+      const extractedTags = (currentContent.match(/#(\w+)/g) || []).map(tag => tag.substring(1));
 
       const updatedNote: Note = {
-        ...selectedNote,
-        content: noteContent,
+        ...currentNote,
+        content: currentContent,
         updated_at: new Date().toISOString(),
         tags: extractedTags,
       };
 
       await dataService.saveNote(updatedNote, userId, isOnline);
-      setNotes(prev => prev.map(n => n.id === selectedNote.id ? updatedNote : n));
+      
+      // Update local state
+      setNotes(prev => prev.map(n => n.id === currentNote.id ? updatedNote : n));
       setSelectedNote(updatedNote);
+      
       if (!isAuto) alert('Anotação salva com sucesso!');
     } catch (error) {
       console.error('Error saving note:', error);
@@ -230,13 +249,13 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
       if (isAuto) setIsAutoSaving(false);
       else setIsSaving(false);
     }
-  }, [noteContent, selectedNote, userId, isOnline]);
+  }, [userId, isOnline]);
 
-  // Auto-save effect
+  // Auto-save effect - now only depends on the stable saveNoteContent function
   useEffect(() => {
     const autoSaveInterval = setInterval(() => {
-      saveNoteContent(true); // Call with isAuto = true
-    }, 30000); // Every 30 seconds
+      saveNoteContent(true);
+    }, 15000); // Every 15 seconds for better reliability
 
     return () => clearInterval(autoSaveInterval);
   }, [saveNoteContent]);

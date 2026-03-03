@@ -88,16 +88,26 @@ export const dataService = {
 
   // NOTES
   async saveNote(note: Note, userId: string, isOnline: boolean) {
+    // Optimistic update in local DB
     await db.notes.put(note);
+    console.log("Note saved locally:", note.id);
 
     if (isOnline) {
-      const { error } = await supabase.from('notes').upsert({
-        ...note,
-        user_id: userId,
-        subject_id: note.subject_id
-      });
-      if (error) {
-        console.error("Error syncing note to cloud, adding to queue", error);
+      try {
+        const { error } = await supabase.from('notes').upsert({
+          ...note,
+          user_id: userId,
+          subject_id: note.subject_id
+        });
+        
+        if (error) {
+          console.error("Error syncing note to cloud, adding to queue", error);
+          await addToSyncQueue({ table: 'notes', action: 'update', data: note });
+        } else {
+          console.log("Note synced to cloud successfully");
+        }
+      } catch (err) {
+        console.error("Supabase upsert failed:", err);
         await addToSyncQueue({ table: 'notes', action: 'update', data: note });
       }
     } else {
@@ -106,15 +116,38 @@ export const dataService = {
   },
 
   async getNotesBySubjectId(subjectId: string, userId: string, isOnline: boolean): Promise<Note[]> {
+    // Always start with local data
+    const localNotes = await db.notes
+      .where('subject_id').equals(subjectId)
+      .filter(n => n.user_id === userId)
+      .toArray();
+
     if (isOnline) {
-      const { data, error } = await supabase.from('notes').select('*').eq('subject_id', subjectId).eq('user_id', userId).order('updated_at', { ascending: false });
-      if (error) {
-        console.error('Error fetching notes from cloud:', error);
+      try {
+        const { data, error } = await supabase
+          .from('notes')
+          .select('*')
+          .eq('subject_id', subjectId)
+          .eq('user_id', userId)
+          .order('updated_at', { ascending: false });
+
+        if (error) throw error;
+
+        if (data) {
+          const remoteNotes = data as Note[];
+          
+          // Simple merge: remote wins but we update local
+          if (remoteNotes.length > 0) {
+            await db.notes.bulkPut(remoteNotes);
+            return remoteNotes;
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching notes from cloud, falling back to local:', error);
       }
-      return (data || []) as Note[];
-    } else {
-      return db.notes.where({ subject_id: subjectId, user_id: userId }).toArray();
     }
+    
+    return localNotes;
   },
 
   async deleteNote(id: string, userId: string, isOnline: boolean) {
@@ -157,7 +190,14 @@ export const dataService = {
              delete payload.nextReview;
           }
           
-          await supabase.from(item.table).upsert(payload);
+          if (item.table === 'notes') {
+            // Ensure correct mapping if needed, though Note is already snake_case
+            payload.subject_id = payload.subject_id || payload.subjectId;
+            delete payload.subjectId;
+          }
+          
+          const { error } = await supabase.from(item.table).upsert(payload);
+          if (error) throw error;
         }
         await db.syncQueue.delete(item.id!);
       } catch (err) {
