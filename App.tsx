@@ -167,7 +167,7 @@ const BrasiliaClock: React.FC = () => {
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>(View.Dashboard);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -658,7 +658,7 @@ const App: React.FC = () => {
                 </div>
               </div>
             </button>
-            <button onClick={closeSidebar} className="lg:hidden p-2 text-slate-400 hover:text-sanfran-rubi transition-colors self-start">
+            <button onClick={closeSidebar} className="p-2 text-slate-400 hover:text-sanfran-rubi transition-colors self-start">
               <X className="w-6 h-6" />
             </button>
           </div>
@@ -738,7 +738,7 @@ const App: React.FC = () => {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0 relative">
-        <header className={`${isExtremeFocus ? 'hidden' : 'lg:hidden'} bg-white dark:bg-[#0d0303] border-b border-slate-200 dark:border-sanfran-rubi/30 p-4 flex items-center justify-between sticky top-0 z-20`}>
+        <header className={`${isExtremeFocus ? 'hidden' : (isSidebarOpen ? 'lg:hidden' : 'flex')} bg-white dark:bg-[#0d0303] border-b border-slate-200 dark:border-sanfran-rubi/30 p-4 flex items-center justify-between sticky top-0 z-20`}>
           <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-slate-100 dark:bg-sanfran-rubi/10 rounded-xl text-slate-600 dark:text-white">
             <Menu className="w-6 h-6" />
           </button>
