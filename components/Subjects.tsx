@@ -9,10 +9,11 @@ interface SubjectsProps {
   setSubjects: React.Dispatch<React.SetStateAction<Subject[]>>;
   userId: string;
   onViewNotes: (subjectId: string) => void;
+  onViewRepository: (subjectId: string) => void;
   tasks: Task[];
 }
 
-const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId, onViewNotes, tasks }) => {
+const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId, onViewNotes, onViewRepository, tasks }) => {
   const [newSubjectName, setNewSubjectName] = useState('');
   const [selectedColor, setSelectedColor] = useState('#9B111E');
   const [isSaving, setIsSaving] = useState(false);
@@ -284,9 +285,25 @@ const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId, onVi
                         <button onClick={() => removeSubject(subject.id)} className="p-2 text-slate-300 dark:text-slate-600 hover:text-[#9B111E] transition-colors"><Trash2 className="w-5 h-5" /></button>
                       </div>
                     </div>
-                    <div className="mt-4" onClick={() => onViewNotes(subject.id)}>
-                      <h4 className="text-xl font-bold text-slate-800 dark:text-slate-100 leading-tight">{subject.name}</h4>
-                      <div className="mt-4 space-y-3">
+                    <div className="mt-4">
+                      <h4 className="text-xl font-bold text-slate-800 dark:text-slate-100 leading-tight" onClick={() => onViewNotes(subject.id)}>{subject.name}</h4>
+                      
+                      <div className="mt-3 flex gap-2">
+                        <button 
+                          onClick={() => onViewNotes(subject.id)}
+                          className="flex-1 py-2 bg-slate-100 dark:bg-white/5 text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-xl transition-all"
+                        >
+                          Anotações
+                        </button>
+                        <button 
+                          onClick={() => onViewRepository(subject.id)}
+                          className="flex-1 py-2 bg-slate-100 dark:bg-white/5 text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-all"
+                        >
+                          Repositório
+                        </button>
+                      </div>
+
+                      <div className="mt-4 space-y-3" onClick={() => onViewNotes(subject.id)}>
                         {nextDeadline && (
                           <div className={`p-2 rounded-lg text-xs font-bold flex items-center gap-2 ${nextDeadline.days <= 3 ? 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300' : 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300'}`}>
                             <span className="text-lg">🔥</span> {nextDeadline.title} em {nextDeadline.days} dia{nextDeadline.days !== 1 ? 's' : ''}

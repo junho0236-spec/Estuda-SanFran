@@ -192,6 +192,7 @@ const App: React.FC = () => {
   const [studySessions, setStudySessions] = useState<StudySession[]>([]);
   const [correctQuestionsCount, setCorrectQuestionsCount] = useState(0);
   const [selectedSubjectIdForNotes, setSelectedSubjectIdForNotes] = useState<string | null>(null);
+  const [initialNoteTab, setInitialNoteTab] = useState<'notes' | 'repository' | 'assignments'>('notes');
   const [ankiTextToGenerate, setAnkiTextToGenerate] = useState<string | null>(null);
 
   // --- Timer Global State (Pomodoro) ---
@@ -796,6 +797,7 @@ const App: React.FC = () => {
                     subjectId={selectedSubjectIdForNotes} 
                     userId={session.user.id} 
                     isOnline={isOnline} 
+                    initialTab={initialNoteTab}
                     onBack={() => setCurrentView(View.Subjects)} 
                     onNavigateToAnki={(text) => {
                       setAnkiTextToGenerate(text);
@@ -929,6 +931,12 @@ const App: React.FC = () => {
                     userId={session.user.id} 
                     onViewNotes={(subjectId) => {
                       setSelectedSubjectIdForNotes(subjectId);
+                      setInitialNoteTab('notes');
+                      setCurrentView(View.NoteView);
+                    }}
+                    onViewRepository={(subjectId) => {
+                      setSelectedSubjectIdForNotes(subjectId);
+                      setInitialNoteTab('repository');
                       setCurrentView(View.NoteView);
                     }}
                     tasks={tasks}

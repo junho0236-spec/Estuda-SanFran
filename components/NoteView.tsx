@@ -18,16 +18,17 @@ interface NoteViewProps {
   subjectId: string; // Initial subject ID, can be changed
   userId: string;
   isOnline: boolean;
+  initialTab?: 'notes' | 'repository' | 'assignments';
   onBack: () => void;
   onNavigateToAnki: (text: string) => void; // For generating flashcards
   subjects: Subject[]; // List of all subjects
   onToggleSidebar: (isOpen: boolean) => void; // Function to toggle sidebar visibility
 }
 
-const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId, isOnline, onBack, onNavigateToAnki, subjects, onToggleSidebar }) => {
+const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId, isOnline, initialTab = 'notes', onBack, onNavigateToAnki, subjects, onToggleSidebar }) => {
   const [notes, setNotes] = useState<Note[]>([]);
   const [files, setFiles] = useState<SubjectFile[]>([]);
-  const [activeTab, setActiveTab] = useState<'notes' | 'repository' | 'assignments'>('notes');
+  const [activeTab, setActiveTab] = useState<'notes' | 'repository' | 'assignments'>(initialTab);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [selectedFile, setSelectedFile] = useState<SubjectFile | null>(null);
   const [noteContent, setNoteContent] = useState('');
@@ -122,6 +123,10 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     'align',
     'code-block'
   ];
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -314,12 +319,17 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     const file = event.target.files?.[0];
     if (!file) return;
 
+    if (!userId || !selectedSubjectId) {
+      alert("Erro: Usuário ou disciplina não identificados.");
+      return;
+    }
+
     setIsUploading(true);
     try {
       const path = `${userId}/${selectedSubjectId}/${Date.now()}_${file.name}`;
       const publicUrl = await dataService.uploadFile(file, path);
       
-      if (!publicUrl) throw new Error("Upload failed");
+      if (!publicUrl) throw new Error("Não foi possível obter a URL pública do arquivo.");
 
       let extractedText = '';
       if (file.type === 'application/pdf') {
@@ -344,9 +354,10 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
       await dataService.saveFile(newFile, userId, isOnline);
       setFiles(prev => [newFile, ...prev]);
       alert("Arquivo enviado com sucesso!");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error uploading file:", error);
-      alert("Erro ao enviar arquivo.");
+      const errorMsg = error?.message || error?.error_description || String(error);
+      alert(`Erro ao enviar arquivo: ${errorMsg}`);
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
