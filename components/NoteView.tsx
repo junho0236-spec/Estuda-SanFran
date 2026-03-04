@@ -45,6 +45,13 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   const [isRenaming, setIsRenaming] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   
+  // Sync selectedSubjectId when initialSubjectId changes from props
+  useEffect(() => {
+    if (initialSubjectId && initialSubjectId !== selectedSubjectId) {
+      setSelectedSubjectId(initialSubjectId);
+    }
+  }, [initialSubjectId]);
+
   const quillRef = useRef<Quill | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -395,6 +402,13 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // Check file size (e.g., 10MB limit)
+    const MAX_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      alert("O arquivo é muito grande. O limite é de 10MB.");
+      return;
+    }
+
     if (!userId || !selectedSubjectId) {
       alert("Erro: Usuário ou disciplina não identificados.");
       return;
@@ -402,7 +416,10 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
 
     setIsUploading(true);
     try {
-      const path = `${userId}/${selectedSubjectId}/${Date.now()}_${file.name}`;
+      // Create a clean filename
+      const cleanFileName = file.name.replace(/[^\w.-]/g, '_');
+      const path = `${userId}/${selectedSubjectId}/${Date.now()}_${cleanFileName}`;
+      
       const publicUrl = await dataService.uploadFile(file, path);
       
       if (!publicUrl) throw new Error("Não foi possível obter a URL pública do arquivo.");
@@ -412,7 +429,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
         try {
           extractedText = await extractTextFromPdf(file);
         } catch (err) {
-          console.error("PDF extraction failed:", err);
+          console.error("PDF extraction failed (continuing without text):", err);
         }
       }
 
