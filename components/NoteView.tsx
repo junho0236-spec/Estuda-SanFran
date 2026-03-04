@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css'; // Import Quill styles
 import { ArrowLeft, Save, Loader2, FileText, BrainCircuit, Sparkles, Tag, Split, Download, Gavel, Plus, Trash2, Edit3 } from 'lucide-react';
@@ -48,19 +48,80 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   const quillRef = useRef<Quill | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const modules = {
-    toolbar: [
-      [{ 'header': '1' }, { 'header': '2' }, { 'font': [] }],
-      [{ size: [] }],
-      ['bold', 'italic', 'underline', 'strike', 'blockquote'],
-      [{ 'list': 'ordered' }, { 'list': 'bullet' }, { 'indent': '-1' }, { 'indent': '+1' }],
-      ['link', 'image', 'video'],
-      [{ 'color': [] }, { 'background': [] }],
-      [{ 'align': [] }],
-      ['clean'],
-      ['code-block']
-    ],
-  };
+  const imageHandler = useCallback(() => {
+    const input = document.createElement('input');
+    input.setAttribute('type', 'file');
+    input.setAttribute('accept', 'image/*');
+    input.click();
+
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (file) {
+        setIsUploading(true);
+        try {
+          const path = `${userId}/notes/images/${Date.now()}_${file.name}`;
+          const url = await dataService.uploadFile(file, path);
+          const quill = quillRef.current;
+          if (quill) {
+            const range = quill.getSelection();
+            if (range) {
+              quill.insertEmbed(range.index, 'image', url);
+              quill.setSelection(range.index + 1 as any);
+            }
+          }
+        } catch (error) {
+          console.error("Error uploading image to Quill:", error);
+          alert("Erro ao carregar imagem.");
+        } finally {
+          setIsUploading(false);
+        }
+      }
+    };
+  }, [userId]);
+
+  const legalCitationHandler = useCallback(() => {
+    const quill = quillRef.current;
+    if (!quill) return;
+
+    const range = quill.getSelection();
+    let text = '';
+    
+    if (range && range.length > 0) {
+      text = quill.getText(range.index, range.length);
+    } else {
+      text = prompt('Digite a citação legal (ex: Art. 5, CF):') || '';
+    }
+
+    if (text) {
+      const url = `https://www.google.com/search?q=site:planalto.gov.br+${encodeURIComponent(text)}`;
+      if (range && range.length > 0) {
+        quill.format('link', url);
+      } else {
+        const index = range ? range.index : quill.getLength();
+        quill.insertText(index, text, 'link', url);
+      }
+    }
+  }, []);
+
+  const modules = useMemo(() => ({
+    toolbar: {
+      container: [
+        [{ 'header': '1' }, { 'header': '2' }, { 'font': [] }],
+        [{ size: [] }],
+        ['bold', 'italic', 'underline', 'strike', 'blockquote'],
+        [{ 'list': 'ordered' }, { 'list': 'bullet' }, { 'indent': '-1' }, { 'indent': '+1' }],
+        ['link', 'image', 'video', 'legal-citation'],
+        [{ 'color': [] }, { 'background': [] }],
+        [{ 'align': [] }],
+        ['clean'],
+        ['code-block']
+      ],
+      handlers: {
+        'image': imageHandler,
+        'legal-citation': legalCitationHandler
+      }
+    },
+  }), [imageHandler, legalCitationHandler]);
 
   const contentInitializedRef = useRef(false);
 
@@ -78,6 +139,23 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
           theme: 'snow',
           modules: modules,
         });
+
+        // Add custom icon for legal citation button
+        const toolbar = node.parentElement?.querySelector('.ql-toolbar');
+        if (toolbar) {
+          const legalButton = toolbar.querySelector('.ql-legal-citation');
+          if (legalButton) {
+            legalButton.innerHTML = `
+              <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m14 5 3 3L7 18l-3-3L14 5Z"></path>
+                <path d="m14 5 3 3-3-3Z"></path>
+                <path d="M16 16v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"></path>
+                <path d="m8 14 3 3"></path>
+              </svg>
+            `;
+            legalButton.setAttribute('title', 'Citação Legal');
+          }
+        }
 
         quillRef.current.on('text-change', () => {
           const html = node.querySelector('.ql-editor')?.innerHTML || '';
