@@ -627,7 +627,7 @@ const App: React.FC = () => {
         />
       )}
 
-      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${isExtremeFocus ? '-translate-x-full lg:-translate-x-full lg:w-0' : 'lg:relative lg:translate-x-0 lg:w-72'} fixed inset-y-0 left-0 z-40 bg-white dark:bg-[#0d0303] border-r border-slate-200 dark:border-sanfran-rubi/30 transition-all duration-700 flex flex-col shadow-2xl lg:shadow-none`}>
+      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${(isExtremeFocus || !isSidebarOpen) ? '-translate-x-full lg:-translate-x-full lg:w-0' : 'lg:relative lg:translate-x-0 lg:w-72'} fixed inset-y-0 left-0 z-40 bg-white dark:bg-[#0d0303] border-r border-slate-200 dark:border-sanfran-rubi/30 transition-all duration-700 flex flex-col shadow-2xl lg:shadow-none`}>
         <div className="p-6 border-b border-slate-100 dark:border-sanfran-rubi/20 flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <button
@@ -937,6 +937,11 @@ const App: React.FC = () => {
                     onViewRepository={(subjectId) => {
                       setSelectedSubjectIdForNotes(subjectId);
                       setInitialNoteTab('repository');
+                      setCurrentView(View.NoteView);
+                    }}
+                    onViewAssignments={(subjectId) => {
+                      setSelectedSubjectIdForNotes(subjectId);
+                      setInitialNoteTab('assignments');
                       setCurrentView(View.NoteView);
                     }}
                     tasks={tasks}

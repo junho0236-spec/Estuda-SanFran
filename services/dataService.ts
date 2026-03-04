@@ -49,12 +49,12 @@ export const dataService = {
   },
 
   async uploadFile(file: File, path: string): Promise<string> {
-    const { data, error } = await supabase.storage.from('subject-files').upload(path, file);
+    const { data, error } = await supabase.storage.from('subject_files').upload(path, file);
     if (error) {
       console.error("Upload error:", error);
       throw error;
     }
-    const { data: { publicUrl } } = supabase.storage.from('subject-files').getPublicUrl(data.path);
+    const { data: { publicUrl } } = supabase.storage.from('subject_files').getPublicUrl(data.path);
     return publicUrl;
   },
   // TASKS

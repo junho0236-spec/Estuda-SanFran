@@ -510,8 +510,9 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
           {/* Split View Button */}
           <button
             onClick={() => {
-              setIsSplitView(prev => !prev);
-              onToggleSidebar(isSplitView); // Toggle sidebar based on new split view state
+              const nextSplitState = !isSplitView;
+              setIsSplitView(nextSplitState);
+              onToggleSidebar(!nextSplitState); // Hide sidebar if split view is active
             }}
             className="py-2 px-4 bg-slate-500 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-slate-600 transition-colors"
           >

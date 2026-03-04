@@ -10,10 +10,11 @@ interface SubjectsProps {
   userId: string;
   onViewNotes: (subjectId: string) => void;
   onViewRepository: (subjectId: string) => void;
+  onViewAssignments: (subjectId: string) => void;
   tasks: Task[];
 }
 
-const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId, onViewNotes, onViewRepository, tasks }) => {
+const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId, onViewNotes, onViewRepository, onViewAssignments, tasks }) => {
   const [newSubjectName, setNewSubjectName] = useState('');
   const [selectedColor, setSelectedColor] = useState('#9B111E');
   const [isSaving, setIsSaving] = useState(false);
@@ -293,13 +294,19 @@ const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId, onVi
                           onClick={() => onViewNotes(subject.id)}
                           className="flex-1 py-2 bg-slate-100 dark:bg-white/5 text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-xl transition-all"
                         >
-                          Anotações
+                          Notas
                         </button>
                         <button 
                           onClick={() => onViewRepository(subject.id)}
                           className="flex-1 py-2 bg-slate-100 dark:bg-white/5 text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-all"
                         >
                           Repositório
+                        </button>
+                        <button 
+                          onClick={() => onViewAssignments(subject.id)}
+                          className="flex-1 py-2 bg-slate-100 dark:bg-white/5 text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-xl transition-all"
+                        >
+                          Entregas
                         </button>
                       </div>
 
