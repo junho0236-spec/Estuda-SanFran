@@ -585,7 +585,7 @@ const App: React.FC = () => {
 
   return (
     <div className={`flex h-screen overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#fcfcfc]'}`}>
-      <Atmosphere isExtremeFocus={isExtremeFocus} />
+      <Atmosphere isExtremeFocus={isExtremeFocus} isSidebarOpen={isSidebarOpen} />
       
       <Suspense fallback={null}>
         <GlobalSearch 
@@ -627,7 +627,11 @@ const App: React.FC = () => {
         />
       )}
 
-      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${(isExtremeFocus || !isSidebarOpen) ? '-translate-x-full lg:-translate-x-full lg:w-0' : 'lg:relative lg:translate-x-0 lg:w-72'} fixed inset-y-0 left-0 z-40 bg-white dark:bg-[#0d0303] border-r border-slate-200 dark:border-sanfran-rubi/30 transition-all duration-700 flex flex-col shadow-2xl lg:shadow-none`}>
+      <aside className={`
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
+        ${(isExtremeFocus || !isSidebarOpen) ? 'lg:w-0' : 'lg:w-72'} 
+        fixed lg:relative inset-y-0 left-0 z-40 bg-white dark:bg-[#0d0303] border-r border-slate-200 dark:border-sanfran-rubi/30 transition-all duration-500 flex flex-col shadow-2xl lg:shadow-none overflow-hidden
+      `}>
         <div className="p-6 border-b border-slate-100 dark:border-sanfran-rubi/20 flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <button
@@ -745,7 +749,7 @@ const App: React.FC = () => {
           <div className="w-10"></div>
         </header>
 
-        <main className={`flex-1 overflow-y-auto ${isExtremeFocus ? 'p-0' : 'p-4 md:p-10'} relative transition-all duration-700`}>
+        <main className={`flex-1 overflow-y-auto ${isExtremeFocus ? 'p-0' : 'p-4 md:p-8 lg:p-10'} relative transition-all duration-500`}>
           {/* Offline Indicator */}
           {!isOnline && (
             <div className="fixed top-4 right-4 z-50 bg-amber-500 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2 animate-bounce">
@@ -759,7 +763,7 @@ const App: React.FC = () => {
               <span className="text-[10px] font-black uppercase tracking-widest">Sincronizando...</span>
             </div>
           )}
-          <div className={`${isExtremeFocus ? 'max-w-none h-full flex items-center justify-center' : 'max-w-6xl mx-auto h-full'}`}>
+          <div className={`${isExtremeFocus ? 'max-w-none min-h-full flex items-center justify-center' : 'max-w-6xl mx-auto min-h-full'}`}>
              <Suspense fallback={<PageLoader />}>
                 {currentView === View.Dashboard && (
                   <Dashboard 

@@ -63,11 +63,9 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
           const url = await dataService.uploadFile(file, path);
           const quill = quillRef.current;
           if (quill) {
-            const range = quill.getSelection();
-            if (range) {
-              quill.insertEmbed(range.index, 'image', url);
-              quill.setSelection(range.index + 1 as any);
-            }
+            const range = quill.getSelection() || { index: quill.getLength(), length: 0 };
+            quill.insertEmbed(range.index, 'image', url);
+            quill.setSelection((range.index + 1) as any);
           }
         } catch (error) {
           console.error("Error uploading image to Quill:", error);
@@ -173,7 +171,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
       quillRef.current = null;
       contentInitializedRef.current = false;
     }
-  }, []); // Dependências vazias para manter a função estável
+  }, [modules]); // Depende de modules para reinicializar se necessário
 
   // Sync content from state to editor when note is loaded or changed
   useEffect(() => {

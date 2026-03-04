@@ -49,7 +49,7 @@ const Login: React.FC<AuthProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-6 bg-[#fcfcfc] dark:bg-sanfran-rubiBlack transition-colors duration-500 overflow-hidden relative">
+    <div className="min-h-screen w-full flex items-center justify-center p-6 bg-[#fcfcfc] dark:bg-sanfran-rubiBlack transition-colors duration-500 overflow-y-auto relative">
       <div className="absolute top-[-10%] right-[-5%] w-96 h-96 bg-sanfran-rubi opacity-[0.03] rounded-full blur-3xl animate-pulse"></div>
       <div className="absolute bottom-[-10%] left-[-5%] w-80 h-80 bg-usp-blue opacity-[0.03] rounded-full blur-3xl animate-pulse delay-700"></div>
       

@@ -189,7 +189,7 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
       {/* Widget OAB Countdown no Topo */}
       <div 
         onClick={() => onNavigate(View.OabCountdown)}
-        className={`group cursor-pointer rounded-[2rem] p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 border-b-[8px] transition-all hover:scale-[1.01] active:scale-[0.99] shadow-2xl relative overflow-hidden ${
+        className={`group cursor-pointer rounded-[2rem] p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 border-b-4 transition-all hover:scale-[1.01] active:scale-[0.99] shadow-2xl relative overflow-hidden ${
           daysToOab < 15 ? 'bg-sanfran-rubi border-sanfran-rubiDark text-white' : 
           daysToOab < 45 ? 'bg-orange-500 border-orange-700 text-white' : 
           'bg-usp-blue border-[#0b6a7a] text-white'
@@ -281,7 +281,7 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         <StatCard 
           icon={<Brain className="text-sanfran-rubi dark:text-white" />} 
           label="Para Revisar" 
@@ -377,12 +377,12 @@ const StatCard: React.FC<{ icon: React.ReactNode, label: string, value: string |
       {React.cloneElement(icon as React.ReactElement<any>, { size: 24 })}
     </div>
     <div className="space-y-0 md:space-y-1">
-      <p className="text-[10px] md:text-xs font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest">{label}</p>
+      <p className="text-[8px] md:text-xs font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest">{label}</p>
       <div className="flex items-baseline gap-1">
-        <h4 className="text-3xl md:text-4xl font-black text-slate-950 dark:text-white tabular-nums">{value}</h4>
-        {unit && <span className="text-xs font-black text-slate-400 uppercase">{unit}</span>}
+        <h4 className="text-2xl md:text-4xl font-black text-slate-950 dark:text-white tabular-nums">{value}</h4>
+        {unit && <span className="text-[10px] font-black text-slate-400 uppercase">{unit}</span>}
       </div>
-      <p className="text-[10px] text-slate-700 dark:text-slate-300 font-black uppercase tracking-wide opacity-80 truncate">{subtext}</p>
+      <p className="text-[8px] md:text-[10px] text-slate-700 dark:text-slate-300 font-black uppercase tracking-wide opacity-80 truncate">{subtext}</p>
     </div>
   </div>
 );
