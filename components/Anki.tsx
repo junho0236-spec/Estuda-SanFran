@@ -193,8 +193,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   // AI State
   const [aiSourceText, setAiSourceText] = useState(initialText || '');
   const [aiQuantity, setAiQuantity] = useState(5);
-  const [aiFrontLength, setAiFrontLength] = useState<'Curto' | 'Normal' | 'Extenso'>('Normal');
-  const [aiBackLength, setAiBackLength] = useState<'Curto' | 'Normal' | 'Extenso'>('Normal');
+  const [aiFrontLength, setAiFrontLength] = useState<'curta' | 'normal' | 'extensa'>('normal');
+  const [aiBackLength, setAiBackLength] = useState<'curta' | 'normal' | 'extensa'>('normal');
   const [aiCardType, setAiCardType] = useState('Geral');
   const [aiCustomInstructions, setAiCustomInstructions] = useState('');
   const [aiGeneratedCardsPreview, setAiGeneratedCardsPreview] = useState<any[]>([]);
@@ -714,12 +714,12 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         aiFormat,
         aiSourceType,
         aiIncludeMnemonics,
-        aiFrontLength,
-        aiBackLength,
         (partialCards) => {
           // Atualiza o preview conforme os cards chegam
           setAiGeneratedCardsPreview(partialCards);
-        }
+        },
+        aiFrontLength,
+        aiBackLength
       );
 
     } catch (err: any) {
@@ -2330,7 +2330,53 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                    </div>
 
                    <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Foco dos Cards</label>
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Comprimento da Pergunta</label>
+                       <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { id: 'curta', label: 'Curta' },
+                            { id: 'normal', label: 'Normal' },
+                            { id: 'extensa', label: 'Extensa' }
+                          ].map(len => (
+                            <button
+                              key={len.id}
+                              onClick={() => setAiFrontLength(len.id as any)}
+                              className={`py-2 px-1 rounded-xl text-[10px] font-black uppercase border-2 transition-all ${
+                                aiFrontLength === len.id 
+                                  ? 'border-purple-500 bg-purple-500 text-white' 
+                                  : 'border-slate-200 text-slate-400 hover:border-purple-200'
+                              }`}
+                            >
+                              {len.label}
+                            </button>
+                          ))}
+                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Comprimento da Resposta</label>
+                       <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { id: 'curta', label: 'Curta' },
+                            { id: 'normal', label: 'Normal' },
+                            { id: 'extensa', label: 'Extensa' }
+                          ].map(len => (
+                            <button
+                              key={len.id}
+                              onClick={() => setAiBackLength(len.id as any)}
+                              className={`py-2 px-1 rounded-xl text-[10px] font-black uppercase border-2 transition-all ${
+                                aiBackLength === len.id 
+                                  ? 'border-purple-500 bg-purple-500 text-white' 
+                                  : 'border-slate-200 text-slate-400 hover:border-purple-200'
+                              }`}
+                            >
+                              {len.label}
+                            </button>
+                          ))}
+                       </div>
+                    </div>
+
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Foco dos Cards</label>
                       <div className="grid grid-cols-2 gap-2">
                          {[
                            { id: 'Geral', label: 'Geral' },

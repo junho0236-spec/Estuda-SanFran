@@ -61,8 +61,8 @@ const buildFlashcardPromptParts = (
   format: string,
   sourceType: string,
   includeMnemonics: boolean,
-  frontLength: 'Curto' | 'Normal' | 'Extenso' = 'Normal',
-  backLength: 'Curto' | 'Normal' | 'Extenso' = 'Normal'
+  frontLength: 'curta' | 'normal' | 'extensa' = 'normal',
+  backLength: 'curta' | 'normal' | 'extensa' = 'normal'
 ) => {
   let typeInstruction = '';
   switch (cardType) {
@@ -115,10 +115,8 @@ const buildFlashcardPromptParts = (
     : '';
 
   const lengthInstruction = `
-    - Comprimento da Pergunta (Front): ${frontLength}. 
-      ${frontLength === 'Curto' ? 'Seja extremamente direto, use poucas palavras.' : frontLength === 'Extenso' ? 'Pode ser detalhado, contextualizado ou um caso prático longo.' : 'Equilibrado e claro.'}
-    - Comprimento da Resposta (Back): ${backLength}.
-      ${backLength === 'Curto' ? 'Respostas diretas, "papo reto", sem enrolação.' : backLength === 'Extenso' ? 'Explicações profundas, detalhadas, com citações e exemplos.' : 'Didático e objetivo.'}
+    - Comprimento da Pergunta (front): ${frontLength === 'curta' ? 'Extremamente curta e direta (estilo flashcard atômico).' : frontLength === 'extensa' ? 'Extensa e detalhada (estilo caso prático ou enunciado longo).' : 'Tamanho normal e equilibrado.'}
+    - Comprimento da Resposta (back): ${backLength === 'curta' ? 'Extremamente curta, focada apenas no termo ou conceito essencial.' : backLength === 'extensa' ? 'Extensa, detalhada, com explicações completas e fundamentação.' : 'Tamanho normal, didática e objetiva.'}
   `;
 
   const parts: any[] = [];
@@ -143,11 +141,11 @@ const buildFlashcardPromptParts = (
     Diretriz de Foco (${cardType}):
     ${typeInstruction}
 
-    Diretriz de Extensão:
-    ${lengthInstruction}
-
     Mnemônicos:
     ${mnemonicInstruction}
+    
+    Diretrizes de Comprimento:
+    ${lengthInstruction}
     
     Instruções Adicionais do Usuário:
     ${customInstructions ? customInstructions : 'Nenhuma instrução adicional.'}
@@ -203,8 +201,8 @@ export const generateFlashcards = async (
   format: string = 'Básico',
   sourceType: string = 'Geral',
   includeMnemonics: boolean = false,
-  frontLength: 'Curto' | 'Normal' | 'Extenso' = 'Normal',
-  backLength: 'Curto' | 'Normal' | 'Extenso' = 'Normal'
+  frontLength: 'curta' | 'normal' | 'extensa' = 'normal',
+  backLength: 'curta' | 'normal' | 'extensa' = 'normal'
 ) => {
   try {
     // Lógica de Cache
@@ -348,9 +346,9 @@ export const generateFlashcardsStream = async (
   format: string = 'Básico',
   sourceType: string = 'Geral',
   includeMnemonics: boolean = false,
-  frontLength: 'Curto' | 'Normal' | 'Extenso' = 'Normal',
-  backLength: 'Curto' | 'Normal' | 'Extenso' = 'Normal',
-  onChunk: (cards: any[]) => void
+  onChunk: (cards: any[]) => void,
+  frontLength: 'curta' | 'normal' | 'extensa' = 'normal',
+  backLength: 'curta' | 'normal' | 'extensa' = 'normal'
 ) => {
   try {
     // Lógica de Cache
@@ -445,13 +443,6 @@ export const generateFlashcardsStream = async (
 
       // Salva no cache para uso futuro
       try {
-        const cacheKey = await generateHash(JSON.stringify({
-          text, subjectName, quantity, cardType, customInstructions, 
-          urls, difficulty, format, sourceType, includeMnemonics,
-          frontLength, backLength,
-          fileCount: files.length
-        }));
-        
         await supabase.from('flashcard_cache').upsert({
           hash: cacheKey,
           cards: finalParsed,
