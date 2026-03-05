@@ -99,30 +99,45 @@ export const dataService = {
 
   // FLASHCARDS
   async saveFlashcard(card: any, userId: string, isOnline: boolean) {
+    // 1. Salva localmente primeiro (IndexedDB)
     await db.flashcards.put(card);
 
     if (isOnline) {
+      // 2. Prepara o payload EXATO que o banco espera (snake_case)
       const payload = {
-        ...card,
+        id: card.id,
         user_id: userId,
         subject_id: card.subjectId || null,
         folder_id: card.folderId || null,
-        next_review: card.nextReview
+        front: card.front,
+        back: card.back,
+        notes: card.notes || null,
+        image: card.image || null,
+        next_review: card.nextReview ? Math.floor(card.nextReview) : Date.now(),
+        interval: card.interval || 0,
+        archived_at: card.archived_at || null,
+        tags: card.tags || [],
+        source: card.source || null,
+        is_suspended: card.is_suspended || false
       };
-      delete payload.subjectId;
-      delete payload.folderId;
-      delete payload.nextReview;
 
-      console.log("Saving flashcard to Supabase:", payload);
-      const { error } = await supabase.from('flashcards').upsert(payload);
+      console.log("Tentando Upsert no Supabase:", payload);
+      
+      const { data, error } = await supabase
+        .from('flashcards')
+        .upsert(payload, { onConflict: 'id' })
+        .select();
+
       if (error) {
-        console.error("Error saving flashcard to Supabase:", error);
+        console.error("ERRO CRÍTICO NO SUPABASE:", error);
+        // Se falhar, adiciona na fila de sincronização para tentar depois
         await addToSyncQueue({ table: 'flashcards', action: 'update', data: card });
+        throw new Error(`Erro ao salvar no nuvem: ${error.message}`);
       } else {
-        console.log("Flashcard saved to Supabase successfully");
+        console.log("Sucesso ao salvar no Supabase:", data);
       }
     } else {
-      console.log("Offline: Flashcard added to sync queue");
+      console.log("Modo Offline: Card agendado para sincronização.");
       await addToSyncQueue({ table: 'flashcards', action: 'update', data: card });
     }
   },
