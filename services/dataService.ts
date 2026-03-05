@@ -5,24 +5,17 @@ import { Flashcard, Task, StudySession, Note, SubjectFile } from '../types';
 export const dataService = {
   // FILES
   async saveFile(file: SubjectFile, userId: string, isOnline: boolean) {
-    try {
-      await db.subject_files.put(file);
-      if (isOnline) {
-        const { error } = await supabase.from('subject_files').upsert({
-          ...file,
-          user_id: userId,
-          subject_id: file.subject_id
-        });
-        if (error) {
-          console.error("Error saving file to Supabase:", error);
-          await addToSyncQueue({ table: 'subject_files', action: 'update', data: file });
-        }
-      } else {
+    await db.subject_files.put(file);
+    if (isOnline) {
+      const { error } = await supabase.from('subject_files').upsert({
+        ...file,
+        user_id: userId
+      });
+      if (error) {
         await addToSyncQueue({ table: 'subject_files', action: 'update', data: file });
       }
-    } catch (err) {
-      console.error("Error in saveFile:", err);
-      throw err;
+    } else {
+      await addToSyncQueue({ table: 'subject_files', action: 'update', data: file });
     }
   },
 
@@ -33,9 +26,8 @@ export const dataService = {
         const { data, error } = await supabase.from('subject_files').select('*').eq('subject_id', subjectId).eq('user_id', userId);
         if (error) throw error;
         if (data) {
-          const remoteFiles = data as SubjectFile[];
-          await db.subject_files.bulkPut(remoteFiles);
-          return remoteFiles;
+          await db.subject_files.bulkPut(data as SubjectFile[]);
+          return data as SubjectFile[];
         }
       } catch (err) {
         console.error("Error fetching files:", err);
@@ -57,38 +49,13 @@ export const dataService = {
   },
 
   async uploadFile(file: File, path: string): Promise<string> {
-    // Sanitize path: remove special characters but keep slashes and dots
-    const sanitizedPath = path.split('/').map(part => part.replace(/[^\w.-]/g, '_')).join('/');
-    
-    try {
-      const { data, error } = await supabase.storage.from('subject_files').upload(sanitizedPath, file, {
-        cacheControl: '3600',
-        upsert: true
-      });
-
-      if (error) {
-        console.error("Supabase Storage Upload Error:", error);
-        if (error.message.includes('Bucket not found')) {
-          throw new Error("O bucket 'subject_files' não foi encontrado no Supabase Storage. Certifique-se de que ele foi criado e está configurado como público.");
-        }
-        throw error;
-      }
-
-      if (!data || !data.path) {
-        throw new Error("O upload foi concluído mas o Supabase não retornou o caminho do arquivo.");
-      }
-
-      const { data: { publicUrl } } = supabase.storage.from('subject_files').getPublicUrl(data.path);
-      
-      if (!publicUrl) {
-        throw new Error("Não foi possível gerar a URL pública para o arquivo enviado.");
-      }
-
-      return publicUrl;
-    } catch (err: any) {
-      console.error("Error in uploadFile:", err);
-      throw err;
+    const { data, error } = await supabase.storage.from('subject-files').upload(path, file);
+    if (error) {
+      console.error("Upload error:", error);
+      throw error;
     }
+    const { data: { publicUrl } } = supabase.storage.from('subject-files').getPublicUrl(data.path);
+    return publicUrl;
   },
   // TASKS
   async saveTask(task: any, userId: string, isOnline: boolean) {
@@ -96,11 +63,18 @@ export const dataService = {
     await db.tasks.put(task);
 
     if (isOnline) {
-      const { error } = await supabase.from('tasks').upsert({
+      const payload = {
         ...task,
         user_id: userId,
-        subject_id: task.subjectId || null
-      });
+        subject_id: task.subjectId || null,
+        due_date: task.dueDate || null,
+        completed_at: task.completedAt || null
+      };
+      delete payload.subjectId;
+      delete payload.dueDate;
+      delete payload.completedAt;
+
+      const { error } = await supabase.from('tasks').upsert(payload);
       if (error) {
         console.error("Error syncing task to cloud, adding to queue", error);
         await addToSyncQueue({ table: 'tasks', action: 'update', data: task });
@@ -128,14 +102,20 @@ export const dataService = {
     await db.flashcards.put(card);
 
     if (isOnline) {
-      const { error } = await supabase.from('flashcards').upsert({
+      const payload = {
         ...card,
         user_id: userId,
         subject_id: card.subjectId || null,
         folder_id: card.folderId || null,
         next_review: card.nextReview
-      });
+      };
+      delete payload.subjectId;
+      delete payload.folderId;
+      delete payload.nextReview;
+
+      const { error } = await supabase.from('flashcards').upsert(payload);
       if (error) {
+        console.error("Error saving flashcard to Supabase:", error);
         await addToSyncQueue({ table: 'flashcards', action: 'update', data: card });
       }
     } else {
@@ -266,7 +246,11 @@ export const dataService = {
           // Map camelCase to snake_case for Supabase if needed
           if (item.table === 'tasks') {
              payload.subject_id = payload.subjectId || null;
+             payload.due_date = payload.dueDate || null;
+             payload.completed_at = payload.completedAt || null;
              delete payload.subjectId;
+             delete payload.dueDate;
+             delete payload.completedAt;
           }
           if (item.table === 'flashcards') {
              payload.subject_id = payload.subjectId || null;

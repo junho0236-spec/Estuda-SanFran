@@ -857,8 +857,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setManualBack(''); 
       setManualNotes('');
       setManualImage(null);
-    } catch (err) { 
-      alert("Erro ao protocolar card."); 
+    } catch (err: any) { 
+      console.error("Erro ao criar flashcard:", err);
+      alert(`Erro ao protocolar card: ${err.message || "Tente novamente."}`); 
     }
   };
 
@@ -868,8 +869,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       await dataService.saveFlashcard(editingCard, userId, isOnline);
       setFlashcards(prev => prev.map(f => f.id === editingCard.id ? editingCard : f));
       setEditingCard(null);
-    } catch (err) {
-      alert("Erro ao salvar alterações.");
+    } catch (err: any) {
+      console.error("Erro ao editar flashcard:", err);
+      alert(`Erro ao salvar alterações: ${err.message || "Tente novamente."}`);
     }
   };
 
