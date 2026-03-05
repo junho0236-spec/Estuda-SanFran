@@ -113,12 +113,16 @@ export const dataService = {
       delete payload.folderId;
       delete payload.nextReview;
 
+      console.log("Saving flashcard to Supabase:", payload);
       const { error } = await supabase.from('flashcards').upsert(payload);
       if (error) {
         console.error("Error saving flashcard to Supabase:", error);
         await addToSyncQueue({ table: 'flashcards', action: 'update', data: card });
+      } else {
+        console.log("Flashcard saved to Supabase successfully");
       }
     } else {
+      console.log("Offline: Flashcard added to sync queue");
       await addToSyncQueue({ table: 'flashcards', action: 'update', data: card });
     }
   },

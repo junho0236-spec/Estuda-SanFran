@@ -767,8 +767,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         notes: c.notes || '',
         tags: c.tags || [],
         source: c.source || '',
-        subjectId: selectedSubjectId,
-        folderId: currentFolderId,
+        subjectId: selectedSubjectId || null,
+        folderId: currentFolderId || null,
         nextReview: Date.now(),
         interval: 0,
         archived_at: null
@@ -843,8 +843,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         back: manualBack, 
         notes: manualNotes,
         image: manualImage || undefined,
-        subjectId: selectedSubjectId, 
-        folderId: currentFolderId, 
+        subjectId: selectedSubjectId || null, 
+        folderId: currentFolderId || null, 
         nextReview: Date.now(), 
         interval: 0,
         archived_at: null

@@ -427,17 +427,20 @@ const App: React.FC = () => {
     
     try {
       if (isOnline) {
-        const [resSubs, resFlds, resCards, resTks, resSessions, resReadings, resProgress] = await Promise.all([
-          supabase.from('subjects').select('*').eq('user_id', userId),
+        // Fetch subjects first as they are often dependencies
+        const { data: subs } = await supabase.from('subjects').select('*').eq('user_id', userId);
+        if (subs) setSubjects(subs);
+
+        // Fetch others in parallel but handle them individually to avoid one failure crashing everything
+        const [resFlds, resCards, resTks, resSessions, resReadings, resProgress] = await Promise.all([
           supabase.from('folders').select('*').eq('user_id', userId),
           supabase.from('flashcards').select('*').eq('user_id', userId).is('archived_at', null),
           supabase.from('tasks').select('*').eq('user_id', userId).is('archived_at', null).order('created_at', { ascending: false }),
           supabase.from('study_sessions').select('*').eq('user_id', userId).order('start_time', { ascending: false }),
           supabase.from('readings').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-          supabase.from('user_progress').select('correct_count').eq('user_id', userId).single()
+          supabase.from('user_progress').select('correct_count').eq('user_id', userId).maybeSingle()
         ]);
 
-        if (resSubs.data) setSubjects(resSubs.data);
         if (resFlds.data) setFolders(resFlds.data.map(f => ({ id: f.id, name: f.name, parentId: f.parent_id })));
         if (resProgress.data) setCorrectQuestionsCount(resProgress.data.correct_count || 0);
         
@@ -446,18 +449,21 @@ const App: React.FC = () => {
             id: c.id, 
             front: c.front, 
             back: c.back, 
-            notes: c.notes,
-            image: c.image,
-            tags: c.tags,
-            source: c.source,
-            subjectId: c.subject_id, 
-            folderId: c.folder_id, 
-            nextReview: c.next_review, 
-            interval: c.interval, 
-            archived_at: c.archived_at
+            notes: c.notes || '',
+            image: c.image || null,
+            tags: c.tags || [],
+            source: c.source || '',
+            subjectId: c.subject_id || '', 
+            folderId: c.folder_id || null, 
+            nextReview: Number(c.next_review) || Date.now(), 
+            interval: c.interval || 0, 
+            archived_at: c.archived_at || null
           }));
+          console.log(`Loaded ${formattedCards.length} flashcards from Supabase`);
           setFlashcards(formattedCards);
           await db.flashcards.bulkPut(formattedCards);
+        } else {
+          console.log("No flashcards found in Supabase for this user");
         }
 
         if (resTks.data) {
@@ -476,7 +482,6 @@ const App: React.FC = () => {
 
         if (resReadings.data) setReadings(resReadings.data);
       } else {
-        // Offline mode: Load from local DB
         const [localCards, localTasks, localSessions] = await Promise.all([
           db.flashcards.toArray(),
           db.tasks.toArray(),
@@ -488,7 +493,6 @@ const App: React.FC = () => {
       }
     } catch (err) {
       console.error("Erro no carregamento dos dados:", err);
-      // Fallback to local DB
       const [localCards, localTasks, localSessions] = await Promise.all([
         db.flashcards.toArray(),
         db.tasks.toArray(),
