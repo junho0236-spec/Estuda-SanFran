@@ -167,7 +167,7 @@ const BrasiliaClock: React.FC = () => {
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>(View.Dashboard);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -192,7 +192,6 @@ const App: React.FC = () => {
   const [studySessions, setStudySessions] = useState<StudySession[]>([]);
   const [correctQuestionsCount, setCorrectQuestionsCount] = useState(0);
   const [selectedSubjectIdForNotes, setSelectedSubjectIdForNotes] = useState<string | null>(null);
-  const [initialNoteTab, setInitialNoteTab] = useState<'notes' | 'repository' | 'assignments'>('notes');
   const [ankiTextToGenerate, setAnkiTextToGenerate] = useState<string | null>(null);
 
   // --- Timer Global State (Pomodoro) ---
@@ -444,7 +443,18 @@ const App: React.FC = () => {
         
         if (resCards.data) {
           const formattedCards = resCards.data.map(c => ({
-            id: c.id, front: c.front, back: c.back, subjectId: c.subject_id, folderId: c.folder_id, nextReview: c.next_review, interval: c.interval, archived_at: c.archived_at
+            id: c.id, 
+            front: c.front, 
+            back: c.back, 
+            notes: c.notes,
+            image: c.image,
+            tags: c.tags,
+            source: c.source,
+            subjectId: c.subject_id, 
+            folderId: c.folder_id, 
+            nextReview: c.next_review, 
+            interval: c.interval, 
+            archived_at: c.archived_at
           }));
           setFlashcards(formattedCards);
           await db.flashcards.bulkPut(formattedCards);
@@ -585,7 +595,7 @@ const App: React.FC = () => {
 
   return (
     <div className={`flex h-screen overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#fcfcfc]'}`}>
-      <Atmosphere isExtremeFocus={isExtremeFocus} isSidebarOpen={isSidebarOpen} />
+      <Atmosphere isExtremeFocus={isExtremeFocus} />
       
       <Suspense fallback={null}>
         <GlobalSearch 
@@ -627,11 +637,7 @@ const App: React.FC = () => {
         />
       )}
 
-      <aside className={`
-        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
-        ${(isExtremeFocus || !isSidebarOpen) ? 'lg:w-0' : 'lg:w-72'} 
-        fixed lg:relative inset-y-0 left-0 z-40 bg-white dark:bg-[#0d0303] border-r border-slate-200 dark:border-sanfran-rubi/30 transition-all duration-500 flex flex-col shadow-2xl lg:shadow-none overflow-hidden
-      `}>
+      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${isExtremeFocus ? '-translate-x-full lg:-translate-x-full lg:w-0' : 'lg:relative lg:translate-x-0 lg:w-72'} fixed inset-y-0 left-0 z-40 bg-white dark:bg-[#0d0303] border-r border-slate-200 dark:border-sanfran-rubi/30 transition-all duration-700 flex flex-col shadow-2xl lg:shadow-none`}>
         <div className="p-6 border-b border-slate-100 dark:border-sanfran-rubi/20 flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <button
@@ -658,7 +664,7 @@ const App: React.FC = () => {
                 </div>
               </div>
             </button>
-            <button onClick={closeSidebar} className="p-2 text-slate-400 hover:text-sanfran-rubi transition-colors self-start">
+            <button onClick={closeSidebar} className="lg:hidden p-2 text-slate-400 hover:text-sanfran-rubi transition-colors self-start">
               <X className="w-6 h-6" />
             </button>
           </div>
@@ -738,7 +744,7 @@ const App: React.FC = () => {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0 relative">
-        <header className={`${isExtremeFocus ? 'hidden' : (isSidebarOpen ? 'lg:hidden' : 'flex')} bg-white dark:bg-[#0d0303] border-b border-slate-200 dark:border-sanfran-rubi/30 p-4 flex items-center justify-between sticky top-0 z-20`}>
+        <header className={`${isExtremeFocus ? 'hidden' : 'lg:hidden'} bg-white dark:bg-[#0d0303] border-b border-slate-200 dark:border-sanfran-rubi/30 p-4 flex items-center justify-between sticky top-0 z-20`}>
           <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-slate-100 dark:bg-sanfran-rubi/10 rounded-xl text-slate-600 dark:text-white">
             <Menu className="w-6 h-6" />
           </button>
@@ -749,7 +755,7 @@ const App: React.FC = () => {
           <div className="w-10"></div>
         </header>
 
-        <main className={`flex-1 overflow-y-auto ${isExtremeFocus ? 'p-0' : 'p-4 md:p-8 lg:p-10'} relative transition-all duration-500`}>
+        <main className={`flex-1 overflow-y-auto ${isExtremeFocus ? 'p-0' : 'p-4 md:p-10'} relative transition-all duration-700`}>
           {/* Offline Indicator */}
           {!isOnline && (
             <div className="fixed top-4 right-4 z-50 bg-amber-500 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2 animate-bounce">
@@ -763,7 +769,7 @@ const App: React.FC = () => {
               <span className="text-[10px] font-black uppercase tracking-widest">Sincronizando...</span>
             </div>
           )}
-          <div className={`${isExtremeFocus ? 'max-w-none min-h-full flex items-center justify-center' : 'max-w-6xl mx-auto min-h-full'}`}>
+          <div className={`${isExtremeFocus ? 'max-w-none h-full flex items-center justify-center' : 'max-w-6xl mx-auto h-full'}`}>
              <Suspense fallback={<PageLoader />}>
                 {currentView === View.Dashboard && (
                   <Dashboard 
@@ -801,7 +807,6 @@ const App: React.FC = () => {
                     subjectId={selectedSubjectIdForNotes} 
                     userId={session.user.id} 
                     isOnline={isOnline} 
-                    initialTab={initialNoteTab}
                     onBack={() => setCurrentView(View.Subjects)} 
                     onNavigateToAnki={(text) => {
                       setAnkiTextToGenerate(text);
@@ -935,17 +940,6 @@ const App: React.FC = () => {
                     userId={session.user.id} 
                     onViewNotes={(subjectId) => {
                       setSelectedSubjectIdForNotes(subjectId);
-                      setInitialNoteTab('notes');
-                      setCurrentView(View.NoteView);
-                    }}
-                    onViewRepository={(subjectId) => {
-                      setSelectedSubjectIdForNotes(subjectId);
-                      setInitialNoteTab('repository');
-                      setCurrentView(View.NoteView);
-                    }}
-                    onViewAssignments={(subjectId) => {
-                      setSelectedSubjectIdForNotes(subjectId);
-                      setInitialNoteTab('assignments');
                       setCurrentView(View.NoteView);
                     }}
                     tasks={tasks}
