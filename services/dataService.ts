@@ -112,7 +112,6 @@ export const dataService = {
         front: card.front,
         back: card.back,
         notes: card.notes || null,
-        image: card.image || null,
         next_review: card.nextReview ? Math.floor(card.nextReview) : Date.now(),
         interval: card.interval || 0,
         archived_at: card.archived_at || null,
