@@ -1429,18 +1429,41 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       </div>
     )}
 
-      {/* {showFolderInput && (
-        <div className="flex gap-2 animate-in slide-in-from-top-4">
-           <input 
-            value={newFolderName} 
-            onChange={(e) => setNewFolderName(e.target.value)} 
-            placeholder="Nome da nova pasta..." 
-            className="flex-1 p-4 bg-white dark:bg-black/40 border-2 border-slate-200 rounded-2xl font-bold outline-none"
-           />
-           <button onClick={handleCreateFolder} className="p-4 bg-sanfran-rubi text-white rounded-2xl font-black"><Check className="w-6 h-6" /></button>
-           <button onClick={() => setShowFolderInput(false)} className="p-4 bg-slate-200 text-slate-500 rounded-2xl font-black"><X className="w-6 h-6" /></button>
+      {showFolderInput && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md p-8 rounded-[2.5rem] shadow-2xl border-2 border-slate-200 dark:border-white/10 animate-in zoom-in-95 duration-300">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-black uppercase tracking-tighter text-slate-900 dark:text-white">Nova Pasta</h3>
+              <button onClick={() => setShowFolderInput(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
+                <X className="w-6 h-6 text-slate-400" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nome da Pasta</label>
+                <input 
+                  autoFocus
+                  value={newFolderName} 
+                  onChange={(e) => setNewFolderName(e.target.value)} 
+                  placeholder="Ex: Direito Civil, OAB 2024..." 
+                  className="w-full p-4 bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-white/10 rounded-2xl font-bold outline-none focus:border-sanfran-rubi transition-colors"
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder()}
+                />
+              </div>
+              
+              <button 
+                onClick={handleCreateFolder}
+                disabled={!newFolderName.trim()}
+                className="w-full py-4 bg-sanfran-rubi text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-sanfran-rubi/20 hover:bg-sanfran-rubiDark transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <Check className="w-5 h-5" />
+                Criar Pasta
+              </button>
+            </div>
+          </div>
         </div>
-      )} */}
+      )}
 
       {mode === 'community' && (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
