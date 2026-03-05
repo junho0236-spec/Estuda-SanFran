@@ -193,6 +193,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   // AI State
   const [aiSourceText, setAiSourceText] = useState(initialText || '');
   const [aiQuantity, setAiQuantity] = useState(5);
+  const [aiFrontLength, setAiFrontLength] = useState<'Curto' | 'Normal' | 'Extenso'>('Normal');
+  const [aiBackLength, setAiBackLength] = useState<'Curto' | 'Normal' | 'Extenso'>('Normal');
   const [aiCardType, setAiCardType] = useState('Geral');
   const [aiCustomInstructions, setAiCustomInstructions] = useState('');
   const [aiGeneratedCardsPreview, setAiGeneratedCardsPreview] = useState<any[]>([]);
@@ -712,6 +714,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         aiFormat,
         aiSourceType,
         aiIncludeMnemonics,
+        aiFrontLength,
+        aiBackLength,
         (partialCards) => {
           // Atualiza o preview conforme os cards chegam
           setAiGeneratedCardsPreview(partialCards);
@@ -2355,7 +2359,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                       <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Quantidade de Cards</label>
                       <div className="flex items-center gap-4 bg-slate-50 dark:bg-black/50 p-4 rounded-2xl border-2 border-slate-200">
                          <input 
-                           type="range" min="1" max="15" 
+                           type="range" min="1" max="30" 
                            value={aiQuantity} 
                            onChange={(e) => setAiQuantity(Number(e.target.value))} 
                            className="flex-1 accent-purple-500" 

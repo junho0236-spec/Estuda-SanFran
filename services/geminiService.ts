@@ -60,7 +60,9 @@ const buildFlashcardPromptParts = (
   difficulty: string,
   format: string,
   sourceType: string,
-  includeMnemonics: boolean
+  includeMnemonics: boolean,
+  frontLength: 'Curto' | 'Normal' | 'Extenso' = 'Normal',
+  backLength: 'Curto' | 'Normal' | 'Extenso' = 'Normal'
 ) => {
   let typeInstruction = '';
   switch (cardType) {
@@ -112,6 +114,13 @@ const buildFlashcardPromptParts = (
     ? 'Sempre que houver uma lista de requisitos, princípios ou elementos, tente criar um mnemônico criativo (sigla ou frase) e inclua-o no final da resposta (back).'
     : '';
 
+  const lengthInstruction = `
+    - Comprimento da Pergunta (Front): ${frontLength}. 
+      ${frontLength === 'Curto' ? 'Seja extremamente direto, use poucas palavras.' : frontLength === 'Extenso' ? 'Pode ser detalhado, contextualizado ou um caso prático longo.' : 'Equilibrado e claro.'}
+    - Comprimento da Resposta (Back): ${backLength}.
+      ${backLength === 'Curto' ? 'Respostas diretas, "papo reto", sem enrolação.' : backLength === 'Extenso' ? 'Explicações profundas, detalhadas, com citações e exemplos.' : 'Didático e objetivo.'}
+  `;
+
   const parts: any[] = [];
   
   // Adiciona o prompt principal
@@ -133,6 +142,9 @@ const buildFlashcardPromptParts = (
     
     Diretriz de Foco (${cardType}):
     ${typeInstruction}
+
+    Diretriz de Extensão:
+    ${lengthInstruction}
 
     Mnemônicos:
     ${mnemonicInstruction}
@@ -190,13 +202,16 @@ export const generateFlashcards = async (
   difficulty: string = 'Graduação',
   format: string = 'Básico',
   sourceType: string = 'Geral',
-  includeMnemonics: boolean = false
+  includeMnemonics: boolean = false,
+  frontLength: 'Curto' | 'Normal' | 'Extenso' = 'Normal',
+  backLength: 'Curto' | 'Normal' | 'Extenso' = 'Normal'
 ) => {
   try {
     // Lógica de Cache
     const cacheKey = await generateHash(JSON.stringify({
       text, subjectName, quantity, cardType, customInstructions, 
       urls, difficulty, format, sourceType, includeMnemonics,
+      frontLength, backLength,
       fileCount: files.length
     }));
 
@@ -225,7 +240,8 @@ export const generateFlashcards = async (
 
     const { parts, tools } = buildFlashcardPromptParts(
       text, subjectName, quantity, cardType, customInstructions,
-      files, urls, difficulty, format, sourceType, includeMnemonics
+      files, urls, difficulty, format, sourceType, includeMnemonics,
+      frontLength, backLength
     );
 
     const response = await ai.models.generateContent({
@@ -280,6 +296,7 @@ export const generateFlashcards = async (
           const cacheKey = await generateHash(JSON.stringify({
             text, subjectName, quantity, cardType, customInstructions, 
             urls, difficulty, format, sourceType, includeMnemonics,
+            frontLength, backLength,
             fileCount: files.length
           }));
           
@@ -331,6 +348,8 @@ export const generateFlashcardsStream = async (
   format: string = 'Básico',
   sourceType: string = 'Geral',
   includeMnemonics: boolean = false,
+  frontLength: 'Curto' | 'Normal' | 'Extenso' = 'Normal',
+  backLength: 'Curto' | 'Normal' | 'Extenso' = 'Normal',
   onChunk: (cards: any[]) => void
 ) => {
   try {
@@ -338,6 +357,7 @@ export const generateFlashcardsStream = async (
     const cacheKey = await generateHash(JSON.stringify({
       text, subjectName, quantity, cardType, customInstructions, 
       urls, difficulty, format, sourceType, includeMnemonics,
+      frontLength, backLength,
       fileCount: files.length
     }));
 
@@ -366,7 +386,8 @@ export const generateFlashcardsStream = async (
 
     const { parts, tools } = buildFlashcardPromptParts(
       text, subjectName, quantity, cardType, customInstructions,
-      files, urls, difficulty, format, sourceType, includeMnemonics
+      files, urls, difficulty, format, sourceType, includeMnemonics,
+      frontLength, backLength
     );
 
     const responseStream = await ai.models.generateContentStream({
@@ -424,6 +445,13 @@ export const generateFlashcardsStream = async (
 
       // Salva no cache para uso futuro
       try {
+        const cacheKey = await generateHash(JSON.stringify({
+          text, subjectName, quantity, cardType, customInstructions, 
+          urls, difficulty, format, sourceType, includeMnemonics,
+          frontLength, backLength,
+          fileCount: files.length
+        }));
+        
         await supabase.from('flashcard_cache').upsert({
           hash: cacheKey,
           cards: finalParsed,
