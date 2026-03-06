@@ -450,7 +450,6 @@ const App: React.FC = () => {
             front: c.front, 
             back: c.back, 
             notes: c.notes || '',
-            image: c.image || null,
             tags: c.tags || [],
             source: c.source || '',
             subjectId: c.subject_id || '', 
