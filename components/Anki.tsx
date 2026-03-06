@@ -1805,7 +1805,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
             const hasUpdate = folder.original_deck_id && publicDecks.some(pd => pd.id === folder.original_deck_id && (pd.version || 1) > (folder.version || 1));
             
             return (
-              <div key={folder.id} onClick={() => setCurrentFolderId(folder.id)} className={`group bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2rem] border-2 border-slate-200 dark:border-sanfran-rubi/40 shadow-xl cursor-pointer hover:border-usp-gold border-l-[10px] ${folder.color || 'border-l-usp-gold'} transition-all relative`}>
+              <div key={folder.id} onClick={() => setCurrentFolderId(folder.id)} className={`group bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2rem] border-2 border-slate-200 dark:border-sanfran-rubi/40 shadow-xl cursor-pointer hover:shadow-2xl hover:-translate-y-1 border-l-[10px] ${folder.color || 'border-l-usp-gold'} transition-all relative`}>
                 {hasUpdate && (
                   <div className="absolute -top-3 -right-3 z-20 animate-bounce">
                     <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 text-white rounded-full shadow-lg border-2 border-white dark:border-slate-900">

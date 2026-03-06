@@ -441,7 +441,12 @@ const App: React.FC = () => {
           supabase.from('user_progress').select('correct_count').eq('user_id', userId).maybeSingle()
         ]);
 
-        if (resFlds.data) setFolders(resFlds.data.map(f => ({ id: f.id, name: f.name, parentId: f.parent_id })));
+        if (resFlds.data) setFolders(resFlds.data.map(f => ({ 
+          id: f.id, 
+          name: f.name, 
+          parentId: f.parent_id,
+          color: f.color 
+        })));
         if (resProgress.data) setCorrectQuestionsCount(resProgress.data.correct_count || 0);
         
         if (resCards.data) {
