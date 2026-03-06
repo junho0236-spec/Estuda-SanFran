@@ -56,7 +56,7 @@ import {
   Smartphone
 } from 'lucide-react';
 import JSZip from 'jszip';
-import { Flashcard, Subject, Folder, DeckRequest } from '../types';
+import { Flashcard, Subject, Folder, DeckRequest, StudySession } from '../types';
 import { supabase } from '../services/supabaseClient';
 import { dataService } from '../services/dataService';
 import { updateQuestProgress } from '../services/questService';
@@ -73,6 +73,7 @@ interface AnkiProps {
   isOnline: boolean;
   initialText: string | null;
   setInitialText: React.Dispatch<React.SetStateAction<string | null>>;
+  setStudySessions?: React.Dispatch<React.SetStateAction<any[]>>;
 }
 
 const FOLDER_COLORS = [
@@ -88,7 +89,7 @@ const FOLDER_COLORS = [
   { name: 'Indigo', border: 'border-l-indigo-500', text: 'text-indigo-500', bg: 'bg-indigo-500' },
 ];
 
-const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folders, setFolders, userId, isOnline, initialText, setInitialText }) => {
+const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folders, setFolders, userId, isOnline, initialText, setInitialText, setStudySessions }) => {
   const location = useLocation();
   const { state } = location;
 
@@ -184,8 +185,31 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [mode, isFlipped, isDissertativeMode, isCramMode]);
 
-  const handleNextCram = () => {
+  const handleNextCram = async () => {
     if (!currentCard) return;
+    
+    // RECORD STUDY SESSION FOR CONSTANCY
+    const sessionData: StudySession = {
+      id: Math.random().toString(36).substr(2, 9),
+      user_id: userId,
+      start_time: new Date().toISOString(),
+      duration: cardTimer,
+      subject_id: currentCard.subjectId
+    };
+    await dataService.saveStudySession(sessionData, userId, isOnline);
+    
+    // Update global study sessions state if provided
+    if (setStudySessions) {
+      setStudySessions(prev => [sessionData, ...prev]);
+    }
+
+    // Update local study history state for immediate feedback
+    const today = new Date().toISOString().split('T')[0];
+    setStudyHistory(prev => ({
+      ...prev,
+      [today]: (prev[today] || 0) + 1
+    }));
+
     setUserWrittenAnswer('');
     setAiEvaluation(null);
     setIsDissertativeMode(false);
@@ -413,36 +437,48 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
   const deleteFolder = async (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    if (!confirm("Deseja eliminar esta pasta? Todos os flashcards dentro dela TAMBÉM serão excluídos permanentemente.")) return;
+    if (!confirm("Deseja eliminar esta pasta? Todos os flashcards dentro dela E de suas subpastas TAMBÉM serão excluídos permanentemente.")) return;
     
     try {
+      // Helper to get all descendant folder IDs recursively
+      const getDescendantIds = (folderId: string, allFolders: Folder[]): string[] => {
+        let ids: string[] = [];
+        const children = allFolders.filter(f => f.parentId === folderId);
+        for (const child of children) {
+          ids.push(child.id);
+          ids.push(...getDescendantIds(child.id, allFolders));
+        }
+        return ids;
+      };
+
+      const allFolderIdsToDelete = [id, ...getDescendantIds(id, folders)];
+
       // 1. Delete flashcards locally first for instant feedback
-      const cardsToDelete = flashcards.filter(f => f.folderId === id);
-      setFlashcards(prev => prev.filter(f => f.folderId !== id));
+      setFlashcards(prev => prev.filter(f => !f.folderId || !allFolderIdsToDelete.includes(f.folderId)));
       
-      // 2. Delete folder locally
-      setFolders(prev => prev.filter(f => f.id !== id));
+      // 2. Delete folders locally
+      setFolders(prev => prev.filter(f => !allFolderIdsToDelete.includes(f.id)));
       
-      if (currentFolderId === id) {
+      if (allFolderIdsToDelete.includes(currentFolderId || '')) {
         setCurrentFolderId(null);
       }
       setActiveMenuFolderId(null);
 
       // 3. Perform deletions in Supabase
-      // Delete flashcards first
+      // Delete all flashcards in any of the folders being deleted
       const { error: cardsError } = await supabase
         .from('flashcards')
         .delete()
-        .eq('folder_id', id)
+        .in('folder_id', allFolderIdsToDelete)
         .eq('user_id', userId);
         
       if (cardsError) throw cardsError;
 
-      // Then delete folder
+      // Then delete all the folders
       const { error: folderError } = await supabase
         .from('folders')
         .delete()
-        .eq('id', id)
+        .in('id', allFolderIdsToDelete)
         .eq('user_id', userId);
         
       if (folderError) throw folderError;
@@ -450,7 +486,6 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     } catch (err) {
       console.error("Erro ao eliminar pasta e cards:", err);
       alert("Erro ao eliminar pasta. Tente novamente.");
-      // In a real app, we might want to reload data here to restore state if deletion failed
     }
   };
 
@@ -1240,6 +1275,28 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       const updatedCard = { ...card, interval: newInterval, nextReview };
       await dataService.saveFlashcard(updatedCard, userId, isOnline);
       
+      // RECORD STUDY SESSION FOR CONSTANCY
+      const sessionData: StudySession = {
+        id: Math.random().toString(36).substr(2, 9),
+        user_id: userId,
+        start_time: new Date().toISOString(),
+        duration: cardTimer,
+        subject_id: card.subjectId
+      };
+      await dataService.saveStudySession(sessionData, userId, isOnline);
+      
+      // Update global study sessions state if provided
+      if (setStudySessions) {
+        setStudySessions(prev => [sessionData, ...prev]);
+      }
+      
+      // Update local study history state for immediate feedback
+      const today = new Date().toISOString().split('T')[0];
+      setStudyHistory(prev => ({
+        ...prev,
+        [today]: (prev[today] || 0) + 1
+      }));
+
       setFlashcards(prev => prev.map(f => f.id === card.id ? updatedCard : f));
       
       // TRIGGER QUEST UPDATE
