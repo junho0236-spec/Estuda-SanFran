@@ -107,6 +107,7 @@ export interface Folder {
   shared?: boolean; // New: Indicates if this is a collaborative deck
   original_deck_id?: string; // For update alerts
   version?: number; // For versioning
+  color?: string;
 }
 
 export interface DeckRequest {

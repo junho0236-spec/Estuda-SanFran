@@ -75,6 +75,19 @@ interface AnkiProps {
   setInitialText: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
+const FOLDER_COLORS = [
+  { name: 'Dourado', border: 'border-l-usp-gold', text: 'text-usp-gold', bg: 'bg-usp-gold' },
+  { name: 'Rubi', border: 'border-l-sanfran-rubi', text: 'text-sanfran-rubi', bg: 'bg-sanfran-rubi' },
+  { name: 'Azul', border: 'border-l-blue-500', text: 'text-blue-500', bg: 'bg-blue-500' },
+  { name: 'Esmeralda', border: 'border-l-emerald-500', text: 'text-emerald-500', bg: 'bg-emerald-500' },
+  { name: 'Âmbar', border: 'border-l-amber-500', text: 'text-amber-500', bg: 'bg-amber-500' },
+  { name: 'Roxo', border: 'border-l-purple-500', text: 'text-purple-500', bg: 'bg-purple-500' },
+  { name: 'Rosa', border: 'border-l-pink-500', text: 'text-pink-500', bg: 'bg-pink-500' },
+  { name: 'Ciano', border: 'border-l-cyan-500', text: 'text-cyan-500', bg: 'bg-cyan-500' },
+  { name: 'Laranja', border: 'border-l-orange-500', text: 'text-orange-500', bg: 'bg-orange-500' },
+  { name: 'Indigo', border: 'border-l-indigo-500', text: 'text-indigo-500', bg: 'bg-indigo-500' },
+];
+
 const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folders, setFolders, userId, isOnline, initialText, setInitialText }) => {
   const location = useLocation();
   const { state } = location;
@@ -98,6 +111,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [manualNotes, setManualNotes] = useState('');
   const [manualImage, setManualImage] = useState<string | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
+  const [newFolderColor, setNewFolderColor] = useState(FOLDER_COLORS[0].border);
+  const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
 
   useEffect(() => {
     if (state && (state as any).newFlashcard) {
@@ -907,14 +922,34 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         id: newId, 
         user_id: userId, 
         name: newFolderName, 
-        parent_id: currentFolderId 
+        parent_id: currentFolderId,
+        color: newFolderColor
       });
       if (error) throw error;
-      setFolders(prev => [...prev, { id: newId, name: newFolderName, parentId: currentFolderId }]);
+      setFolders(prev => [...prev, { id: newId, name: newFolderName, parentId: currentFolderId, color: newFolderColor }]);
       setNewFolderName(''); 
+      setNewFolderColor(FOLDER_COLORS[0].border);
       setShowFolderInput(false);
     } catch (err) { 
       alert("Erro ao criar pasta."); 
+    }
+  };
+
+  const handleUpdateFolder = async () => {
+    if (!editingFolder || !editingFolder.name.trim()) return;
+    try {
+      const { error } = await supabase.from('folders').update({ 
+        name: editingFolder.name,
+        color: editingFolder.color
+      }).eq('id', editingFolder.id).eq('user_id', userId);
+      
+      if (error) throw error;
+      
+      setFolders(prev => prev.map(f => f.id === editingFolder.id ? editingFolder : f));
+      setEditingFolder(null);
+      setActiveMenuFolderId(null);
+    } catch (err) {
+      alert("Erro ao atualizar pasta.");
     }
   };
 
@@ -1465,7 +1500,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               </button>
             </div>
             
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nome da Pasta</label>
                 <input 
@@ -1477,6 +1512,20 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder()}
                 />
               </div>
+
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Cor do Deck</label>
+                <div className="grid grid-cols-5 gap-2">
+                  {FOLDER_COLORS.map((color) => (
+                    <button
+                      key={color.name}
+                      onClick={() => setNewFolderColor(color.border)}
+                      className={`w-full aspect-square rounded-xl transition-all border-4 ${color.bg} ${newFolderColor === color.border ? 'border-white dark:border-slate-800 scale-110 shadow-lg' : 'border-transparent opacity-60 hover:opacity-100'}`}
+                      title={color.name}
+                    />
+                  ))}
+                </div>
+              </div>
               
               <button 
                 onClick={handleCreateFolder}
@@ -1485,6 +1534,56 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               >
                 <Check className="w-5 h-5" />
                 Criar Pasta
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Edição de Pasta */}
+      {editingFolder && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md p-8 rounded-[2.5rem] shadow-2xl border-2 border-slate-200 dark:border-white/10 animate-in zoom-in-95 duration-300">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-black uppercase tracking-tighter text-slate-900 dark:text-white">Editar Pasta</h3>
+              <button onClick={() => setEditingFolder(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
+                <X className="w-6 h-6 text-slate-400" />
+              </button>
+            </div>
+            
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nome da Pasta</label>
+                <input 
+                  autoFocus
+                  value={editingFolder.name} 
+                  onChange={(e) => setEditingFolder({ ...editingFolder, name: e.target.value })} 
+                  className="w-full p-4 bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-white/10 rounded-2xl font-bold outline-none focus:border-sanfran-rubi transition-colors"
+                  onKeyDown={(e) => e.key === 'Enter' && handleUpdateFolder()}
+                />
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Cor do Deck</label>
+                <div className="grid grid-cols-5 gap-2">
+                  {FOLDER_COLORS.map((color) => (
+                    <button
+                      key={color.name}
+                      onClick={() => setEditingFolder({ ...editingFolder, color: color.border })}
+                      className={`w-full aspect-square rounded-xl transition-all border-4 ${color.bg} ${(editingFolder.color || 'border-l-usp-gold') === color.border ? 'border-white dark:border-slate-800 scale-110 shadow-lg' : 'border-transparent opacity-60 hover:opacity-100'}`}
+                      title={color.name}
+                    />
+                  ))}
+                </div>
+              </div>
+              
+              <button 
+                onClick={handleUpdateFolder}
+                disabled={!editingFolder.name.trim()}
+                className="w-full py-4 bg-sanfran-rubi text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-sanfran-rubi/20 hover:bg-sanfran-rubiDark transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <Save className="w-5 h-5" />
+                Salvar Alterações
               </button>
             </div>
           </div>
@@ -1706,7 +1805,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
             const hasUpdate = folder.original_deck_id && publicDecks.some(pd => pd.id === folder.original_deck_id && (pd.version || 1) > (folder.version || 1));
             
             return (
-              <div key={folder.id} onClick={() => setCurrentFolderId(folder.id)} className="group bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2rem] border-2 border-slate-200 dark:border-sanfran-rubi/40 shadow-xl cursor-pointer hover:border-usp-gold border-l-[10px] border-l-usp-gold transition-all relative">
+              <div key={folder.id} onClick={() => setCurrentFolderId(folder.id)} className={`group bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2rem] border-2 border-slate-200 dark:border-sanfran-rubi/40 shadow-xl cursor-pointer hover:border-usp-gold border-l-[10px] ${folder.color || 'border-l-usp-gold'} transition-all relative`}>
                 {hasUpdate && (
                   <div className="absolute -top-3 -right-3 z-20 animate-bounce">
                     <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 text-white rounded-full shadow-lg border-2 border-white dark:border-slate-900">
@@ -1730,10 +1829,10 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                     {activeMenuFolderId === folder.id && (
                       <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-white/10 z-50 overflow-hidden animate-in fade-in zoom-in duration-200">
                         <button 
-                          onClick={(e) => { e.stopPropagation(); handleRenameFolder(folder.id, folder.name); }}
+                          onClick={(e) => { e.stopPropagation(); setEditingFolder(folder); }}
                           className="w-full flex items-center gap-3 px-4 py-3 text-left text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 transition-all"
                         >
-                          <Edit2 className="w-4 h-4 text-blue-500" /> Renomear
+                          <Edit2 className="w-4 h-4 text-blue-500" /> Personalizar
                         </button>
                         <button 
                           onClick={(e) => { e.stopPropagation(); handleExportFolder(folder.id, folder.name); }}
@@ -1764,7 +1863,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                     )}
                   </div>
                 </div>
-                <FolderIcon className="text-usp-gold w-8 h-8 mb-4" />
+                <FolderIcon className={`${folder.color?.replace('border-l-', 'text-') || 'text-usp-gold'} w-8 h-8 mb-4`} />
                 <h4 className="font-black text-slate-950 dark:text-white uppercase tracking-tight mb-2">{folder.name}</h4>
                 
                 {/* Anki Style Metrics */}
