@@ -1206,7 +1206,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setCardTimer(0);
       
       const interval = setInterval(() => {
-        setCardTimer(prev => Math.min(prev + 1, 15));
+        setCardTimer(prev => prev + 1);
       }, 1000);
       
       return () => clearInterval(interval);
@@ -1233,13 +1233,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     if (!currentCard) return;
     const card = currentCard;
     
-    // Timer penalty: if > 15s, cap quality at 3 (Good)
-    let finalQuality = quality;
-    if (Date.now() - cardStartTime > 15000 && quality > 3) {
-      finalQuality = 3;
-    }
-
-    const newInterval = finalQuality === 0 ? 0 : (card.interval === 0 ? 1 : Math.ceil(card.interval * (finalQuality === 2 ? 1.2 : finalQuality === 3 ? 2.5 : 4)));
+    const newInterval = quality === 0 ? 0 : (card.interval === 0 ? 1 : Math.ceil(card.interval * (quality === 2 ? 1.2 : quality === 3 ? 2.5 : 4)));
     const nextReview = Date.now() + newInterval * 24 * 60 * 60 * 1000;
     
     try {
@@ -2033,6 +2027,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 <Clock size={14} /> {currentIndex + 1} / {reviewQueue.length}
               </div>
+              <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400 rounded-full text-[9px] font-black uppercase tracking-widest">
+                Tempo: {Math.floor(cardTimer / 60)}:{(cardTimer % 60).toString().padStart(2, '0')}
+              </div>
               {isCramMode && (
                 <div className="flex items-center gap-2 px-3 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-full text-[9px] font-black uppercase tracking-widest">
                   <Smartphone size={12} /> Tinder Mode
@@ -2047,14 +2044,6 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
           </div>
 
           <div className="relative w-full max-w-2xl min-h-[550px] preserve-3d group/card">
-            {/* Subtle Timer Bar */}
-            <div className="absolute -top-4 left-0 w-full h-1.5 bg-slate-200 dark:bg-white/5 rounded-full overflow-hidden z-10">
-              <div 
-                className={`h-full transition-all duration-1000 ${cardTimer >= 15 ? 'bg-red-500' : cardTimer >= 10 ? 'bg-orange-500' : 'bg-emerald-500'}`}
-                style={{ width: `${(cardTimer / 15) * 100}%` }}
-              ></div>
-            </div>
-
             <AnimatePresence mode="wait">
               {currentCard && (
                 <motion.div
@@ -2224,8 +2213,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   </button>
                   <button 
                     onClick={() => handleReview(5)} 
-                    disabled={cardTimer >= 15}
-                    className={`flex flex-col items-center gap-2 p-4 bg-usp-blue text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform disabled:opacity-50 disabled:grayscale`}
+                    className={`flex flex-col items-center gap-2 p-4 bg-usp-blue text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform`}
                   >
                     <span>Fácil</span>
                     <span className="px-2 py-0.5 bg-black/20 rounded text-[8px]">4</span>
