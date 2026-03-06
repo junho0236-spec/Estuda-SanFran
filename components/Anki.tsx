@@ -398,20 +398,44 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
   const deleteFolder = async (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    if (!confirm("Deseja eliminar esta pasta? Todos os flashcards nela contidos ficarão órfãos de categoria.")) return;
+    if (!confirm("Deseja eliminar esta pasta? Todos os flashcards dentro dela TAMBÉM serão excluídos permanentemente.")) return;
+    
     try {
-      const { error } = await supabase.from('folders').delete().eq('id', id).eq('user_id', userId);
-      if (error) throw error;
+      // 1. Delete flashcards locally first for instant feedback
+      const cardsToDelete = flashcards.filter(f => f.folderId === id);
+      setFlashcards(prev => prev.filter(f => f.folderId !== id));
       
+      // 2. Delete folder locally
       setFolders(prev => prev.filter(f => f.id !== id));
-      setFlashcards(prev => prev.map(f => f.folderId === id ? { ...f, folderId: null } : f));
       
       if (currentFolderId === id) {
         setCurrentFolderId(null);
       }
       setActiveMenuFolderId(null);
+
+      // 3. Perform deletions in Supabase
+      // Delete flashcards first
+      const { error: cardsError } = await supabase
+        .from('flashcards')
+        .delete()
+        .eq('folder_id', id)
+        .eq('user_id', userId);
+        
+      if (cardsError) throw cardsError;
+
+      // Then delete folder
+      const { error: folderError } = await supabase
+        .from('folders')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', userId);
+        
+      if (folderError) throw folderError;
+
     } catch (err) {
-      alert("Erro ao eliminar pasta.");
+      console.error("Erro ao eliminar pasta e cards:", err);
+      alert("Erro ao eliminar pasta. Tente novamente.");
+      // In a real app, we might want to reload data here to restore state if deletion failed
     }
   };
 
