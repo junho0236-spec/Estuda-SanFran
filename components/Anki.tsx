@@ -1265,7 +1265,6 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     if (!userWrittenAnswer.trim()) return;
     setIsEvaluating(true);
     try {
-      const currentCard = reviewQueue[currentIndex];
       if (!currentCard) throw new Error("Card não encontrado na fila de revisão.");
       const evaluation = await evaluateDissertativeAnswer(currentCard.front, currentCard.back, userWrittenAnswer);
       setAiEvaluation(evaluation);

@@ -701,28 +701,20 @@ export const evaluateDissertativeAnswer = async (question: string, correctAnswer
 
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Você é um sistema de avaliação lógica de flashcards.
-      Sua única tarefa é comparar a "Resposta do Aluno" com o "Gabarito Esperado" e atribuir uma nota justa.
-      
-      REGRAS ABSOLUTAS DE AVALIAÇÃO:
-      1. FOCO NO GABARITO: Baseie sua nota EXCLUSIVAMENTE no "Gabarito Esperado" fornecido.
-      2. SINÔNIMOS SÃO VÁLIDOS: Se o aluno expressou a mesma ideia do gabarito com outras palavras, a nota deve ser 10.0.
-      3. PROIBIDO INVENTAR: Não exija termos técnicos, artigos de lei ou conceitos que NÃO estejam explicitamente no "Gabarito Esperado".
-      4. IGNORE CONTEXTO EXTERNO: Mesmo que você saiba mais sobre o assunto, não penalize o aluno por não citar detalhes que não constam no gabarito.
-      5. RESPOSTAS COMPLETAS: Se o aluno respondeu o que foi pedido e ainda complementou corretamente, a nota é 10.0.
-      
-      Pergunta/Enunciado: "${question}"
+      contents: `COMPARE AS SEGUINTES INFORMAÇÕES:
+      Pergunta: "${question}"
       Gabarito Esperado: "${correctAnswer}"
-      Resposta do Aluno: "${userAnswer}"
-      
-      Retorne a resposta EXATAMENTE no formato JSON:
-      {
-        "score": 10.0,
-        "feedback": "Explique brevemente por que a nota foi essa, comparando a resposta com o gabarito.",
-        "missing_keywords": ["Apenas o que realmente faltou em relação ao gabarito"],
-        "is_perfect": true
-      }`,
+      Resposta do Aluno: "${userAnswer}"`,
       config: {
+        systemInstruction: `Você é um robô de correção lógica e semântica. 
+        Sua única fonte de verdade é o "Gabarito Esperado". 
+        
+        REGRAS CRÍTICAS:
+        1. É PROIBIDO usar qualquer conhecimento externo. 
+        2. Se o aluno disse algo que significa o mesmo que o gabarito (mesmo que com palavras diferentes ou sinônimos), a nota DEVE ser 10.0.
+        3. Se o aluno respondeu corretamente o que está no gabarito, ignore se ele não citou outros detalhes que você conhece mas que não estão no gabarito fornecido.
+        4. Não alucine. Não invente que o aluno deveria ter citado nomes de textos, autores ou leis que não estão no "Gabarito Esperado".
+        5. Seja generoso com erros de digitação leves ou acentuação.`,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
