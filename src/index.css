@@ -56,7 +56,42 @@
   color: #64748b; /* slate-500 */
 }
 
-/* Custom font sizes for headers */
+/* Custom Markdown Styling */
+.prose {
+  color: inherit;
+}
+.prose strong {
+  color: inherit;
+  font-weight: 800;
+}
+.prose h1, .prose h2, .prose h3, .prose h4 {
+  color: inherit;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.prose p {
+  margin-bottom: 1em;
+}
+.prose ul, .prose ol {
+  margin-bottom: 1em;
+  padding-left: 1.5em;
+}
+.prose li {
+  margin-bottom: 0.5em;
+}
+
+.prose-xs {
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.prose-sm {
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
 .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="small"]::before,
 .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="small"]::before {
   content: '13px';

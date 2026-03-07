@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLocation } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
 import { GoogleGenAI, Type } from '@google/genai';
 import { 
   Plus, 
@@ -1301,7 +1302,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         model: "gemini-3-flash-preview",
         contents: chatContext,
         config: {
-          systemInstruction: "Você é um mentor de estudos especializado. O usuário está revisando um flashcard e teve uma dúvida sobre a avaliação ou o conteúdo. Responda de forma clara e didática, focando em sanar a dúvida e aprofundar o conhecimento necessário para o assunto do card. Se o assunto for jurídico, seja técnico; se for de outra área, adapte sua linguagem."
+          systemInstruction: "Você é um mentor de estudos especializado. O usuário está revisando um flashcard e teve uma dúvida sobre a avaliação ou o conteúdo. Responda de forma clara e didática, usando formatação Markdown (negrito, listas, títulos) para organizar sua resposta e torná-la visualmente agradável. Se o assunto for jurídico, seja técnico; se for de outra área, adapte sua linguagem."
         }
       });
 
@@ -2327,7 +2328,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Sua Resposta:</span>
                               <p className="text-sm font-medium text-slate-600 dark:text-slate-400 italic">"{userWrittenAnswer}"</p>
                             </div>
-                            <p className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-relaxed mb-4">{aiEvaluation.feedback}</p>
+                            <div className="prose prose-sm dark:prose-invert max-w-none text-slate-700 dark:text-slate-200 leading-relaxed mb-4 font-bold">
+                              <ReactMarkdown>{aiEvaluation.feedback}</ReactMarkdown>
+                            </div>
                             {aiEvaluation.missing_keywords.length > 0 && (
                               <div className="space-y-2">
                                 <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">O que faltou:</span>
@@ -2351,12 +2354,14 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                               <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-2">
                                 {followUpChat.map((msg, i) => (
                                   <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[85%] p-3 rounded-2xl text-xs font-bold ${
+                                    <div className={`max-w-[90%] p-4 rounded-2xl text-xs font-bold shadow-sm ${
                                       msg.role === 'user' 
                                         ? 'bg-purple-600 text-white rounded-tr-none' 
-                                        : 'bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 rounded-tl-none'
+                                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-tl-none border border-slate-100 dark:border-white/5'
                                     }`}>
-                                      {msg.text}
+                                      <div className="prose prose-xs dark:prose-invert max-w-none">
+                                        <ReactMarkdown>{msg.text}</ReactMarkdown>
+                                      </div>
                                     </div>
                                   </div>
                                 ))}
