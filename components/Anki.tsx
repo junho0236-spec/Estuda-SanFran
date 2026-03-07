@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLocation } from 'react-router-dom';
+import { GoogleGenAI, Type } from '@google/genai';
 import { 
   Plus, 
   BrainCircuit, 
@@ -53,7 +54,9 @@ import {
   Maximize2,
   Clock,
   Minimize2,
-  Smartphone
+  Smartphone,
+  MessageSquareText,
+  Send
 } from 'lucide-react';
 import JSZip from 'jszip';
 import { Flashcard, Subject, Folder, DeckRequest, StudySession } from '../types';
@@ -153,6 +156,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [isDissertativeMode, setIsDissertativeMode] = useState(false);
   const [userWrittenAnswer, setUserWrittenAnswer] = useState('');
   const [aiEvaluation, setAiEvaluation] = useState<{ score: number; feedback: string; missing_keywords: string[]; is_perfect: boolean } | null>(null);
+  const [followUpChat, setFollowUpChat] = useState<{ role: 'user' | 'model'; text: string }[]>([]);
+  const [followUpInput, setFollowUpInput] = useState('');
+  const [isFollowUpLoading, setIsFollowUpLoading] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
   const [sessionQueue, setSessionQueue] = useState<Flashcard[]>([]);
@@ -189,6 +195,12 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
   const handleNextCram = async () => {
     if (!currentCard) return;
+    
+    setUserWrittenAnswer('');
+    setAiEvaluation(null);
+    setFollowUpChat([]);
+    setFollowUpInput('');
+    setIsDissertativeMode(false);
     
     // RECORD STUDY SESSION FOR CONSTANCY
     const sessionData: StudySession = {
@@ -1265,6 +1277,41 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     }
   };
 
+  const handleFollowUp = async () => {
+    if (!followUpInput.trim() || !currentCard || !aiEvaluation) return;
+    
+    const userMsg = followUpInput.trim();
+    setFollowUpChat(prev => [...prev, { role: 'user', text: userMsg }]);
+    setFollowUpInput('');
+    setIsFollowUpLoading(true);
+    
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      // Using a model that supports chat
+      const chatContext = [
+        { role: 'user', parts: [{ text: `Contexto do Flashcard:\nPergunta: ${currentCard.front}\nResposta Correta: ${currentCard.back}\nMinha Resposta: ${userWrittenAnswer}\nAvaliação Inicial da IA: ${aiEvaluation.feedback} (Nota: ${aiEvaluation.score}/10)` }] },
+        ...followUpChat.map(msg => ({ role: msg.role === 'user' ? 'user' : 'model', parts: [{ text: msg.text }] })),
+        { role: 'user', parts: [{ text: userMsg }] }
+      ];
+
+      const result = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: chatContext,
+        config: {
+          systemInstruction: "Você é um mentor jurídico especializado. O usuário está revisando um flashcard e teve uma dúvida sobre a avaliação ou o conteúdo. Responda de forma clara, técnica e didática, focando em sanar a dúvida e aprofundar o conhecimento jurídico necessário."
+        }
+      });
+
+      const responseText = result.text;
+      setFollowUpChat(prev => [...prev, { role: 'model', text: responseText }]);
+    } catch (err) {
+      console.error("Erro no follow-up da IA:", err);
+      setFollowUpChat(prev => [...prev, { role: 'model', text: "Desculpe, tive um problema ao processar sua dúvida. Pode tentar novamente?" }]);
+    } finally {
+      setIsFollowUpLoading(false);
+    }
+  };
+
   const handleReview = async (quality: number) => {
     if (!currentCard) return;
     const card = currentCard;
@@ -1356,6 +1403,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
       setUserWrittenAnswer('');
       setAiEvaluation(null);
+      setFollowUpChat([]);
+      setFollowUpInput('');
       setIsDissertativeMode(false);
 
       if (shouldReinsert) {
@@ -2252,7 +2301,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                         <span className="px-4 py-2 bg-slate-100 dark:bg-white/5 rounded-full text-[9px] font-black text-slate-400 uppercase tracking-widest">Pressione Espaço para virar</span>
                       </div>
                     </div>
-                    <div className="absolute inset-0 w-full h-full bg-slate-50 dark:bg-black border-[6px] border-usp-blue/40 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden rotate-y-180 overflow-y-auto custom-scrollbar">
+                    <div className="absolute inset-0 w-full h-full bg-slate-50 dark:bg-black border-[6px] border-usp-blue/40 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-start text-center backface-hidden rotate-y-180 overflow-y-auto custom-scrollbar">
                       {aiEvaluation ? (
                         <div className="w-full mb-8 animate-in fade-in duration-500">
                           <div className="flex items-center justify-between mb-4">
@@ -2279,6 +2328,57 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                                 </div>
                               </div>
                             )}
+
+                            {/* Follow-up Chat */}
+                            <div className="mt-6 pt-6 border-t border-slate-100 dark:border-white/5 space-y-4" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex items-center gap-2 mb-2">
+                                <MessageSquareText size={16} className="text-purple-500" />
+                                <span className="text-[10px] font-black text-purple-600 uppercase tracking-widest">Aprofundar com Mentor IA</span>
+                              </div>
+                              
+                              <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                                {followUpChat.map((msg, i) => (
+                                  <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`max-w-[85%] p-3 rounded-2xl text-xs font-bold ${
+                                      msg.role === 'user' 
+                                        ? 'bg-purple-600 text-white rounded-tr-none' 
+                                        : 'bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 rounded-tl-none'
+                                    }`}>
+                                      {msg.text}
+                                    </div>
+                                  </div>
+                                ))}
+                                {isFollowUpLoading && (
+                                  <div className="flex justify-start">
+                                    <div className="bg-slate-100 dark:bg-white/5 p-3 rounded-2xl rounded-tl-none">
+                                      <Loader2 size={14} className="animate-spin text-purple-500" />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex gap-2">
+                                <input 
+                                  type="text"
+                                  value={followUpInput}
+                                  onChange={(e) => setFollowUpInput(e.target.value)}
+                                  onKeyDown={(e) => e.key === 'Enter' && handleFollowUp()}
+                                  placeholder="Tire uma dúvida ou peça para aprofundar..."
+                                  className="flex-1 p-3 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold outline-none focus:border-purple-500"
+                                />
+                                <button 
+                                  onClick={handleFollowUp}
+                                  disabled={isFollowUpLoading || !followUpInput.trim()}
+                                  className="p-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors disabled:opacity-50"
+                                >
+                                  {isFollowUpLoading ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Send className="w-4 h-4" />
+                                  )}
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       ) : (
