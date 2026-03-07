@@ -701,31 +701,26 @@ export const evaluateDissertativeAnswer = async (question: string, correctAnswer
 
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Você é um professor avaliador da Faculdade de Direito do Largo São Francisco (USP).
-      Sua tarefa é avaliar a resposta dissertativa de um aluno para um flashcard de estudo.
+      contents: `Você é um sistema de avaliação lógica de flashcards.
+      Sua única tarefa é comparar a "Resposta do Aluno" com o "Gabarito Esperado" e atribuir uma nota justa.
       
-      DIRETRIZ CRÍTICA: Baseie sua avaliação ESTRITAMENTE no "Gabarito Esperado" fornecido. 
-      - NÃO invente requisitos técnicos ou jurídicos que não estejam explicitamente no gabarito.
-      - Se o gabarito for simples, a avaliação deve ser simples.
-      - Se o aluno respondeu corretamente o que o gabarito pedia, a nota deve ser 10.0, mesmo que a resposta seja curta.
-      - NÃO tente forçar uma interpretação jurídica complexa se o tema for pedagógico, histórico ou geral.
+      REGRAS ABSOLUTAS DE AVALIAÇÃO:
+      1. FOCO NO GABARITO: Baseie sua nota EXCLUSIVAMENTE no "Gabarito Esperado" fornecido.
+      2. SINÔNIMOS SÃO VÁLIDOS: Se o aluno expressou a mesma ideia do gabarito com outras palavras, a nota deve ser 10.0.
+      3. PROIBIDO INVENTAR: Não exija termos técnicos, artigos de lei ou conceitos que NÃO estejam explicitamente no "Gabarito Esperado".
+      4. IGNORE CONTEXTO EXTERNO: Mesmo que você saiba mais sobre o assunto, não penalize o aluno por não citar detalhes que não constam no gabarito.
+      5. RESPOSTAS COMPLETAS: Se o aluno respondeu o que foi pedido e ainda complementou corretamente, a nota é 10.0.
       
       Pergunta/Enunciado: "${question}"
       Gabarito Esperado: "${correctAnswer}"
       Resposta do Aluno: "${userAnswer}"
       
-      Diretrizes de Avaliação:
-      1. Atribua uma nota de 0.0 a 10.0.
-      2. Verifique se o aluno capturou a essência do gabarito. Sinônimos e explicações com palavras próprias devem ser aceitos.
-      3. Aponte o que faltou ou o que foi citado incorretamente em relação ao gabarito.
-      4. Dê um feedback construtivo curto (máximo 2 parágrafos).
-      
       Retorne a resposta EXATAMENTE no formato JSON:
       {
-        "score": 8.5,
-        "feedback": "Seu feedback aqui...",
-        "missing_keywords": ["Palavra-chave 1", "Palavra-chave 2"],
-        "is_perfect": false
+        "score": 10.0,
+        "feedback": "Explique brevemente por que a nota foi essa, comparando a resposta com o gabarito.",
+        "missing_keywords": ["Apenas o que realmente faltou em relação ao gabarito"],
+        "is_perfect": true
       }`,
       config: {
         responseMimeType: "application/json",
