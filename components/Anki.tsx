@@ -156,6 +156,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
   const [sessionQueue, setSessionQueue] = useState<Flashcard[]>([]);
+  const [learningCards, setLearningCards] = useState<Set<string>>(new Set());
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -171,9 +172,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       // 1, 2, 3, 4 for ratings (if flipped)
       if (isFlipped && !isCramMode) {
         if (e.key === '1') handleReview(0);
-        if (e.key === '2') handleReview(1);
-        if (e.key === '3') handleReview(2);
-        if (e.key === '4') handleReview(3);
+        if (e.key === '2') handleReview(2);
+        if (e.key === '3') handleReview(3);
+        if (e.key === '4') handleReview(5);
       }
 
       // Enter for next in Cram Mode (if flipped)
@@ -1267,13 +1268,64 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const handleReview = async (quality: number) => {
     if (!currentCard) return;
     const card = currentCard;
+    const isNew = card.interval === 0;
+    const isLearning = learningCards.has(card.id);
     
-    const newInterval = quality === 0 ? 0 : (card.interval === 0 ? 1 : Math.ceil(card.interval * (quality === 2 ? 1.2 : quality === 3 ? 2.5 : 4)));
+    // Anki Logic:
+    // If New and Good (3) -> Re-insert in 10m (offset ~15), add to learningCards
+    // If Learning and Good (3) -> Graduate to 1d, remove from learningCards
+    
+    let newInterval = card.interval;
+    let shouldReinsert = false;
+    let offset = 0;
+
+    if (quality === 0) { // Again
+      newInterval = 0;
+      shouldReinsert = true;
+      offset = 4; // ~1 min
+      setLearningCards(prev => {
+        const next = new Set(prev);
+        next.delete(card.id);
+        return next;
+      });
+    } else if (quality === 2) { // Hard
+      newInterval = isNew ? 0 : Math.ceil(card.interval * 1.2);
+      shouldReinsert = true;
+      offset = 10; // ~6 min
+    } else if (quality === 3) { // Good
+      if (isNew && !isLearning) {
+        newInterval = 0;
+        shouldReinsert = true;
+        offset = 15; // ~10 min
+        setLearningCards(prev => new Set(prev).add(card.id));
+      } else {
+        newInterval = isNew ? 1 : Math.ceil(card.interval * 2.5);
+        shouldReinsert = false;
+        setLearningCards(prev => {
+          const next = new Set(prev);
+          next.delete(card.id);
+          return next;
+        });
+      }
+    } else if (quality === 5) { // Easy
+      newInterval = isNew ? 4 : Math.ceil(card.interval * 4);
+      shouldReinsert = false;
+      setLearningCards(prev => {
+        const next = new Set(prev);
+        next.delete(card.id);
+        return next;
+      });
+    }
+
     const nextReview = Date.now() + newInterval * 24 * 60 * 60 * 1000;
     
     try {
       const updatedCard = { ...card, interval: newInterval, nextReview };
-      await dataService.saveFlashcard(updatedCard, userId, isOnline);
+      
+      // Only save to DB if it's NOT a temporary learning re-insertion
+      if (!shouldReinsert || quality === 0 || (quality === 2 && !isNew)) {
+        await dataService.saveFlashcard(updatedCard, userId, isOnline);
+      }
       
       // RECORD STUDY SESSION FOR CONSTANCY
       const sessionData: StudySession = {
@@ -1306,12 +1358,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setAiEvaluation(null);
       setIsDissertativeMode(false);
 
-      if (quality === 0 || quality === 2) {
-        // Re-insert into session queue
-        // Anki style: if failed, it comes back in ~1 min (after a few cards)
-        // If hard, it comes back in ~6 mins (after more cards)
+      if (shouldReinsert) {
         const newQueue = [...sessionQueue];
-        const offset = quality === 0 ? 4 : 10;
         const nextPos = Math.min(currentIndex + offset + 1, newQueue.length);
         newQueue.splice(nextPos, 0, card);
         setSessionQueue(newQueue);
@@ -1327,6 +1375,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
           setCurrentIndex(0); 
           setIsFlipped(false); 
           setSessionQueue([]);
+          setLearningCards(new Set());
         }
       }
     } catch (err) { 
@@ -1400,6 +1449,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                       setCurrentIndex(0); 
                       setIsFlipped(false); 
                       setSessionQueue([]); // Reset to force re-initialization
+                      setLearningCards(new Set());
                     }} 
                     disabled={reviewQueue.length === 0} 
                     className="flex items-center gap-2 px-8 py-3.5 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest disabled:opacity-50 hover:bg-sanfran-rubiDark shadow-xl"
@@ -1416,6 +1466,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                           setCurrentIndex(0);
                           setIsFlipped(false);
                           setSessionQueue([]); // Reset to force re-initialization
+                          setLearningCards(new Set());
                         }
                       }} 
                       className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all ${isCramMode ? 'bg-orange-600 text-white' : 'bg-white dark:bg-sanfran-rubiDark text-orange-600 border-2 border-orange-600 hover:bg-orange-50'}`}
@@ -1436,6 +1487,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                           setCurrentIndex(0);
                           setIsFlipped(false);
                           setSessionQueue([]); // Reset to force re-initialization
+                          setLearningCards(new Set());
                         }
                       }} 
                       className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all ${isAudioMode ? 'bg-emerald-600 text-white' : 'bg-white dark:bg-sanfran-rubiDark text-emerald-600 border-2 border-emerald-600 hover:bg-emerald-50'}`}
@@ -2088,6 +2140,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   setIsFlipped(false);
                   setIsSessionModalOpen(false);
                   setSessionQueue([]); // Force re-initialization
+                  setLearningCards(new Set());
                 }}
                 className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-indigo-500/20 disabled:opacity-50"
               >
@@ -2295,7 +2348,11 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   </button>
                   <button onClick={() => handleReview(3)} className="flex flex-col items-center gap-1 p-4 bg-usp-gold text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform">
                     <span>Bom</span>
-                    <span className="text-[8px] opacity-60">{currentCard.interval === 0 ? '1d' : Math.ceil(currentCard.interval * 2.5) + 'd'}</span>
+                    <span className="text-[8px] opacity-60">
+                      {currentCard.interval === 0 
+                        ? (learningCards.has(currentCard.id) ? '1d' : '10 min') 
+                        : Math.ceil(currentCard.interval * 2.5) + 'd'}
+                    </span>
                     <span className="px-2 py-0.5 bg-black/20 rounded text-[8px]">3</span>
                   </button>
                   <button 
