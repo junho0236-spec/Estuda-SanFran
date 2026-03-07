@@ -1298,7 +1298,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         model: "gemini-3-flash-preview",
         contents: chatContext,
         config: {
-          systemInstruction: "Você é um mentor jurídico especializado. O usuário está revisando um flashcard e teve uma dúvida sobre a avaliação ou o conteúdo. Responda de forma clara, técnica e didática, focando em sanar a dúvida e aprofundar o conhecimento jurídico necessário."
+          systemInstruction: "Você é um mentor de estudos especializado. O usuário está revisando um flashcard e teve uma dúvida sobre a avaliação ou o conteúdo. Responda de forma clara e didática, focando em sanar a dúvida e aprofundar o conhecimento necessário para o assunto do card. Se o assunto for jurídico, seja técnico; se for de outra área, adapte sua linguagem."
         }
       });
 
@@ -2305,7 +2305,16 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                       {aiEvaluation ? (
                         <div className="w-full mb-8 animate-in fade-in duration-500">
                           <div className="flex items-center justify-between mb-4">
-                            <span className="text-xs font-black text-purple-600 uppercase tracking-[0.3em]">Avaliação IA</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-black text-purple-600 uppercase tracking-[0.3em]">Avaliação IA</span>
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); setAiEvaluation(null); setIsFlipped(false); setIsDissertativeMode(true); }}
+                                className="p-1 text-slate-400 hover:text-purple-600 transition-colors"
+                                title="Refazer Avaliação"
+                              >
+                                <RotateCcw size={14} />
+                              </button>
+                            </div>
                             <div className="flex items-center gap-2 px-4 py-1 bg-purple-600 text-white rounded-full text-lg font-black">
                               {aiEvaluation.score.toFixed(1)} / 10
                             </div>

@@ -702,24 +702,29 @@ export const evaluateDissertativeAnswer = async (question: string, correctAnswer
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Você é um professor avaliador da Faculdade de Direito do Largo São Francisco (USP).
-      Sua tarefa é avaliar a resposta dissertativa de um aluno para um flashcard jurídico.
+      Sua tarefa é avaliar a resposta dissertativa de um aluno para um flashcard de estudo.
+      
+      DIRETRIZ CRÍTICA: Baseie sua avaliação ESTRITAMENTE no "Gabarito Esperado" fornecido. 
+      - NÃO invente requisitos técnicos ou jurídicos que não estejam explicitamente no gabarito.
+      - Se o gabarito for simples, a avaliação deve ser simples.
+      - Se o aluno respondeu corretamente o que o gabarito pedia, a nota deve ser 10.0, mesmo que a resposta seja curta.
+      - NÃO tente forçar uma interpretação jurídica complexa se o tema for pedagógico, histórico ou geral.
       
       Pergunta/Enunciado: "${question}"
-      Gabarito Esperado (Doutrina/Lei): "${correctAnswer}"
+      Gabarito Esperado: "${correctAnswer}"
       Resposta do Aluno: "${userAnswer}"
       
       Diretrizes de Avaliação:
       1. Atribua uma nota de 0.0 a 10.0.
-      2. Seja rigoroso tecnicamente, mas didático.
-      3. Verifique se o aluno mencionou palavras-chave, artigos de lei ou teorias essenciais presentes no gabarito.
-      4. Aponte o que faltou ou o que foi citado incorretamente.
-      5. Dê um feedback construtivo curto (máximo 3 parágrafos).
+      2. Verifique se o aluno capturou a essência do gabarito. Sinônimos e explicações com palavras próprias devem ser aceitos.
+      3. Aponte o que faltou ou o que foi citado incorretamente em relação ao gabarito.
+      4. Dê um feedback construtivo curto (máximo 2 parágrafos).
       
       Retorne a resposta EXATAMENTE no formato JSON:
       {
         "score": 8.5,
         "feedback": "Seu feedback aqui...",
-        "missing_keywords": ["Art. 5º", "Teoria X"],
+        "missing_keywords": ["Palavra-chave 1", "Palavra-chave 2"],
         "is_perfect": false
       }`,
       config: {
