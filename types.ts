@@ -96,7 +96,9 @@ export enum View {
   StudyBuddy = 'study_buddy',
   CaseAnalyzer = 'case_analyzer',
   Certificates = 'certificates',
-  NoteView = 'note_view'
+  NoteView = 'note_view',
+  Repository = 'repository',
+  Assignments = 'assignments'
 }
 
 export interface Folder {

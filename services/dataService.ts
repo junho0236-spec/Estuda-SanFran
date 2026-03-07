@@ -1,8 +1,71 @@
 import { supabase } from './supabaseClient';
 import { db, addToSyncQueue } from './offlineService';
-import { Flashcard, Task, StudySession, Note, SubjectFile } from '../types';
+import { Flashcard, Task, StudySession, Note, SubjectFile, Folder } from '../types';
 
 export const dataService = {
+  // FOLDERS
+  async saveFolder(folder: Folder, userId: string, isOnline: boolean) {
+    await db.folders.put(folder);
+    if (isOnline) {
+      const { error } = await supabase.from('folders').upsert({
+        id: folder.id,
+        user_id: userId,
+        name: folder.name,
+        parent_id: folder.parentId,
+        color: folder.color,
+        shared: folder.shared || false,
+        original_deck_id: folder.original_deck_id || null,
+        version: folder.version || 1
+      });
+      if (error) {
+        await addToSyncQueue({ table: 'folders', action: 'update', data: folder });
+      }
+    } else {
+      await addToSyncQueue({ table: 'folders', action: 'update', data: folder });
+    }
+  },
+
+  async deleteFolder(id: string, userId: string, isOnline: boolean) {
+    // This is the recursive logic moved to service
+    const allFolders = await db.folders.toArray();
+    const getDescendantIds = (folderId: string): string[] => {
+      let ids: string[] = [];
+      const children = allFolders.filter(f => f.parentId === folderId);
+      for (const child of children) {
+        ids.push(child.id);
+        ids.push(...getDescendantIds(child.id));
+      }
+      return ids;
+    };
+
+    const allFolderIdsToDelete = [id, ...getDescendantIds(id)];
+
+    // Delete locally
+    await db.folders.bulkDelete(allFolderIdsToDelete);
+    await db.flashcards.where('folderId').anyOf(allFolderIdsToDelete).delete();
+
+    if (isOnline) {
+      // Delete in Supabase
+      const { error: cardsError } = await supabase
+        .from('flashcards')
+        .delete()
+        .in('folder_id', allFolderIdsToDelete)
+        .eq('user_id', userId);
+        
+      const { error: folderError } = await supabase
+        .from('folders')
+        .delete()
+        .in('id', allFolderIdsToDelete)
+        .eq('user_id', userId);
+
+      if (cardsError || folderError) {
+        // If one fails, we add to queue (simplified: we just queue the top-level delete)
+        await addToSyncQueue({ table: 'folders', action: 'delete', data: { id, recursive: true } });
+      }
+    } else {
+      await addToSyncQueue({ table: 'folders', action: 'delete', data: { id, recursive: true } });
+    }
+  },
   // FILES
   async saveFile(file: SubjectFile, userId: string, isOnline: boolean) {
     await db.subject_files.put(file);
@@ -258,7 +321,28 @@ export const dataService = {
     for (const item of queue) {
       try {
         if (item.action === 'delete') {
-          await supabase.from(item.table).delete().eq('id', item.data.id).eq('user_id', userId);
+          if (item.table === 'folders' && item.data.recursive) {
+             // Handle recursive folder deletion during sync
+             // Fetch all folders to find descendants in JS
+             const { data: allFolders } = await supabase.from('folders').select('id, parent_id').eq('user_id', userId);
+             
+             const getDescendantIds = (folderId: string, folders: any[]): string[] => {
+               let ids: string[] = [];
+               const children = folders.filter(f => f.parent_id === folderId);
+               for (const child of children) {
+                 ids.push(child.id);
+                 ids.push(...getDescendantIds(child.id, folders));
+               }
+               return ids;
+             };
+             
+             const ids = [item.data.id, ...getDescendantIds(item.data.id, allFolders || [])];
+             
+             await supabase.from('flashcards').delete().in('folder_id', ids).eq('user_id', userId);
+             await supabase.from('folders').delete().in('id', ids).eq('user_id', userId);
+          } else {
+            await supabase.from(item.table).delete().eq('id', item.data.id).eq('user_id', userId);
+          }
         } else {
           const payload = { ...item.data, user_id: userId };
           // Map camelCase to snake_case for Supabase if needed
@@ -277,6 +361,11 @@ export const dataService = {
              delete payload.subjectId;
              delete payload.folderId;
              delete payload.nextReview;
+          }
+          
+          if (item.table === 'folders') {
+             payload.parent_id = payload.parentId || null;
+             delete payload.parentId;
           }
           
           if (item.table === 'notes') {

@@ -192,6 +192,8 @@ const App: React.FC = () => {
   const [studySessions, setStudySessions] = useState<StudySession[]>([]);
   const [correctQuestionsCount, setCorrectQuestionsCount] = useState(0);
   const [selectedSubjectIdForNotes, setSelectedSubjectIdForNotes] = useState<string | null>(null);
+  const [selectedSubjectIdForRepository, setSelectedSubjectIdForRepository] = useState<string | null>(null);
+  const [selectedSubjectIdForAssignments, setSelectedSubjectIdForAssignments] = useState<string | null>(null);
   const [ankiTextToGenerate, setAnkiTextToGenerate] = useState<string | null>(null);
 
   // --- Timer Global State (Pomodoro) ---
@@ -486,25 +488,29 @@ const App: React.FC = () => {
 
         if (resReadings.data) setReadings(resReadings.data);
       } else {
-        const [localCards, localTasks, localSessions] = await Promise.all([
+        const [localCards, localTasks, localSessions, localFolders] = await Promise.all([
           db.flashcards.toArray(),
           db.tasks.toArray(),
-          db.study_sessions.toArray()
+          db.study_sessions.toArray(),
+          db.folders.toArray()
         ]);
         setFlashcards(localCards);
         setTasks(localTasks);
         setStudySessions(localSessions);
+        setFolders(localFolders);
       }
     } catch (err) {
       console.error("Erro no carregamento dos dados:", err);
-      const [localCards, localTasks, localSessions] = await Promise.all([
+      const [localCards, localTasks, localSessions, localFolders] = await Promise.all([
         db.flashcards.toArray(),
         db.tasks.toArray(),
-        db.study_sessions.toArray()
+        db.study_sessions.toArray(),
+        db.folders.toArray()
       ]);
       setFlashcards(localCards);
       setTasks(localTasks);
       setStudySessions(localSessions);
+      setFolders(localFolders);
     }
   };
 
@@ -603,7 +609,7 @@ const App: React.FC = () => {
 
   return (
     <div className={`flex h-screen overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#fcfcfc]'}`}>
-      <Atmosphere isExtremeFocus={isExtremeFocus} />
+      <Atmosphere isExtremeFocus={isExtremeFocus} isSidebarOpen={isSidebarOpen} />
       
       <Suspense fallback={null}>
         <GlobalSearch 
@@ -960,6 +966,14 @@ const App: React.FC = () => {
                     onViewNotes={(subjectId) => {
                       setSelectedSubjectIdForNotes(subjectId);
                       setCurrentView(View.NoteView);
+                    }}
+                    onViewRepository={(subjectId) => {
+                      setSelectedSubjectIdForRepository(subjectId);
+                      setCurrentView(View.Repository);
+                    }}
+                    onViewAssignments={(subjectId) => {
+                      setSelectedSubjectIdForAssignments(subjectId);
+                      setCurrentView(View.Assignments);
                     }}
                     tasks={tasks}
                   />

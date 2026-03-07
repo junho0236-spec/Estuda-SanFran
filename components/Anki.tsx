@@ -155,6 +155,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [aiEvaluation, setAiEvaluation] = useState<{ score: number; feedback: string; missing_keywords: string[]; is_perfect: boolean } | null>(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
+  const [sessionQueue, setSessionQueue] = useState<Flashcard[]>([]);
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -213,11 +214,12 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     setUserWrittenAnswer('');
     setAiEvaluation(null);
     setIsDissertativeMode(false);
-    if (currentIndex < reviewQueue.length - 1) {
+    if (currentIndex < sessionQueue.length - 1) {
       setCurrentIndex(prev => prev + 1);
       setIsFlipped(false);
     } else {
       setMode('browse');
+      setSessionQueue([]);
     }
   };
 
@@ -440,49 +442,29 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     if (!confirm("Deseja eliminar esta pasta? Todos os flashcards dentro dela E de suas subpastas TAMBÉM serão excluídos permanentemente.")) return;
     
     try {
-      // Helper to get all descendant folder IDs recursively
-      const getDescendantIds = (folderId: string, allFolders: Folder[]): string[] => {
+      // 1. Delete locally and in Supabase via service
+      await dataService.deleteFolder(id, userId, isOnline);
+
+      // 2. Update local state for instant feedback
+      const allFolders = folders;
+      const getDescendantIds = (folderId: string): string[] => {
         let ids: string[] = [];
         const children = allFolders.filter(f => f.parentId === folderId);
         for (const child of children) {
           ids.push(child.id);
-          ids.push(...getDescendantIds(child.id, allFolders));
+          ids.push(...getDescendantIds(child.id));
         }
         return ids;
       };
+      const allFolderIdsToDelete = [id, ...getDescendantIds(id)];
 
-      const allFolderIdsToDelete = [id, ...getDescendantIds(id, folders)];
-
-      // 1. Delete flashcards locally first for instant feedback
       setFlashcards(prev => prev.filter(f => !f.folderId || !allFolderIdsToDelete.includes(f.folderId)));
-      
-      // 2. Delete folders locally
       setFolders(prev => prev.filter(f => !allFolderIdsToDelete.includes(f.id)));
       
       if (allFolderIdsToDelete.includes(currentFolderId || '')) {
         setCurrentFolderId(null);
       }
       setActiveMenuFolderId(null);
-
-      // 3. Perform deletions in Supabase
-      // Delete all flashcards in any of the folders being deleted
-      const { error: cardsError } = await supabase
-        .from('flashcards')
-        .delete()
-        .in('folder_id', allFolderIdsToDelete)
-        .eq('user_id', userId);
-        
-      if (cardsError) throw cardsError;
-
-      // Then delete all the folders
-      const { error: folderError } = await supabase
-        .from('folders')
-        .delete()
-        .in('id', allFolderIdsToDelete)
-        .eq('user_id', userId);
-        
-      if (folderError) throw folderError;
-
     } catch (err) {
       console.error("Erro ao eliminar pasta e cards:", err);
       alert("Erro ao eliminar pasta. Tente novamente.");
@@ -493,11 +475,14 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     const newName = prompt("Novo nome para a pasta:", currentName);
     if (!newName || newName === currentName) return;
 
+    const folder = folders.find(f => f.id === id);
+    if (!folder) return;
+
     try {
-      const { error } = await supabase.from('folders').update({ name: newName }).eq('id', id).eq('user_id', userId);
-      if (error) throw error;
+      const updatedFolder = { ...folder, name: newName };
+      await dataService.saveFolder(updatedFolder, userId, isOnline);
       
-      setFolders(prev => prev.map(f => f.id === id ? { ...f, name: newName } : f));
+      setFolders(prev => prev.map(f => f.id === id ? updatedFolder : f));
       setActiveMenuFolderId(null);
     } catch (err) {
       alert("Erro ao renomear pasta.");
@@ -953,15 +938,15 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     if (!newFolderName.trim()) return;
     const newId = Math.random().toString(36).substr(2, 9);
     try {
-      const { error } = await supabase.from('folders').insert({ 
+      const newFolder: Folder = { 
         id: newId, 
-        user_id: userId, 
         name: newFolderName, 
-        parent_id: currentFolderId,
-        color: newFolderColor
-      });
-      if (error) throw error;
-      setFolders(prev => [...prev, { id: newId, name: newFolderName, parentId: currentFolderId, color: newFolderColor }]);
+        parentId: currentFolderId, 
+        color: newFolderColor,
+        user_id: userId
+      };
+      await dataService.saveFolder(newFolder, userId, isOnline);
+      setFolders(prev => [...prev, newFolder]);
       setNewFolderName(''); 
       setNewFolderColor(FOLDER_COLORS[0].border);
       setShowFolderInput(false);
@@ -973,13 +958,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const handleUpdateFolder = async () => {
     if (!editingFolder || !editingFolder.name.trim()) return;
     try {
-      const { error } = await supabase.from('folders').update({ 
-        name: editingFolder.name,
-        color: editingFolder.color
-      }).eq('id', editingFolder.id).eq('user_id', userId);
-      
-      if (error) throw error;
-      
+      await dataService.saveFolder(editingFolder, userId, isOnline);
       setFolders(prev => prev.map(f => f.id === editingFolder.id ? editingFolder : f));
       setEditingFolder(null);
       setActiveMenuFolderId(null);
@@ -1130,11 +1109,20 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     }
   }, [reviewQueue.length, currentIndex, mode]);
 
+  // Initialize sessionQueue when entering study mode
+  useEffect(() => {
+    if (mode === 'study' && sessionQueue.length === 0 && reviewQueue.length > 0) {
+      setSessionQueue([...reviewQueue].sort(() => Math.random() - 0.5));
+    } else if (mode !== 'study' && sessionQueue.length > 0) {
+      setSessionQueue([]);
+    }
+  }, [mode, reviewQueue.length]);
+
   // Derived state for safe card access
-  const currentCard = reviewQueue[currentIndex] || null;
+  const currentCard = mode === 'study' ? (sessionQueue[currentIndex] || null) : (reviewQueue[currentIndex] || null);
 
   useEffect(() => {
-    if (!isAudioMode || mode !== 'study' || reviewQueue.length === 0) {
+    if (!isAudioMode || mode !== 'study' || sessionQueue.length === 0) {
       window.speechSynthesis.cancel();
       setIsSpeaking(false);
       return;
@@ -1144,7 +1132,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       if (isSpeaking) return;
       setIsSpeaking(true);
 
-      const card = reviewQueue[currentIndex];
+      const card = sessionQueue[currentIndex];
       if (!card) {
         setIsSpeaking(false);
         return;
@@ -1173,6 +1161,17 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
           window.speechSynthesis.speak(backUtterance);
 
           backUtterance.onend = () => {
+            // RECORD STUDY SESSION FOR CONSTANCY
+            const sessionData: StudySession = {
+              id: Math.random().toString(36).substr(2, 9),
+              user_id: userId,
+              start_time: new Date().toISOString(),
+              duration: cardTimer,
+              subject_id: card.subjectId
+            };
+            dataService.saveStudySession(sessionData, userId, isOnline);
+            if (setStudySessions) setStudySessions(prev => [sessionData, ...prev]);
+
             // Wait 2 seconds before next card
             setTimeout(() => {
               if (!isAudioMode) {
@@ -1180,7 +1179,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 return;
               }
               
-              if (currentIndex < reviewQueue.length - 1) {
+              if (currentIndex < sessionQueue.length - 1) {
                 setCurrentIndex(prev => prev + 1);
                 setIsFlipped(false);
                 setIsSpeaking(false);
@@ -1188,6 +1187,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 setMode('browse');
                 setIsAudioMode(false);
                 setIsSpeaking(false);
+                setSessionQueue([]);
               }
             }, 2000);
           };
@@ -1306,13 +1306,28 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setAiEvaluation(null);
       setIsDissertativeMode(false);
 
-      if (currentIndex < reviewQueue.length - 1) { 
-        setCurrentIndex(prev => prev + 1); 
-        setIsFlipped(false); 
-      } else { 
-        setMode('browse'); 
-        setCurrentIndex(0); 
-        setIsFlipped(false); 
+      if (quality === 0 || quality === 2) {
+        // Re-insert into session queue
+        // Anki style: if failed, it comes back in ~1 min (after a few cards)
+        // If hard, it comes back in ~6 mins (after more cards)
+        const newQueue = [...sessionQueue];
+        const offset = quality === 0 ? 4 : 10;
+        const nextPos = Math.min(currentIndex + offset + 1, newQueue.length);
+        newQueue.splice(nextPos, 0, card);
+        setSessionQueue(newQueue);
+        
+        setCurrentIndex(prev => prev + 1);
+        setIsFlipped(false);
+      } else {
+        if (currentIndex < sessionQueue.length - 1) { 
+          setCurrentIndex(prev => prev + 1); 
+          setIsFlipped(false); 
+        } else { 
+          setMode('browse'); 
+          setCurrentIndex(0); 
+          setIsFlipped(false); 
+          setSessionQueue([]);
+        }
       }
     } catch (err) { 
       alert("Erro ao atualizar revisão."); 
@@ -1379,7 +1394,16 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 </div>
               ) : (
                 <>
-                  <button onClick={() => { setMode('study'); setCurrentIndex(0); setIsFlipped(false); }} disabled={reviewQueue.length === 0} className="flex items-center gap-2 px-8 py-3.5 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest disabled:opacity-50 hover:bg-sanfran-rubiDark shadow-xl">
+                  <button 
+                    onClick={() => { 
+                      setMode('study'); 
+                      setCurrentIndex(0); 
+                      setIsFlipped(false); 
+                      setSessionQueue([]); // Reset to force re-initialization
+                    }} 
+                    disabled={reviewQueue.length === 0} 
+                    className="flex items-center gap-2 px-8 py-3.5 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest disabled:opacity-50 hover:bg-sanfran-rubiDark shadow-xl"
+                  >
                     <RotateCcw className="w-5 h-5" /> Estudar ({reviewQueue.length})
                   </button>
 
@@ -1391,6 +1415,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                           setMode('study');
                           setCurrentIndex(0);
                           setIsFlipped(false);
+                          setSessionQueue([]); // Reset to force re-initialization
                         }
                       }} 
                       className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all ${isCramMode ? 'bg-orange-600 text-white' : 'bg-white dark:bg-sanfran-rubiDark text-orange-600 border-2 border-orange-600 hover:bg-orange-50'}`}
@@ -1410,6 +1435,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                           setMode('study');
                           setCurrentIndex(0);
                           setIsFlipped(false);
+                          setSessionQueue([]); // Reset to force re-initialization
                         }
                       }} 
                       className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all ${isAudioMode ? 'bg-emerald-600 text-white' : 'bg-white dark:bg-sanfran-rubiDark text-emerald-600 border-2 border-emerald-600 hover:bg-emerald-50'}`}
@@ -2061,6 +2087,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   setCurrentIndex(0);
                   setIsFlipped(false);
                   setIsSessionModalOpen(false);
+                  setSessionQueue([]); // Force re-initialization
                 }}
                 className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-indigo-500/20 disabled:opacity-50"
               >
@@ -2071,7 +2098,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         </div>
       )}
 
-      {mode === 'study' && reviewQueue.length > 0 && (
+      {mode === 'study' && sessionQueue.length > 0 && (
         <div className={`flex flex-col items-center animate-in fade-in zoom-in ${isFocusMode ? 'w-full max-w-4xl' : 'py-10'}`}>
           <div className={`w-full max-w-2xl mb-8 flex items-center justify-between ${isFocusMode ? 'opacity-0 hover:opacity-100 transition-opacity duration-500' : ''}`}>
             <div className="flex items-center gap-4">
@@ -2082,7 +2109,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 {isFocusMode ? <Minimize2 size={14} /> : <Maximize2 size={14} />} {isFocusMode ? 'Sair do Foco' : 'Modo Foco'}
               </button>
               <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                <Clock size={14} /> {currentIndex + 1} / {reviewQueue.length}
+                <Clock size={14} /> {currentIndex + 1} / {sessionQueue.length}
               </div>
               <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400 rounded-full text-[9px] font-black uppercase tracking-widest">
                 Tempo: {Math.floor(cardTimer / 60)}:{(cardTimer % 60).toString().padStart(2, '0')}
@@ -2256,23 +2283,27 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 </button>
               ) : (
                 <div className="grid grid-cols-4 gap-4 w-full">
-                  <button onClick={() => handleReview(0)} className="flex flex-col items-center gap-2 p-4 bg-red-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform">
+                  <button onClick={() => handleReview(0)} className="flex flex-col items-center gap-1 p-4 bg-red-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform">
                     <span>Errei</span>
+                    <span className="text-[8px] opacity-60">~1 min</span>
                     <span className="px-2 py-0.5 bg-black/20 rounded text-[8px]">1</span>
                   </button>
-                  <button onClick={() => handleReview(2)} className="flex flex-col items-center gap-2 p-4 bg-orange-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform">
+                  <button onClick={() => handleReview(2)} className="flex flex-col items-center gap-1 p-4 bg-orange-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform">
                     <span>Difícil</span>
+                    <span className="text-[8px] opacity-60">~6 min</span>
                     <span className="px-2 py-0.5 bg-black/20 rounded text-[8px]">2</span>
                   </button>
-                  <button onClick={() => handleReview(3)} className="flex flex-col items-center gap-2 p-4 bg-usp-gold text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform">
+                  <button onClick={() => handleReview(3)} className="flex flex-col items-center gap-1 p-4 bg-usp-gold text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform">
                     <span>Bom</span>
+                    <span className="text-[8px] opacity-60">{currentCard.interval === 0 ? '1d' : Math.ceil(currentCard.interval * 2.5) + 'd'}</span>
                     <span className="px-2 py-0.5 bg-black/20 rounded text-[8px]">3</span>
                   </button>
                   <button 
                     onClick={() => handleReview(5)} 
-                    className={`flex flex-col items-center gap-2 p-4 bg-usp-blue text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform`}
+                    className={`flex flex-col items-center gap-1 p-4 bg-usp-blue text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform`}
                   >
                     <span>Fácil</span>
+                    <span className="text-[8px] opacity-60">{currentCard.interval === 0 ? '4d' : Math.ceil(currentCard.interval * 4) + 'd'}</span>
                     <span className="px-2 py-0.5 bg-black/20 rounded text-[8px]">4</span>
                   </button>
                 </div>
