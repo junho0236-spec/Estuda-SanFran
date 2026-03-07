@@ -162,6 +162,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
   const [sessionQueue, setSessionQueue] = useState<Flashcard[]>([]);
+  const [sessionTotal, setSessionTotal] = useState(0);
   const [learningCards, setLearningCards] = useState<Set<string>>(new Set());
 
   // Keyboard Shortcuts
@@ -1115,19 +1116,22 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     return (currentFolderId === null ? true : currentContextIds.includes(f.folderId as string));
   });
 
-  // Keep currentIndex in bounds when reviewQueue changes
+  // Keep currentIndex in bounds when sessionQueue changes
   useEffect(() => {
-    if (mode === 'study' && reviewQueue.length > 0 && currentIndex >= reviewQueue.length) {
-      setCurrentIndex(reviewQueue.length - 1);
+    if (mode === 'study' && sessionQueue.length > 0 && currentIndex >= sessionQueue.length) {
+      setCurrentIndex(sessionQueue.length - 1);
     }
-  }, [reviewQueue.length, currentIndex, mode]);
+  }, [sessionQueue.length, currentIndex, mode]);
 
   // Initialize sessionQueue when entering study mode
   useEffect(() => {
     if (mode === 'study' && sessionQueue.length === 0 && reviewQueue.length > 0) {
-      setSessionQueue([...reviewQueue].sort(() => Math.random() - 0.5));
+      const initialQueue = [...reviewQueue].sort(() => Math.random() - 0.5);
+      setSessionQueue(initialQueue);
+      setSessionTotal(initialQueue.length);
     } else if (mode !== 'study' && sessionQueue.length > 0) {
       setSessionQueue([]);
+      setSessionTotal(0);
     }
   }, [mode, reviewQueue.length]);
 
@@ -2210,7 +2214,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 {isFocusMode ? <Minimize2 size={14} /> : <Maximize2 size={14} />} {isFocusMode ? 'Sair do Foco' : 'Modo Foco'}
               </button>
               <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                <Clock size={14} /> {currentIndex + 1} / {sessionQueue.length}
+                <Clock size={14} /> {currentIndex + 1} / {sessionTotal || sessionQueue.length}
               </div>
               <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400 rounded-full text-[9px] font-black uppercase tracking-widest">
                 Tempo: {Math.floor(cardTimer / 60)}:{(cardTimer % 60).toString().padStart(2, '0')}
