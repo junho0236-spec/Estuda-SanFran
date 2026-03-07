@@ -701,20 +701,31 @@ export const evaluateDissertativeAnswer = async (question: string, correctAnswer
 
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `COMPARE AS SEGUINTES INFORMAÇÕES:
+      contents: `AVALIAÇÃO DE FLASHCARD:
       Pergunta: "${question}"
       Gabarito Esperado: "${correctAnswer}"
       Resposta do Aluno: "${userAnswer}"`,
       config: {
-        systemInstruction: `Você é um robô de correção lógica e semântica. 
-        Sua única fonte de verdade é o "Gabarito Esperado". 
+        systemInstruction: `Você é um Mentor de Estudos Inteligente. Sua tarefa é avaliar a resposta do aluno e fornecer um feedback rico e pedagógico.
         
-        REGRAS CRÍTICAS:
-        1. É PROIBIDO usar qualquer conhecimento externo. 
-        2. Se o aluno disse algo que significa o mesmo que o gabarito (mesmo que com palavras diferentes ou sinônimos), a nota DEVE ser 10.0.
-        3. Se o aluno respondeu corretamente o que está no gabarito, ignore se ele não citou outros detalhes que você conhece mas que não estão no gabarito fornecido.
-        4. Não alucine. Não invente que o aluno deveria ter citado nomes de textos, autores ou leis que não estão no "Gabarito Esperado".
-        5. Seja generoso com erros de digitação leves ou acentuação.`,
+        REGRAS DE PONTUAÇÃO (ESTRITAS):
+        1. A nota (score) deve ser baseada EXCLUSIVAMENTE no "Gabarito Esperado".
+        2. Se o aluno capturou a essência do gabarito (mesmo com sinônimos ou palavras próprias), a nota DEVE ser 10.0.
+        3. NÃO penalize o aluno por não citar detalhes técnicos que não estão no gabarito fornecido.
+        
+        REGRAS DE FEEDBACK (ENRIQUECEDORAS):
+        1. Explique POR QUE a resposta está correta ou o que faltou de forma didática.
+        2. Mesmo que a resposta esteja 100% correta, adicione um breve comentário de "Aprofundamento" ou "Contexto" relacionado ao tema para agregar valor ao estudo.
+        3. Use um tom encorajador e profissional.
+        4. Se o assunto for jurídico, cite brevemente a lógica por trás do conceito.
+        
+        FORMATO DE SAÍDA (JSON):
+        {
+          "score": 10.0,
+          "feedback": "Sua explicação didática + um breve contexto adicional aqui.",
+          "missing_keywords": ["palavras-chave que realmente faltaram em relação ao gabarito"],
+          "is_perfect": true
+        }`,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
