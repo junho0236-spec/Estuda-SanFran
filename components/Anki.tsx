@@ -165,6 +165,37 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [sessionQueue, setSessionQueue] = useState<Flashcard[]>([]);
   const [sessionTotal, setSessionTotal] = useState(0);
   const [learningCards, setLearningCards] = useState<Set<string>>(new Set());
+
+  // Persistence for Study Session
+  useEffect(() => {
+    const savedSession = localStorage.getItem(`anki_session_${userId}`);
+    if (savedSession) {
+      try {
+        const { queue, index, total, learning } = JSON.parse(savedSession);
+        if (queue && queue.length > 0) {
+          setSessionQueue(queue);
+          setCurrentIndex(index);
+          setSessionTotal(total);
+          setLearningCards(new Set(learning));
+        }
+      } catch (e) {
+        console.error("Error restoring session", e);
+      }
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    if (sessionQueue.length > 0) {
+      localStorage.setItem(`anki_session_${userId}`, JSON.stringify({
+        queue: sessionQueue,
+        index: currentIndex,
+        total: sessionTotal,
+        learning: Array.from(learningCards)
+      }));
+    } else {
+      localStorage.removeItem(`anki_session_${userId}`);
+    }
+  }, [sessionQueue, currentIndex, sessionTotal, learningCards, userId]);
   const [undoStack, setUndoStack] = useState<any[]>([]);
   const [redoStack, setRedoStack] = useState<any[]>([]);
 
@@ -1253,11 +1284,6 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setSessionTotal(initialQueue.length);
       setUndoStack([]);
       setRedoStack([]);
-    } else if (mode !== 'study' && sessionQueue.length > 0) {
-      setSessionQueue([]);
-      setSessionTotal(0);
-      setUndoStack([]);
-      setRedoStack([]);
     }
   }, [mode, reviewQueue.length]);
 
@@ -1592,15 +1618,19 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   <button 
                     onClick={() => { 
                       setMode('study'); 
-                      setCurrentIndex(0); 
-                      setIsFlipped(false); 
-                      setSessionQueue([]); // Reset to force re-initialization
-                      setLearningCards(new Set());
+                      // Only reset if session is finished or empty
+                      if (sessionQueue.length === 0 || currentIndex >= sessionQueue.length) {
+                        setCurrentIndex(0); 
+                        setIsFlipped(false); 
+                        setSessionQueue([]); // Reset to force re-initialization
+                        setLearningCards(new Set());
+                      }
                     }} 
-                    disabled={reviewQueue.length === 0} 
+                    disabled={reviewQueue.length === 0 && (sessionQueue.length === 0 || currentIndex >= sessionQueue.length)} 
                     className="flex items-center gap-2 px-8 py-3.5 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest disabled:opacity-50 hover:bg-sanfran-rubiDark shadow-xl"
                   >
-                    <RotateCcw className="w-5 h-5" /> Estudar ({reviewQueue.length})
+                    <RotateCcw className="w-5 h-5" /> 
+                    {sessionQueue.length > 0 && currentIndex < sessionQueue.length ? 'Continuar Audiência' : `Estudar (${reviewQueue.length})`}
                   </button>
 
                   <div className="relative group">
@@ -1609,15 +1639,17 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                         setIsCramMode(!isCramMode);
                         if (!isCramMode) {
                           setMode('study');
-                          setCurrentIndex(0);
-                          setIsFlipped(false);
-                          setSessionQueue([]); // Reset to force re-initialization
-                          setLearningCards(new Set());
+                          if (sessionQueue.length === 0 || currentIndex >= sessionQueue.length) {
+                            setCurrentIndex(0);
+                            setIsFlipped(false);
+                            setSessionQueue([]); // Reset to force re-initialization
+                            setLearningCards(new Set());
+                          }
                         }
                       }} 
                       className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all ${isCramMode ? 'bg-orange-600 text-white' : 'bg-white dark:bg-sanfran-rubiDark text-orange-600 border-2 border-orange-600 hover:bg-orange-50'}`}
                     >
-                      <ZapOff className="w-5 h-5" /> {isCramMode ? 'Parar Emergência' : 'Revisão de Emergência'}
+                      <ZapOff className="w-5 h-5" /> {isCramMode ? 'Parar Emergência' : (sessionQueue.length > 0 && currentIndex < sessionQueue.length ? 'Continuar Emergência' : 'Revisão de Emergência')}
                     </button>
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1 bg-slate-900 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
                       Ignorar algoritmo e estudar tudo
@@ -1630,15 +1662,17 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                         setIsAudioMode(!isAudioMode);
                         if (!isAudioMode) {
                           setMode('study');
-                          setCurrentIndex(0);
-                          setIsFlipped(false);
-                          setSessionQueue([]); // Reset to force re-initialization
-                          setLearningCards(new Set());
+                          if (sessionQueue.length === 0 || currentIndex >= sessionQueue.length) {
+                            setCurrentIndex(0);
+                            setIsFlipped(false);
+                            setSessionQueue([]); // Reset to force re-initialization
+                            setLearningCards(new Set());
+                          }
                         }
                       }} 
                       className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all ${isAudioMode ? 'bg-emerald-600 text-white' : 'bg-white dark:bg-sanfran-rubiDark text-emerald-600 border-2 border-emerald-600 hover:bg-emerald-50'}`}
                     >
-                      <Volume2 className="w-5 h-5" /> {isAudioMode ? 'Parar Áudio' : 'Modo Áudio'}
+                      <Volume2 className="w-5 h-5" /> {isAudioMode ? 'Parar Áudio' : (sessionQueue.length > 0 && currentIndex < sessionQueue.length ? 'Continuar Áudio' : 'Modo Áudio')}
                     </button>
                     {isAudioMode && (
                       <select 
@@ -2282,6 +2316,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 disabled={selectedFolderIdsForSession.size === 0}
                 onClick={() => {
                   setMode('study');
+                  // For custom sessions, we usually want to start fresh if the selection changed
+                  // but if it's the same selection, we could resume. 
+                  // For simplicity, let's always start fresh for custom sessions unless we implement more complex tracking
                   setCurrentIndex(0);
                   setIsFlipped(false);
                   setIsSessionModalOpen(false);
