@@ -165,37 +165,6 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [sessionQueue, setSessionQueue] = useState<Flashcard[]>([]);
   const [sessionTotal, setSessionTotal] = useState(0);
   const [learningCards, setLearningCards] = useState<Set<string>>(new Set());
-
-  // Persistence for Study Session
-  useEffect(() => {
-    const savedSession = localStorage.getItem(`anki_session_${userId}`);
-    if (savedSession) {
-      try {
-        const { queue, index, total, learning } = JSON.parse(savedSession);
-        if (queue && queue.length > 0) {
-          setSessionQueue(queue);
-          setCurrentIndex(index);
-          setSessionTotal(total);
-          setLearningCards(new Set(learning));
-        }
-      } catch (e) {
-        console.error("Error restoring session", e);
-      }
-    }
-  }, [userId]);
-
-  useEffect(() => {
-    if (sessionQueue.length > 0) {
-      localStorage.setItem(`anki_session_${userId}`, JSON.stringify({
-        queue: sessionQueue,
-        index: currentIndex,
-        total: sessionTotal,
-        learning: Array.from(learningCards)
-      }));
-    } else {
-      localStorage.removeItem(`anki_session_${userId}`);
-    }
-  }, [sessionQueue, currentIndex, sessionTotal, learningCards, userId]);
   const [undoStack, setUndoStack] = useState<any[]>([]);
   const [redoStack, setRedoStack] = useState<any[]>([]);
 
@@ -1618,19 +1587,23 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   <button 
                     onClick={() => { 
                       setMode('study'); 
-                      // Only reset if session is finished or empty
-                      if (sessionQueue.length === 0 || currentIndex >= sessionQueue.length) {
-                        setCurrentIndex(0); 
-                        setIsFlipped(false); 
-                        setSessionQueue([]); // Reset to force re-initialization
-                        setLearningCards(new Set());
-                      }
+                      setCurrentIndex(0); 
+                      setIsFlipped(false); 
+                      setSessionQueue([]); // Reset to force re-initialization
+                      setLearningCards(new Set());
                     }} 
-                    disabled={reviewQueue.length === 0 && (sessionQueue.length === 0 || currentIndex >= sessionQueue.length)} 
-                    className="flex items-center gap-2 px-8 py-3.5 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest disabled:opacity-50 hover:bg-sanfran-rubiDark shadow-xl"
+                    disabled={reviewQueue.length === 0} 
+                    className="flex flex-col items-center justify-center px-8 py-2.5 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest disabled:opacity-50 hover:bg-sanfran-rubiDark shadow-xl"
                   >
-                    <RotateCcw className="w-5 h-5" /> 
-                    {sessionQueue.length > 0 && currentIndex < sessionQueue.length ? 'Continuar Audiência' : `Estudar (${reviewQueue.length})`}
+                    <div className="flex items-center gap-2 mb-1">
+                      <RotateCcw className="w-5 h-5" /> 
+                      Estudar
+                    </div>
+                    <div className="flex items-center gap-3 text-[10px]">
+                      <span className="text-blue-200" title="Novos">{reviewQueue.filter(c => c.interval === 0).length}</span>
+                      <span className="text-red-200" title="Aprendizagem">0</span>
+                      <span className="text-green-200" title="A Revisar">{reviewQueue.filter(c => c.interval > 0).length}</span>
+                    </div>
                   </button>
 
                   <div className="relative group">
@@ -1639,17 +1612,15 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                         setIsCramMode(!isCramMode);
                         if (!isCramMode) {
                           setMode('study');
-                          if (sessionQueue.length === 0 || currentIndex >= sessionQueue.length) {
-                            setCurrentIndex(0);
-                            setIsFlipped(false);
-                            setSessionQueue([]); // Reset to force re-initialization
-                            setLearningCards(new Set());
-                          }
+                          setCurrentIndex(0);
+                          setIsFlipped(false);
+                          setSessionQueue([]); // Reset to force re-initialization
+                          setLearningCards(new Set());
                         }
                       }} 
-                      className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all ${isCramMode ? 'bg-orange-600 text-white' : 'bg-white dark:bg-sanfran-rubiDark text-orange-600 border-2 border-orange-600 hover:bg-orange-50'}`}
+                      className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all h-full ${isCramMode ? 'bg-orange-600 text-white' : 'bg-white dark:bg-sanfran-rubiDark text-orange-600 border-2 border-orange-600 hover:bg-orange-50'}`}
                     >
-                      <ZapOff className="w-5 h-5" /> {isCramMode ? 'Parar Emergência' : (sessionQueue.length > 0 && currentIndex < sessionQueue.length ? 'Continuar Emergência' : 'Revisão de Emergência')}
+                      <ZapOff className="w-5 h-5" /> {isCramMode ? 'Parar Emergência' : 'Revisão de Emergência'}
                     </button>
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1 bg-slate-900 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
                       Ignorar algoritmo e estudar tudo
@@ -1662,17 +1633,15 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                         setIsAudioMode(!isAudioMode);
                         if (!isAudioMode) {
                           setMode('study');
-                          if (sessionQueue.length === 0 || currentIndex >= sessionQueue.length) {
-                            setCurrentIndex(0);
-                            setIsFlipped(false);
-                            setSessionQueue([]); // Reset to force re-initialization
-                            setLearningCards(new Set());
-                          }
+                          setCurrentIndex(0);
+                          setIsFlipped(false);
+                          setSessionQueue([]); // Reset to force re-initialization
+                          setLearningCards(new Set());
                         }
                       }} 
-                      className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all ${isAudioMode ? 'bg-emerald-600 text-white' : 'bg-white dark:bg-sanfran-rubiDark text-emerald-600 border-2 border-emerald-600 hover:bg-emerald-50'}`}
+                      className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all h-full ${isAudioMode ? 'bg-emerald-600 text-white' : 'bg-white dark:bg-sanfran-rubiDark text-emerald-600 border-2 border-emerald-600 hover:bg-emerald-50'}`}
                     >
-                      <Volume2 className="w-5 h-5" /> {isAudioMode ? 'Parar Áudio' : (sessionQueue.length > 0 && currentIndex < sessionQueue.length ? 'Continuar Áudio' : 'Modo Áudio')}
+                      <Volume2 className="w-5 h-5" /> {isAudioMode ? 'Parar Áudio' : 'Modo Áudio'}
                     </button>
                     {isAudioMode && (
                       <select 
@@ -2346,8 +2315,19 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 {isFocusMode ? 'Sair do Foco' : 'Modo Foco'}
                 <span className="px-1.5 py-0.5 bg-black/10 dark:bg-white/10 rounded text-[8px] ml-1">F</span>
               </button>
-              <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                <Clock size={14} /> {currentIndex + 1} / {sessionTotal || sessionQueue.length}
+              <div className="flex items-center gap-3 text-[11px] font-black uppercase tracking-widest">
+                <span className="text-blue-500 flex items-center gap-1" title="Novos">
+                  <div className="w-2 h-2 rounded-full bg-blue-500"></div> 
+                  {sessionQueue.slice(currentIndex).filter(c => c.interval === 0 && !learningCards.has(c.id)).length}
+                </span>
+                <span className="text-red-500 flex items-center gap-1" title="Aprendizagem">
+                  <div className="w-2 h-2 rounded-full bg-red-500"></div> 
+                  {sessionQueue.slice(currentIndex).filter(c => learningCards.has(c.id)).length}
+                </span>
+                <span className="text-green-500 flex items-center gap-1" title="A Revisar">
+                  <div className="w-2 h-2 rounded-full bg-green-500"></div> 
+                  {sessionQueue.slice(currentIndex).filter(c => c.interval > 0 && !learningCards.has(c.id)).length}
+                </span>
               </div>
               <div className="flex items-center gap-1 ml-2">
                 <button 
