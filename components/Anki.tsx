@@ -262,6 +262,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      
       if (mode !== 'study' || isDissertativeMode) return;
       
       // Space to flip
@@ -283,6 +286,16 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         e.preventDefault();
         redoAction();
       }
+
+      // Focus Mode Toggle
+      if (e.code === 'KeyF') {
+        e.preventDefault();
+        setIsFocusMode(prev => !prev);
+      }
+      if (e.code === 'Escape' && isFocusMode) {
+        e.preventDefault();
+        setIsFocusMode(false);
+      }
       
       // 1, 2, 3, 4 for ratings (if flipped)
       if (isFlipped && !isCramMode) {
@@ -293,14 +306,14 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       }
 
       // Enter for next in Cram Mode (if flipped)
-      if (isFlipped && isCramMode && e.key === 'Enter') {
+      if (isFlipped && isCramMode && (e.key === 'Enter' || e.key === 'ArrowRight')) {
         handleNextCram();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mode, isFlipped, isDissertativeMode, isCramMode]);
+  }, [mode, isFlipped, isDissertativeMode, isCramMode, isFocusMode]);
 
   const handleNextCram = async () => {
     if (!currentCard) return;
@@ -1333,39 +1346,6 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   }, [isAudioMode, mode, currentIndex, reviewQueue, audioSpeed]);
 
   useEffect(() => {
-    if (mode !== 'study' || reviewQueue.length === 0) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if typing in an input
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-
-      if (e.code === 'Space') {
-        e.preventDefault();
-        setIsFlipped(prev => !prev);
-      }
-
-      if (isFlipped && !isCramMode) {
-        if (e.key === '1') handleReview(0);
-        if (e.key === '2') handleReview(2);
-        if (e.key === '3') handleReview(3);
-        if (e.key === '4') handleReview(5);
-      } else if (isFlipped && isCramMode) {
-        if (e.key === 'Enter' || e.key === 'Space' || e.key === 'ArrowRight') {
-          if (currentIndex < reviewQueue.length - 1) {
-            setCurrentIndex(prev => prev + 1);
-            setIsFlipped(false);
-          } else {
-            setMode('browse');
-          }
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mode, isFlipped, isCramMode, currentIndex, reviewQueue]);
-
-  useEffect(() => {
     if (mode === 'study') {
       setCardStartTime(Date.now());
       setCardTimer(0);
@@ -2325,7 +2305,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 onClick={() => setIsFocusMode(!isFocusMode)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all ${isFocusMode ? 'bg-white text-slate-950' : 'bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-slate-700'}`}
               >
-                {isFocusMode ? <Minimize2 size={14} /> : <Maximize2 size={14} />} {isFocusMode ? 'Sair do Foco' : 'Modo Foco'}
+                {isFocusMode ? <Minimize2 size={14} /> : <Maximize2 size={14} />} 
+                {isFocusMode ? 'Sair do Foco' : 'Modo Foco'}
+                <span className="px-1.5 py-0.5 bg-black/10 dark:bg-white/10 rounded text-[8px] ml-1">F</span>
               </button>
               <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 <Clock size={14} /> {currentIndex + 1} / {sessionTotal || sessionQueue.length}
