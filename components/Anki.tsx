@@ -165,6 +165,99 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [sessionQueue, setSessionQueue] = useState<Flashcard[]>([]);
   const [sessionTotal, setSessionTotal] = useState(0);
   const [learningCards, setLearningCards] = useState<Set<string>>(new Set());
+  const [undoStack, setUndoStack] = useState<any[]>([]);
+  const [redoStack, setRedoStack] = useState<any[]>([]);
+
+  const pushToHistory = () => {
+    const currentState = {
+      currentIndex,
+      sessionQueue: [...sessionQueue],
+      learningCards: new Set(learningCards),
+      isFlipped,
+      userWrittenAnswer,
+      aiEvaluation,
+      followUpChat: [...followUpChat],
+      isDissertativeMode,
+      // We store the current state of the card being reviewed to revert it if needed
+      cardState: sessionQueue[currentIndex] ? { ...sessionQueue[currentIndex] } : null
+    };
+    setUndoStack(prev => [...prev.slice(-19), currentState]); // Limit to 20 items
+    setRedoStack([]); // Clear redo stack on new action
+  };
+
+  const undoAction = () => {
+    if (undoStack.length === 0) return;
+
+    const prevState = undoStack[undoStack.length - 1];
+    const currentState = {
+      currentIndex,
+      sessionQueue: [...sessionQueue],
+      learningCards: new Set(learningCards),
+      isFlipped,
+      userWrittenAnswer,
+      aiEvaluation,
+      followUpChat: [...followUpChat],
+      isDissertativeMode,
+      cardState: sessionQueue[currentIndex] ? { ...sessionQueue[currentIndex] } : null
+    };
+
+    setRedoStack(prev => [...prev, currentState]);
+    setUndoStack(prev => prev.slice(0, -1));
+
+    // Restore state
+    setCurrentIndex(prevState.currentIndex);
+    setSessionQueue(prevState.sessionQueue);
+    setLearningCards(prevState.learningCards);
+    setIsFlipped(prevState.isFlipped);
+    setUserWrittenAnswer(prevState.userWrittenAnswer);
+    setAiEvaluation(prevState.aiEvaluation);
+    setFollowUpChat(prevState.followUpChat);
+    setIsDissertativeMode(prevState.isDissertativeMode);
+
+    // Revert the card in the global flashcards state if it was updated
+    if (prevState.cardState) {
+      setFlashcards(prev => prev.map(f => f.id === prevState.cardState.id ? prevState.cardState : f));
+      // In a real app, we might want to revert the DB change too, 
+      // but for a "undo" in a study session, reverting local state is usually enough 
+      // until the next sync or if we explicitly save it back.
+      dataService.saveFlashcard(prevState.cardState, userId, isOnline);
+    }
+  };
+
+  const redoAction = () => {
+    if (redoStack.length === 0) return;
+
+    const nextState = redoStack[redoStack.length - 1];
+    const currentState = {
+      currentIndex,
+      sessionQueue: [...sessionQueue],
+      learningCards: new Set(learningCards),
+      isFlipped,
+      userWrittenAnswer,
+      aiEvaluation,
+      followUpChat: [...followUpChat],
+      isDissertativeMode,
+      cardState: sessionQueue[currentIndex] ? { ...sessionQueue[currentIndex] } : null
+    };
+
+    setUndoStack(prev => [...prev, currentState]);
+    setRedoStack(prev => prev.slice(0, -1));
+
+    // Restore state
+    setCurrentIndex(nextState.currentIndex);
+    setSessionQueue(nextState.sessionQueue);
+    setLearningCards(nextState.learningCards);
+    setIsFlipped(nextState.isFlipped);
+    setUserWrittenAnswer(nextState.userWrittenAnswer);
+    setAiEvaluation(nextState.aiEvaluation);
+    setFollowUpChat(nextState.followUpChat);
+    setIsDissertativeMode(nextState.isDissertativeMode);
+
+    if (nextState.cardState) {
+      setFlashcards(prev => prev.map(f => f.id === nextState.cardState.id ? nextState.cardState : f));
+      dataService.saveFlashcard(nextState.cardState, userId, isOnline);
+    }
+  };
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -175,6 +268,20 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       if (e.code === 'Space') {
         e.preventDefault();
         setIsFlipped(prev => !prev);
+      }
+
+      // Undo/Redo
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          redoAction();
+        } else {
+          undoAction();
+        }
+      }
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyY') {
+        e.preventDefault();
+        redoAction();
       }
       
       // 1, 2, 3, 4 for ratings (if flipped)
@@ -198,6 +305,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const handleNextCram = async () => {
     if (!currentCard) return;
     
+    pushToHistory();
     setUserWrittenAnswer('');
     setAiEvaluation(null);
     setFollowUpChat([]);
@@ -1130,9 +1238,13 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       const initialQueue = [...reviewQueue].sort(() => Math.random() - 0.5);
       setSessionQueue(initialQueue);
       setSessionTotal(initialQueue.length);
+      setUndoStack([]);
+      setRedoStack([]);
     } else if (mode !== 'study' && sessionQueue.length > 0) {
       setSessionQueue([]);
       setSessionTotal(0);
+      setUndoStack([]);
+      setRedoStack([]);
     }
   }, [mode, reviewQueue.length]);
 
@@ -1318,6 +1430,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
   const handleReview = async (quality: number) => {
     if (!currentCard) return;
+    pushToHistory();
     const card = currentCard;
     const isNew = card.interval === 0;
     const isLearning = learningCards.has(card.id);
@@ -2216,6 +2329,24 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               </button>
               <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 <Clock size={14} /> {currentIndex + 1} / {sessionTotal || sessionQueue.length}
+              </div>
+              <div className="flex items-center gap-1 ml-2">
+                <button 
+                  onClick={undoAction} 
+                  disabled={undoStack.length === 0}
+                  className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg text-slate-400 disabled:opacity-30 transition-colors"
+                  title="Desfazer (Ctrl+Z)"
+                >
+                  <RotateCcw size={14} />
+                </button>
+                <button 
+                  onClick={redoAction} 
+                  disabled={redoStack.length === 0}
+                  className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg text-slate-400 disabled:opacity-30 transition-colors scale-x-[-1]"
+                  title="Refazer (Ctrl+Y)"
+                >
+                  <RotateCcw size={14} />
+                </button>
               </div>
               <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400 rounded-full text-[9px] font-black uppercase tracking-widest">
                 Tempo: {Math.floor(cardTimer / 60)}:{(cardTimer % 60).toString().padStart(2, '0')}
