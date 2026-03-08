@@ -1422,15 +1422,22 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       newInterval = 0;
       shouldReinsert = true;
       offset = 4; // ~1 min
-      setLearningCards(prev => {
-        const next = new Set(prev);
-        next.delete(card.id);
-        return next;
-      });
+      setLearningCards(prev => new Set(prev).add(card.id));
     } else if (quality === 2) { // Hard
-      newInterval = isNew ? 0 : Math.ceil(card.interval * 1.2);
-      shouldReinsert = true;
-      offset = 10; // ~6 min
+      if (isNew || isLearning) {
+        newInterval = 0;
+        shouldReinsert = true;
+        offset = 10; // ~6 min
+        setLearningCards(prev => new Set(prev).add(card.id));
+      } else {
+        newInterval = Math.ceil(card.interval * 1.2);
+        shouldReinsert = false;
+        setLearningCards(prev => {
+          const next = new Set(prev);
+          next.delete(card.id);
+          return next;
+        });
+      }
     } else if (quality === 3) { // Good
       if (isNew && !isLearning) {
         newInterval = 0;
