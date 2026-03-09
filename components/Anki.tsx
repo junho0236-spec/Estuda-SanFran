@@ -2256,13 +2256,13 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-10">
           {currentFolders.map(folder => {
             const stats = getFolderStats(folder.id);
             const hasUpdate = folder.original_deck_id && publicDecks.some(pd => pd.id === folder.original_deck_id && (pd.version || 1) > (folder.version || 1));
             
             return (
-              <div key={folder.id} onClick={() => setCurrentFolderId(folder.id)} className={`group bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2rem] border-2 border-slate-200 dark:border-sanfran-rubi/40 shadow-xl cursor-pointer hover:shadow-2xl hover:-translate-y-1 border-l-[10px] ${folder.color || 'border-l-usp-gold'} transition-all relative`}>
+              <div key={folder.id} onClick={() => setCurrentFolderId(folder.id)} className={`group bg-white dark:bg-sanfran-rubiDark/50 p-10 rounded-[3rem] border-2 border-slate-200 dark:border-sanfran-rubi/40 shadow-xl cursor-pointer hover:shadow-2xl hover:-translate-y-1 border-l-[10px] ${folder.color || 'border-l-usp-gold'} transition-all relative`}>
                 {hasUpdate && (
                   <div className="absolute -top-3 -right-3 z-20 animate-bounce">
                     <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 text-white rounded-full shadow-lg border-2 border-white dark:border-slate-900">
@@ -2320,40 +2320,44 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                     )}
                   </div>
                 </div>
-                {(() => {
-                  const IconComp = FOLDER_ICONS.find(i => i.value === folder.icon)?.icon || FolderIcon;
-                  return <IconComp className={`${folder.color?.replace('border-l-', 'text-') || 'text-usp-gold'} w-8 h-8 mb-4`} />;
-                })()}
-                <h4 className="font-black text-slate-950 dark:text-white uppercase tracking-tight mb-1 line-clamp-1">{folder.name}</h4>
-                
-                {folder.targetDate && (
-                  <div className="flex items-center gap-1 text-[9px] font-black text-sanfran-rubi uppercase tracking-widest mb-3">
-                    <Calendar size={10} />
-                    Alvo: {(() => {
-                      const d = new Date(folder.targetDate);
-                      return `${d.getUTCDate().toString().padStart(2, '0')}/${(d.getUTCMonth() + 1).toString().padStart(2, '0')}/${d.getUTCFullYear()}`;
-                    })()}
-                  </div>
-                )}
-                {!folder.targetDate && <div className="mb-3 h-4"></div>}
+                <div className="flex items-start justify-between mb-6">
+                  {(() => {
+                    const IconComp = FOLDER_ICONS.find(i => i.value === folder.icon)?.icon || FolderIcon;
+                    return <IconComp className={`${folder.color?.replace('border-l-', 'text-') || 'text-usp-gold'} w-10 h-10`} />;
+                  })()}
+                  
+                  {folder.targetDate && (
+                    <div className="px-3 py-1 bg-sanfran-rubi/10 border border-sanfran-rubi/20 rounded-full flex items-center gap-1.5">
+                      <Calendar size={10} className="text-sanfran-rubi" />
+                      <span className="text-[9px] font-black text-sanfran-rubi uppercase tracking-widest">
+                        {(() => {
+                          const d = new Date(folder.targetDate);
+                          return `${d.getUTCDate().toString().padStart(2, '0')}/${(d.getUTCMonth() + 1).toString().padStart(2, '0')}`;
+                        })()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <h4 className="font-black text-slate-950 dark:text-white uppercase text-xl tracking-tight mb-6 line-clamp-1">{folder.name}</h4>
                 
                 {/* Anki Style Metrics */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-                  <div className="flex flex-col items-center text-center bg-blue-50 dark:bg-blue-900/20 p-2 rounded-xl">
-                    <span className="text-[8px] font-black text-blue-500 uppercase tracking-wider">Novos</span>
-                    <span className="text-sm font-black text-blue-600">{stats.newCount}</span>
+                <div className="flex items-center gap-6 mb-6">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Novos</span>
+                    <span className="text-xl font-black text-blue-600 leading-none">{stats.newCount}</span>
                   </div>
-                  <div className="flex flex-col items-center text-center bg-orange-50 dark:bg-orange-900/20 p-2 rounded-xl">
-                    <span className="text-[8px] font-black text-orange-500 uppercase tracking-wider">Aprender</span>
-                    <span className="text-sm font-black text-orange-600">{stats.learningCount}</span>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-orange-500 uppercase tracking-widest mb-1">Aprender</span>
+                    <span className="text-xl font-black text-orange-600 leading-none">{stats.learningCount}</span>
                   </div>
-                  <div className="flex flex-col items-center text-center bg-emerald-50 dark:bg-emerald-900/20 p-2 rounded-xl">
-                    <span className="text-[8px] font-black text-emerald-500 uppercase tracking-wider">Revisar</span>
-                    <span className="text-sm font-black text-emerald-600">{stats.reviewCount}</span>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Revisar</span>
+                    <span className="text-xl font-black text-emerald-600 leading-none">{stats.reviewCount}</span>
                   </div>
-                  <div className="flex flex-col items-center text-center bg-slate-50 dark:bg-white/5 p-2 rounded-xl">
-                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider">Domínio</span>
-                    <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">{stats.mastery}%</span>
+                  <div className="flex flex-col ml-auto text-right">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Domínio</span>
+                    <span className="text-xl font-black text-emerald-600 dark:text-emerald-400 leading-none">{stats.mastery}%</span>
                   </div>
                 </div>
 
@@ -2375,7 +2379,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               <div 
                 key={card.id} 
                 onClick={() => isSelectionMode ? toggleCardSelection(card.id) : setEditingCard(card)}
-                className={`group bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2rem] border-2 shadow-xl flex flex-col justify-between min-h-[240px] border-l-[10px] transition-all relative cursor-pointer ${isSelected ? 'border-sanfran-rubi bg-red-50/30 dark:bg-sanfran-rubi/10' : 'border-slate-200 dark:border-sanfran-rubi/40 hover:border-sanfran-rubi/50'}`} 
+                className={`group bg-white dark:bg-sanfran-rubiDark/50 p-10 rounded-[3rem] border-2 shadow-xl flex flex-col justify-between min-h-[240px] border-l-[10px] transition-all relative cursor-pointer ${isSelected ? 'border-sanfran-rubi bg-red-50/30 dark:bg-sanfran-rubi/10' : 'border-slate-200 dark:border-sanfran-rubi/40 hover:border-sanfran-rubi/50'}`} 
                 style={{ borderLeftColor: isSelected ? undefined : (subject?.color || '#9B111E') }}
               >
                 {!isSelectionMode && (
@@ -2433,7 +2437,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
             </div>
             
             <div className="p-10 max-h-[400px] overflow-y-auto">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {(folders || []).filter(f => !f.parentId).map(folder => {
                   const isSelected = selectedFolderIdsForSession.has(folder.id);
                   const stats = getFolderStats(folder.id);
@@ -2446,7 +2450,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                         else next.add(folder.id);
                         setSelectedFolderIdsForSession(next);
                       }}
-                      className={`p-6 rounded-2xl border-2 cursor-pointer transition-all flex items-center justify-between ${
+                      className={`p-8 rounded-[2rem] border-2 cursor-pointer transition-all flex items-center justify-between ${
                         isSelected ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-100 dark:border-white/5 hover:border-indigo-300'
                       }`}
                     >
