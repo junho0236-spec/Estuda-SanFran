@@ -1,9 +1,9 @@
 import Dexie, { Table } from 'dexie';
-import { Flashcard, Task, StudySession, Note, SubjectFile, Folder } from '../types';
+import { Flashcard, Task, StudySession, Note, SubjectFile, Folder, Subject } from '../types';
 
 export interface OfflineSyncQueue {
   id?: number;
-  table: 'flashcards' | 'tasks' | 'study_sessions' | 'notes' | 'subject_files' | 'folders';
+  table: 'flashcards' | 'tasks' | 'study_sessions' | 'notes' | 'subject_files' | 'folders' | 'subjects';
   action: 'insert' | 'update' | 'delete';
   data: any;
   timestamp: string;
@@ -12,6 +12,7 @@ export interface OfflineSyncQueue {
 export class SanFranOfflineDB extends Dexie {
   flashcards!: Table<Flashcard>;
   folders!: Table<Folder>;
+  subjects!: Table<Subject>;
   tasks!: Table<Task>;
   study_sessions!: Table<StudySession>;
   notes!: Table<Note>;
@@ -20,9 +21,10 @@ export class SanFranOfflineDB extends Dexie {
 
   constructor() {
     super('SanFranOfflineDB');
-    this.version(2).stores({
+    this.version(3).stores({
       flashcards: 'id, subjectId, folderId',
       folders: 'id, parentId',
+      subjects: 'id',
       tasks: 'id, subjectId, dueDate',
       study_sessions: 'id, subject_id, start_time',
       notes: 'id, subject_id, user_id',

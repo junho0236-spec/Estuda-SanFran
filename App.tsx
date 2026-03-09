@@ -191,6 +191,7 @@ const App: React.FC = () => {
   const [readings, setReadings] = useState<Reading[]>([]);
   const [studySessions, setStudySessions] = useState<StudySession[]>([]);
   const [correctQuestionsCount, setCorrectQuestionsCount] = useState(0);
+  const [confidenceLevels, setConfidenceLevels] = useState<Record<string, 'certeza' | 'duvida' | 'chute'>>({});
   const [selectedSubjectIdForNotes, setSelectedSubjectIdForNotes] = useState<string | null>(null);
   const [selectedSubjectIdForRepository, setSelectedSubjectIdForRepository] = useState<string | null>(null);
   const [selectedSubjectIdForAssignments, setSelectedSubjectIdForAssignments] = useState<string | null>(null);
@@ -440,18 +441,46 @@ const App: React.FC = () => {
           supabase.from('tasks').select('*').eq('user_id', userId).is('archived_at', null).order('created_at', { ascending: false }),
           supabase.from('study_sessions').select('*').eq('user_id', userId).order('start_time', { ascending: false }),
           supabase.from('readings').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-          supabase.from('user_progress').select('correct_count').eq('user_id', userId).maybeSingle()
+          supabase.from('user_progress').select('correct_count, confidence_levels').eq('user_id', userId).maybeSingle()
         ]);
 
-        if (resFlds.data) setFolders(resFlds.data.map(f => ({ 
-          id: f.id, 
-          name: f.name, 
-          parentId: f.parent_id,
-          color: f.color,
-          icon: f.icon || undefined,
-          targetDate: f.target_date || undefined
-        })));
-        if (resProgress.data) setCorrectQuestionsCount(resProgress.data.correct_count || 0);
+        if (resFlds.data) {
+          const formattedFolders = resFlds.data.map(f => ({ 
+            id: f.id, 
+            name: f.name, 
+            parentId: f.parent_id,
+            color: f.color,
+            icon: f.icon || undefined,
+            targetDate: f.target_date || undefined
+          }));
+
+          const syncCount = await db.syncQueue.count();
+          if (syncCount === 0) {
+            const localFolders = await db.folders.toArray();
+            const remoteIds = new Set(formattedFolders.map(f => f.id));
+            const idsToDelete = localFolders.filter(f => !remoteIds.has(f.id)).map(f => f.id);
+            if (idsToDelete.length > 0) await db.folders.bulkDelete(idsToDelete);
+            await db.folders.bulkPut(formattedFolders);
+          }
+          setFolders(formattedFolders);
+        }
+        
+        if (subs) {
+          const syncCount = await db.syncQueue.count();
+          if (syncCount === 0) {
+            const localSubs = await db.subjects.toArray();
+            const remoteIds = new Set(subs.map(s => s.id));
+            const idsToDelete = localSubs.filter(s => !remoteIds.has(s.id)).map(s => s.id);
+            if (idsToDelete.length > 0) await db.subjects.bulkDelete(idsToDelete);
+            await db.subjects.bulkPut(subs);
+          }
+          setSubjects(subs);
+        }
+
+        if (resProgress.data) {
+          setCorrectQuestionsCount(resProgress.data.correct_count || 0);
+          setConfidenceLevels(resProgress.data.confidence_levels || {});
+        }
         
         if (resCards.data) {
           const localCards = await db.flashcards.toArray();
@@ -482,6 +511,14 @@ const App: React.FC = () => {
           const syncCount = await db.syncQueue.count();
           if (syncCount === 0) {
             console.log(`[App] Sincronizando ${formattedCards.length} flashcards do Supabase para o IndexedDB local.`);
+            
+            const remoteIds = new Set(formattedCards.map(c => c.id));
+            const idsToDelete = localCards.filter(c => !remoteIds.has(c.id)).map(c => c.id);
+            if (idsToDelete.length > 0) {
+              console.log(`[App] Removendo ${idsToDelete.length} flashcards locais obsoletos.`);
+              await db.flashcards.bulkDelete(idsToDelete);
+            }
+
             setFlashcards(formattedCards);
             await db.flashcards.bulkPut(formattedCards);
           } else {
@@ -497,13 +534,28 @@ const App: React.FC = () => {
             id: t.id, title: t.title, completed: t.completed, subjectId: t.subject_id, dueDate: t.due_date, completedAt: t.completed_at,
             priority: t.priority || 'normal', category: t.category || 'geral', archived_at: t.archived_at
           }));
+
+          const syncCount = await db.syncQueue.count();
+          if (syncCount === 0) {
+            const localTasks = await db.tasks.toArray();
+            const remoteIds = new Set(formattedTasks.map(t => t.id));
+            const idsToDelete = localTasks.filter(t => !remoteIds.has(t.id)).map(t => t.id);
+            if (idsToDelete.length > 0) await db.tasks.bulkDelete(idsToDelete);
+            await db.tasks.bulkPut(formattedTasks);
+          }
           setTasks(formattedTasks);
-          await db.tasks.bulkPut(formattedTasks);
         }
         
         if (resSessions.data) {
+          const syncCount = await db.syncQueue.count();
+          if (syncCount === 0) {
+            const localSessions = await db.study_sessions.toArray();
+            const remoteIds = new Set(resSessions.data.map(s => s.id));
+            const idsToDelete = localSessions.filter(s => !remoteIds.has(s.id)).map(s => s.id);
+            if (idsToDelete.length > 0) await db.study_sessions.bulkDelete(idsToDelete);
+            await db.study_sessions.bulkPut(resSessions.data);
+          }
           setStudySessions(resSessions.data);
-          await db.study_sessions.bulkPut(resSessions.data);
         }
 
         if (resReadings.data) setReadings(resReadings.data);
@@ -626,6 +678,26 @@ const App: React.FC = () => {
 
   // Helper to check if current view is a child of SanFran OAB
   const isOABChild = [View.OabCountdown].includes(currentView);
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      // Limpa dados locais para evitar vazamento entre usuários e garantir sincronização limpa no próximo login
+      await Promise.all([
+        db.flashcards.clear(),
+        db.tasks.clear(),
+        db.study_sessions.clear(),
+        db.notes.clear(),
+        db.subject_files.clear(),
+        db.folders.clear(),
+        db.subjects.clear(),
+        db.syncQueue.clear()
+      ]);
+      window.location.reload();
+    } catch (err) {
+      console.error("Erro ao encerrar sessão:", err);
+    }
+  };
 
   return (
     <div className={`flex h-screen overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#fcfcfc]'}`}>
@@ -773,7 +845,7 @@ const App: React.FC = () => {
             {isDarkMode ? 'Modo Escuro' : 'Modo Claro'}
             {isDarkMode ? <Moon className="w-4 h-4 text-usp-blue" /> : <Sun className="w-4 h-4 text-usp-gold" />}
           </button>
-          <button onClick={() => supabase.auth.signOut()} className="w-full flex items-center justify-center gap-2 px-4 py-3 text-slate-400 hover:text-red-500 font-black uppercase text-[10px] tracking-widest transition-colors hover:bg-red-50 dark:hover:bg-red-900/10 rounded-2xl"><LogOut className="w-4 h-4" /> Encerrar Sessão</button>
+          <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 px-4 py-3 text-slate-400 hover:text-red-500 font-black uppercase text-[10px] tracking-widest transition-colors hover:bg-red-50 dark:hover:bg-red-900/10 rounded-2xl"><LogOut className="w-4 h-4" /> Encerrar Sessão</button>
         </div>
       </aside>
 
@@ -929,7 +1001,7 @@ const App: React.FC = () => {
                 {currentView === View.SpeedReader && <SpeedReader />}
                 {currentView === View.Mnemonics && <Mnemonics userId={session.user.id} />}
                 {currentView === View.ReverseSchedule && <ReverseStudyPlanner userId={session.user.id} />}
-                {currentView === View.Statistics && <Statistics studySessions={studySessions} flashcards={flashcards} tasks={tasks} subjects={subjects} correctQuestionsCount={correctQuestionsCount} />}
+                {currentView === View.Statistics && <Statistics studySessions={studySessions} flashcards={flashcards} tasks={tasks} subjects={subjects} correctQuestionsCount={correctQuestionsCount} confidenceLevels={confidenceLevels} />}
                 
                 {currentView === View.Duel && activeDuel && (
                   <DuelArena 

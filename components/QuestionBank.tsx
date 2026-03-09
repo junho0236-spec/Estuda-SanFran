@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
-import { Question, UserProgress, Notebook, Folder, Flashcard, ConfidenceLevel } from '../types';
+import { Question, UserProgress, Notebook, Folder, Flashcard } from '../types';
 import { sampleQuestions } from './sampleQuestions';
 import { GoogleGenAI, Type } from '@google/genai';
 import Markdown from 'react-markdown';
@@ -83,28 +83,6 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
-  const [showConfidenceSelection, setShowConfidenceSelection] = useState(false);
-  const [confidenceLevel, setConfidenceLevel] = useState<ConfidenceLevel | null>(null);
-  const [confidenceLogs, setConfidenceLogs] = useState<Record<string, ConfidenceLevel>>({});
-  const [pendingQuestion, setPendingQuestion] = useState<Question | null>(null);
-
-  const handleConfidenceSelection = (level: ConfidenceLevel) => {
-    if (!pendingQuestion || selectedOption === null) return;
-    
-    setConfidenceLevel(level);
-    setShowConfidenceSelection(false);
-    
-    // Update confidence logs
-    const newConfidenceLogs = { ...confidenceLogs, [pendingQuestion.id]: level };
-    setConfidenceLogs(newConfidenceLogs);
-    localStorage.setItem(`sanfran_confidence_logs_${userId}`, JSON.stringify(newConfidenceLogs));
-    
-    // Sync to DB
-    syncUserProgress({ confidenceLogs: newConfidenceLogs });
-    
-    // Proceed with answer processing
-    handleAnswer(selectedOption, pendingQuestion, true);
-  }
   
   // Filters
   const [subjects, setSubjects] = useState<string[]>([]);
@@ -135,11 +113,16 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
 
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
   const [eliminatedOptions, setEliminatedOptions] = useState<Record<string, number[]>>({});
+  const [confidenceLevel, setConfidenceLevel] = useState<'certeza' | 'duvida' | 'chute' | null>(null);
+  const [showConfidenceSelection, setShowConfidenceSelection] = useState(false);
+  const [pendingAnswerIndex, setPendingAnswerIndex] = useState<number | null>(null);
+  const [sessionConfidenceStats, setSessionConfidenceStats] = useState<Record<string, 'certeza' | 'duvida' | 'chute'>>({});
   const notificationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Stats
   const [correctCount, setCorrectCount] = useState(0);
   const [wrongCount, setWrongCount] = useState(0);
+  const [userProgress, setUserProgress] = useState<UserProgress | null>(null);
   const [errorMastery, setErrorMastery] = useState<Record<string, number>>({});
   const [isErrorNotebookMode, setIsErrorNotebookMode] = useState(false);
   const [showAiLesson, setShowAiLesson] = useState(false);
@@ -149,7 +132,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
   // Mock Mode States
   const [isMockMode, setIsMockMode] = useState(false);
   const [mockTimeRemaining, setMockTimeRemaining] = useState(0);
-  const [mockAnswers, setMockAnswers] = useState<Record<string, { answer: number; confidence: ConfidenceLevel | null }>>({});
+  const [mockAnswers, setMockAnswers] = useState<Record<string, number>>({});
   const [isMockFinished, setIsMockFinished] = useState(false);
   const [mockStartTime, setMockStartTime] = useState<number | null>(null);
   const [showMockSetup, setShowMockSetup] = useState(false);
@@ -159,8 +142,10 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
     score: number;
     total: number;
     timeSpent: number;
-    subjectStats: { subject: string; correct: number; total: number }[];
+    subjectStats: { subject: string; correct: number; total: number; confidence: Record<string, number> }[];
     avgTimePerQuestion: number;
+    confidenceStats: { certeza: number; duvida: number; chute: number };
+    luckyGuesses: string[];
   } | null>(null);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -191,18 +176,26 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
     
     // Calculate results
     let correct = 0;
-    const subjectMap: Record<string, { correct: number; total: number }> = {};
+    const subjectMap: Record<string, { correct: number; total: number; confidence: Record<string, number> }> = {};
+    const confidenceStats = { certeza: 0, duvida: 0, chute: 0 };
+    const luckyGuesses: string[] = [];
     
     mockQuestions.forEach(q => {
       const userAnswer = mockAnswers[q.id];
       const isCorrect = userAnswer === q.correct_answer;
+      const confidence = sessionConfidenceStats[q.id] || 'certeza';
       
-      if (isCorrect) correct++;
+      if (isCorrect) {
+        correct++;
+        if (confidence === 'chute') luckyGuesses.push(q.id);
+      }
       
       if (!subjectMap[q.subject]) {
-        subjectMap[q.subject] = { correct: 0, total: 0 };
+        subjectMap[q.subject] = { correct: 0, total: 0, confidence: { certeza: 0, duvida: 0, chute: 0 } };
       }
       subjectMap[q.subject].total++;
+      subjectMap[q.subject].confidence[confidence]++;
+      confidenceStats[confidence]++;
       if (isCorrect) subjectMap[q.subject].correct++;
     });
     
@@ -216,7 +209,9 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
       total: mockQuestions.length,
       timeSpent,
       subjectStats,
-      avgTimePerQuestion: timeSpent / (Object.keys(mockAnswers).length || 1)
+      avgTimePerQuestion: timeSpent / (Object.keys(mockAnswers).length || 1),
+      confidenceStats,
+      luckyGuesses
     });
     
     setIsMockFinished(true);
@@ -239,11 +234,14 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
     setCorrectCount(newCorrectCount);
     setWrongCount(newWrongCount);
 
+    const currentConfidenceLevels = { ...(userProgress?.confidence_levels || {}), ...sessionConfidenceStats };
+
     syncUserProgress({
       correctQuestions: newCorrectQuestions,
       wrongQuestions: newWrongQuestions,
       correctCount: newCorrectCount,
-      wrongCount: newWrongCount
+      wrongCount: newWrongCount,
+      confidence_levels: currentConfidenceLevels
     });
   };
 
@@ -465,6 +463,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
       }
 
       if (data) {
+        setUserProgress(data);
         setFavorites(data.favorites || []);
         setWrongQuestions(data.wrong_questions || []);
         setCorrectQuestions(data.correct_questions || []);
@@ -527,7 +526,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
         correct_count: updates.correctCount !== undefined ? updates.correctCount : (current?.correct_count || correctCount),
         wrong_count: updates.wrongCount !== undefined ? updates.wrongCount : (current?.wrong_count || wrongCount),
         error_mastery: updates.errorMastery !== undefined ? updates.errorMastery : (current?.error_mastery || errorMastery),
-        confidence_logs: updates.confidenceLogs !== undefined ? updates.confidenceLogs : (current?.confidence_logs || confidenceLogs),
+        confidence_levels: updates.confidence_levels !== undefined ? updates.confidence_levels : (current?.confidence_levels || userProgress?.confidence_levels || {}),
         updated_at: new Date().toISOString()
       };
 
@@ -714,12 +713,16 @@ Forneça a explicação de forma concisa e didática.`;
     }
   };
 
-  const handleCreateFlashcardFromError = (question: Question) => {
+  const handleCreateFlashcardFromError = (question: Question, selectedIndex?: number, isCorrect?: boolean) => {
     const commentary = aiCommentary[question.id];
     const front = `[QUESTÃO] ${question.statement}`;
     
     let back = `**GABARITO: ${String.fromCharCode(65 + question.correct_answer)}**\n\n`;
     
+    if (selectedIndex !== undefined) {
+      back += `**Sua Resposta: ${String.fromCharCode(65 + selectedIndex)} (${isCorrect ? 'Correta' : 'Incorreta'})**\n\n`;
+    }
+
     if (commentary) {
       back += `⚖️ **Fundamentação:** ${commentary.legalBasis}\n\n`;
       back += `❌ **Análise:** ${commentary.alternativesAnalysis}\n\n`;
@@ -1194,12 +1197,36 @@ Forneça a explicação de forma concisa e didática.`;
 
   const currentQuestion = filteredQuestions[currentIndex];
 
-  const handleAnswer = (index: number, questionOverride?: Question, skipConfidence?: boolean) => {
+  const handleAnswer = (index: number, questionOverride?: Question) => {
     const targetQuestion = questionOverride || currentQuestion;
     
     if (isMockMode) {
       if (isMockFinished) return;
-      setMockAnswers(prev => ({ ...prev, [targetQuestion.id]: { answer: index, confidence: null } }));
+      setPendingAnswerIndex(index);
+      setShowConfidenceSelection(true);
+      return;
+    }
+
+    if (showExplanation && !questionOverride) return; 
+    
+    setSelectedOption(index);
+    setPendingAnswerIndex(index);
+    setShowConfidenceSelection(true);
+  };
+
+  const confirmAnswer = (level: 'certeza' | 'duvida' | 'chute') => {
+    if (pendingAnswerIndex === null) return;
+    
+    const index = pendingAnswerIndex;
+    const targetQuestion = isMockMode ? currentQuestion : (currentQuestion || filteredQuestions[currentIndex]);
+    
+    setConfidenceLevel(level);
+    setShowConfidenceSelection(false);
+    setSessionConfidenceStats(prev => ({ ...prev, [targetQuestion.id]: level }));
+
+    if (isMockMode) {
+      setMockAnswers(prev => ({ ...prev, [targetQuestion.id]: index }));
+      setPendingAnswerIndex(null);
       
       // Auto-advance in single view if not the last question
       if (viewMode === 'single' && currentIndex < filteredQuestions.length - 1) {
@@ -1207,22 +1234,17 @@ Forneça a explicação de forma concisa e didática.`;
       }
       return;
     }
-
-    if (showExplanation && !questionOverride) return; 
     
-    if (!skipConfidence) {
-      setSelectedOption(index);
-      setPendingQuestion(targetQuestion);
-      setShowConfidenceSelection(true);
-      return;
-    }
-    
-    setSelectedOption(index);
     setShowExplanation(true);
     
     // Trigger Intelligent Correction
     generateIntelligentCorrection(targetQuestion);
     
+    // Auto-create flashcard for Doubt or Guess
+    if (level === 'duvida' || level === 'chute') {
+      showNotification('Dúvida/Chute detectado: Sugestão de Flashcard habilitada.', 'success');
+    }
+
     if (index === targetQuestion.correct_answer) {
       const newCount = correctCount + 1;
       setCorrectCount(newCount);
@@ -1257,11 +1279,14 @@ Forneça a explicação de forma concisa e didática.`;
         localStorage.setItem(`sanfran_error_mastery_${userId}`, JSON.stringify(newMastery));
       }
       
+      const currentConfidenceLevels = { ...(userProgress?.confidence_levels || {}), [targetQuestion.id]: level };
+
       syncUserProgress({ 
         correctCount: newCount, 
         wrongQuestions: newWrong, 
         correctQuestions: newCorrect,
-        errorMastery: newMastery
+        errorMastery: newMastery,
+        confidence_levels: currentConfidenceLevels
       });
     } else {
       const newCount = wrongCount + 1;
@@ -1281,12 +1306,17 @@ Forneça a explicação de forma concisa e didática.`;
         setWrongQuestions(newWrong);
         localStorage.setItem(`sanfran_wrong_${userId}`, JSON.stringify(newWrong));
       }
+      
+      const currentConfidenceLevels = { ...(userProgress?.confidence_levels || {}), [targetQuestion.id]: level };
+
       syncUserProgress({ 
         wrongCount: newCount, 
         wrongQuestions: newWrong,
-        errorMastery: newMastery
+        errorMastery: newMastery,
+        confidence_levels: currentConfidenceLevels
       });
     }
+    setPendingAnswerIndex(null);
   };
 
   const toggleElimination = (questionId: string, optionIndex: number) => {
@@ -1408,8 +1438,9 @@ Forneça a explicação de forma concisa e didática.`;
                   <PieChart>
                     <Pie
                       data={[
-                        { name: 'Acertos', value: mockResults.score },
-                        { name: 'Erros', value: mockResults.total - mockResults.score }
+                        { name: 'Certeza', value: mockResults.confidenceStats.certeza },
+                        { name: 'Dúvida', value: mockResults.confidenceStats.duvida },
+                        { name: 'Chute', value: mockResults.confidenceStats.chute }
                       ]}
                       innerRadius={60}
                       outerRadius={80}
@@ -1417,6 +1448,7 @@ Forneça a explicação de forma concisa e didática.`;
                       dataKey="value"
                     >
                       <Cell fill="#10b981" />
+                      <Cell fill="#f59e0b" />
                       <Cell fill="#ef4444" />
                     </Pie>
                   </PieChart>
@@ -1425,7 +1457,7 @@ Forneça a explicação de forma concisa e didática.`;
                   <span className="text-4xl font-black text-slate-900 dark:text-white">
                     {Math.round((mockResults.score / mockResults.total) * 100)}%
                   </span>
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Aproveitamento</span>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Verdadeiro Domínio</span>
                 </div>
               </div>
               <div className="flex-1 grid grid-cols-2 gap-6 w-full">
@@ -1434,12 +1466,12 @@ Forneça a explicação de forma concisa e didática.`;
                   <span className="text-2xl font-black text-emerald-600">{mockResults.score} / {mockResults.total}</span>
                 </div>
                 <div className="space-y-1">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Tempo Total</span>
-                  <span className="text-2xl font-black text-blue-600">{formatTime(mockResults.timeSpent)}</span>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Certeza Total</span>
+                  <span className="text-2xl font-black text-emerald-500">{mockResults.confidenceStats.certeza}</span>
                 </div>
                 <div className="space-y-1">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Tempo Médio</span>
-                  <span className="text-2xl font-black text-amber-600">{Math.round(mockResults.avgTimePerQuestion)}s / q</span>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Chutes (Sorte)</span>
+                  <span className="text-2xl font-black text-red-500">{mockResults.confidenceStats.chute}</span>
                 </div>
                 <div className="space-y-1">
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Status</span>
@@ -1455,10 +1487,21 @@ Forneça a explicação de forma concisa e didática.`;
               <div className="p-4 bg-purple-100 dark:bg-purple-900/30 rounded-full">
                 <BrainCircuit size={40} className="text-purple-600 dark:text-purple-400" />
               </div>
-              <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tighter">Análise Cognitiva</h3>
-              <p className="text-sm text-slate-500 leading-relaxed">
-                Seu desempenho em <strong>{mockResults.subjectStats.length}</strong> disciplinas mostra que você está {mockResults.score / mockResults.total > 0.8 ? 'pronto para a prova!' : 'no caminho certo, foque nos temas em amarelo.'}
-              </p>
+              <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tighter">Análise Metacognitiva</h3>
+              {mockResults.luckyGuesses.length > 0 ? (
+                <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-2xl border border-amber-200 dark:border-amber-800">
+                  <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-bold text-xs uppercase tracking-widest mb-2">
+                    <AlertTriangle size={14} /> Alerta de Revisão
+                  </div>
+                  <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
+                    Você acertou <strong>{mockResults.luckyGuesses.length}</strong> questões marcadas como "Chute". Cuidado com o falso domínio! Transforme-as em flashcards para consolidar o conhecimento.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500 leading-relaxed">
+                  Seu nível de certeza está alinhado com seus acertos. Continue focando nos temas de dúvida!
+                </p>
+              )}
             </div>
           </div>
 
@@ -1515,6 +1558,70 @@ Forneça a explicação de forma concisa e didática.`;
 
   return (
     <div className={`${isMockMode ? 'fixed inset-0 z-[100] bg-slate-50 dark:bg-slate-950 overflow-y-auto' : 'max-w-4xl mx-auto p-4 md:p-8 animate-in fade-in duration-500 pb-24'}`}>
+      {/* Confidence Selection Modal */}
+      <AnimatePresence>
+        {showConfidenceSelection && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-2xl max-w-md w-full text-center"
+            >
+              <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
+                <BrainCircuit className="text-blue-600 dark:text-blue-400" size={32} />
+              </div>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Nível de Confiança</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-8">Como você avalia sua resposta para esta questão?</p>
+              
+              <div className="grid grid-cols-1 gap-3">
+                <button
+                  onClick={() => confirmAnswer('certeza')}
+                  className="flex items-center justify-between p-4 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-900/50 rounded-2xl transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/50" />
+                    <div className="text-left">
+                      <span className="block font-black text-emerald-900 dark:text-emerald-400 text-sm uppercase tracking-widest">Certeza</span>
+                      <span className="text-[10px] text-emerald-700 dark:text-emerald-500 font-bold">Tenho o fundamento jurídico</span>
+                    </div>
+                  </div>
+                  <ChevronRight size={16} className="text-emerald-400 group-hover:translate-x-1 transition-transform" />
+                </button>
+
+                <button
+                  onClick={() => confirmAnswer('duvida')}
+                  className="flex items-center justify-between p-4 bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/20 dark:hover:bg-amber-900/30 border border-amber-200 dark:border-amber-900/50 rounded-2xl transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 rounded-full bg-amber-500 shadow-lg shadow-amber-500/50" />
+                    <div className="text-left">
+                      <span className="block font-black text-amber-900 dark:text-amber-400 text-sm uppercase tracking-widest">Dúvida</span>
+                      <span className="text-[10px] text-amber-700 dark:text-amber-500 font-bold">Fiquei entre duas alternativas</span>
+                    </div>
+                  </div>
+                  <ChevronRight size={16} className="text-amber-400 group-hover:translate-x-1 transition-transform" />
+                </button>
+
+                <button
+                  onClick={() => confirmAnswer('chute')}
+                  className="flex items-center justify-between p-4 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 border border-red-200 dark:border-red-900/50 rounded-2xl transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 rounded-full bg-red-500 shadow-lg shadow-red-500/50" />
+                    <div className="text-left">
+                      <span className="block font-black text-red-900 dark:text-red-400 text-sm uppercase tracking-widest">Chute</span>
+                      <span className="text-[10px] text-red-700 dark:text-red-500 font-bold">Não conheço o tema</span>
+                    </div>
+                  </div>
+                  <ChevronRight size={16} className="text-red-400 group-hover:translate-x-1 transition-transform" />
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Mock Mode Floating Timer */}
       {isMockMode && !isMockFinished && (
         <div className={`fixed top-6 right-6 z-[110] flex items-center gap-4 p-4 rounded-3xl border-2 shadow-2xl backdrop-blur-md transition-all duration-500 ${mockTimeRemaining < 600 ? 'bg-red-50/90 border-red-500 animate-pulse' : 'bg-white/90 dark:bg-slate-900/90 border-slate-200 dark:border-slate-800'}`}>
@@ -2413,7 +2520,7 @@ Forneça a explicação de forma concisa e didática.`;
                         <div className="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-4 duration-300">
                           <div className="space-y-3">
                             {q.options.map((option, optIdx) => {
-                              const isSelected = isMockMode ? mockAnswers[q.id]?.answer === optIdx : selectedOption === optIdx;
+                              const isSelected = isMockMode ? mockAnswers[q.id] === optIdx : selectedOption === optIdx;
                               const isCorrect = q.correct_answer === optIdx;
                               const showStatus = isMockMode ? isMockFinished : showExplanation;
                               const isEliminated = (eliminatedOptions[q.id] || []).includes(optIdx);
@@ -2481,26 +2588,6 @@ Forneça a explicação de forma concisa e didática.`;
                                 </div>
                               );
                             })}
-                            
-                            {showConfidenceSelection && (
-                              <div className="mt-6 p-6 bg-slate-50 dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in duration-300">
-                                <p className="text-sm font-black text-slate-600 dark:text-slate-300 mb-4 text-center uppercase tracking-widest">Qual o seu nível de confiança?</p>
-                                <div className="grid grid-cols-3 gap-4">
-                                  <button onClick={() => handleConfidenceSelection('high')} className="flex flex-col items-center gap-2 p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800 hover:border-green-400 transition-colors">
-                                    <span className="text-2xl">🟢</span>
-                                    <span className="text-xs font-black text-green-700 dark:text-green-300 uppercase">Certeza</span>
-                                  </button>
-                                  <button onClick={() => handleConfidenceSelection('medium')} className="flex flex-col items-center gap-2 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl border border-yellow-200 dark:border-yellow-800 hover:border-yellow-400 transition-colors">
-                                    <span className="text-2xl">🟡</span>
-                                    <span className="text-xs font-black text-yellow-700 dark:text-yellow-300 uppercase">Dúvida</span>
-                                  </button>
-                                  <button onClick={() => handleConfidenceSelection('low')} className="flex flex-col items-center gap-2 p-4 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800 hover:border-red-400 transition-colors">
-                                    <span className="text-2xl">🔴</span>
-                                    <span className="text-xs font-black text-red-700 dark:text-red-300 uppercase">Chute</span>
-                                  </button>
-                                </div>
-                              </div>
-                            )}
                           </div>
 
                           {showExplanation && (

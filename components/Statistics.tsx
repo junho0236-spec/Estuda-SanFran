@@ -42,7 +42,8 @@ interface StatisticsProps {
   flashcards: Flashcard[];
   tasks: Task[];
   subjects: Subject[];
-  correctQuestionsCount?: number; // Added from user request context if available
+  correctQuestionsCount?: number;
+  confidenceLevels?: Record<string, 'certeza' | 'duvida' | 'chute'>;
 }
 
 const Statistics: React.FC<StatisticsProps> = ({ 
@@ -50,7 +51,8 @@ const Statistics: React.FC<StatisticsProps> = ({
   flashcards, 
   tasks, 
   subjects,
-  correctQuestionsCount = 0 
+  correctQuestionsCount = 0,
+  confidenceLevels = {}
 }) => {
   const [dateFilter, setDateFilter] = React.useState<'7days' | '30days' | 'all' | 'custom'>('all');
   const [customRange, setCustomRange] = React.useState<{ start: string, end: string }>({
@@ -187,6 +189,20 @@ const Statistics: React.FC<StatisticsProps> = ({
 
   const leeches = flashcards.filter(f => (f.total_errors || 0) >= 5);
 
+  const confidenceStats = React.useMemo(() => {
+    const stats = { certeza: 0, duvida: 0, chute: 0 };
+    Object.values(confidenceLevels).forEach(level => {
+      if (stats[level] !== undefined) stats[level]++;
+    });
+    return stats;
+  }, [confidenceLevels]);
+
+  const confidenceData = [
+    { name: 'Certeza', value: confidenceStats.certeza, color: '#10b981' },
+    { name: 'Dúvida', value: confidenceStats.duvida, color: '#f59e0b' },
+    { name: 'Chute', value: confidenceStats.chute, color: '#ef4444' }
+  ].filter(d => d.value > 0);
+
   return (
     <div className="space-y-8 animate-in fade-in duration-700 pb-20">
       {/* Header */}
@@ -275,6 +291,61 @@ const Statistics: React.FC<StatisticsProps> = ({
           color="border-sanfran-rubi"
         />
       </div>
+
+      {/* Confidence Analysis Section */}
+      {confidenceData.length > 0 && (
+        <div className="bg-white dark:bg-sanfran-rubiDark/20 p-8 rounded-[2rem] border border-slate-200 dark:border-sanfran-rubi/20 shadow-xl">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3">
+              <BrainCircuit className="text-sanfran-rubi w-5 h-5" />
+              <h3 className="text-lg font-black uppercase tracking-tight text-slate-900 dark:text-white">Análise Metacognitiva (Confiança)</h3>
+            </div>
+            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Verdadeiro Domínio</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
+            <div className="h-[250px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={confidenceData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={90}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {confidenceData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {confidenceData.map((stat, i) => (
+                <div key={i} className="p-6 rounded-3xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: stat.color }}></div>
+                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{stat.name}</span>
+                  </div>
+                  <div className="text-3xl font-black text-slate-900 dark:text-white">{stat.value}</div>
+                  <p className="text-[10px] text-slate-500 mt-1 font-bold uppercase">Questões</p>
+                </div>
+              ))}
+              
+              <div className="sm:col-span-3 mt-4 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-2xl border border-amber-200 dark:border-amber-800">
+                <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed font-medium">
+                  <strong>Dica:</strong> Foque nas questões marcadas com <span className="text-amber-600 dark:text-amber-400 font-black">Dúvida</span> e <span className="text-red-500 font-black">Chute</span>. Elas representam seu maior potencial de crescimento imediato ao transformar incerteza em conhecimento sólido.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
