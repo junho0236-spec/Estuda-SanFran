@@ -1265,80 +1265,40 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     }
   }, [mode]);
 
+  // TTS Logic - Refactored for better control and reliability
   useEffect(() => {
-    if (!isAudioMode || mode !== 'study' || reviewQueue.length === 0) {
+    if (!isAudioMode || mode !== 'study' || !currentCard) {
       window.speechSynthesis.cancel();
       setIsSpeaking(false);
       return;
     }
 
-    const speak = async () => {
-      if (isSpeaking) return;
-      setIsSpeaking(true);
-
-      const card = reviewQueue[0];
-      if (!card) {
-        setIsSpeaking(false);
-        return;
-      }
+    const speak = (text: string) => {
+      // Cancel any ongoing speech
+      window.speechSynthesis.cancel();
       
-      // Speak Front
-      const frontUtterance = new SpeechSynthesisUtterance(card.front);
-      frontUtterance.lang = 'pt-BR';
-      frontUtterance.rate = audioSpeed;
-      window.speechSynthesis.speak(frontUtterance);
-
-      frontUtterance.onend = () => {
-        // Wait 4 seconds (average of 3-5)
-        setTimeout(() => {
-          if (!isAudioMode) {
-            setIsSpeaking(false);
-            return;
-          }
-          
-          setIsFlipped(true);
-          
-          // Speak Back
-          const backUtterance = new SpeechSynthesisUtterance(card.back);
-          backUtterance.lang = 'pt-BR';
-          backUtterance.rate = audioSpeed;
-          window.speechSynthesis.speak(backUtterance);
-
-          backUtterance.onend = () => {
-            // RECORD STUDY SESSION FOR CONSTANCY
-            const sessionData: StudySession = {
-              id: Math.random().toString(36).substr(2, 9),
-              user_id: userId,
-              start_time: new Date().toISOString(),
-              duration: cardTimer,
-              subject_id: card.subjectId
-            };
-            dataService.saveStudySession(sessionData, userId, isOnline);
-            if (setStudySessions) setStudySessions(prev => [sessionData, ...prev]);
-
-            // Wait 2 seconds before next card
-            setTimeout(() => {
-              if (!isAudioMode) {
-                setIsSpeaking(false);
-                return;
-              }
-              
-              // In audio mode, we just mark it as Good to move to the next card
-              handleReview(3);
-              setIsSpeaking(false);
-              setIsFlipped(false);
-            }, 2000);
-          };
-        }, 4000);
-      };
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'pt-BR';
+      utterance.rate = audioSpeed;
+      
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+      
+      window.speechSynthesis.speak(utterance);
     };
 
-    speak();
+    // Speak based on flip state
+    if (!isFlipped) {
+      speak(currentCard.front);
+    } else {
+      speak(currentCard.back);
+    }
 
     return () => {
       window.speechSynthesis.cancel();
     };
-  }, [isAudioMode, mode, currentCard?.id, reviewQueue, audioSpeed]);
+  }, [isAudioMode, mode, currentCard?.id, isFlipped, audioSpeed]);
 
   useEffect(() => {
     if (mode === 'study') {
@@ -1696,7 +1656,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                       }} 
                       className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all h-full ${isAudioMode ? 'bg-emerald-600 text-white' : 'bg-white dark:bg-sanfran-rubiDark text-emerald-600 border-2 border-emerald-600 hover:bg-emerald-50'}`}
                     >
-                      <Volume2 className="w-5 h-5" /> {isAudioMode ? 'Parar Áudio' : 'Modo Áudio'}
+                      {isSpeaking ? <Activity className="w-5 h-5 animate-pulse" /> : <Volume2 className="w-5 h-5" />} {isAudioMode ? 'Parar Áudio' : 'Modo Áudio'}
                     </button>
                     {isAudioMode && (
                       <select 
