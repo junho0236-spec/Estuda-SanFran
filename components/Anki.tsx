@@ -77,6 +77,15 @@ import { dataService } from '../services/dataService';
 import { updateQuestProgress } from '../services/questService';
 import { generateFlashcards, generateFlashcardsStream, evaluateDissertativeAnswer } from '../services/geminiService';
 import { SmartText } from './SmartVadeMecum';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+
+interface SessionStats {
+  isActive: boolean;
+  new: { total: number; correct: number };
+  learning: { total: number; correct: number };
+  review: { total: number; correct: number };
+  errors: Flashcard[];
+}
 
 interface AnkiProps {
   subjects: Subject[];
@@ -144,6 +153,13 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
   const [dailyGoal, setDailyGoal] = useState(50);
   const [sessionCounters, setSessionCounters] = useState({ new: 0, pending: 0, completed: 0 });
+  const [sessionStats, setSessionStats] = useState<SessionStats>({
+    isActive: false,
+    new: { total: 0, correct: 0 },
+    learning: { total: 0, correct: 0 },
+    review: { total: 0, correct: 0 },
+    errors: []
+  });
   const [hoveredHeatmapDay, setHoveredHeatmapDay] = useState<{
     date: string;
     count: number;
@@ -1564,14 +1580,41 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     }
   };
 
-  const startStudySession = () => {
+  const startStudySession = (errorCardsOnly: boolean = false) => {
     setMode('study');
     setIsFlipped(false);
     setIsFirstCardOfSession(true);
-    setSessionCounters({
-      new: reviewQueue.filter(c => c.status === 'new' || !c.status).length,
-      pending: reviewQueue.filter(c => c.status !== 'new' && c.status).length,
-      completed: 0
+    
+    if (errorCardsOnly) {
+      const now = Date.now();
+      const updatedCards = sessionStats.errors.map(c => ({ ...c, nextReview: now - 1000 }));
+      
+      setFlashcards(prev => prev.map(f => {
+        const updated = updatedCards.find(uc => uc.id === f.id);
+        return updated ? updated : f;
+      }));
+      
+      updatedCards.forEach(c => dataService.saveFlashcard(c, userId, isOnline));
+      
+      setSessionCounters({
+        new: 0,
+        pending: updatedCards.length,
+        completed: 0
+      });
+    } else {
+      setSessionCounters({
+        new: reviewQueue.filter(c => c.status === 'new' || !c.status).length,
+        pending: reviewQueue.filter(c => c.status !== 'new' && c.status).length,
+        completed: 0
+      });
+    }
+
+    setSessionStats({
+      isActive: true,
+      new: { total: 0, correct: 0 },
+      learning: { total: 0, correct: 0 },
+      review: { total: 0, correct: 0 },
+      errors: []
     });
   };
 
@@ -1585,6 +1628,32 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     if (!currentCard) return;
     pushToHistory(currentCard);
     const card = currentCard;
+    
+    // Update session stats
+    setSessionStats(prev => {
+      if (!prev.isActive) return prev;
+      
+      const isCorrect = quality >= 3;
+      const isError = quality === 0;
+      const statusGroup = (!card.status || card.status === 'new') ? 'new' : 
+                          (card.status === 'review' ? 'review' : 'learning');
+      
+      const newStats = {
+        ...prev,
+        [statusGroup]: {
+          total: prev[statusGroup].total + 1,
+          correct: prev[statusGroup].correct + (isCorrect ? 1 : 0)
+        }
+      };
+      
+      if (isError) {
+        if (!newStats.errors.find(c => c.id === card.id)) {
+          newStats.errors = [...newStats.errors, card];
+        }
+      }
+      
+      return newStats;
+    });
     
     // Anki Logic (SM-2 Modified):
     let newInterval = card.interval || 0;
@@ -1800,6 +1869,105 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       return '1d'; // Good, Hard, Easy fallback
     }
     return '1 min';
+  };
+
+  const renderPerformanceSummary = () => {
+    const { new: newStats, learning, review, errors } = sessionStats;
+    
+    const chartData = [
+      { name: 'Novos', acertos: newStats.total > 0 ? Math.round((newStats.correct / newStats.total) * 100) : 0, total: newStats.total, color: '#3b82f6' }, // blue-500
+      { name: 'Aprender', acertos: learning.total > 0 ? Math.round((learning.correct / learning.total) * 100) : 0, total: learning.total, color: '#ef4444' }, // red-500
+      { name: 'Revisão', acertos: review.total > 0 ? Math.round((review.correct / review.total) * 100) : 0, total: review.total, color: '#22c55e' }, // green-500
+    ].filter(d => d.total > 0);
+
+    let insight = "Sessão concluída!";
+    if (chartData.length > 0) {
+      const allPerfect = chartData.every(d => d.acertos >= 90);
+      const lowReview = chartData.find(d => d.name === 'Revisão' && d.acertos < 50);
+      const highNew = chartData.find(d => d.name === 'Novos' && d.acertos >= 80);
+      
+      if (allPerfect) {
+        insight = "Sessão perfeita! Você manteve um ritmo constante de acertos em todas as fases.";
+      } else if (highNew && lowReview) {
+        insight = `Você dominou ${highNew.acertos}% dos cards Novos, mas errou bastante nas Revisões (${100 - lowReview.acertos}% de erro). Atenção ao conteúdo antigo!`;
+      } else if (lowReview) {
+        insight = `Atenção nas revisões! Sua taxa de acerto foi de apenas ${lowReview.acertos}%.`;
+      } else if (highNew) {
+        insight = `Ótimo trabalho com os cards Novos (${highNew.acertos}% de acerto)! Continue assim.`;
+      } else {
+        insight = "Bom trabalho! Continue revisando para melhorar suas taxas de acerto.";
+      }
+    }
+
+    return (
+      <div className="flex flex-col items-center justify-center h-full min-h-[500px] w-full max-w-2xl mx-auto space-y-8 animate-in fade-in zoom-in p-6">
+        <div className="text-center space-y-2">
+          <h2 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Resumo de Performance</h2>
+          <p className="text-slate-500 dark:text-slate-400">{insight}</p>
+        </div>
+
+        {chartData.length > 0 ? (
+          <div className="w-full h-64 bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-xl border border-slate-200 dark:border-slate-700">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 20, right: 20, left: -20, bottom: 0 }}>
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} domain={[0, 100]} tickFormatter={(val) => `${val}%`} />
+                <Tooltip 
+                  cursor={{ fill: 'transparent' }}
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-slate-900 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl">
+                          {data.name}: {data.acertos}% de acerto ({data.total} cards)
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Bar dataKey="acertos" radius={[6, 6, 0, 0]} maxBarSize={60}>
+                  {chartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="w-24 h-24 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center text-green-600 dark:text-green-400">
+            <CheckSquare className="w-12 h-12" />
+          </div>
+        )}
+
+        <div className="flex flex-col sm:flex-row gap-4 w-full mt-8">
+          <button 
+            onClick={() => {
+              setSessionStats(prev => ({ ...prev, isActive: false }));
+              setMode('browse');
+            }}
+            className="flex-1 px-8 py-4 bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors"
+          >
+            Voltar ao Acervo
+          </button>
+          
+          {errors.length > 0 && (
+            <button 
+              onClick={() => startStudySession(true)}
+              className="flex-1 px-8 py-4 bg-red-500 text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-red-600 transition-colors shadow-lg shadow-red-500/20"
+            >
+              Revisar Erros Agora ({errors.length})
+            </button>
+          )}
+        </div>
+        
+        {studyableFlashcards.some(f => (f.status === 'learning' || f.status === 'relearning') && f.nextReview > currentTime) && (
+          <p className="text-xs text-orange-500 font-bold mt-4 text-center">
+            Alguns cards estão em aprendizado e estarão disponíveis em breve.
+          </p>
+        )}
+      </div>
+    );
   };
 
   if (!subjects || subjects.length === 0) {
@@ -2813,26 +2981,28 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       )}
 
       {mode === 'study' && reviewQueue.length === 0 && (
-        <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center space-y-6 animate-in fade-in zoom-in">
-          <div className="w-24 h-24 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center text-green-600 dark:text-green-400">
-            <CheckSquare className="w-12 h-12" />
+        sessionStats.isActive ? renderPerformanceSummary() : (
+          <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center space-y-6 animate-in fade-in zoom-in">
+            <div className="w-24 h-24 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center text-green-600 dark:text-green-400">
+              <CheckSquare className="w-12 h-12" />
+            </div>
+            <div className="space-y-2 max-w-md">
+              <h2 className="text-2xl font-black text-slate-900 dark:text-white">Parabéns!</h2>
+              <p className="text-slate-500 dark:text-slate-400">Você terminou suas revisões por agora.</p>
+              {studyableFlashcards.some(f => (f.status === 'learning' || f.status === 'relearning') && f.nextReview > currentTime) && (
+                <p className="text-sm text-orange-500 font-bold mt-4">
+                  Alguns cards estão em aprendizado e estarão disponíveis em breve.
+                </p>
+              )}
+            </div>
+            <button 
+              onClick={() => setMode('browse')}
+              className="px-8 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-black uppercase text-xs tracking-widest hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors"
+            >
+              Voltar ao Acervo
+            </button>
           </div>
-          <div className="space-y-2 max-w-md">
-            <h2 className="text-2xl font-black text-slate-900 dark:text-white">Parabéns!</h2>
-            <p className="text-slate-500 dark:text-slate-400">Você terminou suas revisões por agora.</p>
-            {studyableFlashcards.some(f => (f.status === 'learning' || f.status === 'relearning') && f.nextReview > currentTime) && (
-              <p className="text-sm text-orange-500 font-bold mt-4">
-                Alguns cards estão em aprendizado e estarão disponíveis em breve.
-              </p>
-            )}
-          </div>
-          <button 
-            onClick={() => setMode('browse')}
-            className="px-8 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-black uppercase text-xs tracking-widest hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors"
-          >
-            Voltar ao Acervo
-          </button>
-        </div>
+        )
       )}
 
       {mode === 'study' && reviewQueue.length > 0 && (
