@@ -669,10 +669,26 @@ Forneça a explicação de forma concisa e didática.`;
   const handleImportSamples = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      let { data, error } = await supabase
         .from('questions')
         .insert(sampleQuestions)
         .select();
+
+      // Fallback for missing exam_board column
+      if (error && error.message?.includes("exam_board")) {
+        console.warn("Column 'exam_board' not found, retrying without it...");
+        const sanitizedSamples = sampleQuestions.map((q: any) => {
+          const { exam_board, ...rest } = q;
+          return rest;
+        });
+        const retry = await supabase
+          .from('questions')
+          .insert(sanitizedSamples)
+          .select();
+        data = retry.data;
+        error = retry.error;
+      }
 
       if (error) throw error;
 
@@ -714,11 +730,24 @@ Forneça a explicação de forma concisa e didática.`;
 
     try {
       setIsSubmitting(true);
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('questions')
         .insert([newQuestion])
         .select()
         .single();
+
+      // Fallback for missing exam_board column
+      if (error && error.message?.includes("exam_board")) {
+        console.warn("Column 'exam_board' not found, retrying without it...");
+        const { exam_board, ...sanitizedQuestion } = newQuestion;
+        const retry = await supabase
+          .from('questions')
+          .insert([sanitizedQuestion])
+          .select()
+          .single();
+        data = retry.data;
+        error = retry.error;
+      }
 
       if (error) throw error;
 
@@ -830,10 +859,22 @@ Forneça a explicação de forma concisa e didática.`;
       if (response.text) {
         const generatedQuestions = JSON.parse(response.text);
         
-        const { data, error } = await supabase
+        let { data, error } = await supabase
           .from('questions')
           .insert(generatedQuestions)
           .select();
+
+        // Fallback for missing exam_board column
+        if (error && error.message?.includes("exam_board")) {
+          console.warn("Column 'exam_board' not found, retrying without it...");
+          const sanitizedQuestions = generatedQuestions.map(({ exam_board, ...rest }: any) => rest);
+          const retry = await supabase
+            .from('questions')
+            .insert(sanitizedQuestions)
+            .select();
+          data = retry.data;
+          error = retry.error;
+        }
 
         if (error) throw error;
 
