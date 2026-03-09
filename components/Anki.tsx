@@ -143,6 +143,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [newFolderTargetDate, setNewFolderTargetDate] = useState<string>('');
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
   const [dailyGoal, setDailyGoal] = useState(50);
+  const [sessionCounters, setSessionCounters] = useState({ new: 0, pending: 0, completed: 0 });
   const [hoveredHeatmapDay, setHoveredHeatmapDay] = useState<{
     date: string;
     count: number;
@@ -228,7 +229,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       aiEvaluation,
       followUpChat: [...followUpChat],
       isDissertativeMode,
-      cardState: { ...card }
+      cardState: { ...card },
+      sessionCounters: { ...sessionCounters }
     };
     setUndoStack(prev => [...prev.slice(-19), currentState]); // Limit to 20 items
     setRedoStack([]); // Clear redo stack on new action
@@ -244,6 +246,10 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     if (prevState.cardState) {
       setFlashcards(prev => prev.map(f => f.id === prevState.cardState.id ? prevState.cardState : f));
       await dataService.saveFlashcard(prevState.cardState, userId, isOnline);
+    }
+
+    if (prevState.sessionCounters) {
+      setSessionCounters(prevState.sessionCounters);
     }
 
     setUndoStack(prev => prev.slice(0, -1));
@@ -1558,6 +1564,17 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     }
   };
 
+  const startStudySession = () => {
+    setMode('study');
+    setIsFlipped(false);
+    setIsFirstCardOfSession(true);
+    setSessionCounters({
+      new: reviewQueue.filter(c => c.status === 'new' || !c.status).length,
+      pending: reviewQueue.filter(c => c.status !== 'new' && c.status).length,
+      completed: 0
+    });
+  };
+
   const handleReview = async (quality: number) => {
     if (quality === 0) setSwipeDirection('left');
     if (quality >= 3) setSwipeDirection('right');
@@ -1657,6 +1674,32 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       ? Date.now() + offsetMinutes * 60 * 1000 
       : Date.now() + offsetDays * 24 * 60 * 60 * 1000;
     
+    // Update session counters
+    setSessionCounters(prev => {
+      const isNew = !card.status || card.status === 'new';
+      const isGraduating = offsetDays > 0;
+      
+      let newCount = prev.new;
+      let pendingCount = prev.pending;
+      let completedCount = prev.completed;
+
+      if (isNew) {
+        newCount = Math.max(0, newCount - 1);
+        if (isGraduating) {
+          completedCount += 1;
+        } else {
+          pendingCount += 1;
+        }
+      } else {
+        if (isGraduating) {
+          pendingCount = Math.max(0, pendingCount - 1);
+          completedCount += 1;
+        }
+      }
+
+      return { new: newCount, pending: pendingCount, completed: completedCount };
+    });
+
     try {
       const updatedCard = { 
         ...card, 
@@ -1821,9 +1864,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 <>
                   <button 
                     onClick={() => { 
-                      setMode('study'); 
-                      setIsFlipped(false); 
-                      setIsFirstCardOfSession(true);
+                      startStudySession();
                     }} 
                     disabled={reviewQueue.length === 0} 
                     className="flex flex-col items-center justify-center px-8 py-2.5 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest disabled:opacity-50 hover:bg-sanfran-rubiDark shadow-xl"
@@ -1844,9 +1885,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                       onClick={() => {
                         setIsCramMode(!isCramMode);
                         if (!isCramMode) {
-                          setMode('study');
-                          setIsFlipped(false);
-                          setIsFirstCardOfSession(true);
+                          startStudySession();
                         }
                       }} 
                       className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all h-full ${isCramMode ? 'bg-orange-600 text-white' : 'bg-white dark:bg-sanfran-rubiDark text-orange-600 border-2 border-orange-600 hover:bg-orange-50'}`}
@@ -1863,9 +1902,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                       onClick={() => {
                         setIsAudioMode(!isAudioMode);
                         if (!isAudioMode) {
-                          setMode('study');
-                          setIsFlipped(false);
-                          setIsFirstCardOfSession(true);
+                          startStudySession();
                         }
                       }} 
                       className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all h-full ${isAudioMode ? 'bg-emerald-600 text-white' : 'bg-white dark:bg-sanfran-rubiDark text-emerald-600 border-2 border-emerald-600 hover:bg-emerald-50'}`}
@@ -2763,9 +2800,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               <button 
                 disabled={selectedFolderIdsForSession.size === 0}
                 onClick={() => {
-                  setMode('study');
-                  setIsFlipped(false);
-                  setIsFirstCardOfSession(true);
+                  startStudySession();
                   setIsSessionModalOpen(false);
                 }}
                 className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-indigo-500/20 disabled:opacity-50"
@@ -2813,17 +2848,17 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 <span className="px-1.5 py-0.5 bg-black/10 dark:bg-white/10 rounded text-[8px] ml-1">F</span>
               </button>
               <div className="flex items-center gap-3 text-[11px] font-black uppercase tracking-widest">
-                <span className="text-blue-500 flex items-center gap-1" title="Novos">
-                  <div className="w-2 h-2 rounded-full bg-blue-500"></div> 
-                  {reviewQueue.filter(c => c.status === 'new' || !c.status).length}
+                <span className={`text-blue-500 flex items-center gap-1 transition-all ${(!currentCard?.status || currentCard?.status === 'new') ? 'scale-110 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]' : 'opacity-70'}`} title="Novos">
+                  <div className={`w-2 h-2 rounded-full bg-blue-500 transition-all ${(!currentCard?.status || currentCard?.status === 'new') ? 'scale-[1.4] shadow-[0_0_8px_rgba(59,130,246,0.8)]' : ''}`}></div> 
+                  {sessionCounters.new}
                 </span>
-                <span className="text-red-500 flex items-center gap-1" title="Aprendizagem">
-                  <div className="w-2 h-2 rounded-full bg-red-500"></div> 
-                  {reviewQueue.filter(c => c.status === 'learning' || c.status === 'relearning').length}
+                <span className={`text-red-500 flex items-center gap-1 transition-all ${(currentCard?.status === 'learning' || currentCard?.status === 'relearning') ? 'scale-110 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'opacity-70'}`} title="Aprender/Revisar">
+                  <div className={`w-2 h-2 rounded-full bg-red-500 transition-all ${(currentCard?.status === 'learning' || currentCard?.status === 'relearning') ? 'scale-[1.4] shadow-[0_0_8px_rgba(239,68,68,0.8)]' : ''}`}></div> 
+                  {sessionCounters.pending}
                 </span>
-                <span className="text-green-500 flex items-center gap-1" title="A Revisar">
-                  <div className="w-2 h-2 rounded-full bg-green-500"></div> 
-                  {reviewQueue.filter(c => c.status === 'review').length}
+                <span className={`text-green-500 flex items-center gap-1 transition-all ${(currentCard?.status === 'review') ? 'scale-110 drop-shadow-[0_0_8px_rgba(34,197,94,0.5)]' : 'opacity-70'}`} title="Concluídos">
+                  <div className={`w-2 h-2 rounded-full bg-green-500 transition-all ${(currentCard?.status === 'review') ? 'scale-[1.4] shadow-[0_0_8px_rgba(34,197,94,0.8)]' : ''}`}></div> 
+                  {sessionCounters.completed}
                 </span>
               </div>
               <div className="flex items-center gap-1 ml-2">
