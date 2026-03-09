@@ -466,11 +466,19 @@ const App: React.FC = () => {
             status: c.status || 'new',
             archived_at: c.archived_at || null
           }));
-          console.log(`Loaded ${formattedCards.length} flashcards from Supabase`);
-          setFlashcards(formattedCards);
-          await db.flashcards.bulkPut(formattedCards);
-        } else {
-          console.log("No flashcards found in Supabase for this user");
+          
+          // Only update local DB if we are not in the middle of a sync
+          const syncCount = await db.syncQueue.count();
+          if (syncCount === 0) {
+            console.log(`[App] Sincronizando ${formattedCards.length} flashcards do Supabase para o IndexedDB local.`);
+            setFlashcards(formattedCards);
+            await db.flashcards.bulkPut(formattedCards);
+          } else {
+            console.log(`[App] Pulando bulkPut de flashcards pois existem ${syncCount} itens pendentes na fila de sincronização.`);
+            // Still update state but maybe merge? For now, let's trust local more if sync is pending
+            const localCards = await db.flashcards.toArray();
+            setFlashcards(localCards);
+          }
         }
 
         if (resTks.data) {

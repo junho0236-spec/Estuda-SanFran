@@ -165,41 +165,40 @@ export const dataService = {
     // 1. Salva localmente primeiro (IndexedDB)
     await db.flashcards.put(card);
 
-    if (isOnline) {
-      // 2. Prepara o payload EXATO que o banco espera (snake_case)
-      const payload = {
-        id: card.id,
-        user_id: userId,
-        subject_id: card.subjectId || null,
-        folder_id: card.folderId || null,
-        front: card.front,
-        back: card.back,
-        notes: card.notes || null,
-        next_review: card.nextReview ? Math.floor(card.nextReview) : Date.now(),
-        interval: card.interval || 0,
-        status: card.status || 'new',
-        archived_at: card.archived_at || null,
-        tags: card.tags || [],
-        source: card.source || null,
-        is_suspended: card.is_suspended || false
-      };
+      if (isOnline) {
+        // 2. Prepara o payload EXATO que o banco espera (snake_case)
+        const payload = {
+          id: card.id,
+          user_id: userId,
+          subject_id: card.subjectId || null,
+          folder_id: card.folderId || null,
+          front: card.front,
+          back: card.back,
+          notes: card.notes || null,
+          next_review: card.nextReview ? Math.floor(card.nextReview) : Date.now(),
+          interval: card.interval || 0,
+          status: card.status || 'new',
+          archived_at: card.archived_at || null,
+          tags: card.tags || [],
+          source: card.source || null,
+          is_suspended: card.is_suspended || false
+        };
 
-      console.log("Tentando Upsert no Supabase:", payload);
-      
-      const { data, error } = await supabase
-        .from('flashcards')
-        .upsert(payload, { onConflict: 'id' })
-        .select();
+        console.log(`[dataService] Salvando card ${card.id} no Supabase. Status: ${payload.status}`);
+        
+        const { data, error } = await supabase
+          .from('flashcards')
+          .upsert(payload, { onConflict: 'id' })
+          .select();
 
-      if (error) {
-        console.error("ERRO CRÍTICO NO SUPABASE:", error);
-        // Se falhar, adiciona na fila de sincronização para tentar depois
-        await addToSyncQueue({ table: 'flashcards', action: 'update', data: card });
-        throw new Error(`Erro ao salvar no nuvem: ${error.message}`);
+        if (error) {
+          console.error("[dataService] Erro ao salvar no Supabase:", error);
+          await addToSyncQueue({ table: 'flashcards', action: 'update', data: card });
+          throw new Error(`Erro ao salvar no nuvem: ${error.message}`);
+        } else {
+          console.log("[dataService] Card salvo com sucesso no Supabase:", data?.[0]?.id);
+        }
       } else {
-        console.log("Sucesso ao salvar no Supabase:", data);
-      }
-    } else {
       console.log("Modo Offline: Card agendado para sincronização.");
       await addToSyncQueue({ table: 'flashcards', action: 'update', data: card });
     }
@@ -359,6 +358,7 @@ export const dataService = {
              payload.subject_id = payload.subjectId || null;
              payload.folder_id = payload.folderId || null;
              payload.next_review = payload.nextReview;
+             payload.status = payload.status || 'new';
              delete payload.subjectId;
              delete payload.folderId;
              delete payload.nextReview;

@@ -1167,9 +1167,11 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const reviewQueue = useMemo(() => {
     return studyableFlashcards.filter(f => {
       const isDue = f.nextReview <= currentTime;
+      const isLearning = f.status === 'learning';
       
       // In Cram Mode, we ignore the due date
-      if (!isDue && !isCramMode) return false;
+      // We also include learning cards even if not strictly due to prioritize them over new cards
+      if (!isDue && !isCramMode && !isLearning) return false;
       
       // If we have selected folders for a custom session, only include cards from those folders
       if (selectedFolderIdsForSession.size > 0) {
@@ -1183,7 +1185,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       if (isCramMode) return Math.random() - 0.5; // Randomize in cram mode
       
       // Sort logic:
-      // 1. Learning cards that are due
+      // 1. Learning cards (always priority)
       // 2. Review cards that are due
       // 3. New cards
       const order = { 'learning': 0, 'review': 1, 'new': 2 };
@@ -1206,13 +1208,11 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     if (mode === 'study') {
       setCurrentTime(Date.now());
       
-      // If queue is empty, we want to keep checking if learning cards become due
-      if (reviewQueue.length === 0) {
-        const interval = setInterval(() => setCurrentTime(Date.now()), 10000);
-        return () => clearInterval(interval);
-      }
+      // Update time every 5 seconds to keep the queue fresh
+      const interval = setInterval(() => setCurrentTime(Date.now()), 5000);
+      return () => clearInterval(interval);
     }
-  }, [mode, reviewQueue.length]);
+  }, [mode]);
 
   useEffect(() => {
     if (!isAudioMode || mode !== 'study' || reviewQueue.length === 0) {
