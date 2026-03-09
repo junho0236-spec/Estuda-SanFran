@@ -72,12 +72,14 @@ import {
   Timer
 } from 'lucide-react';
 import JSZip from 'jszip';
-import { Flashcard, Subject, Folder, DeckRequest, StudySession } from '../types';
+import { Flashcard, Subject, Folder, DeckRequest, StudySession, GlossaryTerm } from '../types';
 import { supabase } from '../services/supabaseClient';
 import { dataService } from '../services/dataService';
 import { updateQuestProgress } from '../services/questService';
-import { generateFlashcards, generateFlashcardsStream, evaluateDissertativeAnswer } from '../services/geminiService';
+import { generateFlashcards, generateFlashcardsStream, evaluateDissertativeAnswer, fetchTermDefinition } from '../services/geminiService';
 import { SmartText } from './SmartVadeMecum';
+import { GlossaryText } from './GlossaryText.tsx';
+import { GlossaryPopover } from './GlossaryPopover.tsx';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface SessionStats {
@@ -144,6 +146,28 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   // States comuns
   const [bulkInput, setBulkInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Glossary States
+  const [activeGlossaryTerm, setActiveGlossaryTerm] = useState<string | null>(null);
+  const [glossaryData, setGlossaryData] = useState<GlossaryTerm | null>(null);
+  const [glossaryPosition, setGlossaryPosition] = useState({ x: 0, y: 0 });
+  const [isLoadingGlossary, setIsLoadingGlossary] = useState(false);
+
+  const handleTermClick = async (term: string, position: { x: number; y: number }) => {
+    setActiveGlossaryTerm(term);
+    setGlossaryPosition(position);
+    setIsLoadingGlossary(true);
+    setGlossaryData(null);
+
+    try {
+      const data = await fetchTermDefinition(term);
+      setGlossaryData(data);
+    } catch (error) {
+      console.error("Error fetching glossary term:", error);
+    } finally {
+      setIsLoadingGlossary(false);
+    }
+  };
   const [isFlipped, setIsFlipped] = useState(false);
   const [manualFront, setManualFront] = useState('');
   const [manualBack, setManualBack] = useState('');
@@ -3342,7 +3366,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                     <div className="absolute inset-0 w-full h-full bg-white dark:bg-sanfran-rubiDark border-[6px] border-slate-200 dark:border-white/10 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden">
                       <span className="text-xs font-black text-sanfran-rubi uppercase tracking-[0.3em] mb-8">Questão</span>
                       <div className="text-2xl font-black text-slate-950 dark:text-white leading-tight">
-                        <SmartText text={currentCard.front} />
+                        <div className="text-slate-800 dark:text-slate-200 leading-relaxed text-center">
+                          <GlossaryText text={currentCard.front} onTermClick={handleTermClick} />
+                        </div>
                       </div>
                       
                       {isDissertativeMode ? (
@@ -3491,7 +3517,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                           <div className="w-full text-left">
                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Gabarito Oficial</span>
                             <div className="text-2xl font-black text-slate-900 dark:text-white leading-tight mb-6">
-                              <SmartText text={currentCard.back} />
+                              <div className="text-slate-800 dark:text-slate-200 leading-relaxed text-center">
+                                <GlossaryText text={currentCard.back} onTermClick={handleTermClick} />
+                              </div>
                             </div>
                           </div>
                           {currentCard.notes && (
@@ -4322,6 +4350,32 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Glossary Popover */}
+      <AnimatePresence>
+        {activeGlossaryTerm && glossaryData && (
+          <GlossaryPopover
+            data={glossaryData}
+            onClose={() => {
+              setActiveGlossaryTerm(null);
+              setGlossaryData(null);
+            }}
+            userId={userId}
+            isOnline={isOnline}
+            position={glossaryPosition}
+          />
+        )}
+      </AnimatePresence>
+
+      {isLoadingGlossary && !glossaryData && (
+        <div 
+          className="fixed z-[100] p-4 bg-white rounded-2xl shadow-2xl border border-slate-200 flex items-center gap-3 animate-in fade-in duration-200"
+          style={{ left: glossaryPosition.x, top: glossaryPosition.y + 20 }}
+        >
+          <Loader2 className="w-4 h-4 text-indigo-600 animate-spin" />
+          <span className="text-sm font-bold text-slate-600">Buscando definição...</span>
         </div>
       )}
     </div>

@@ -1051,3 +1051,11 @@ export interface CollectedSlang {
   meaning: string;
   collected_at: string;
 }
+
+export interface GlossaryTerm {
+  term: string;
+  definition: string;
+  translation?: string;
+  example: string;
+  isLatin: boolean;
+}

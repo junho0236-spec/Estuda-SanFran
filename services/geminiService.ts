@@ -780,3 +780,52 @@ export const fetchLegalReference = async (reference: string) => {
     return "Não foi possível carregar o conteúdo da lei no momento.";
   }
 };
+
+/**
+ * Busca a definição, tradução e exemplo de um termo jurídico ou expressão em latim.
+ */
+export const fetchTermDefinition = async (term: string) => {
+  try {
+    const ai = getAiClient();
+    const apiKey = getApiKey();
+
+    if (!apiKey || apiKey === "missing_key") {
+      throw new Error("Chave de API não configurada.");
+    }
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Você é um dicionário jurídico especializado da SanFran (USP).
+      Defina o termo ou expressão: "${term}"
+      
+      Retorne um JSON com:
+      {
+        "definition": "Definição curta e direta (máximo 2 frases).",
+        "translation": "Tradução literal (se for latim ou língua estrangeira, caso contrário null).",
+        "example": "Um exemplo prático de uso em uma frase jurídica.",
+        "isLatin": true/false
+      }`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            definition: { type: Type.STRING },
+            translation: { type: Type.STRING, nullable: true },
+            example: { type: Type.STRING },
+            isLatin: { type: Type.BOOLEAN }
+          },
+          required: ['definition', 'example', 'isLatin']
+        }
+      }
+    });
+
+    const resultText = response.text;
+    if (!resultText) throw new Error("Resposta vazia da IA.");
+    
+    return JSON.parse(resultText);
+  } catch (error) {
+    console.error("Erro ao buscar definição do termo:", error);
+    throw error;
+  }
+};

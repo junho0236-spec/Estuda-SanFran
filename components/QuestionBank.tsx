@@ -47,8 +47,15 @@ import {
   CheckCircle,
   AlertTriangle,
   BookX,
-  Sword
+  Sword,
+  Book,
+  Search
 } from 'lucide-react';
+import { GlossaryText } from './GlossaryText.tsx';
+import { GlossaryPopover } from './GlossaryPopover.tsx';
+import { fetchTermDefinition } from '../services/geminiService';
+import { GlossaryTerm } from '../types';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   BarChart, 
   Bar, 
@@ -296,6 +303,56 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSavingPrecedent, setIsSavingPrecedent] = useState<Record<string, boolean>>({});
+
+  // Glossary States
+  const [activeGlossaryTerm, setActiveGlossaryTerm] = useState<string | null>(null);
+  const [glossaryData, setGlossaryData] = useState<GlossaryTerm | null>(null);
+  const [glossaryPosition, setGlossaryPosition] = useState({ x: 0, y: 0 });
+  const [isLoadingGlossary, setIsLoadingGlossary] = useState(false);
+  const [showManualGlossarySearch, setShowManualGlossarySearch] = useState(false);
+  const [manualSearchTerm, setManualSearchTerm] = useState('');
+
+  const handleTermClick = async (term: string, position: { x: number; y: number }) => {
+    setActiveGlossaryTerm(term);
+    setGlossaryPosition(position);
+    setIsLoadingGlossary(true);
+    setGlossaryData(null);
+    
+    try {
+      const data = await fetchTermDefinition(term);
+      if (data) {
+        setGlossaryData({ ...data, term });
+      }
+    } catch (error) {
+      console.error("Error fetching glossary term:", error);
+      showNotification('Erro ao buscar definição do termo.', 'error');
+    } finally {
+      setIsLoadingGlossary(false);
+    }
+  };
+
+  const handleManualSearch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!manualSearchTerm.trim()) return;
+
+    setIsLoadingGlossary(true);
+    setGlossaryData(null);
+    // Position manual search results in the center of the screen or near the search icon
+    setGlossaryPosition({ x: window.innerWidth / 2, y: 100 });
+    
+    try {
+      const data = await fetchTermDefinition(manualSearchTerm);
+      if (data) {
+        setGlossaryData({ ...data, term: manualSearchTerm });
+        setActiveGlossaryTerm(manualSearchTerm);
+      }
+    } catch (error) {
+      console.error("Error in manual glossary search:", error);
+      showNotification('Erro ao buscar definição.', 'error');
+    } finally {
+      setIsLoadingGlossary(false);
+    }
+  };
 
   const handleSaveAsPrecedent = async (question: Question) => {
     try {
@@ -1477,6 +1534,14 @@ Forneça a explicação de forma concisa e didática.`;
           
           <div className="flex flex-wrap gap-2">
             <button
+              onClick={() => setShowManualGlossarySearch(!showManualGlossarySearch)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${showManualGlossarySearch ? 'bg-indigo-600 text-white' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-200'}`}
+              title="Dicionário Jurídico"
+            >
+              <Book size={16} />
+              <Search size={14} className="-ml-1" />
+            </button>
+            <button
               onClick={() => setShowMockSetup(true)}
               className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-colors shadow-lg shadow-emerald-900/20"
             >
@@ -2252,9 +2317,9 @@ Forneça a explicação de forma concisa e didática.`;
                     </div>
                     
                     <div className="p-6">
-                      <p className="text-slate-800 dark:text-slate-200 leading-relaxed mb-4">
-                        {q.statement}
-                      </p>
+                      <div className="text-slate-800 dark:text-slate-200 leading-relaxed mb-4">
+                        <GlossaryText text={q.statement} onTermClick={handleTermClick} />
+                      </div>
                       {selectedText && (
                         <button
                           onClick={handleJuridiquesTranslate}
@@ -2906,6 +2971,76 @@ Forneça a explicação de forma concisa e didática.`;
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Manual Glossary Search Modal */}
+      {showManualGlossarySearch && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md animate-in zoom-in-95 duration-300">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Book className="text-indigo-500" />
+                Dicionário Jurídico
+              </h2>
+              <button onClick={() => setShowManualGlossarySearch(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                <X size={24} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleManualSearch} className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Termo ou Expressão</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    value={manualSearchTerm}
+                    onChange={e => setManualSearchTerm(e.target.value)}
+                    className="w-full p-4 pr-12 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 dark:text-white"
+                    placeholder="Ex: Habeas Corpus, Lide, Prescrição..."
+                  />
+                  <button
+                    type="submit"
+                    disabled={isLoadingGlossary}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                  >
+                    {isLoadingGlossary ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search size={20} />}
+                  </button>
+                </div>
+              </div>
+              <p className="text-xs text-slate-500 italic">
+                A IA da SanFran definirá o termo juridicamente para você.
+              </p>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Glossary Popover */}
+      <AnimatePresence>
+        {activeGlossaryTerm && glossaryData && (
+          <GlossaryPopover
+            data={glossaryData}
+            onClose={() => {
+              setActiveGlossaryTerm(null);
+              setGlossaryData(null);
+            }}
+            userId={userId}
+            isOnline={true} // Assuming online for AI features
+            position={glossaryPosition}
+          />
+        )}
+      </AnimatePresence>
+
+      {isLoadingGlossary && !glossaryData && (
+        <div 
+          className="fixed z-[100] p-4 bg-white rounded-2xl shadow-2xl border border-slate-200 flex items-center gap-3 animate-in fade-in duration-200"
+          style={{ left: glossaryPosition.x, top: glossaryPosition.y + 20 }}
+        >
+          <Loader2 className="w-4 h-4 text-indigo-600 animate-spin" />
+          <span className="text-sm font-bold text-slate-600">Buscando definição...</span>
         </div>
       )}
     </div>
