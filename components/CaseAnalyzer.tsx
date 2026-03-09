@@ -13,7 +13,7 @@ import {
   FileText,
   Sparkles
 } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import Markdown from 'react-markdown';
 
 interface CaseAnalyzerProps {
@@ -32,7 +32,7 @@ const CaseAnalyzer: React.FC<CaseAnalyzerProps> = ({ onBack }) => {
     setAnalysis(null);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
       const model = "gemini-3-flash-preview";
       
       const prompt = `Analise o seguinte caso jurídico concreto:
@@ -53,6 +53,7 @@ const CaseAnalyzer: React.FC<CaseAnalyzerProps> = ({ onBack }) => {
         model: model,
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         config: {
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
           systemInstruction: "Você é um Analista Jurídico Sênior especializado em Direito Brasileiro. Sua função é auxiliar estudantes a identificar teses e fundamentos em casos práticos."
         }
       });

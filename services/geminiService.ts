@@ -1,16 +1,16 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { supabase } from '../services/supabaseClient';
 
 // Inicializa o cliente Google GenAI de forma preguiçosa (lazy)
 let aiInstance: GoogleGenAI | null = null;
 
 const getApiKey = (): string => {
-  // O Vite EXIGE o prefixo VITE_ para expor variáveis de ambiente ao navegador.
-  // A variável no painel da Vercel deve se chamar VITE_API_KEY.
-  const key = (import.meta as any).env.VITE_API_KEY;
+  // Priorizar a chave selecionada pelo usuário no AI Studio (process.env.API_KEY)
+  // Se não houver, tenta a variável de ambiente do Vite (VITE_API_KEY) ou a padrão (GEMINI_API_KEY)
+  const key = (process.env as any).API_KEY || (import.meta as any).env.VITE_API_KEY || (process.env as any).GEMINI_API_KEY;
   
   if (!key) {
-    console.warn("Gemini Service: VITE_API_KEY não foi encontrada nas variáveis de ambiente do build.");
+    console.warn("Gemini Service: Nenhuma chave de API encontrada (API_KEY, VITE_API_KEY ou GEMINI_API_KEY).");
   }
 
   return key || "";
@@ -246,6 +246,7 @@ export const generateFlashcards = async (
       model: 'gemini-3-flash-preview', 
       contents: { parts },
       config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         tools: tools.length > 0 ? tools : undefined,
         responseMimeType: "application/json",
         responseSchema: {
@@ -392,6 +393,7 @@ export const generateFlashcardsStream = async (
       model: 'gemini-3-flash-preview',
       contents: { parts },
       config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         tools: tools.length > 0 ? tools : undefined,
         responseMimeType: "application/json",
         responseSchema: {
@@ -474,6 +476,7 @@ export const getStudyMotivation = async (subjects: string[]) => {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Sou um estudante de Direito na SanFran (USP). Atualmente estudo: ${list}. Dê uma frase curta de motivação em latim relevante ao estudo jurídico e sua tradução em português.`,
+      config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
     });
     return response.text || "Scientia Vinces.";
   } catch (error) {
@@ -502,6 +505,7 @@ export const simplifyLegalText = async (complexText: string) => {
       
       Texto para simplificar:
       "${complexText}"`,
+      config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
     });
     return response.text;
   } catch (error: any) {
@@ -534,6 +538,7 @@ export const explainLegalTerm = async (term: string, context: string) => {
       2. Sugira 2 ou 3 sinônimos ou expressões mais simples que poderiam substituí-lo neste contexto.
       
       Retorne a resposta em formato Markdown simples.`,
+      config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
     });
     return response.text;
   } catch (error) {
@@ -571,6 +576,7 @@ export const generateMnemonic = async (requirements: string) => {
         "description": "Uma breve explicação ou frase engraçada para ajudar a lembrar"
       }`,
       config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -624,6 +630,7 @@ export const summarizeText = async (text: string) => {
       
       Texto para resumir:
       "${text}"`,
+      config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
     });
     return response.text;
   } catch (error) {
@@ -651,6 +658,7 @@ export const extractKeyPoints = async (text: string) => {
       
       Texto para analisar:
       "${text}"`,
+      config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
     });
     return response.text;
   } catch (error) {
@@ -679,6 +687,7 @@ export const generateMindMap = async (text: string) => {
       
       Texto para mapear:
       "${text}"`,
+      config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
     });
     return response.text;
   } catch (error) {
@@ -706,6 +715,7 @@ export const evaluateDissertativeAnswer = async (question: string, correctAnswer
       Gabarito Esperado: "${correctAnswer}"
       Resposta do Aluno: "${userAnswer}"`,
       config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         systemInstruction: `Você é um Mentor de Estudos Inteligente e Rigoroso. Sua tarefa é avaliar a resposta do aluno em relação ao gabarito oficial.
         
         REGRAS DE PONTUAÇÃO (RIGOROSAS):
@@ -773,6 +783,7 @@ export const fetchLegalReference = async (reference: string) => {
       3. Adicione uma breve explicação (1 frase) do que esse dispositivo trata.
       
       Retorne a resposta em Markdown simples e conciso.`,
+      config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
     });
     return response.text || "Conteúdo não encontrado.";
   } catch (error) {

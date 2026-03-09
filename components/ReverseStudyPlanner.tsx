@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { StudyPlan, PlanSubject, DailyPlan } from '../types';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI, Type, ThinkingLevel } from '@google/genai';
 
 interface ReverseStudyPlannerProps {
   userId: string;
@@ -141,6 +141,7 @@ Seja realista e distribua bem o conteúdo. Foque nos tópicos principais.`;
         model: "gemini-3-flash-preview",
         contents: prompt,
         config: {
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.ARRAY,

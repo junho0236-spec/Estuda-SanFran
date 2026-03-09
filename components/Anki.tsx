@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'motion/react';
 import { useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI, Type, ThinkingLevel } from '@google/genai';
 import confetti from 'canvas-confetti';
 import { 
   Plus, 
@@ -1593,7 +1593,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     setIsFollowUpLoading(true);
     
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
       // Using a model that supports chat
       const chatContext = [
         { role: 'user', parts: [{ text: `Contexto do Flashcard:\nPergunta: ${currentCard.front}\nResposta Correta: ${currentCard.back}\nMinha Resposta: ${userWrittenAnswer}\nAvaliação Inicial da IA: ${aiEvaluation.feedback} (Nota: ${aiEvaluation.score}/10)` }] },
@@ -1605,6 +1605,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         model: "gemini-3-flash-preview",
         contents: chatContext,
         config: {
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
           systemInstruction: "Você é um mentor de estudos especializado. O usuário está revisando um flashcard e teve uma dúvida sobre a avaliação ou o conteúdo. Responda de forma clara e didática, usando formatação Markdown (negrito, listas, títulos) para organizar sua resposta e torná-la visualmente agradável. Se o assunto for jurídico, seja técnico; se for de outra área, adapte sua linguagem."
         }
       });

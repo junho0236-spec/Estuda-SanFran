@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
 import { Question, UserProgress, Notebook, Folder, Flashcard } from '../types';
 import { sampleQuestions } from './sampleQuestions';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import Markdown from 'react-markdown';
 import { 
   BookOpen, 
@@ -646,7 +646,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
       setShowJuridiquesModal(true);
       setJuridiquesExplanation(null); // Clear previous explanation
 
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
       const prompt = `Explique o seguinte trecho de texto jurídico em termos simples, como se estivesse explicando para um estudante do 1º semestre de Direito. Foque na clareza e evite jargões complexos, a menos que os explique imediatamente:
 
 """
@@ -658,6 +658,7 @@ Forneça a explicação de forma concisa e didática.`;
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: prompt,
+        config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
       });
 
       if (response.text) {
@@ -686,7 +687,7 @@ Forneça a explicação de forma concisa e didática.`;
 
     try {
       setLoadingAiCommentary(prev => ({ ...prev, [question.id]: true }));
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
       
       const prompt = `Como um professor de Direito especialista em concursos, forneça uma correção técnica e didática para esta questão:
       
@@ -707,6 +708,7 @@ Forneça a explicação de forma concisa e didática.`;
         model: "gemini-3-flash-preview",
         contents: prompt,
         config: {
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
           responseMimeType: "application/json"
         }
       });
@@ -984,7 +986,8 @@ Forneça a explicação de forma concisa e didática.`;
 
     try {
       setIsGenerating(true);
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      // Usar process.env.API_KEY para garantir que use a chave paga selecionada pelo usuário
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
       
       let contextFromFlashcards = "";
       if (aiConfig.baseOnFlashcards && aiConfig.selectedFolderId) {
@@ -1030,6 +1033,7 @@ Forneça a explicação de forma concisa e didática.`;
         model: "gemini-3-flash-preview",
         contents: prompt,
         config: {
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.ARRAY,
@@ -1150,7 +1154,7 @@ Forneça a explicação de forma concisa e didática.`;
       setLoadingAiLesson(true);
       setShowAiLesson(true);
       
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
       const prompt = `Você é um professor de Direito especialista em concursos e OAB. 
       O aluno está tendo erros recorrentes na disciplina de ${subject}.
       Crie uma aula resumida e focada, explicando os conceitos fundamentais, as principais pegadinhas de banca e dicas de memorização (mnemônicos) para este tema.
@@ -1159,6 +1163,7 @@ Forneça a explicação de forma concisa e didática.`;
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: prompt,
+        config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
       });
 
       setAiLessonContent(response.text);
