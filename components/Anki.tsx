@@ -148,6 +148,22 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     y: number;
     isTopHalf: boolean;
   } | null>(null);
+  const [selectedHeatmapDate, setSelectedHeatmapDate] = useState<string | null>(null);
+  const [dailySummaryData, setDailySummaryData] = useState<any[]>([]);
+  const [isDailySummaryLoading, setIsDailySummaryLoading] = useState(false);
+
+  const handleHeatmapClick = async (dateStr: string) => {
+    setSelectedHeatmapDate(dateStr);
+    setIsDailySummaryLoading(true);
+    try {
+      const sessions = await dataService.getStudySessionsByDate(userId, dateStr, isOnline);
+      setDailySummaryData(sessions);
+    } catch (err) {
+      console.error("Error fetching daily summary:", err);
+    } finally {
+      setIsDailySummaryLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (state && (state as any).newFlashcard) {
@@ -316,7 +332,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       user_id: userId,
       start_time: new Date().toISOString(),
       duration: cardTimer,
-      subject_id: currentCard.subjectId
+      subject_id: currentCard.subjectId,
+      folder_id: currentCard.folderId,
+      rating: 3 // Default to 'Good' for Cram mode next
     };
     await dataService.saveStudySession(sessionData, userId, isOnline);
     
@@ -1643,7 +1661,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         user_id: userId,
         start_time: new Date().toISOString(),
         duration: cardTimer,
-        subject_id: card.subjectId
+        subject_id: card.subjectId,
+        folder_id: card.folderId,
+        rating: quality
       };
       await dataService.saveStudySession(sessionData, userId, isOnline);
       
@@ -2247,7 +2267,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                       return (
                         <div 
                           key={i} 
-                          className={`w-3 h-3 rounded-sm ${colorClass} transition-all hover:scale-150 cursor-help relative`}
+                          className={`w-3 h-3 rounded-sm ${colorClass} transition-all hover:scale-150 cursor-pointer relative`}
+                          onClick={() => handleHeatmapClick(dateStr)}
                           onMouseEnter={(e) => {
                             const rect = e.currentTarget.getBoundingClientRect();
                             const container = e.currentTarget.closest('.heatmap-container');
@@ -3753,6 +3774,89 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               >
                 Gostei, Baixar Agora
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* DAILY SUMMARY MODAL */}
+      {selectedHeatmapDate && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[100] flex items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[3rem] shadow-2xl border-2 border-slate-200 dark:border-white/10 overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="p-10 border-b border-slate-100 dark:border-white/5 bg-gradient-to-br from-emerald-600 to-teal-700 text-white">
+              <div className="flex justify-between items-center mb-4">
+                <Activity className="w-10 h-10 text-white/20" />
+                <button onClick={() => setSelectedHeatmapDate(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <h3 className="text-3xl font-black tracking-tighter capitalize">
+                {new Date(selectedHeatmapDate + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+              </h3>
+              <p className="text-emerald-100 font-bold text-sm mt-2 uppercase tracking-widest">Resumo Diário de Estudo</p>
+            </div>
+            
+            <div className="p-10">
+              {isDailySummaryLoading ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                  <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Carregando resumo...</p>
+                </div>
+              ) : dailySummaryData.length === 0 ? (
+                <div className="text-center py-12 border-4 border-dashed border-slate-100 dark:border-white/5 rounded-[2rem]">
+                  <Activity className="w-16 h-16 text-slate-200 dark:text-white/10 mx-auto mb-4" />
+                  <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Nenhuma atividade registrada para este dia.</p>
+                </div>
+              ) : (
+                <div className="space-y-8">
+                  {/* Metrics */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="bg-slate-50 dark:bg-white/5 p-6 rounded-3xl border border-slate-100 dark:border-white/5 text-center">
+                      <span className="text-3xl font-black text-slate-900 dark:text-white block mb-1">{dailySummaryData.length}</span>
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Cards Revisados</span>
+                    </div>
+                    <div className="bg-emerald-50 dark:bg-emerald-900/20 p-6 rounded-3xl border border-emerald-100 dark:border-emerald-500/20 text-center">
+                      <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400 block mb-1">
+                        {Math.round((dailySummaryData.filter(s => s.rating && s.rating >= 3).length / dailySummaryData.length) * 100) || 0}%
+                      </span>
+                      <span className="text-[9px] font-black text-emerald-600/70 dark:text-emerald-400/70 uppercase tracking-widest">Acerto (Bom/Fácil)</span>
+                    </div>
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-3xl border border-blue-100 dark:border-blue-500/20 text-center">
+                      <span className="text-3xl font-black text-blue-600 dark:text-blue-400 block mb-1">
+                        {Math.round(dailySummaryData.reduce((acc, curr) => acc + (curr.duration || 0), 0) / 60)}m
+                      </span>
+                      <span className="text-[9px] font-black text-blue-600/70 dark:text-blue-400/70 uppercase tracking-widest">Tempo Total</span>
+                    </div>
+                  </div>
+
+                  {/* Activity by Folder */}
+                  <div>
+                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                      <FolderIcon size={14} /> Atividade por Disciplina
+                    </h4>
+                    <div className="space-y-3">
+                      {Object.entries(
+                        dailySummaryData.reduce((acc: any, curr: any) => {
+                          const folderId = curr.folder_id || curr.subject_id;
+                          acc[folderId] = (acc[folderId] || 0) + 1;
+                          return acc;
+                        }, {})
+                      ).map(([folderId, count]: [string, any]) => {
+                        const folder = folders?.find(f => f.id === folderId);
+                        const subject = subjects?.find(s => s.id === folderId);
+                        const name = folder?.name || subject?.name || 'Geral';
+                        const color = folder?.color || 'border-l-slate-500';
+                        
+                        return (
+                          <div key={folderId} className={`flex items-center justify-between p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border-l-4 ${color}`}>
+                            <span className="font-bold text-slate-700 dark:text-slate-200">{name}</span>
+                            <span className="text-xs font-black bg-white dark:bg-slate-800 px-3 py-1 rounded-full text-slate-500">{count} cards</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

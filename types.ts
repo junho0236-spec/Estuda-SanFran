@@ -177,7 +177,9 @@ export interface StudySession {
   start_time: string;
   duration: number;
   subject_id: string;
+  folder_id?: string;
   reading_id?: string;
+  rating?: number;
 }
 
 export interface Reading {

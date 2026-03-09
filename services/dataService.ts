@@ -239,6 +239,25 @@ export const dataService = {
     }
   },
 
+  async getStudySessionsByDate(userId: string, dateStr: string, isOnline: boolean) {
+    if (isOnline) {
+      const { data, error } = await supabase
+        .from('study_sessions')
+        .select('*')
+        .eq('user_id', userId)
+        .gte('start_time', `${dateStr}T00:00:00.000Z`)
+        .lte('start_time', `${dateStr}T23:59:59.999Z`);
+      if (error) {
+        console.error("Error fetching study sessions:", error);
+        return [];
+      }
+      return data || [];
+    } else {
+      const allSessions = await db.study_sessions.where('user_id').equals(userId).toArray();
+      return allSessions.filter(s => s.start_time.startsWith(dateStr));
+    }
+  },
+
   // NOTES
   async saveNote(note: Note, userId: string, isOnline: boolean) {
     // Optimistic update in local DB
