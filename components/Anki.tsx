@@ -6,6 +6,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform } from 'motion/re
 import { useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import { GoogleGenAI, Type } from '@google/genai';
+import confetti from 'canvas-confetti';
 import { 
   Plus, 
   BrainCircuit, 
@@ -141,6 +142,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [newFolderIcon, setNewFolderIcon] = useState(FOLDER_ICONS[0].value);
   const [newFolderTargetDate, setNewFolderTargetDate] = useState<string>('');
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
+  const [dailyGoal, setDailyGoal] = useState(50);
   const [hoveredHeatmapDay, setHoveredHeatmapDay] = useState<{
     date: string;
     count: number;
@@ -1321,14 +1323,30 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     });
     const average = Math.round(last30Count / 30 * 10) / 10;
 
+    const cardsToday = studyHistory[today] || 0;
+    const isGoalReached = cardsToday >= dailyGoal;
+
     // Message
     let message = "Mantenha o ritmo! 🚀";
-    if (!studyHistory[today]) message = "Não deixe a chama apagar! 🕯️";
-    if (streak >= 5) message = "Você está on fire! 🔥";
-    if (streak === 0 && !studyHistory[today]) message = "Comece sua jornada hoje! 📚";
+    if (isGoalReached) message = "Meta Batida! 🏆";
+    else if (!studyHistory[today]) message = "Não deixe a chama apagar! 🕯️";
+    else if (streak >= 5) message = "Você está on fire! 🔥";
+    else if (streak === 0 && !studyHistory[today]) message = "Comece sua jornada hoje! 📚";
 
-    return { streak, total, average, message };
-  }, [studyHistory]);
+    return { streak, total, average, message, cardsToday, isGoalReached };
+  }, [studyHistory, dailyGoal]);
+
+  // Confetti effect when goal is reached
+  useEffect(() => {
+    if (stats.cardsToday === dailyGoal && stats.cardsToday > 0) {
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#FFB81C', '#10B981', '#6366F1']
+      });
+    }
+  }, [stats.cardsToday, dailyGoal]);
 
   // Derived state for safe card access
   const currentCard = reviewQueue[0] || null;
@@ -2232,12 +2250,12 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               <div className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-2 border-slate-200 dark:border-white/10 shadow-xl flex flex-col gap-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-2xl">
-                      <Flame className={`w-6 h-6 ${stats.streak > 0 ? 'text-orange-500 fill-orange-500 animate-pulse' : 'text-slate-400'}`} />
+                    <div className={`p-3 rounded-2xl transition-all duration-500 ${stats.isGoalReached ? 'bg-usp-gold/20 shadow-[0_0_15px_rgba(255,184,28,0.5)]' : 'bg-emerald-100 dark:bg-emerald-900/30'}`}>
+                      <Flame className={`w-6 h-6 ${stats.isGoalReached ? 'text-usp-gold fill-usp-gold' : stats.streak > 0 ? 'text-orange-500 fill-orange-500 animate-pulse' : 'text-slate-400'}`} />
                     </div>
                     <div>
                       <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-tight text-lg">Constância</h3>
-                      <p className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">{stats.message}</p>
+                      <p className={`text-[10px] font-black uppercase tracking-widest ${stats.isGoalReached ? 'text-usp-gold' : 'text-emerald-600 dark:text-emerald-400'}`}>{stats.message}</p>
                     </div>
                   </div>
                   <div className="text-right">
@@ -2246,6 +2264,24 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   </div>
                 </div>
                 
+                {/* Progress Bar */}
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Meta Diária</span>
+                    <span className={`text-[10px] font-black uppercase tracking-widest ${stats.isGoalReached ? 'text-usp-gold' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                      {stats.cardsToday} / {dailyGoal} cards
+                    </span>
+                  </div>
+                  <div className="h-2 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+                    <motion.div 
+                      className={`h-full rounded-full ${stats.isGoalReached ? 'bg-usp-gold' : 'bg-emerald-500'}`}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${Math.min(100, (stats.cardsToday / dailyGoal) * 100)}%` }}
+                      transition={{ duration: 1, ease: "easeOut" }}
+                    />
+                  </div>
+                </div>
+
                 <div className="bg-slate-50 dark:bg-black/20 p-4 rounded-3xl relative heatmap-container">
                   <div className="grid grid-rows-7 grid-flow-col gap-1 h-28 overflow-x-auto pb-2 custom-scrollbar overflow-y-visible">
                     {Array.from({ length: 20 * 7 }).map((_, i) => {
