@@ -32,8 +32,32 @@ import {
   Scale,
   Gavel,
   ShieldCheck,
-  FileText
+  FileText,
+  Timer,
+  Trophy,
+  Clock,
+  BarChart3,
+  History,
+  Target,
+  BrainCircuit,
+  Maximize2,
+  Minimize2,
+  Play,
+  CheckCircle,
+  AlertTriangle
 } from 'lucide-react';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer, 
+  Cell,
+  PieChart,
+  Pie
+} from 'recharts';
 
 interface QuestionBankProps {
   userId: string;
@@ -83,6 +107,135 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
   
   // Stats
   const [correctCount, setCorrectCount] = useState(0);
+
+  // Mock Mode States
+  const [isMockMode, setIsMockMode] = useState(false);
+  const [mockTimeRemaining, setMockTimeRemaining] = useState(0);
+  const [mockAnswers, setMockAnswers] = useState<Record<string, number>>({});
+  const [isMockFinished, setIsMockFinished] = useState(false);
+  const [mockStartTime, setMockStartTime] = useState<number | null>(null);
+  const [showMockSetup, setShowMockSetup] = useState(false);
+  const [mockDurationMinutes, setMockDurationMinutes] = useState(60);
+  const [mockQuestions, setMockQuestions] = useState<Question[]>([]);
+  const [mockResults, setMockResults] = useState<{
+    score: number;
+    total: number;
+    timeSpent: number;
+    subjectStats: { subject: string; correct: number; total: number }[];
+    avgTimePerQuestion: number;
+  } | null>(null);
+
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const startMock = (questionsToUse: Question[], durationMinutes: number) => {
+    setMockQuestions(questionsToUse);
+    setMockTimeRemaining(durationMinutes * 60);
+    setMockDurationMinutes(durationMinutes);
+    setIsMockMode(true);
+    setIsMockFinished(false);
+    setMockAnswers({});
+    setMockStartTime(Date.now());
+    setCurrentIndex(0);
+    setShowMockSetup(false);
+    setViewMode('single');
+    
+    // Zen Mode: Hide sidebar and header (handled by isMockMode state in parent/layout if needed, 
+    // but here we'll just make the QuestionBank take over the screen)
+  };
+
+  const finishMockRef = useRef<() => void>(null);
+  
+  const finishMock = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    
+    const endTime = Date.now();
+    const timeSpent = Math.floor((endTime - (mockStartTime || endTime)) / 1000);
+    
+    // Calculate results
+    let correct = 0;
+    const subjectMap: Record<string, { correct: number; total: number }> = {};
+    
+    mockQuestions.forEach(q => {
+      const userAnswer = mockAnswers[q.id];
+      const isCorrect = userAnswer === q.correct_answer;
+      
+      if (isCorrect) correct++;
+      
+      if (!subjectMap[q.subject]) {
+        subjectMap[q.subject] = { correct: 0, total: 0 };
+      }
+      subjectMap[q.subject].total++;
+      if (isCorrect) subjectMap[q.subject].correct++;
+    });
+    
+    const subjectStats = Object.entries(subjectMap).map(([subject, stats]) => ({
+      subject,
+      ...stats
+    }));
+    
+    setMockResults({
+      score: correct,
+      total: mockQuestions.length,
+      timeSpent,
+      subjectStats,
+      avgTimePerQuestion: timeSpent / (Object.keys(mockAnswers).length || 1)
+    });
+    
+    setIsMockFinished(true);
+    
+    // Update local state and sync to Supabase
+    const correctIds = mockQuestions
+      .filter(q => mockAnswers[q.id] === q.correct_answer)
+      .map(q => q.id);
+    const wrongIds = mockQuestions
+      .filter(q => mockAnswers[q.id] !== undefined && mockAnswers[q.id] !== q.correct_answer)
+      .map(q => q.id);
+      
+    const newCorrectQuestions = [...new Set([...correctQuestions, ...correctIds])];
+    const newWrongQuestions = [...new Set([...wrongQuestions, ...wrongIds])];
+    const newCorrectCount = correctCount + correctIds.length;
+    const newWrongCount = wrongCount + wrongIds.length;
+
+    setCorrectQuestions(newCorrectQuestions);
+    setWrongQuestions(newWrongQuestions);
+    setCorrectCount(newCorrectCount);
+    setWrongCount(newWrongCount);
+
+    syncUserProgress({
+      correctQuestions: newCorrectQuestions,
+      wrongQuestions: newWrongQuestions,
+      correctCount: newCorrectCount,
+      wrongCount: newWrongCount
+    });
+  };
+
+  useEffect(() => {
+    finishMockRef.current = finishMock;
+  }, [finishMock]);
+
+  useEffect(() => {
+    if (isMockMode && !isMockFinished && mockTimeRemaining > 0) {
+      timerRef.current = setInterval(() => {
+        setMockTimeRemaining(prev => {
+          if (prev <= 1) {
+            if (finishMockRef.current) finishMockRef.current();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [isMockMode, isMockFinished]);
+
+  const formatTime = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return `${h > 0 ? h + ':' : ''}${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
 
   const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
     if (notificationTimeoutRef.current) clearTimeout(notificationTimeoutRef.current);
@@ -754,6 +907,18 @@ Forneça a explicação de forma concisa e didática.`;
 
   const handleAnswer = (index: number, questionOverride?: Question) => {
     const targetQuestion = questionOverride || currentQuestion;
+    
+    if (isMockMode) {
+      if (isMockFinished) return;
+      setMockAnswers(prev => ({ ...prev, [targetQuestion.id]: index }));
+      
+      // Auto-advance in single view if not the last question
+      if (viewMode === 'single' && currentIndex < filteredQuestions.length - 1) {
+        setTimeout(() => setCurrentIndex(prev => prev + 1), 300);
+      }
+      return;
+    }
+
     if (showExplanation && !questionOverride) return; 
     
     setSelectedOption(index);
@@ -868,46 +1033,374 @@ Forneça a explicação de forma concisa e didática.`;
     );
   }
 
+  // Mock Results View
+  if (isMockMode && isMockFinished && mockResults) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4 md:p-8 animate-in fade-in duration-500">
+        <div className="max-w-5xl mx-auto space-y-8">
+          <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl">
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-2xl">
+                  <Trophy className="text-emerald-600 dark:text-emerald-400" size={32} />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Resultado do Simulado</h1>
+                  <p className="text-slate-500 dark:text-slate-400 font-medium">Desempenho Geral e Análise por Disciplina</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setIsMockMode(false);
+                  setIsMockFinished(false);
+                  setMockResults(null);
+                  setViewMode('list');
+                }}
+                className="px-6 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
+              >
+                Sair do Simulado
+              </button>
+              <button
+                onClick={() => {
+                  setIsMockFinished(false);
+                  setQuestionStatus('wrong');
+                  setViewMode('list');
+                }}
+                className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-purple-900/20"
+              >
+                Revisar Erros
+              </button>
+            </div>
+          </header>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Main Score Card */}
+            <div className="md:col-span-2 bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl flex flex-col md:flex-row items-center gap-8">
+              <div className="relative w-48 h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Acertos', value: mockResults.score },
+                        { name: 'Erros', value: mockResults.total - mockResults.score }
+                      ]}
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      <Cell fill="#10b981" />
+                      <Cell fill="#ef4444" />
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-4xl font-black text-slate-900 dark:text-white">
+                    {Math.round((mockResults.score / mockResults.total) * 100)}%
+                  </span>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Aproveitamento</span>
+                </div>
+              </div>
+              <div className="flex-1 grid grid-cols-2 gap-6 w-full">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Acertos</span>
+                  <span className="text-2xl font-black text-emerald-600">{mockResults.score} / {mockResults.total}</span>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Tempo Total</span>
+                  <span className="text-2xl font-black text-blue-600">{formatTime(mockResults.timeSpent)}</span>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Tempo Médio</span>
+                  <span className="text-2xl font-black text-amber-600">{Math.round(mockResults.avgTimePerQuestion)}s / q</span>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Status</span>
+                  <span className={`text-2xl font-black ${mockResults.score / mockResults.total >= 0.7 ? 'text-emerald-500' : 'text-amber-500'}`}>
+                    {mockResults.score / mockResults.total >= 0.7 ? 'Aprovado' : 'Em Evolução'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Stats */}
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl flex flex-col justify-center items-center text-center space-y-4">
+              <div className="p-4 bg-purple-100 dark:bg-purple-900/30 rounded-full">
+                <BrainCircuit size={40} className="text-purple-600 dark:text-purple-400" />
+              </div>
+              <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tighter">Análise Cognitiva</h3>
+              <p className="text-sm text-slate-500 leading-relaxed">
+                Seu desempenho em <strong>{mockResults.subjectStats.length}</strong> disciplinas mostra que você está {mockResults.score / mockResults.total > 0.8 ? 'pronto para a prova!' : 'no caminho certo, foque nos temas em amarelo.'}
+              </p>
+            </div>
+          </div>
+
+          {/* Subject Stats Chart */}
+          <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl">
+            <h3 className="text-xl font-black text-slate-900 dark:text-white mb-8 flex items-center gap-3">
+              <BarChart3 className="text-blue-500" /> Desempenho por Disciplina
+            </h3>
+            <div className="h-[400px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={mockResults.subjectStats} layout="vertical" margin={{ left: 40, right: 40 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
+                  <XAxis type="number" domain={[0, 100]} hide />
+                  <YAxis 
+                    dataKey="subject" 
+                    type="category" 
+                    width={150} 
+                    tick={{ fontSize: 12, fontWeight: 700, fill: '#64748b' }}
+                  />
+                  <Tooltip 
+                    cursor={{ fill: 'transparent' }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        const percent = Math.round((data.correct / data.total) * 100);
+                        return (
+                          <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-2xl border border-slate-800">
+                            <p className="font-black text-xs uppercase tracking-widest mb-1">{data.subject}</p>
+                            <p className="text-2xl font-black text-blue-400">{percent}%</p>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{data.correct} de {data.total} questões</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar dataKey={(d) => (d.correct / d.total) * 100} radius={[0, 10, 10, 0]} barSize={32}>
+                    {mockResults.subjectStats.map((entry, index) => {
+                      const percent = (entry.correct / entry.total) * 100;
+                      let color = '#ef4444'; // Red
+                      if (percent >= 80) color = '#10b981'; // Green
+                      else if (percent >= 60) color = '#f59e0b'; // Amber
+                      return <Cell key={`cell-${index}`} fill={color} />;
+                    })}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-4xl mx-auto p-4 md:p-8 animate-in fade-in duration-500 pb-24">
-      <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
-            <BookOpen className="text-blue-500" size={32} />
-            Banco de Questões
-          </h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-2">
-            Treine com questões de múltipla escolha e acompanhe seu desempenho.
-          </p>
-        </div>
-        
-        <div className="flex gap-2">
+    <div className={`${isMockMode ? 'fixed inset-0 z-[100] bg-slate-50 dark:bg-slate-950 overflow-y-auto' : 'max-w-4xl mx-auto p-4 md:p-8 animate-in fade-in duration-500 pb-24'}`}>
+      {/* Mock Mode Floating Timer */}
+      {isMockMode && !isMockFinished && (
+        <div className={`fixed top-6 right-6 z-[110] flex items-center gap-4 p-4 rounded-3xl border-2 shadow-2xl backdrop-blur-md transition-all duration-500 ${mockTimeRemaining < 600 ? 'bg-red-50/90 border-red-500 animate-pulse' : 'bg-white/90 dark:bg-slate-900/90 border-slate-200 dark:border-slate-800'}`}>
+          <div className="flex flex-col items-end">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tempo Restante</span>
+            <span className={`text-2xl font-black tabular-nums ${mockTimeRemaining < 600 ? 'text-red-600' : 'text-slate-900 dark:text-white'}`}>
+              {formatTime(mockTimeRemaining)}
+            </span>
+          </div>
+          <div className={`p-3 rounded-2xl ${mockTimeRemaining < 600 ? 'bg-red-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
+            <Clock size={24} />
+          </div>
           <button
-              onClick={handleImportSamples}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-sm transition-colors"
+            onClick={() => {
+              if (window.confirm('Tem certeza que deseja finalizar o simulado agora?')) {
+                finishMock();
+              }
+            }}
+            className="ml-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"
+          >
+            Finalizar
+          </button>
+        </div>
+      )}
+
+      {/* Mock Mode Progress Header */}
+      {isMockMode && !isMockFinished && (
+        <div className="fixed top-0 left-0 right-0 h-1.5 bg-slate-200 dark:bg-slate-800 z-[110]">
+          <div 
+            className="h-full bg-emerald-500 transition-all duration-500"
+            style={{ width: `${(Object.keys(mockAnswers).length / mockQuestions.length) * 100}%` }}
+          ></div>
+        </div>
+      )}
+
+      {!isMockMode && (
+        <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
+              <BookOpen className="text-blue-500" size={32} />
+              Banco de Questões
+            </h1>
+            <p className="text-slate-500 dark:text-slate-400 mt-2">
+              Treine com questões de múltipla escolha e acompanhe seu desempenho.
+            </p>
+          </div>
+          
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setShowMockSetup(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-colors shadow-lg shadow-emerald-900/20"
             >
-              <Download size={16} /> Importar Exemplos
+              <Timer size={16} /> Iniciar Simulado
             </button>
-          <button
-            onClick={() => setShowAIGenerator(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition-colors"
-          >
-            <Sparkles size={16} /> Gerar com IA
-          </button>
-          <button
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-colors"
-          >
-            {showAddForm ? 'Voltar para Questões' : <><Plus size={16} /> Nova Questão</>}
-          </button>
-          <button
-            onClick={() => setShowNotebookCreationMode(prev => !prev)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${showNotebookCreationMode ? 'bg-orange-600 hover:bg-orange-700 text-white' : 'bg-orange-100 dark:bg-orange-800 hover:bg-orange-200 dark:hover:bg-orange-700 text-orange-700 dark:text-orange-300'}`}
-          >
-            <NotebookText size={16} /> {showNotebookCreationMode ? 'Sair do Modo Caderno' : 'Criar Caderno'}
-          </button>
+            <button
+                onClick={handleImportSamples}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-sm transition-colors"
+              >
+                <Download size={16} /> Importar Exemplos
+              </button>
+            <button
+              onClick={() => setShowAIGenerator(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition-colors"
+            >
+              <Sparkles size={16} /> Gerar com IA
+            </button>
+            <button
+              onClick={() => setShowAddForm(!showAddForm)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-colors"
+            >
+              {showAddForm ? 'Voltar para Questões' : <><Plus size={16} /> Nova Questão</>}
+            </button>
+            <button
+              onClick={() => setShowNotebookCreationMode(prev => !prev)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${showNotebookCreationMode ? 'bg-orange-600 hover:bg-orange-700 text-white' : 'bg-orange-100 dark:bg-orange-800 hover:bg-orange-200 dark:hover:bg-orange-700 text-orange-700 dark:text-orange-300'}`}
+            >
+              <NotebookText size={16} /> {showNotebookCreationMode ? 'Sair do Modo Caderno' : 'Criar Caderno'}
+            </button>
+          </div>
+        </header>
+      )}
+
+      {/* Mock Setup Modal */}
+      {showMockSetup && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[120] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 md:p-10 shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-lg animate-in zoom-in-95 duration-300">
+            <div className="flex justify-between items-center mb-8">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-2xl">
+                  <Timer className="text-emerald-600 dark:text-emerald-400" size={24} />
+                </div>
+                <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Configurar Simulado</h2>
+              </div>
+              <button onClick={() => setShowMockSetup(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all">
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="space-y-8">
+              <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-sm font-black text-slate-400 uppercase tracking-widest">Questões Disponíveis</span>
+                  <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full text-xs font-black">{filteredQuestions.length}</span>
+                </div>
+                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                  O simulado usará as questões baseadas nos seus filtros atuais. Aplique filtros de matéria ou banca antes de começar se desejar um tema específico.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Duração do Simulado (Minutos)</label>
+                <div className="grid grid-cols-4 gap-3">
+                  {[30, 60, 120, 240].map(mins => (
+                    <button
+                      key={mins}
+                      onClick={() => setMockDurationMinutes(mins)}
+                      className={`py-3 rounded-2xl font-black text-sm transition-all border-2 ${mockDurationMinutes === mins ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-900/20' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-emerald-500'}`}
+                    >
+                      {mins >= 60 ? `${mins/60}h` : `${mins}m`}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-3 pt-2">
+                  <input
+                    type="range"
+                    min="5"
+                    max="300"
+                    step="5"
+                    value={mockDurationMinutes}
+                    onChange={(e) => setMockDurationMinutes(parseInt(e.target.value))}
+                    className="flex-1 h-2 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+                  />
+                  <span className="text-lg font-black text-slate-900 dark:text-white w-16 text-right">{mockDurationMinutes}m</span>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-100 dark:border-amber-900/30">
+                <AlertTriangle className="text-amber-500 shrink-0" size={20} />
+                <p className="text-[10px] font-bold text-amber-800 dark:text-amber-400 leading-relaxed uppercase tracking-wider">
+                  No modo simulado, o gabarito e as explicações só serão revelados após a finalização. O cronômetro não pode ser pausado.
+                </p>
+              </div>
+
+              <button
+                onClick={() => {
+                  if (filteredQuestions.length === 0) {
+                    showNotification('Não há questões disponíveis com os filtros atuais.', 'error');
+                    return;
+                  }
+                  startMock(filteredQuestions, mockDurationMinutes);
+                }}
+                className="w-full py-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-3xl font-black text-sm uppercase tracking-[0.3em] transition-all shadow-xl shadow-emerald-900/30 active:scale-[0.98]"
+              >
+                Começar Prova Real
+              </button>
+            </div>
+          </div>
         </div>
-      </header>
+      )}
+
+      {isMockMode && !isMockFinished && (
+        <div className="max-w-4xl mx-auto pt-24 pb-32 px-4">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-2xl">
+                <Target className="text-blue-600 dark:text-blue-400" size={24} />
+              </div>
+              <div>
+                <h2 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Simulado em Curso</h2>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Questão {currentIndex + 1} de {mockQuestions.length}</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setCurrentIndex(prev => Math.max(0, prev - 1))}
+                disabled={currentIndex === 0}
+                className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 disabled:opacity-30 transition-all"
+              >
+                <ChevronLeft size={24} />
+              </button>
+              <button 
+                onClick={() => setCurrentIndex(prev => Math.min(mockQuestions.length - 1, prev + 1))}
+                disabled={currentIndex === mockQuestions.length - 1}
+                className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 disabled:opacity-30 transition-all"
+              >
+                <ChevronRight size={24} />
+              </button>
+            </div>
+          </div>
+
+          {/* Question Navigation Bar */}
+          <div className="flex flex-wrap gap-2 mb-8 p-4 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-lg">
+            {mockQuestions.map((q, idx) => (
+              <button
+                key={q.id}
+                onClick={() => setCurrentIndex(idx)}
+                className={`w-10 h-10 rounded-xl font-black text-xs flex items-center justify-center transition-all ${
+                  currentIndex === idx 
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' 
+                    : mockAnswers[q.id] !== undefined
+                      ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-slate-200'
+                }`}
+              >
+                {idx + 1}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div id="ai-generator-portal">
         {showAIGenerator && (
@@ -1463,18 +1956,20 @@ Forneça a explicação de forma concisa e didática.`;
                           {expandedQuestionId === q.id ? 'Fechar Questão' : 'Resolver Questão'}
                         </button>
                         
-                        <button
-                          onClick={() => {
-                            setCurrentIndex(idx);
-                            setViewMode('single');
-                            setSelectedOption(null);
-                            setShowExplanation(false);
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                          }}
-                          className="px-4 py-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold transition-colors"
-                        >
-                          Modo Foco
-                        </button>
+                        {!isMockMode && (
+                          <button
+                            onClick={() => {
+                              setCurrentIndex(idx);
+                              setViewMode('single');
+                              setSelectedOption(null);
+                              setShowExplanation(false);
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            className="px-4 py-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold transition-colors"
+                          >
+                            Modo Foco
+                          </button>
+                        )}
                       </div>
 
                       {/* Expanded Accordion Content */}
@@ -1482,17 +1977,21 @@ Forneça a explicação de forma concisa e didática.`;
                         <div className="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-4 duration-300">
                           <div className="space-y-3">
                             {q.options.map((option, optIdx) => {
-                              const isSelected = selectedOption === optIdx;
+                              const isSelected = isMockMode ? mockAnswers[q.id] === optIdx : selectedOption === optIdx;
                               const isCorrect = q.correct_answer === optIdx;
-                              const showStatus = showExplanation;
+                              const showStatus = isMockMode ? isMockFinished : showExplanation;
                               const isEliminated = (eliminatedOptions[q.id] || []).includes(optIdx);
                               
                               let btnClass = "w-full text-left p-4 rounded-2xl border-2 transition-all duration-200 flex items-start gap-4 relative group ";
                               
                               if (!showStatus) {
-                                btnClass += isEliminated 
-                                  ? "border-slate-100 dark:border-slate-800 opacity-40 grayscale" 
-                                  : "border-slate-200 dark:border-slate-700 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/10";
+                                if (isSelected) {
+                                  btnClass += "border-blue-500 bg-blue-50 dark:bg-blue-900/20";
+                                } else {
+                                  btnClass += isEliminated 
+                                    ? "border-slate-100 dark:border-slate-800 opacity-40 grayscale" 
+                                    : "border-slate-200 dark:border-slate-700 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/10";
+                                }
                               } else {
                                 if (isCorrect) {
                                   btnClass += "border-green-500 bg-green-50 dark:bg-green-900/10";
@@ -1511,12 +2010,13 @@ Forneça a explicação de forma concisa e didática.`;
                                       e.preventDefault();
                                       toggleElimination(q.id, optIdx);
                                     }}
-                                    disabled={showExplanation}
+                                    disabled={showStatus && !isMockMode}
                                     className={btnClass}
                                   >
                                     <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center font-bold text-sm ${
                                       showStatus && isCorrect ? 'bg-green-500 text-white' :
                                       showStatus && isSelected && !isCorrect ? 'bg-red-500 text-white' :
+                                      isSelected && !showStatus ? 'bg-blue-500 text-white' :
                                       'bg-slate-100 dark:bg-slate-800 text-slate-500'
                                     }`}>
                                       {String.fromCharCode(65 + optIdx)}
@@ -1699,17 +2199,21 @@ Forneça a explicação de forma concisa e didática.`;
 
                 <div className="space-y-3">
                   {currentQuestion.options.map((option, idx) => {
-                    const isSelected = selectedOption === idx;
+                    const isSelected = isMockMode ? mockAnswers[currentQuestion.id] === idx : selectedOption === idx;
                     const isCorrect = currentQuestion.correct_answer === idx;
-                    const showStatus = showExplanation;
+                    const showStatus = isMockMode ? isMockFinished : showExplanation;
                     const isEliminated = (eliminatedOptions[currentQuestion.id] || []).includes(idx);
                     
                     let btnClass = "w-full text-left p-4 rounded-2xl border-2 transition-all duration-200 flex items-start gap-4 relative group ";
                     
                     if (!showStatus) {
-                      btnClass += isEliminated 
-                        ? "border-slate-100 dark:border-slate-800 opacity-40 grayscale" 
-                        : "border-slate-200 dark:border-slate-700 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/10";
+                      if (isSelected) {
+                        btnClass += "border-blue-500 bg-blue-50 dark:bg-blue-900/20";
+                      } else {
+                        btnClass += isEliminated 
+                          ? "border-slate-100 dark:border-slate-800 opacity-40 grayscale" 
+                          : "border-slate-200 dark:border-slate-700 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/10";
+                      }
                     } else {
                       if (isCorrect) {
                         btnClass += "border-green-500 bg-green-50 dark:bg-green-900/10";
@@ -1728,12 +2232,13 @@ Forneça a explicação de forma concisa e didática.`;
                             e.preventDefault();
                             toggleElimination(currentQuestion.id, idx);
                           }}
-                          disabled={showExplanation}
+                          disabled={showStatus && !isMockMode}
                           className={btnClass}
                         >
                           <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center font-bold text-sm ${
                             showStatus && isCorrect ? 'bg-green-500 text-white' :
                             showStatus && isSelected && !isCorrect ? 'bg-red-500 text-white' :
+                            isSelected && !showStatus ? 'bg-blue-500 text-white' :
                             'bg-slate-100 dark:bg-slate-800 text-slate-500'
                           }`}>
                             {String.fromCharCode(65 + idx)}
