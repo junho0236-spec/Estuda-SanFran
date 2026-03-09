@@ -141,6 +141,13 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [newFolderIcon, setNewFolderIcon] = useState(FOLDER_ICONS[0].value);
   const [newFolderTargetDate, setNewFolderTargetDate] = useState<string>('');
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
+  const [hoveredHeatmapDay, setHoveredHeatmapDay] = useState<{
+    date: string;
+    count: number;
+    x: number;
+    y: number;
+    isTopHalf: boolean;
+  } | null>(null);
 
   useEffect(() => {
     if (state && (state as any).newFlashcard) {
@@ -2219,8 +2226,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   </div>
                 </div>
                 
-                <div className="bg-slate-50 dark:bg-black/20 p-4 rounded-3xl">
-                  <div className="grid grid-rows-7 grid-flow-col gap-1 h-28 overflow-x-auto pb-2 custom-scrollbar">
+                <div className="bg-slate-50 dark:bg-black/20 p-4 rounded-3xl relative heatmap-container">
+                  <div className="grid grid-rows-7 grid-flow-col gap-1 h-28 overflow-x-auto pb-2 custom-scrollbar overflow-y-visible">
                     {Array.from({ length: 20 * 7 }).map((_, i) => {
                       const date = new Date();
                       const dayOffset = (20 * 7) - 1 - i;
@@ -2234,18 +2241,54 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                       else if (count > 10) colorClass = 'bg-emerald-500';
                       else if (count > 0) colorClass = 'bg-emerald-400';
 
+                      const rowIndex = i % 7;
+                      const isTopHalf = rowIndex < 3;
+
                       return (
                         <div 
                           key={i} 
-                          className={`w-3 h-3 rounded-sm ${colorClass} transition-all hover:scale-150 hover:z-10 group relative cursor-help`}
-                        >
-                          <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white text-[8px] font-bold px-2 py-1 rounded whitespace-nowrap z-20 pointer-events-none shadow-xl border border-white/10">
-                            {date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}: {count} cards
-                          </div>
-                        </div>
+                          className={`w-3 h-3 rounded-sm ${colorClass} transition-all hover:scale-150 cursor-help relative`}
+                          onMouseEnter={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const container = e.currentTarget.closest('.heatmap-container');
+                            if (container) {
+                              const containerRect = container.getBoundingClientRect();
+                              setHoveredHeatmapDay({
+                                date: date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }),
+                                count,
+                                x: rect.left - containerRect.left + rect.width / 2,
+                                y: rect.top - containerRect.top,
+                                isTopHalf
+                              });
+                            }
+                          }}
+                          onMouseLeave={() => setHoveredHeatmapDay(null)}
+                        />
                       );
                     })}
                   </div>
+                  {hoveredHeatmapDay && (
+                    <div 
+                      className="absolute bg-slate-900 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg z-[100] pointer-events-none shadow-2xl border border-white/10 animate-in fade-in zoom-in-95 duration-200"
+                      style={{ 
+                        left: hoveredHeatmapDay.x, 
+                        top: hoveredHeatmapDay.isTopHalf ? hoveredHeatmapDay.y + 20 : hoveredHeatmapDay.y - 10,
+                        transform: `translateX(-50%) translateY(${hoveredHeatmapDay.isTopHalf ? '0' : '-100%'})`
+                      }}
+                    >
+                      <div className="flex items-center gap-2 relative">
+                        <div className={`w-2 h-2 rounded-full ${hoveredHeatmapDay.count > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}`} />
+                        {hoveredHeatmapDay.date}: {hoveredHeatmapDay.count} cards
+                        
+                        {/* Arrow */}
+                        <div 
+                          className={`absolute left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900 border-slate-900 rotate-45 ${
+                            hoveredHeatmapDay.isTopHalf ? '-top-2.5 border-t border-l border-white/10' : '-bottom-2.5 border-b border-r border-white/10'
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center mt-2 px-1">
                     <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Menos</span>
                     <div className="flex gap-1">
