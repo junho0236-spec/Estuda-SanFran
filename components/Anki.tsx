@@ -2,7 +2,7 @@
 // Anki.tsx - Community Features and Card Rating
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useMotionValue, useTransform } from 'motion/react';
 import { useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import { GoogleGenAI, Type } from '@google/genai';
@@ -182,6 +182,11 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [isFollowUpLoading, setIsFollowUpLoading] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
+  
+  const dragX = useMotionValue(0);
+  const leftOverlayOpacity = useTransform(dragX, [-150, -50, 0], [0.6, 0, 0]);
+  const rightOverlayOpacity = useTransform(dragX, [0, 50, 150], [0, 0, 0.6]);
+  
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [undoStack, setUndoStack] = useState<any[]>([]);
   const [redoStack, setRedoStack] = useState<any[]>([]);
@@ -1261,6 +1266,10 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const currentCard = reviewQueue[0] || null;
 
   useEffect(() => {
+    dragX.set(0);
+  }, [currentCard?.id]);
+
+  useEffect(() => {
     if (mode === 'study') {
       setCurrentTime(Date.now());
       
@@ -1464,6 +1473,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   };
 
   const handleReview = async (quality: number) => {
+    if (quality === 0) setSwipeDirection('left');
+    if (quality >= 3) setSwipeDirection('right');
+    
     window.speechSynthesis.cancel(); // Abort audio before transition
     setIsFlipped(false); // Atomic Reset: Reset flip state BEFORE updating card data
     
@@ -2682,20 +2694,47 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                     rotate: swipeDirection === 'left' ? -20 : swipeDirection === 'right' ? 20 : 0
                   }}
                   transition={{ type: 'spring', damping: 20, stiffness: 100 }}
-                  drag={isCramMode ? "x" : false}
+                  style={{ x: dragX }}
+                  drag="x"
                   dragConstraints={{ left: 0, right: 0 }}
                   onDragEnd={(_, info) => {
                     if (info.offset.x > 100) {
                       setSwipeDirection('right');
-                      handleNextCram();
+                      if (isCramMode) {
+                        handleNextCram();
+                      } else {
+                        handleReview(3); // Good
+                      }
                     } else if (info.offset.x < -100) {
                       setSwipeDirection('left');
-                      handleNextCram();
+                      if (isCramMode) {
+                        handleNextCram();
+                      } else {
+                        handleReview(0); // Again
+                      }
                     }
                   }}
                   className="absolute inset-0 w-full h-full"
                 >
                   <div className={`relative w-full h-full cursor-pointer transition-transform duration-700 preserve-3d ${isFlipped ? 'rotate-y-180' : ''}`} onClick={() => !isDissertativeMode && setIsFlipped(!isFlipped)}>
+                    {/* Swipe Overlays */}
+                    <motion.div 
+                      style={{ opacity: leftOverlayOpacity }}
+                      className="absolute inset-0 z-50 bg-red-500 rounded-[3rem] pointer-events-none flex items-center justify-center"
+                    >
+                      <div className="bg-white/20 p-8 rounded-full backdrop-blur-md">
+                        <X size={80} className="text-white" />
+                      </div>
+                    </motion.div>
+                    <motion.div 
+                      style={{ opacity: rightOverlayOpacity }}
+                      className="absolute inset-0 z-50 bg-emerald-500 rounded-[3rem] pointer-events-none flex items-center justify-center"
+                    >
+                      <div className="bg-white/20 p-8 rounded-full backdrop-blur-md">
+                        <Check size={80} className="text-white" />
+                      </div>
+                    </motion.div>
+
                     <div className="absolute inset-0 w-full h-full bg-white dark:bg-sanfran-rubiDark border-[6px] border-slate-200 dark:border-white/10 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-center text-center backface-hidden">
                       <span className="text-xs font-black text-sanfran-rubi uppercase tracking-[0.3em] mb-8">Questão</span>
                       <div className="text-2xl font-black text-slate-950 dark:text-white leading-tight">
