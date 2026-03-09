@@ -177,6 +177,7 @@ export const dataService = {
         notes: card.notes || null,
         next_review: card.nextReview ? Math.floor(card.nextReview) : Date.now(),
         interval: card.interval || 0,
+        status: card.status || 'new',
         archived_at: card.archived_at || null,
         tags: card.tags || [],
         source: card.source || null,

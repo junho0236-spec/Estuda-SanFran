@@ -1,7 +1,7 @@
 // Anki.tsx - Community Features and Card Rating
 // Anki.tsx - Community Features and Card Rating
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
@@ -109,7 +109,6 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   // States comuns
   const [bulkInput, setBulkInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [manualFront, setManualFront] = useState('');
   const [manualBack, setManualBack] = useState('');
@@ -162,101 +161,46 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [isFollowUpLoading, setIsFollowUpLoading] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
-  const [sessionQueue, setSessionQueue] = useState<Flashcard[]>([]);
-  const [sessionTotal, setSessionTotal] = useState(0);
-  const [learningCards, setLearningCards] = useState<Set<string>>(new Set());
+  const [currentTime, setCurrentTime] = useState(Date.now());
   const [undoStack, setUndoStack] = useState<any[]>([]);
   const [redoStack, setRedoStack] = useState<any[]>([]);
 
-  const pushToHistory = () => {
+  const pushToHistory = (card: Flashcard) => {
     const currentState = {
-      currentIndex,
-      sessionQueue: [...sessionQueue],
-      learningCards: new Set(learningCards),
       isFlipped,
       userWrittenAnswer,
       aiEvaluation,
       followUpChat: [...followUpChat],
       isDissertativeMode,
-      // We store the current state of the card being reviewed to revert it if needed
-      cardState: sessionQueue[currentIndex] ? { ...sessionQueue[currentIndex] } : null
+      cardState: { ...card }
     };
     setUndoStack(prev => [...prev.slice(-19), currentState]); // Limit to 20 items
     setRedoStack([]); // Clear redo stack on new action
   };
 
-  const undoAction = () => {
+  const undoAction = async () => {
     if (undoStack.length === 0) return;
 
     const prevState = undoStack[undoStack.length - 1];
-    const currentState = {
-      currentIndex,
-      sessionQueue: [...sessionQueue],
-      learningCards: new Set(learningCards),
-      isFlipped,
-      userWrittenAnswer,
-      aiEvaluation,
-      followUpChat: [...followUpChat],
-      isDissertativeMode,
-      cardState: sessionQueue[currentIndex] ? { ...sessionQueue[currentIndex] } : null
-    };
-
-    setRedoStack(prev => [...prev, currentState]);
-    setUndoStack(prev => prev.slice(0, -1));
-
-    // Restore state
-    setCurrentIndex(prevState.currentIndex);
-    setSessionQueue(prevState.sessionQueue);
-    setLearningCards(prevState.learningCards);
-    setIsFlipped(prevState.isFlipped);
-    setUserWrittenAnswer(prevState.userWrittenAnswer);
-    setAiEvaluation(prevState.aiEvaluation);
-    setFollowUpChat(prevState.followUpChat);
-    setIsDissertativeMode(prevState.isDissertativeMode);
-
-    // Revert the card in the global flashcards state if it was updated
+    
+    // Revert in DB
     if (prevState.cardState) {
       setFlashcards(prev => prev.map(f => f.id === prevState.cardState.id ? prevState.cardState : f));
-      // In a real app, we might want to revert the DB change too, 
-      // but for a "undo" in a study session, reverting local state is usually enough 
-      // until the next sync or if we explicitly save it back.
-      dataService.saveFlashcard(prevState.cardState, userId, isOnline);
+      await dataService.saveFlashcard(prevState.cardState, userId, isOnline);
     }
+
+    setUndoStack(prev => prev.slice(0, -1));
+    // We don't need to restore UI state like isFlipped because the card will reappear in the queue
+    setIsFlipped(false);
+    setUserWrittenAnswer('');
+    setAiEvaluation(null);
+    setFollowUpChat([]);
+    setIsDissertativeMode(false);
   };
 
-  const redoAction = () => {
-    if (redoStack.length === 0) return;
-
-    const nextState = redoStack[redoStack.length - 1];
-    const currentState = {
-      currentIndex,
-      sessionQueue: [...sessionQueue],
-      learningCards: new Set(learningCards),
-      isFlipped,
-      userWrittenAnswer,
-      aiEvaluation,
-      followUpChat: [...followUpChat],
-      isDissertativeMode,
-      cardState: sessionQueue[currentIndex] ? { ...sessionQueue[currentIndex] } : null
-    };
-
-    setUndoStack(prev => [...prev, currentState]);
-    setRedoStack(prev => prev.slice(0, -1));
-
-    // Restore state
-    setCurrentIndex(nextState.currentIndex);
-    setSessionQueue(nextState.sessionQueue);
-    setLearningCards(nextState.learningCards);
-    setIsFlipped(nextState.isFlipped);
-    setUserWrittenAnswer(nextState.userWrittenAnswer);
-    setAiEvaluation(nextState.aiEvaluation);
-    setFollowUpChat(nextState.followUpChat);
-    setIsDissertativeMode(nextState.isDissertativeMode);
-
-    if (nextState.cardState) {
-      setFlashcards(prev => prev.map(f => f.id === nextState.cardState.id ? nextState.cardState : f));
-      dataService.saveFlashcard(nextState.cardState, userId, isOnline);
-    }
+  const redoAction = async () => {
+    // Redo is complex with dynamic queues, so we'll just disable it for now or implement later
+    // The user rarely needs redo for flashcards anyway
   };
 
   // Keyboard Shortcuts
@@ -318,7 +262,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const handleNextCram = async () => {
     if (!currentCard) return;
     
-    pushToHistory();
+    pushToHistory(currentCard);
     setUserWrittenAnswer('');
     setAiEvaluation(null);
     setFollowUpChat([]);
@@ -347,16 +291,14 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       [today]: (prev[today] || 0) + 1
     }));
 
-    setUserWrittenAnswer('');
-    setAiEvaluation(null);
-    setIsDissertativeMode(false);
-    if (currentIndex < sessionQueue.length - 1) {
-      setCurrentIndex(prev => prev + 1);
-      setIsFlipped(false);
-    } else {
-      setMode('browse');
-      setSessionQueue([]);
-    }
+    // In Cram mode, we just push the card to the end of the queue by setting nextReview to a future date
+    // or we can just mark it as Good (3) to update its interval
+    const updatedCard = { ...currentCard, nextReview: Date.now() + 10 * 60 * 1000 }; // Push 10 mins into future
+    setFlashcards(prev => prev.map(f => f.id === updatedCard.id ? updatedCard : f));
+    await dataService.saveFlashcard(updatedCard, userId, isOnline);
+    setCurrentTime(Date.now());
+
+    setIsFlipped(false);
   };
 
   useEffect(() => {
@@ -1220,47 +1162,60 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   }, [userId]);
 
   const currentFolders = (folders || []).filter(f => f.parentId === currentFolderId);
-  const currentContextIds = getSubfolderIds(currentFolderId);
+  const currentContextIds = useMemo(() => getSubfolderIds(currentFolderId), [currentFolderId, folders]);
   
-  const reviewQueue = studyableFlashcards.filter(f => {
-    const isDue = f.nextReview <= Date.now();
-    
-    // In Cram Mode, we ignore the due date
-    if (!isDue && !isCramMode) return false;
-    
-    // If we have selected folders for a custom session, only include cards from those folders
-    if (selectedFolderIdsForSession.size > 0) {
-      const allSessionFolderIds = Array.from(selectedFolderIdsForSession).flatMap(id => getSubfolderIds(id));
-      return allSessionFolderIds.includes(f.folderId as string);
-    }
-    
-    // Otherwise, use the current folder context
-    return (currentFolderId === null ? true : currentContextIds.includes(f.folderId as string));
-  });
+  const reviewQueue = useMemo(() => {
+    return studyableFlashcards.filter(f => {
+      const isDue = f.nextReview <= currentTime;
+      
+      // In Cram Mode, we ignore the due date
+      if (!isDue && !isCramMode) return false;
+      
+      // If we have selected folders for a custom session, only include cards from those folders
+      if (selectedFolderIdsForSession.size > 0) {
+        const allSessionFolderIds = Array.from(selectedFolderIdsForSession).flatMap(id => getSubfolderIds(id));
+        return allSessionFolderIds.includes(f.folderId as string);
+      }
+      
+      // Otherwise, use the current folder context
+      return (currentFolderId === null ? true : currentContextIds.includes(f.folderId as string));
+    }).sort((a, b) => {
+      if (isCramMode) return Math.random() - 0.5; // Randomize in cram mode
+      
+      // Sort logic:
+      // 1. Learning cards that are due
+      // 2. Review cards that are due
+      // 3. New cards
+      const order = { 'learning': 0, 'review': 1, 'new': 2 };
+      const statusA = a.status || 'new';
+      const statusB = b.status || 'new';
+      
+      if (order[statusA] !== order[statusB]) {
+        return order[statusA] - order[statusB];
+      }
+      
+      // Within same status, sort by nextReview (oldest first)
+      return a.nextReview - b.nextReview;
+    });
+  }, [studyableFlashcards, currentTime, isCramMode, selectedFolderIdsForSession, currentFolderId, currentContextIds, folders]);
 
-  // Keep currentIndex in bounds when sessionQueue changes
-  useEffect(() => {
-    if (mode === 'study' && sessionQueue.length > 0 && currentIndex >= sessionQueue.length) {
-      setCurrentIndex(sessionQueue.length - 1);
-    }
-  }, [sessionQueue.length, currentIndex, mode]);
+  // Derived state for safe card access
+  const currentCard = reviewQueue[0] || null;
 
-  // Initialize sessionQueue when entering study mode
   useEffect(() => {
-    if (mode === 'study' && sessionQueue.length === 0 && reviewQueue.length > 0) {
-      const initialQueue = [...reviewQueue].sort(() => Math.random() - 0.5);
-      setSessionQueue(initialQueue);
-      setSessionTotal(initialQueue.length);
-      setUndoStack([]);
-      setRedoStack([]);
+    if (mode === 'study') {
+      setCurrentTime(Date.now());
+      
+      // If queue is empty, we want to keep checking if learning cards become due
+      if (reviewQueue.length === 0) {
+        const interval = setInterval(() => setCurrentTime(Date.now()), 10000);
+        return () => clearInterval(interval);
+      }
     }
   }, [mode, reviewQueue.length]);
 
-  // Derived state for safe card access
-  const currentCard = mode === 'study' ? (sessionQueue[currentIndex] || null) : (reviewQueue[currentIndex] || null);
-
   useEffect(() => {
-    if (!isAudioMode || mode !== 'study' || sessionQueue.length === 0) {
+    if (!isAudioMode || mode !== 'study' || reviewQueue.length === 0) {
       window.speechSynthesis.cancel();
       setIsSpeaking(false);
       return;
@@ -1270,7 +1225,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       if (isSpeaking) return;
       setIsSpeaking(true);
 
-      const card = sessionQueue[currentIndex];
+      const card = reviewQueue[0];
       if (!card) {
         setIsSpeaking(false);
         return;
@@ -1317,16 +1272,10 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 return;
               }
               
-              if (currentIndex < sessionQueue.length - 1) {
-                setCurrentIndex(prev => prev + 1);
-                setIsFlipped(false);
-                setIsSpeaking(false);
-              } else {
-                setMode('browse');
-                setIsAudioMode(false);
-                setIsSpeaking(false);
-                setSessionQueue([]);
-              }
+              // In audio mode, we just mark it as Good to move to the next card
+              handleReview(3);
+              setIsSpeaking(false);
+              setIsFlipped(false);
             }, 2000);
           };
         }, 4000);
@@ -1338,7 +1287,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     return () => {
       window.speechSynthesis.cancel();
     };
-  }, [isAudioMode, mode, currentIndex, reviewQueue, audioSpeed]);
+  }, [isAudioMode, mode, currentCard?.id, reviewQueue, audioSpeed]);
 
   useEffect(() => {
     if (mode === 'study') {
@@ -1351,7 +1300,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       
       return () => clearInterval(interval);
     }
-  }, [mode, currentIndex]);
+  }, [mode, currentCard?.id]);
 
   const handleEvaluateDissertative = async () => {
     if (!userWrittenAnswer.trim()) return;
@@ -1405,73 +1354,57 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
   const handleReview = async (quality: number) => {
     if (!currentCard) return;
-    pushToHistory();
+    pushToHistory(currentCard);
     const card = currentCard;
-    const isNew = card.interval === 0;
-    const isLearning = learningCards.has(card.id);
+    const isNew = card.status === 'new' || !card.status;
+    const isLearning = card.status === 'learning';
     
     // Anki Logic:
-    // If New and Good (3) -> Re-insert in 10m (offset ~15), add to learningCards
-    // If Learning and Good (3) -> Graduate to 1d, remove from learningCards
+    // If New and Good (3) -> Re-insert in 10m (offset ~10)
+    // If Learning and Good (3) -> Graduate to 1d
     
     let newInterval = card.interval;
-    let shouldReinsert = false;
-    let offset = 0;
+    let newStatus: 'new' | 'learning' | 'review' = card.status || 'new';
+    let offsetMinutes = 0;
 
     if (quality === 0) { // Again
       newInterval = 0;
-      shouldReinsert = true;
-      offset = 4; // ~1 min
-      setLearningCards(prev => new Set(prev).add(card.id));
+      newStatus = 'learning';
+      offsetMinutes = 1; // ~1 min
     } else if (quality === 2) { // Hard
       if (isNew || isLearning) {
         newInterval = 0;
-        shouldReinsert = true;
-        offset = 10; // ~6 min
-        setLearningCards(prev => new Set(prev).add(card.id));
+        newStatus = 'learning';
+        offsetMinutes = 6; // ~6 min
       } else {
         newInterval = Math.ceil(card.interval * 1.2);
-        shouldReinsert = false;
-        setLearningCards(prev => {
-          const next = new Set(prev);
-          next.delete(card.id);
-          return next;
-        });
+        newStatus = 'review';
       }
     } else if (quality === 3) { // Good
       if (isNew && !isLearning) {
         newInterval = 0;
-        shouldReinsert = true;
-        offset = 15; // ~10 min
-        setLearningCards(prev => new Set(prev).add(card.id));
+        newStatus = 'learning';
+        offsetMinutes = 10; // ~10 min
       } else {
         newInterval = isNew ? 1 : Math.ceil(card.interval * 2.5);
-        shouldReinsert = false;
-        setLearningCards(prev => {
-          const next = new Set(prev);
-          next.delete(card.id);
-          return next;
-        });
+        newStatus = 'review';
       }
     } else if (quality === 5) { // Easy
       newInterval = isNew ? 4 : Math.ceil(card.interval * 4);
-      shouldReinsert = false;
-      setLearningCards(prev => {
-        const next = new Set(prev);
-        next.delete(card.id);
-        return next;
-      });
+      newStatus = 'review';
     }
 
-    const nextReview = Date.now() + newInterval * 24 * 60 * 60 * 1000;
+    const nextReview = offsetMinutes > 0 
+      ? Date.now() + offsetMinutes * 60 * 1000 
+      : Date.now() + newInterval * 24 * 60 * 60 * 1000;
     
     try {
-      const updatedCard = { ...card, interval: newInterval, nextReview };
+      const updatedCard = { ...card, interval: newInterval, nextReview, status: newStatus };
       
-      // Only save to DB if it's NOT a temporary learning re-insertion
-      if (!shouldReinsert || quality === 0 || (quality === 2 && !isNew)) {
-        await dataService.saveFlashcard(updatedCard, userId, isOnline);
-      }
+      // ALWAYS save to DB so the queue updates dynamically
+      setFlashcards(prev => prev.map(f => f.id === updatedCard.id ? updatedCard : f));
+      await dataService.saveFlashcard(updatedCard, userId, isOnline);
+      setCurrentTime(Date.now());
       
       // RECORD STUDY SESSION FOR CONSTANCY
       const sessionData: StudySession = {
@@ -1495,8 +1428,6 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         [today]: (prev[today] || 0) + 1
       }));
 
-      setFlashcards(prev => prev.map(f => f.id === card.id ? updatedCard : f));
-      
       // TRIGGER QUEST UPDATE
       await updateQuestProgress(userId, 'review_cards', 1);
 
@@ -1505,27 +1436,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setFollowUpChat([]);
       setFollowUpInput('');
       setIsDissertativeMode(false);
-
-      if (shouldReinsert) {
-        const newQueue = [...sessionQueue];
-        const nextPos = Math.min(currentIndex + offset + 1, newQueue.length);
-        newQueue.splice(nextPos, 0, card);
-        setSessionQueue(newQueue);
-        
-        setCurrentIndex(prev => prev + 1);
-        setIsFlipped(false);
-      } else {
-        if (currentIndex < sessionQueue.length - 1) { 
-          setCurrentIndex(prev => prev + 1); 
-          setIsFlipped(false); 
-        } else { 
-          setMode('browse'); 
-          setCurrentIndex(0); 
-          setIsFlipped(false); 
-          setSessionQueue([]);
-          setLearningCards(new Set());
-        }
-      }
+      setIsFlipped(false);
     } catch (err) { 
       alert("Erro ao atualizar revisão."); 
     }
@@ -1594,10 +1505,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   <button 
                     onClick={() => { 
                       setMode('study'); 
-                      setCurrentIndex(0); 
                       setIsFlipped(false); 
-                      setSessionQueue([]); // Reset to force re-initialization
-                      setLearningCards(new Set());
                     }} 
                     disabled={reviewQueue.length === 0} 
                     className="flex flex-col items-center justify-center px-8 py-2.5 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest disabled:opacity-50 hover:bg-sanfran-rubiDark shadow-xl"
@@ -1607,9 +1515,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                       Estudar
                     </div>
                     <div className="flex items-center gap-3 text-[10px]">
-                      <span className="text-blue-200" title="Novos">{reviewQueue.filter(c => c.interval === 0).length}</span>
-                      <span className="text-red-200" title="Aprendizagem">0</span>
-                      <span className="text-green-200" title="A Revisar">{reviewQueue.filter(c => c.interval > 0).length}</span>
+                      <span className="text-blue-200" title="Novos">{reviewQueue.filter(c => c.status === 'new' || !c.status).length}</span>
+                      <span className="text-red-200" title="Aprendizagem">{reviewQueue.filter(c => c.status === 'learning').length}</span>
+                      <span className="text-green-200" title="A Revisar">{reviewQueue.filter(c => c.status === 'review').length}</span>
                     </div>
                   </button>
 
@@ -1619,10 +1527,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                         setIsCramMode(!isCramMode);
                         if (!isCramMode) {
                           setMode('study');
-                          setCurrentIndex(0);
                           setIsFlipped(false);
-                          setSessionQueue([]); // Reset to force re-initialization
-                          setLearningCards(new Set());
                         }
                       }} 
                       className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all h-full ${isCramMode ? 'bg-orange-600 text-white' : 'bg-white dark:bg-sanfran-rubiDark text-orange-600 border-2 border-orange-600 hover:bg-orange-50'}`}
@@ -1640,10 +1545,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                         setIsAudioMode(!isAudioMode);
                         if (!isAudioMode) {
                           setMode('study');
-                          setCurrentIndex(0);
                           setIsFlipped(false);
-                          setSessionQueue([]); // Reset to force re-initialization
-                          setLearningCards(new Set());
                         }
                       }} 
                       className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all h-full ${isAudioMode ? 'bg-emerald-600 text-white' : 'bg-white dark:bg-sanfran-rubiDark text-emerald-600 border-2 border-emerald-600 hover:bg-emerald-50'}`}
@@ -2292,14 +2194,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 disabled={selectedFolderIdsForSession.size === 0}
                 onClick={() => {
                   setMode('study');
-                  // For custom sessions, we usually want to start fresh if the selection changed
-                  // but if it's the same selection, we could resume. 
-                  // For simplicity, let's always start fresh for custom sessions unless we implement more complex tracking
-                  setCurrentIndex(0);
                   setIsFlipped(false);
                   setIsSessionModalOpen(false);
-                  setSessionQueue([]); // Force re-initialization
-                  setLearningCards(new Set());
                 }}
                 className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-indigo-500/20 disabled:opacity-50"
               >
@@ -2310,7 +2206,30 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         </div>
       )}
 
-      {mode === 'study' && sessionQueue.length > 0 && (
+      {mode === 'study' && reviewQueue.length === 0 && (
+        <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center space-y-6 animate-in fade-in zoom-in">
+          <div className="w-24 h-24 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center text-green-600 dark:text-green-400">
+            <CheckSquare className="w-12 h-12" />
+          </div>
+          <div className="space-y-2 max-w-md">
+            <h2 className="text-2xl font-black text-slate-900 dark:text-white">Parabéns!</h2>
+            <p className="text-slate-500 dark:text-slate-400">Você terminou suas revisões por agora.</p>
+            {studyableFlashcards.some(f => f.status === 'learning' && f.nextReview > currentTime) && (
+              <p className="text-sm text-orange-500 font-bold mt-4">
+                Alguns cards estão em aprendizado e estarão disponíveis em breve.
+              </p>
+            )}
+          </div>
+          <button 
+            onClick={() => setMode('browse')}
+            className="px-8 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-black uppercase text-xs tracking-widest hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors"
+          >
+            Voltar ao Acervo
+          </button>
+        </div>
+      )}
+
+      {mode === 'study' && reviewQueue.length > 0 && (
         <div className={`flex flex-col items-center animate-in fade-in zoom-in ${isFocusMode ? 'w-full max-w-4xl' : 'py-10'}`}>
           <div className={`w-full max-w-2xl mb-8 flex items-center justify-between ${isFocusMode ? 'opacity-0 hover:opacity-100 transition-opacity duration-500' : ''}`}>
             <div className="flex items-center gap-4">
@@ -2325,15 +2244,15 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               <div className="flex items-center gap-3 text-[11px] font-black uppercase tracking-widest">
                 <span className="text-blue-500 flex items-center gap-1" title="Novos">
                   <div className="w-2 h-2 rounded-full bg-blue-500"></div> 
-                  {sessionQueue.slice(currentIndex).filter(c => c.interval === 0 && !learningCards.has(c.id)).length}
+                  {reviewQueue.filter(c => c.status === 'new' || !c.status).length}
                 </span>
                 <span className="text-red-500 flex items-center gap-1" title="Aprendizagem">
                   <div className="w-2 h-2 rounded-full bg-red-500"></div> 
-                  {sessionQueue.slice(currentIndex).filter(c => learningCards.has(c.id)).length}
+                  {reviewQueue.filter(c => c.status === 'learning').length}
                 </span>
                 <span className="text-green-500 flex items-center gap-1" title="A Revisar">
                   <div className="w-2 h-2 rounded-full bg-green-500"></div> 
-                  {sessionQueue.slice(currentIndex).filter(c => c.interval > 0 && !learningCards.has(c.id)).length}
+                  {reviewQueue.filter(c => c.status === 'review').length}
                 </span>
               </div>
               <div className="flex items-center gap-1 ml-2">
@@ -2603,9 +2522,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   <button onClick={() => handleReview(3)} className="flex flex-col items-center gap-1 p-4 bg-usp-gold text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform">
                     <span>Bom</span>
                     <span className="text-[8px] opacity-60">
-                      {currentCard.interval === 0 
-                        ? (learningCards.has(currentCard.id) ? '1d' : '10 min') 
-                        : Math.ceil(currentCard.interval * 2.5) + 'd'}
+                      {currentCard.status === 'learning' 
+                        ? '1d' 
+                        : (currentCard.status === 'new' || !currentCard.status ? '10 min' : Math.ceil(currentCard.interval * 2.5) + 'd')}
                     </span>
                     <span className="px-2 py-0.5 bg-black/20 rounded text-[8px]">3</span>
                   </button>

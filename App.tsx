@@ -463,6 +463,7 @@ const App: React.FC = () => {
             folderId: c.folder_id || null, 
             nextReview: Number(c.next_review) || Date.now(), 
             interval: c.interval || 0, 
+            status: c.status || 'new',
             archived_at: c.archived_at || null
           }));
           console.log(`Loaded ${formattedCards.length} flashcards from Supabase`);
