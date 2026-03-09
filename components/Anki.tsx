@@ -1448,6 +1448,31 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     }
   };
 
+  const forecast = useMemo(() => {
+    const days = Array.from({ length: 7 }).map((_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      d.setHours(0, 0, 0, 0);
+      return d.getTime();
+    });
+    
+    return days.map((dayStart, i) => {
+      const dayEnd = dayStart + 24 * 60 * 60 * 1000;
+      const count = flashcards.filter(f => {
+        if (f.status === 'new' || f.is_suspended || f.archived_at) return false;
+        if (i === 0) return f.nextReview < dayEnd;
+        return f.nextReview >= dayStart && f.nextReview < dayEnd;
+      }).length;
+      
+      const dateObj = new Date(dayStart);
+      const label = i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : dateObj.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
+      
+      return { label, count };
+    });
+  }, [flashcards]);
+
+  const maxForecast = Math.max(...forecast.map(f => f.count), 1);
+
   if (!subjects || subjects.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-slate-500 dark:text-slate-400 min-h-[400px]">
@@ -1575,38 +1600,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                     </div>
                   </div>
 
-                  {/* HEATMAP / STREAK */}
-                  <div className="hidden lg:flex items-center gap-1 bg-white dark:bg-white/5 p-2 rounded-2xl border border-slate-200 dark:border-white/10">
-                    <div className="grid grid-cols-7 gap-1">
-                      {Array.from({ length: 21 }).map((_, i) => {
-                        const date = new Date();
-                        date.setDate(date.getDate() - (20 - i));
-                        const dateStr = date.toISOString().split('T')[0];
-                        const count = studyHistory[dateStr] || 0;
-                        return (
-                          <div 
-                            key={i} 
-                            className={`w-3 h-3 rounded-sm ${
-                              count > 5 ? 'bg-emerald-600' : 
-                              count > 2 ? 'bg-emerald-400' : 
-                              count > 0 ? 'bg-emerald-200' : 
-                              'bg-slate-100 dark:bg-white/5'
-                            }`}
-                            title={`${dateStr}: ${count} sessões`}
-                          />
-                        );
-                      })}
-                    </div>
-                    <div className="flex flex-col ml-2">
-                      <span className="text-[8px] font-black uppercase text-slate-400">Constância</span>
-                      <div className="flex items-center gap-1">
-                        <Zap className="w-3 h-3 text-usp-gold fill-usp-gold" />
-                        <span className="text-[10px] font-black text-slate-700 dark:text-white">
-                          {Object.keys(studyHistory).length} Dias
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                  {/* HEATMAP / STREAK - Removed from header to be placed in dashboard */}
                   
                   {/* BOTÃO GERAR COM IA */}
                   <div className="relative group">
@@ -1897,6 +1891,97 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
       {mode === 'browse' && (
         <div className="space-y-6">
+          {currentFolderId === null && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 animate-in slide-in-from-top-4 duration-500">
+              {/* Heatmap Widget */}
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border-2 border-slate-200 dark:border-white/10 shadow-xl flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl">
+                      <Zap className="w-5 h-5 text-emerald-600 dark:text-emerald-400 fill-emerald-600 dark:fill-emerald-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-tight">Constância</h3>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{Object.keys(studyHistory).length} Dias de Estudo</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{Object.keys(studyHistory).length}</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Dias</span>
+                  </div>
+                </div>
+                
+                <div className="flex items-end gap-1.5 overflow-x-auto pb-2 custom-scrollbar">
+                  {Array.from({ length: 35 }).map((_, i) => {
+                    const date = new Date();
+                    date.setDate(date.getDate() - (34 - i));
+                    const dateStr = date.toISOString().split('T')[0];
+                    const count = studyHistory[dateStr] || 0;
+                    
+                    // Intensidade da cor baseada no número de sessões
+                    let colorClass = 'bg-slate-100 dark:bg-white/5';
+                    if (count > 10) colorClass = 'bg-emerald-600';
+                    else if (count > 5) colorClass = 'bg-emerald-500';
+                    else if (count > 2) colorClass = 'bg-emerald-400';
+                    else if (count > 0) colorClass = 'bg-emerald-300';
+
+                    return (
+                      <div key={i} className="flex flex-col items-center gap-1 group relative">
+                        <div 
+                          className={`w-4 h-4 sm:w-5 sm:h-5 rounded-md ${colorClass} transition-all hover:scale-110 hover:ring-2 ring-emerald-400 ring-offset-1 dark:ring-offset-slate-900`}
+                        />
+                        <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded whitespace-nowrap z-10 pointer-events-none">
+                          {date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}: {count} sessões
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Forecast Widget */}
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border-2 border-slate-200 dark:border-white/10 shadow-xl flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
+                      <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-tight">Previsão</h3>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Revisões nos próximos 7 dias</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-2xl font-black text-blue-600 dark:text-blue-400">{forecast.reduce((acc, curr) => acc + curr.count, 0)}</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Total</span>
+                  </div>
+                </div>
+
+                <div className="flex items-end justify-between h-24 gap-2 mt-4">
+                  {forecast.map((day, i) => {
+                    const heightPercent = Math.max((day.count / maxForecast) * 100, 4); // min 4% height for visibility
+                    return (
+                      <div key={i} className="flex flex-col items-center gap-2 flex-1 group">
+                        <div className="relative w-full flex justify-center h-full items-end">
+                          <div 
+                            className={`w-full max-w-[24px] rounded-t-lg transition-all duration-500 ${i === 0 ? 'bg-sanfran-rubi' : 'bg-blue-500 dark:bg-blue-600'} group-hover:opacity-80`}
+                            style={{ height: `${heightPercent}%` }}
+                          />
+                          <div className="absolute bottom-full mb-1 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-black text-slate-600 dark:text-slate-300">
+                            {day.count}
+                          </div>
+                        </div>
+                        <span className={`text-[9px] font-black uppercase tracking-widest ${i === 0 ? 'text-sanfran-rubi' : 'text-slate-400'}`}>
+                          {day.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-col md:flex-row items-center gap-4 mb-6 animate-in slide-in-from-left-4">
             <div className="relative flex-1 w-full">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
@@ -2073,20 +2158,18 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                     <span className="text-[10px] font-black text-emerald-500 uppercase">Revisar</span>
                     <span className="text-sm font-black text-emerald-600">{stats.reviewCount}</span>
                   </div>
+                  <div className="flex flex-col ml-auto text-right">
+                    <span className="text-[10px] font-black text-slate-400 uppercase">Domínio</span>
+                    <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">{stats.mastery}%</span>
+                  </div>
                 </div>
 
                 {/* Mastery Bar */}
-                <div className="space-y-1">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[9px] font-black text-slate-400 uppercase">Domínio</span>
-                    <span className="text-[9px] font-black text-slate-600 dark:text-slate-300">{stats.mastery}%</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-usp-gold to-yellow-500 transition-all duration-500" 
-                      style={{ width: `${stats.mastery}%` }}
-                    />
-                  </div>
+                <div className="absolute bottom-0 left-0 right-0 h-2 bg-slate-100 dark:bg-white/5 overflow-hidden rounded-b-[1.8rem]">
+                  <div 
+                    className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 transition-all duration-1000 ease-out" 
+                    style={{ width: `${stats.mastery}%` }}
+                  />
                 </div>
               </div>
             );
