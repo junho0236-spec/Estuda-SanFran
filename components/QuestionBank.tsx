@@ -4,6 +4,7 @@ import { supabase } from '../services/supabaseClient';
 import { Question, UserProgress, Notebook, Folder, Flashcard } from '../types';
 import { sampleQuestions } from './sampleQuestions';
 import { GoogleGenAI, Type } from '@google/genai';
+import Markdown from 'react-markdown';
 import { 
   BookOpen, 
   CheckCircle2, 
@@ -44,7 +45,9 @@ import {
   Minimize2,
   Play,
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  BookX,
+  Sword
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -107,6 +110,12 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
   
   // Stats
   const [correctCount, setCorrectCount] = useState(0);
+  const [wrongCount, setWrongCount] = useState(0);
+  const [errorMastery, setErrorMastery] = useState<Record<string, number>>({});
+  const [isErrorNotebookMode, setIsErrorNotebookMode] = useState(false);
+  const [showAiLesson, setShowAiLesson] = useState(false);
+  const [aiLessonContent, setAiLessonContent] = useState<string | null>(null);
+  const [loadingAiLesson, setLoadingAiLesson] = useState(false);
 
   // Mock Mode States
   const [isMockMode, setIsMockMode] = useState(false);
@@ -269,8 +278,6 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
     };
   }, []);
 
-  const [wrongCount, setWrongCount] = useState(0);
-
   // Form for new question
   const [showAddForm, setShowAddForm] = useState(false);
   const [showAIGenerator, setShowAIGenerator] = useState(false);
@@ -323,6 +330,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
         setNotes(data.notes || {});
         setCorrectCount(data.correct_count || 0);
         setWrongCount(data.wrong_count || 0);
+        setErrorMastery(data.error_mastery || {});
         
         // Sync to local storage as backup
         localStorage.setItem(`sanfran_favorites_${userId}`, JSON.stringify(data.favorites || []));
@@ -331,6 +339,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
         localStorage.setItem(`sanfran_notes_${userId}`, JSON.stringify(data.notes || {}));
         localStorage.setItem(`sanfran_correct_count_${userId}`, (data.correct_count || 0).toString());
         localStorage.setItem(`sanfran_wrong_count_${userId}`, (data.wrong_count || 0).toString());
+        localStorage.setItem(`sanfran_error_mastery_${userId}`, JSON.stringify(data.error_mastery || {}));
       } else {
         // Fallback to local storage if no DB data yet
         const storedFavorites = localStorage.getItem(`sanfran_favorites_${userId}`);
@@ -350,6 +359,9 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
         
         const storedWrongCount = localStorage.getItem(`sanfran_wrong_count_${userId}`);
         if (storedWrongCount) setWrongCount(parseInt(storedWrongCount));
+
+        const storedMastery = localStorage.getItem(`sanfran_error_mastery_${userId}`);
+        if (storedMastery) setErrorMastery(JSON.parse(storedMastery));
       }
     } catch (err) {
       console.error('Failed to sync progress:', err);
@@ -373,6 +385,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
         notes: updates.notes !== undefined ? updates.notes : (current?.notes || notes),
         correct_count: updates.correctCount !== undefined ? updates.correctCount : (current?.correct_count || correctCount),
         wrong_count: updates.wrongCount !== undefined ? updates.wrongCount : (current?.wrong_count || wrongCount),
+        error_mastery: updates.errorMastery !== undefined ? updates.errorMastery : (current?.error_mastery || errorMastery),
         updated_at: new Date().toISOString()
       };
 
@@ -858,6 +871,44 @@ Forneça a explicação de forma concisa e didática.`;
     setNewQuestion({ ...newQuestion, options: newOptions });
   };
 
+  const startErrorRetrain = () => {
+    const errorQuestions = questions.filter(q => wrongQuestions.includes(q.id));
+    if (errorQuestions.length === 0) {
+      showNotification('Você não tem erros para vencer no momento!', 'success');
+      return;
+    }
+    setIsErrorNotebookMode(true);
+    setViewMode('single');
+    setCurrentIndex(0);
+    setSelectedOption(null);
+    setShowExplanation(false);
+  };
+
+  const generateAiLesson = async (subject: string) => {
+    try {
+      setLoadingAiLesson(true);
+      setShowAiLesson(true);
+      
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+      const prompt = `Você é um professor de Direito especialista em concursos e OAB. 
+      O aluno está tendo erros recorrentes na disciplina de ${subject}.
+      Crie uma aula resumida e focada, explicando os conceitos fundamentais, as principais pegadinhas de banca e dicas de memorização (mnemônicos) para este tema.
+      Use uma linguagem clara, direta e motivadora. Formate em Markdown.`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+      });
+
+      setAiLessonContent(response.text);
+    } catch (error) {
+      console.error('Error generating AI lesson:', error);
+      showNotification('Erro ao gerar aula da IA.', 'error');
+    } finally {
+      setLoadingAiLesson(false);
+    }
+  };
+
   const filteredQuestions = questions.filter(q => {
     const matchSearch = searchTerm === '' || 
       q.statement.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -878,7 +929,9 @@ Forneça a explicação de forma concisa e didática.`;
     const isWrong = wrongQuestions.includes(q.id);
     const isCorrect = correctQuestions.includes(q.id);
     
-    if (questionStatus === 'wrong') {
+    if (isErrorNotebookMode) {
+      matchStatus = isWrong;
+    } else if (questionStatus === 'wrong') {
       matchStatus = isWrong;
     } else if (questionStatus === 'correct') {
       matchStatus = isCorrect;
@@ -940,27 +993,56 @@ Forneça a explicação de forma concisa e didática.`;
         localStorage.setItem(`sanfran_correct_${userId}`, JSON.stringify(newCorrect));
       }
 
-      let newWrong = wrongQuestions;
-      // If answered correctly, remove from wrong questions list if present
+      let newWrong = [...wrongQuestions];
+      let newMastery = { ...errorMastery };
+
+      // Smart Error Notebook Logic: If it was in wrong questions, track mastery
       if (wrongQuestions.includes(targetQuestion.id)) {
-        newWrong = wrongQuestions.filter(id => id !== targetQuestion.id);
-        setWrongQuestions(newWrong);
-        localStorage.setItem(`sanfran_wrong_${userId}`, JSON.stringify(newWrong));
+        const currentMastery = (newMastery[targetQuestion.id] || 0) + 1;
+        if (currentMastery >= 2) {
+          // Archived from error notebook after 2 consecutive correct answers
+          newWrong = wrongQuestions.filter(id => id !== targetQuestion.id);
+          delete newMastery[targetQuestion.id];
+          setWrongQuestions(newWrong);
+          localStorage.setItem(`sanfran_wrong_${userId}`, JSON.stringify(newWrong));
+          showNotification('Questão vencida! Removida do Caderno de Erros.', 'success');
+        } else {
+          newMastery[targetQuestion.id] = currentMastery;
+          showNotification(`Acerto consecutivo: ${currentMastery}/2 para vencer esta questão.`, 'success');
+        }
+        setErrorMastery(newMastery);
+        localStorage.setItem(`sanfran_error_mastery_${userId}`, JSON.stringify(newMastery));
       }
-      syncUserProgress({ correctCount: newCount, wrongQuestions: newWrong, correctQuestions: newCorrect });
+      
+      syncUserProgress({ 
+        correctCount: newCount, 
+        wrongQuestions: newWrong, 
+        correctQuestions: newCorrect,
+        errorMastery: newMastery
+      });
     } else {
       const newCount = wrongCount + 1;
       setWrongCount(newCount);
       localStorage.setItem(`sanfran_wrong_count_${userId}`, newCount.toString());
       
       let newWrong = [...wrongQuestions];
-      // If answered incorrectly, add to wrong questions list
+      let newMastery = { ...errorMastery };
+
+      // Reset mastery on error
+      newMastery[targetQuestion.id] = 0;
+      setErrorMastery(newMastery);
+      localStorage.setItem(`sanfran_error_mastery_${userId}`, JSON.stringify(newMastery));
+
       if (!wrongQuestions.includes(targetQuestion.id)) {
         newWrong.push(targetQuestion.id);
         setWrongQuestions(newWrong);
         localStorage.setItem(`sanfran_wrong_${userId}`, JSON.stringify(newWrong));
       }
-      syncUserProgress({ wrongCount: newCount, wrongQuestions: newWrong });
+      syncUserProgress({ 
+        wrongCount: newCount, 
+        wrongQuestions: newWrong,
+        errorMastery: newMastery
+      });
     }
   };
 
@@ -1268,8 +1350,67 @@ Forneça a explicação de forma concisa e didática.`;
             >
               <NotebookText size={16} /> {showNotebookCreationMode ? 'Sair do Modo Caderno' : 'Criar Caderno'}
             </button>
+            <button
+              onClick={() => {
+                if (isErrorNotebookMode) {
+                  setIsErrorNotebookMode(false);
+                  setViewMode('list');
+                } else {
+                  setIsErrorNotebookMode(true);
+                  setViewMode('list');
+                }
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${isErrorNotebookMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50 text-red-700 dark:text-red-400'}`}
+            >
+              <BookX size={16} /> {isErrorNotebookMode ? 'Sair dos Erros' : 'Caderno de Erros'}
+            </button>
           </div>
         </header>
+      )}
+
+      {/* AI Insight Banner for Error Notebook */}
+      {isErrorNotebookMode && !isMockMode && !isMockFinished && (
+        <div className="mb-8 p-6 bg-gradient-to-r from-red-500 to-orange-500 rounded-[2rem] text-white shadow-xl shadow-red-900/20 relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-8 opacity-10">
+            <BrainCircuit size={120} />
+          </div>
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                <AlertTriangle size={20} />
+              </div>
+              <h3 className="text-lg font-black uppercase tracking-tight">Insight de Desempenho Inteligente</h3>
+            </div>
+            
+            <div className="space-y-4">
+              <p className="text-sm font-bold leading-relaxed max-w-2xl">
+                Você tem <span className="text-2xl px-2">{wrongQuestions.length}</span> erros recorrentes. 
+                {selectedSubject && selectedSubject !== 'Todos' ? (
+                  <> A disciplina de <span className="underline decoration-2 underline-offset-4">{selectedSubject}</span> é onde você mais precisa de reforço.</>
+                ) : (
+                  <> Analisamos seu histórico e identificamos lacunas importantes em temas fundamentais.</>
+                )}
+              </p>
+              
+              <div className="flex flex-wrap gap-3 pt-2">
+                <button
+                  onClick={startErrorRetrain}
+                  className="px-6 py-3 bg-white text-red-600 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-50 transition-all flex items-center gap-2 shadow-lg"
+                >
+                  <Sword size={16} /> Vencer Meus Erros
+                </button>
+                {selectedSubject && selectedSubject !== 'Todos' && (
+                  <button
+                    onClick={() => generateAiLesson(selectedSubject)}
+                    className="px-6 py-3 bg-red-900/20 hover:bg-red-900/30 text-white border border-white/30 rounded-xl font-black text-xs uppercase tracking-widest transition-all flex items-center gap-2 backdrop-blur-sm"
+                  >
+                    <Sparkles size={16} /> Aula Resumida IA
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Mock Setup Modal */}
@@ -2450,6 +2591,58 @@ Forneça a explicação de forma concisa e didática.`;
           </div>
         )}
       </div>
+
+      {/* AI Lesson Modal */}
+      {showAiLesson && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[130] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 md:p-10 shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-3xl animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center mb-8 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-2xl">
+                  <Sparkles className="text-purple-600 dark:text-purple-400" size={24} />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Aula Resumida IA</h2>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{selectedSubject}</p>
+                </div>
+              </div>
+              <button onClick={() => setShowAiLesson(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all">
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto pr-4 custom-scrollbar">
+              {loadingAiLesson ? (
+                <div className="flex flex-col items-center justify-center py-20">
+                  <div className="relative mb-8">
+                    <div className="w-20 h-20 border-4 border-purple-100 dark:border-purple-900/30 rounded-full animate-pulse"></div>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <BrainCircuit className="text-purple-500 animate-bounce" size={32} />
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2 uppercase tracking-tight">Preparando sua Aula...</h3>
+                  <p className="text-slate-500 text-center max-w-xs font-medium">
+                    Nossa IA está analisando seus erros e preparando um resumo focado para você vencer esse tema.
+                  </p>
+                </div>
+              ) : (
+                <div className="prose prose-slate dark:prose-invert max-w-none prose-headings:font-black prose-headings:uppercase prose-headings:tracking-tighter prose-p:font-medium prose-p:leading-relaxed prose-strong:text-purple-600 dark:prose-strong:text-purple-400">
+                  <Markdown>{aiLessonContent}</Markdown>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 shrink-0">
+              <button
+                onClick={() => setShowAiLesson(false)}
+                className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all hover:scale-[1.02] active:scale-[0.98]"
+              >
+                Entendido, Vamos Praticar!
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Juridiquês Translator Modal */}
       {showJuridiquesModal && (

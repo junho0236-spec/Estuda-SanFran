@@ -418,12 +418,14 @@ export interface UserConfig {
 
 export interface UserProgress {
   user_id: string;
-  answered_questions: string[];
+  favorites: string[];
+  wrong_questions: string[];
   correct_questions: string[];
-  favorite_questions: string[];
-  skipped_questions: string[];
-  current_question_index: number;
-  last_activity_at: string;
+  notes: Record<string, string>;
+  correct_count: number;
+  wrong_count: number;
+  error_mastery?: Record<string, number>; // question_id -> consecutive_correct_count
+  updated_at: string;
 }
 
 export interface PetitumSection {
