@@ -2265,7 +2265,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               <div 
                 key={folder.id} 
                 onClick={() => setCurrentFolderId(folder.id)} 
-                className={`group bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2.5rem] border-2 border-slate-200 dark:border-sanfran-rubi/40 shadow-xl cursor-pointer hover:shadow-2xl hover:-translate-y-1 border-l-[10px] ${folder.color || 'border-l-usp-gold'} transition-all relative flex flex-col justify-between min-h-[280px] h-auto overflow-hidden`}
+                className={`group bg-white dark:bg-sanfran-rubiDark/50 p-6 rounded-[2.5rem] border-2 border-slate-200 dark:border-sanfran-rubi/40 shadow-xl cursor-pointer hover:shadow-2xl hover:-translate-y-1 border-l-[10px] ${folder.color || 'border-l-usp-gold'} transition-all relative flex flex-col justify-between min-h-[280px] h-auto overflow-hidden`}
               >
                 {hasUpdate && (
                   <div className="absolute -top-3 -right-3 z-20 animate-bounce">
@@ -2353,22 +2353,22 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 
                 {/* Bottom Content: Metrics & Mastery */}
                 <div className="mt-auto">
-                  <div className="flex items-center justify-between gap-4 mb-4">
+                  <div className="grid grid-cols-2 gap-4 mb-4">
                     <div className="flex flex-col">
-                      <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-1">Novos</span>
-                      <span className="text-lg font-black text-blue-600 leading-none">{stats.newCount}</span>
+                      <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Novos</span>
+                      <span className="text-base font-black text-blue-600 leading-none">{stats.newCount}</span>
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[9px] font-black text-orange-500 uppercase tracking-widest mb-1">Aprender</span>
-                      <span className="text-lg font-black text-orange-600 leading-none">{stats.learningCount}</span>
+                      <span className="text-[10px] font-black text-orange-500 uppercase tracking-widest mb-1">Aprender</span>
+                      <span className="text-base font-black text-orange-600 leading-none">{stats.learningCount}</span>
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest mb-1">Revisar</span>
-                      <span className="text-lg font-black text-emerald-600 leading-none">{stats.reviewCount}</span>
+                      <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Revisar</span>
+                      <span className="text-base font-black text-emerald-600 leading-none">{stats.reviewCount}</span>
                     </div>
-                    <div className="flex flex-col text-right">
-                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Domínio</span>
-                      <span className="text-lg font-black text-emerald-600 dark:text-emerald-400 leading-none">{stats.mastery}%</span>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Domínio</span>
+                      <span className="text-base font-black text-emerald-600 dark:text-emerald-400 leading-none">{stats.mastery}%</span>
                     </div>
                   </div>
 
