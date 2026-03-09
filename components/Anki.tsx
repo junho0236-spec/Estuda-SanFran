@@ -68,7 +68,8 @@ import {
   Briefcase,
   GraduationCap,
   Landmark,
-  Library
+  Library,
+  Timer
 } from 'lucide-react';
 import JSZip from 'jszip';
 import { Flashcard, Subject, Folder, DeckRequest, StudySession } from '../types';
@@ -82,10 +83,11 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 interface SessionStats {
   isActive: boolean;
   isFinished: boolean;
-  new: { total: number; correct: number };
-  learning: { total: number; correct: number };
-  review: { total: number; correct: number };
+  new: { total: number; correct: number; totalTimeMs: number };
+  learning: { total: number; correct: number; totalTimeMs: number };
+  review: { total: number; correct: number; totalTimeMs: number };
   errors: Flashcard[];
+  cardTimes: { card: Flashcard; timeMs: number }[];
 }
 
 interface AnkiProps {
@@ -157,10 +159,11 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [sessionStats, setSessionStats] = useState<SessionStats>({
     isActive: false,
     isFinished: false,
-    new: { total: 0, correct: 0 },
-    learning: { total: 0, correct: 0 },
-    review: { total: 0, correct: 0 },
-    errors: []
+    new: { total: 0, correct: 0, totalTimeMs: 0 },
+    learning: { total: 0, correct: 0, totalTimeMs: 0 },
+    review: { total: 0, correct: 0, totalTimeMs: 0 },
+    errors: [],
+    cardTimes: []
   });
   const [hoveredHeatmapDay, setHoveredHeatmapDay] = useState<{
     date: string;
@@ -213,6 +216,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [searchQuery, setSearchQuery] = useState('');
   const [isGlobalSearch, setIsGlobalSearch] = useState(false);
   const [isCramMode, setIsCramMode] = useState(false);
+  const [isAdvanceMode, setIsAdvanceMode] = useState(false);
   const [isAudioMode, setIsAudioMode] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [audioSpeed, setAudioSpeed] = useState(1);
@@ -1282,9 +1286,18 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const reviewQueue = useMemo(() => {
     return studyableFlashcards.filter(f => {
       const isDue = f.nextReview <= currentTime;
+      const tomorrowEnd = currentTime + 24 * 60 * 60 * 1000;
+      const isDueTomorrow = f.nextReview <= tomorrowEnd;
       
       // In Cram Mode, we ignore the due date
-      if (!isDue && !isCramMode) return false;
+      if (isCramMode) {
+        // Continue to folder filtering
+      } else if (isAdvanceMode) {
+        // In Advance Mode, we include tomorrow's cards
+        if (!isDueTomorrow) return false;
+      } else {
+        if (!isDue) return false;
+      }
       
       // If we have selected folders for a custom session, only include cards from those folders
       if (selectedFolderIdsForSession.size > 0) {
@@ -1614,10 +1627,11 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     setSessionStats({
       isActive: true,
       isFinished: false,
-      new: { total: 0, correct: 0 },
-      learning: { total: 0, correct: 0 },
-      review: { total: 0, correct: 0 },
-      errors: []
+      new: { total: 0, correct: 0, totalTimeMs: 0 },
+      learning: { total: 0, correct: 0, totalTimeMs: 0 },
+      review: { total: 0, correct: 0, totalTimeMs: 0 },
+      errors: [],
+      cardTimes: []
     });
   };
 
@@ -1641,12 +1655,16 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       const statusGroup = (!card.status || card.status === 'new') ? 'new' : 
                           (card.status === 'review' ? 'review' : 'learning');
       
+      const timeMs = Date.now() - cardStartTime;
+
       const newStats = {
         ...prev,
         [statusGroup]: {
           total: prev[statusGroup].total + 1,
-          correct: prev[statusGroup].correct + (isCorrect ? 1 : 0)
-        }
+          correct: prev[statusGroup].correct + (isCorrect ? 1 : 0),
+          totalTimeMs: prev[statusGroup].totalTimeMs + timeMs
+        },
+        cardTimes: [...prev.cardTimes, { card, timeMs }]
       };
       
       if (isError) {
@@ -1836,20 +1854,40 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     
     return days.map((dayStart, i) => {
       const dayEnd = dayStart + 24 * 60 * 60 * 1000;
-      const count = flashcards.filter(f => {
-        if (f.status === 'new' || f.is_suspended || f.archived_at) return false;
+      
+      const dayCards = flashcards.filter(f => {
+        if (f.is_suspended || f.archived_at) return false;
+        // New cards don't have a nextReview in the future normally, 
+        // but we can show them for "Today" if they are in the queue.
+        if (f.status === 'new' || !f.status) {
+          return i === 0;
+        }
         if (i === 0) return f.nextReview < dayEnd;
         return f.nextReview >= dayStart && f.nextReview < dayEnd;
-      }).length;
+      });
+
+      const counts = {
+        new: dayCards.filter(f => f.status === 'new' || !f.status).length,
+        learning: dayCards.filter(f => f.status === 'learning' || f.status === 'relearning').length,
+        review: dayCards.filter(f => f.status === 'review').length
+      };
       
+      const total = dayCards.length;
       const dateObj = new Date(dayStart);
       const label = i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : dateObj.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
       
-      return { label, count };
-    });
-  }, [flashcards]);
+      // Check for exams in this day
+      const exams = subjects.filter(s => {
+        const p1 = s.p1_date ? new Date(s.p1_date).setHours(0,0,0,0) : null;
+        const p2 = s.p2_date ? new Date(s.p2_date).setHours(0,0,0,0) : null;
+        return p1 === dayStart || p2 === dayStart;
+      });
 
-  const maxForecast = Math.max(...forecast.map(f => f.count), 1);
+      return { label, count: total, counts, hasExam: exams.length > 0, exams: exams.map(e => e.name) };
+    });
+  }, [flashcards, subjects]);
+
+  const maxForecast = Math.max(...forecast.map(f => f.count), dailyGoal, 1);
 
   const getButtonLabel = (quality: number, card: Flashcard) => {
     const status = card.status || 'new';
@@ -1878,14 +1916,36 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     const { new: newStats, learning, review, errors } = sessionStats;
     
     const chartData = [
-      { name: 'Novos', acertos: newStats.total > 0 ? Math.round((newStats.correct / newStats.total) * 100) : 0, total: newStats.total, color: '#3b82f6' }, // blue-500
-      { name: 'Aprender', acertos: learning.total > 0 ? Math.round((learning.correct / learning.total) * 100) : 0, total: learning.total, color: '#ef4444' }, // red-500
-      { name: 'Revisão', acertos: review.total > 0 ? Math.round((review.correct / review.total) * 100) : 0, total: review.total, color: '#22c55e' }, // green-500
+      { 
+        name: 'Novos', 
+        acertos: newStats.total > 0 ? Math.round((newStats.correct / newStats.total) * 100) : 0, 
+        total: newStats.total, 
+        color: '#3b82f6',
+        avgTime: newStats.total > 0 ? (newStats.totalTimeMs / newStats.total / 1000).toFixed(1) : 0
+      }, // blue-500
+      { 
+        name: 'Aprender', 
+        acertos: learning.total > 0 ? Math.round((learning.correct / learning.total) * 100) : 0, 
+        total: learning.total, 
+        color: '#ef4444',
+        avgTime: learning.total > 0 ? (learning.totalTimeMs / learning.total / 1000).toFixed(1) : 0
+      }, // red-500
+      { 
+        name: 'Revisão', 
+        acertos: review.total > 0 ? Math.round((review.correct / review.total) * 100) : 0, 
+        total: review.total, 
+        color: '#22c55e',
+        avgTime: review.total > 0 ? (review.totalTimeMs / review.total / 1000).toFixed(1) : 0
+      }, // green-500
     ].filter(d => d.total > 0);
 
     const totalStudied = newStats.total + learning.total + review.total;
     const totalCorrect = newStats.correct + learning.correct + review.correct;
+    const totalTimeMs = newStats.totalTimeMs + learning.totalTimeMs + review.totalTimeMs;
     const overallAccuracy = totalStudied > 0 ? Math.round((totalCorrect / totalStudied) * 100) : 0;
+    const avgSessionTimeMs = totalStudied > 0 ? totalTimeMs / totalStudied : 0;
+
+    const criticalCards = sessionStats.cardTimes.filter(ct => ct.timeMs > avgSessionTimeMs * 3 && ct.timeMs > 5000); // Also ensure it's at least 5s to avoid noise
     
     // sessionCounters.completed represents cards that graduated.
     // The initial queue size is roughly the sum of new, pending, and completed.
@@ -1930,32 +1990,100 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         </div>
 
         {chartData.length > 0 ? (
-          <div className="w-full h-64 bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-xl border border-slate-200 dark:border-slate-700">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 20, right: 20, left: -20, bottom: 0 }}>
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} domain={[0, 100]} tickFormatter={(val) => `${val}%`} />
-                <Tooltip 
-                  cursor={{ fill: 'transparent' }}
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0].payload;
-                      return (
-                        <div className="bg-slate-900 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl">
-                          {data.name}: {data.acertos}% de acerto ({data.total} cards)
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Bar dataKey="acertos" radius={[6, 6, 0, 0]} maxBarSize={60}>
-                  {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+          <div className="w-full space-y-6">
+            <div className="w-full h-64 bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-xl border border-slate-200 dark:border-slate-700">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 20, right: 20, left: -20, bottom: 0 }}>
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} domain={[0, 100]} tickFormatter={(val) => `${val}%`} />
+                  <Tooltip 
+                    cursor={{ fill: 'transparent' }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-slate-900 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl space-y-1">
+                            <div>{data.name}: {data.acertos}% de acerto</div>
+                            <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                              <Timer className="w-3 h-3" /> {data.avgTime}s/card
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar dataKey="acertos" radius={[6, 6, 0, 0]} maxBarSize={60}>
+                    {chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {chartData.map((data) => (
+                <div key={data.name} className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-col items-center text-center space-y-1">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{data.name}</span>
+                  <div className="flex items-center gap-2">
+                    <Timer className="w-4 h-4 text-slate-400" />
+                    <span className="text-lg font-black text-slate-900 dark:text-white">{data.avgTime}s</span>
+                  </div>
+                  <span className="text-[10px] text-slate-500">média por card</span>
+                </div>
+              ))}
+            </div>
+
+            {criticalCards.length > 0 && (
+              <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800/50 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400">
+                  <AlertCircle className="w-5 h-5" />
+                  <span className="font-black uppercase text-xs tracking-widest">Cards Críticos Detectados</span>
+                </div>
+                <p className="text-xs text-orange-700 dark:text-orange-300 leading-relaxed">
+                  Identificamos {criticalCards.length} card(s) que tomaram muito tempo (mais de 3x a média da sessão). 
+                  Isso pode indicar que o conteúdo está complexo demais.
+                </p>
+                <div className="space-y-2">
+                  {criticalCards.slice(0, 2).map((ct, idx) => (
+                    <div key={idx} className="bg-white/50 dark:bg-black/20 p-3 rounded-xl flex items-center justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase truncate">Frente do Card</p>
+                        <p className="text-xs font-medium text-slate-900 dark:text-white truncate">{ct.card.front}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase">Tempo</p>
+                        <p className="text-xs font-black text-orange-600">{(ct.timeMs / 1000).toFixed(1)}s</p>
+                      </div>
+                    </div>
                   ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+                  {criticalCards.length > 2 && (
+                    <p className="text-[10px] text-center text-orange-500 font-bold italic">...e mais {criticalCards.length - 2} outros</p>
+                  )}
+                </div>
+                <div className="pt-2 flex gap-2">
+                  <button 
+                    onClick={() => {
+                      setMode('browse');
+                      setSearchQuery(criticalCards[0].card.front);
+                    }}
+                    className="flex-1 py-2 bg-orange-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-orange-700 transition-colors"
+                  >
+                    Editar Primeiro Card
+                  </button>
+                  <button 
+                    onClick={() => {
+                      // Logic to trigger AI simplification could go here
+                      alert("A IA analisará estes cards para sugerir simplificações em breve!");
+                    }}
+                    className="flex-1 py-2 border border-orange-600 text-orange-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-orange-50 transition-colors"
+                  >
+                    Pedir Simplificação IA
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="w-24 h-24 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center text-green-600 dark:text-green-400">
@@ -2613,35 +2741,103 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               </div>
 
               {/* Forecast Widget */}
-              <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border-2 border-slate-200 dark:border-white/10 shadow-xl flex flex-col justify-between">
-                <div className="flex items-center justify-between mb-4">
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border-2 border-slate-200 dark:border-white/10 shadow-xl flex flex-col justify-between relative overflow-hidden">
+                <div className="flex items-center justify-between mb-4 relative z-10">
                   <div className="flex items-center gap-2">
                     <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
                       <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div>
-                      <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-tight">Previsão</h3>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Revisões nos próximos 7 dias</p>
+                      <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-tight">Planejador Estratégico</h3>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Carga Semanal SanFran</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <span className="text-2xl font-black text-blue-600 dark:text-blue-400">{forecast.reduce((acc, curr) => acc + curr.count, 0)}</span>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Total</span>
+                  <div className="flex items-center gap-3">
+                    <button 
+                      onClick={() => {
+                        setIsAdvanceMode(!isAdvanceMode);
+                        if (!isAdvanceMode) {
+                          startStudySession();
+                        }
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${isAdvanceMode ? 'bg-orange-600 text-white' : 'bg-slate-100 dark:bg-white/5 text-slate-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:text-orange-600'}`}
+                    >
+                      {isAdvanceMode ? 'Modo Antecipação' : 'Adiantar Revisões'}
+                    </button>
+                    <div className="text-right">
+                      <span className="text-2xl font-black text-blue-600 dark:text-blue-400">{forecast.reduce((acc, curr) => acc + curr.count, 0)}</span>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Total</span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-end justify-between h-24 gap-2 mt-4">
+                <div className="relative h-32 mt-4 flex items-end justify-between gap-1.5">
+                  {/* Goal Line */}
+                  <div 
+                    className="absolute left-0 right-0 border-t-2 border-dashed border-slate-200 dark:border-white/10 z-0 pointer-events-none"
+                    style={{ bottom: `${(dailyGoal / maxForecast) * 100}%` }}
+                  >
+                    <span className="absolute right-0 -top-4 text-[8px] font-black text-slate-400 uppercase tracking-widest">Meta: {dailyGoal}</span>
+                  </div>
+
                   {forecast.map((day, i) => {
-                    const heightPercent = Math.max((day.count / maxForecast) * 100, 4); // min 4% height for visibility
+                    const totalHeight = (day.count / maxForecast) * 100;
+                    const newHeight = (day.counts.new / day.count) * 100 || 0;
+                    const learningHeight = (day.counts.learning / day.count) * 100 || 0;
+                    const reviewHeight = (day.counts.review / day.count) * 100 || 0;
+
+                    // Calculate estimated time (avg 15s or from session stats)
+                    const avgTime = sessionStats.cardTimes.length > 0 
+                      ? sessionStats.cardTimes.reduce((acc, curr) => acc + curr.timeMs, 0) / sessionStats.cardTimes.length / 1000 
+                      : 15;
+                    const estMinutes = Math.round((day.count * avgTime) / 60);
+
                     return (
-                      <div key={i} className="flex flex-col items-center gap-2 flex-1 group h-full">
-                        <div className="relative w-full flex justify-center h-full items-end">
+                      <div key={i} className="flex flex-col items-center gap-2 flex-1 group h-full relative z-10">
+                        <div className="relative w-full flex flex-col justify-end h-full items-center">
+                          {day.hasExam && (
+                            <div className="absolute -top-6 animate-bounce">
+                              <AlertCircle className="w-4 h-4 text-orange-500" />
+                            </div>
+                          )}
+                          
                           <div 
-                            className={`w-full max-w-[24px] rounded-t-lg transition-all duration-500 ${i === 0 ? 'bg-sanfran-rubi' : 'bg-blue-500 dark:bg-blue-600'} group-hover:opacity-80`}
-                            style={{ height: `${heightPercent}%` }}
-                          />
-                          <div className="absolute bottom-full mb-1 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-black text-slate-600 dark:text-slate-300">
-                            {day.count}
+                            className="w-full max-w-[20px] rounded-t-md overflow-hidden flex flex-col justify-end transition-all duration-500 group-hover:ring-2 ring-blue-400 ring-offset-2 dark:ring-offset-slate-900"
+                            style={{ height: `${Math.max(totalHeight, 2)}%` }}
+                          >
+                            <div className="bg-blue-500" style={{ height: `${newHeight}%` }} />
+                            <div className="bg-red-500" style={{ height: `${learningHeight}%` }} />
+                            <div className="bg-green-500" style={{ height: `${reviewHeight}%` }} />
+                          </div>
+
+                          {/* Tooltip */}
+                          <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-all pointer-events-none z-50 translate-y-2 group-hover:translate-y-0">
+                            <div className="bg-slate-900 text-white p-2 rounded-xl shadow-2xl border border-white/10 min-w-[120px]">
+                              <p className="text-[10px] font-black uppercase tracking-widest mb-1 border-b border-white/10 pb-1">{day.label}</p>
+                              <div className="space-y-1">
+                                <div className="flex justify-between gap-4">
+                                  <span className="text-[9px] text-slate-400">Novos</span>
+                                  <span className="text-[9px] font-bold text-blue-400">{day.counts.new}</span>
+                                </div>
+                                <div className="flex justify-between gap-4">
+                                  <span className="text-[9px] text-slate-400">Aprendizado</span>
+                                  <span className="text-[9px] font-bold text-red-400">{day.counts.learning}</span>
+                                </div>
+                                <div className="flex justify-between gap-4">
+                                  <span className="text-[9px] text-slate-400">Revisão</span>
+                                  <span className="text-[9px] font-bold text-green-400">{day.counts.review}</span>
+                                </div>
+                                <div className="pt-1 mt-1 border-t border-white/10 flex items-center justify-between">
+                                  <span className="text-[9px] font-black text-white">Tempo Est.</span>
+                                  <span className="text-[9px] font-black text-blue-400">{estMinutes} min</span>
+                                </div>
+                                {day.hasExam && (
+                                  <div className="pt-1 mt-1 border-t border-orange-500/30">
+                                    <p className="text-[8px] font-black text-orange-400 uppercase">⚠️ Prova: {day.exams.join(', ')}</p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         </div>
                         <span className={`text-[9px] font-black uppercase tracking-widest ${i === 0 ? 'text-sanfran-rubi' : 'text-slate-400'}`}>
