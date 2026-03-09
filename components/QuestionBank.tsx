@@ -311,6 +311,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
   const [aiConfig, setAiConfig] = useState({
     subject: '',
     topic: '',
+    context: '',
     count: 3,
     difficulty: 'media' as 'facil' | 'media' | 'dificil',
     examStyle: 'OAB (FGV)' as 'OAB (FGV)' | 'Magistratura/Promotoria' | 'Acadêmico (SanFran)',
@@ -985,6 +986,11 @@ Forneça a explicação de forma concisa e didática.`;
         }
       }
 
+      let contextFromText = "";
+      if (aiConfig.context) {
+        contextFromText = `Baseie as questões no seguinte material de estudo fornecido:\n${aiConfig.context}`;
+      }
+
       const isJurisprudenceMode = aiConfig.legalFocus.includes('Jurisprudência Atualizada');
       let jurisprudencePrompt = "";
       if (isJurisprudenceMode) {
@@ -1004,6 +1010,7 @@ Forneça a explicação de forma concisa e didática.`;
       Tipo de Enunciado: ${aiConfig.statementType}.
       ${jurisprudencePrompt}
       ${contextFromFlashcards}
+      ${contextFromText}
       
       Cada questão deve ter 5 alternativas (A, B, C, D, E).
       A explicação deve ser EXTREMAMENTE detalhada, contendo uma análise individual para cada alternativa (A, B, C, D, E), explicando por que a alternativa correta está certa e por que cada uma das outras alternativas está incorreta, fundamentando com base no foco jurídico selecionado (${aiConfig.legalFocus.join(', ') || 'Lei, Jurisprudência e Doutrina'}).
@@ -1904,7 +1911,7 @@ Forneça a explicação de forma concisa e didática.`;
       <div id="ai-generator-portal">
         {showAIGenerator && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md animate-in zoom-in-95 duration-300">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-2xl animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Sparkles className="text-purple-500" />
@@ -1921,7 +1928,7 @@ Forneça a explicação de forma concisa e didática.`;
                   <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Matéria / Assunto *</label>
                   <input
                     type="text"
-                    required={!aiConfig.baseOnFlashcards}
+                    required={!aiConfig.baseOnFlashcards && !aiConfig.context}
                     value={aiConfig.subject}
                     onChange={e => setAiConfig({...aiConfig, subject: e.target.value})}
                     className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
@@ -1938,6 +1945,16 @@ Forneça a explicação de forma concisa e didática.`;
                     placeholder="Ex: Crimes contra a vida"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Material de Base / Texto da Aula (Opcional)</label>
+                <textarea
+                  value={aiConfig.context}
+                  onChange={e => setAiConfig({...aiConfig, context: e.target.value})}
+                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none min-h-[120px] text-sm"
+                  placeholder="Cole aqui o texto da aula, anotações ou trechos de livros para que a IA crie questões baseadas exatamente neste conteúdo..."
+                />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2052,7 +2069,7 @@ Forneça a explicação de forma concisa e didática.`;
                   <input
                     type="number"
                     min="1"
-                    max="10"
+                    max="20"
                     required
                     value={aiConfig.count}
                     onChange={e => setAiConfig({...aiConfig, count: parseInt(e.target.value) || 1})}
