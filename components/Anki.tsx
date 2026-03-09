@@ -185,6 +185,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [undoStack, setUndoStack] = useState<any[]>([]);
   const [redoStack, setRedoStack] = useState<any[]>([]);
+  const [isFirstCardOfSession, setIsFirstCardOfSession] = useState(true);
   const utteranceRefs = useRef<SpeechSynthesisUtterance[]>([]);
 
   const pushToHistory = (card: Flashcard) => {
@@ -1271,6 +1272,28 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
   // TTS Logic - Refactored for maximum stability and reliability
   useEffect(() => {
+    // 1. Initial Warm-up on Mount: Wake up the engine as soon as the component loads
+    const warmUp = () => {
+      const wakeUp = new SpeechSynthesisUtterance(" ");
+      wakeUp.volume = 0;
+      window.speechSynthesis.speak(wakeUp);
+    };
+
+    // Ensure voices are loaded (some browsers need this)
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+      window.speechSynthesis.onvoiceschanged = warmUp;
+    }
+    
+    warmUp(); // Try immediately
+
+    return () => {
+      if (window.speechSynthesis.onvoiceschanged !== undefined) {
+        window.speechSynthesis.onvoiceschanged = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     // 1. Immediate Abort: Stop any ongoing speech as soon as dependencies change
     if (window.speechSynthesis.speaking) {
       window.speechSynthesis.cancel();
@@ -1283,7 +1306,10 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
     let retryCount = 0;
     const MAX_RETRIES = 2;
-    let currentDelay = 400; // Increased base delay for safety on transitions
+    
+    // Delay Estendido Apenas para o Primeiro Card:
+    // Se for o primeiro card, damos 1 segundo para o hardware abrir o canal
+    let currentDelay = isFirstCardOfSession ? 1000 : 400;
 
     // O Truque do "Silêncio Inicial" (Fix do Início Cortado):
     // "Acorda" o canal de áudio do SO sem emitir som
@@ -1324,6 +1350,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
           utterance.onstart = () => {
             console.log("TTS Started speaking.");
             setIsSpeaking(true);
+            // Once we start speaking successfully, it's no longer the first card
+            setIsFirstCardOfSession(false);
           };
         }
 
@@ -1370,7 +1398,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setIsSpeaking(false);
       utteranceRefs.current = [];
     };
-  }, [isAudioMode, mode, currentCard?.id, isFlipped, audioSpeed]);
+  }, [isAudioMode, mode, currentCard?.id, isFlipped, audioSpeed, isFirstCardOfSession]);
 
   useEffect(() => {
     if (mode === 'study') {
@@ -1687,6 +1715,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                     onClick={() => { 
                       setMode('study'); 
                       setIsFlipped(false); 
+                      setIsFirstCardOfSession(true);
                     }} 
                     disabled={reviewQueue.length === 0} 
                     className="flex flex-col items-center justify-center px-8 py-2.5 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest disabled:opacity-50 hover:bg-sanfran-rubiDark shadow-xl"
@@ -1709,6 +1738,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                         if (!isCramMode) {
                           setMode('study');
                           setIsFlipped(false);
+                          setIsFirstCardOfSession(true);
                         }
                       }} 
                       className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all h-full ${isCramMode ? 'bg-orange-600 text-white' : 'bg-white dark:bg-sanfran-rubiDark text-orange-600 border-2 border-orange-600 hover:bg-orange-50'}`}
@@ -1727,6 +1757,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                         if (!isAudioMode) {
                           setMode('study');
                           setIsFlipped(false);
+                          setIsFirstCardOfSession(true);
                         }
                       }} 
                       className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all h-full ${isAudioMode ? 'bg-emerald-600 text-white' : 'bg-white dark:bg-sanfran-rubiDark text-emerald-600 border-2 border-emerald-600 hover:bg-emerald-50'}`}
@@ -2534,6 +2565,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 onClick={() => {
                   setMode('study');
                   setIsFlipped(false);
+                  setIsFirstCardOfSession(true);
                   setIsSessionModalOpen(false);
                 }}
                 className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-indigo-500/20 disabled:opacity-50"
