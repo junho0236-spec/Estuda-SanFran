@@ -200,6 +200,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   };
 
   const undoAction = async () => {
+    window.speechSynthesis.cancel(); // Abort audio before transition
     if (undoStack.length === 0) return;
 
     const prevState = undoStack[undoStack.length - 1];
@@ -1267,35 +1268,49 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
   // TTS Logic - Refactored for better control and reliability
   useEffect(() => {
+    // Abort any previous audio immediately before starting new one or cleanup
+    window.speechSynthesis.cancel();
+    
     if (!isAudioMode || mode !== 'study' || !currentCard) {
-      window.speechSynthesis.cancel();
       setIsSpeaking(false);
       return;
     }
 
-    const speak = (text: string) => {
-      // Cancel any ongoing speech
-      window.speechSynthesis.cancel();
+    const speakText = (text: string) => {
+      if (!text) return;
       
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'pt-BR';
-      utterance.rate = audioSpeed;
-      
-      utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = () => setIsSpeaking(false);
-      
-      window.speechSynthesis.speak(utterance);
+      // Chunking: split text into sentences if it's too long (>200 chars)
+      // This prevents the API from cutting off long texts
+      const chunks = text.length > 200 
+        ? (text.match(/[^.!?]+[.!?]+|[^.!?]+/g) || [text])
+        : [text];
+
+      chunks.forEach((chunk, index) => {
+        const utterance = new SpeechSynthesisUtterance(chunk.trim());
+        utterance.lang = 'pt-BR';
+        utterance.rate = audioSpeed;
+        
+        if (index === 0) {
+          utterance.onstart = () => setIsSpeaking(true);
+        }
+        if (index === chunks.length - 1) {
+          utterance.onend = () => setIsSpeaking(false);
+          utterance.onerror = () => setIsSpeaking(false);
+        }
+        
+        window.speechSynthesis.speak(utterance);
+      });
     };
 
-    // Speak based on flip state
-    if (!isFlipped) {
-      speak(currentCard.front);
-    } else {
-      speak(currentCard.back);
-    }
+    // Trava de Sincronia: 200ms delay to ensure card is rendered and state is stable
+    const timer = setTimeout(() => {
+      // Use the text from the card directly to avoid stale state
+      const textToSpeak = isFlipped ? currentCard.back : currentCard.front;
+      speakText(textToSpeak);
+    }, 200);
 
     return () => {
+      clearTimeout(timer);
       window.speechSynthesis.cancel();
     };
   }, [isAudioMode, mode, currentCard?.id, isFlipped, audioSpeed]);
@@ -1364,6 +1379,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   };
 
   const handleReview = async (quality: number) => {
+    window.speechSynthesis.cancel(); // Abort audio before transition
     if (!currentCard) return;
     pushToHistory(currentCard);
     const card = currentCard;
