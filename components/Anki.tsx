@@ -81,6 +81,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 
 interface SessionStats {
   isActive: boolean;
+  isFinished: boolean;
   new: { total: number; correct: number };
   learning: { total: number; correct: number };
   review: { total: number; correct: number };
@@ -155,6 +156,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [sessionCounters, setSessionCounters] = useState({ new: 0, pending: 0, completed: 0 });
   const [sessionStats, setSessionStats] = useState<SessionStats>({
     isActive: false,
+    isFinished: false,
     new: { total: 0, correct: 0 },
     learning: { total: 0, correct: 0 },
     review: { total: 0, correct: 0 },
@@ -1611,6 +1613,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
     setSessionStats({
       isActive: true,
+      isFinished: false,
       new: { total: 0, correct: 0 },
       learning: { total: 0, correct: 0 },
       review: { total: 0, correct: 0 },
@@ -1880,6 +1883,15 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       { name: 'Revisão', acertos: review.total > 0 ? Math.round((review.correct / review.total) * 100) : 0, total: review.total, color: '#22c55e' }, // green-500
     ].filter(d => d.total > 0);
 
+    const totalStudied = newStats.total + learning.total + review.total;
+    const totalCorrect = newStats.correct + learning.correct + review.correct;
+    const overallAccuracy = totalStudied > 0 ? Math.round((totalCorrect / totalStudied) * 100) : 0;
+    
+    // sessionCounters.completed represents cards that graduated.
+    // The initial queue size is roughly the sum of new, pending, and completed.
+    const initialQueueSize = sessionCounters.new + sessionCounters.pending + sessionCounters.completed;
+    const remaining = sessionCounters.new + sessionCounters.pending;
+
     let insight = "Sessão concluída!";
     if (chartData.length > 0) {
       const allPerfect = chartData.every(d => d.acertos >= 90);
@@ -1903,7 +1915,18 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       <div className="flex flex-col items-center justify-center h-full min-h-[500px] w-full max-w-2xl mx-auto space-y-8 animate-in fade-in zoom-in p-6">
         <div className="text-center space-y-2">
           <h2 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Resumo de Performance</h2>
-          <p className="text-slate-500 dark:text-slate-400">{insight}</p>
+          
+          {sessionStats.isFinished && remaining > 0 ? (
+            <p className="text-slate-500 dark:text-slate-400 font-medium">
+              Você estudou {totalStudied} cards. Faltaram {remaining} para limpar o deck, mas sua taxa de acerto foi de {overallAccuracy}%.
+            </p>
+          ) : (
+            <p className="text-slate-500 dark:text-slate-400 font-medium">
+              Você limpou o deck! Estudou {totalStudied} cards com uma taxa de acerto de {overallAccuracy}%.
+            </p>
+          )}
+          
+          <p className="text-slate-500 dark:text-slate-400 mt-2">{insight}</p>
         </div>
 
         {chartData.length > 0 ? (
@@ -2980,7 +3003,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         </div>
       )}
 
-      {mode === 'study' && reviewQueue.length === 0 && (
+      {mode === 'study' && (reviewQueue.length === 0 || sessionStats.isFinished) && (
         sessionStats.isActive ? renderPerformanceSummary() : (
           <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center space-y-6 animate-in fade-in zoom-in">
             <div className="w-24 h-24 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center text-green-600 dark:text-green-400">
@@ -3005,7 +3028,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         )
       )}
 
-      {mode === 'study' && reviewQueue.length > 0 && (
+      {mode === 'study' && reviewQueue.length > 0 && !sessionStats.isFinished && (
         <div className={`flex flex-col items-center animate-in fade-in zoom-in ${isFocusMode ? 'w-full max-w-4xl' : 'py-10'}`}>
           <div className={`w-full max-w-2xl mb-8 flex items-center justify-between ${isFocusMode ? 'opacity-0 hover:opacity-100 transition-opacity duration-500' : ''}`}>
             <div className="flex items-center gap-4">
@@ -3363,7 +3386,10 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
             </div>
           )}
           {!isFocusMode && (
-            <button onClick={() => setMode('browse')} className="mt-12 text-slate-400 font-black text-xs uppercase underline hover:text-red-500 transition-colors">Sair da Audiência</button>
+            <button onClick={() => {
+              window.speechSynthesis.cancel();
+              setSessionStats(prev => ({ ...prev, isFinished: true }));
+            }} className="mt-12 text-slate-400 font-black text-xs uppercase underline hover:text-red-500 transition-colors">Sair da Audiência</button>
           )}
         </div>
       )}
