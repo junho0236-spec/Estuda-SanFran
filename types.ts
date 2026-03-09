@@ -376,7 +376,7 @@ export interface Question {
   explanation?: string;
   difficulty: 'facil' | 'media' | 'dificil';
   exam_board?: string;
-  year?: number;
+  year?: string;
   created_at?: string;
 }
 

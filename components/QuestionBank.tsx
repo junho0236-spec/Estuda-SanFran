@@ -81,7 +81,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
   const [subjects, setSubjects] = useState<string[]>([]);
   const [topics, setTopics] = useState<string[]>([]);
   const [examBoards, setExamBoards] = useState<string[]>([]);
-  const [years, setYears] = useState<number[]>([]);
+  const [years, setYears] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [selectedTopic, setSelectedTopic] = useState<string>('');
@@ -364,7 +364,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
     explanation: '',
     difficulty: 'media',
     exam_board: '',
-    year: new Date().getFullYear()
+    year: new Date().getFullYear().toString()
   });
 
   useEffect(() => {
@@ -724,23 +724,36 @@ Forneça a explicação de forma concisa e didática.`;
     const uniqueExamBoards = Array.from(new Set(data.map(q => q.exam_board))).filter(Boolean) as string[];
     setExamBoards(uniqueExamBoards);
 
-    const uniqueYears = Array.from(new Set(data.map(q => q.year))).filter(Boolean) as number[];
-    setYears(uniqueYears.sort((a, b) => b - a));
+    const uniqueYears = Array.from(new Set(data.map(q => q.year?.toString()))).filter(Boolean) as string[];
+    setYears(uniqueYears.sort((a, b) => b.localeCompare(a)));
   };
 
   const handleImportSamples = async () => {
     try {
       setLoading(true);
       
+      // Sanitize samples to ensure only valid columns are sent
+      const sanitizedInitialSamples = sampleQuestions.map((q: any) => ({
+        subject: q.subject,
+        topic: q.topic,
+        statement: q.statement,
+        options: q.options,
+        correct_answer: q.correct_answer,
+        explanation: q.explanation,
+        difficulty: q.difficulty,
+        exam_board: q.exam_board,
+        year: q.year?.toString()
+      }));
+
       let { data, error } = await supabase
         .from('questions')
-        .insert(sampleQuestions)
+        .insert(sanitizedInitialSamples)
         .select();
 
       // Fallback for missing exam_board column
       if (error && error.message?.includes("exam_board")) {
         console.warn("Column 'exam_board' not found, retrying without it...");
-        const sanitizedSamples = sampleQuestions.map((q: any) => {
+        const sanitizedSamples = sanitizedInitialSamples.map((q: any) => {
           const { exam_board, ...rest } = q;
           return rest;
         });
@@ -768,8 +781,8 @@ Forneça a explicação de forma concisa e didática.`;
         const newExamBoards = Array.from(new Set([...examBoards, ...data.map(q => q.exam_board)])).filter(Boolean) as string[];
         setExamBoards(newExamBoards);
 
-        const newYears = Array.from(new Set([...years, ...data.map(q => q.year)])).filter(Boolean) as number[];
-        setYears(newYears.sort((a, b) => b - a));
+        const newYears = Array.from(new Set([...years, ...data.map(q => q.year?.toString())])).filter(Boolean) as string[];
+        setYears(newYears.sort((a, b) => b.localeCompare(a)));
         
         setViewMode('list');
       }
@@ -792,16 +805,29 @@ Forneça a explicação de forma concisa e didática.`;
 
     try {
       setIsSubmitting(true);
+      // Sanitize question to ensure only valid columns are sent
+      const sanitizedInitialQuestion = {
+        subject: newQuestion.subject,
+        topic: newQuestion.topic,
+        statement: newQuestion.statement,
+        options: newQuestion.options,
+        correct_answer: newQuestion.correct_answer,
+        explanation: newQuestion.explanation,
+        difficulty: newQuestion.difficulty,
+        exam_board: newQuestion.exam_board,
+        year: newQuestion.year?.toString()
+      };
+
       let { data, error } = await supabase
         .from('questions')
-        .insert([newQuestion])
+        .insert([sanitizedInitialQuestion])
         .select()
         .single();
 
       // Fallback for missing exam_board column
       if (error && error.message?.includes("exam_board")) {
         console.warn("Column 'exam_board' not found, retrying without it...");
-        const { exam_board, ...sanitizedQuestion } = newQuestion;
+        const { exam_board, ...sanitizedQuestion } = sanitizedInitialQuestion;
         const retry = await supabase
           .from('questions')
           .insert([sanitizedQuestion])
@@ -827,7 +853,7 @@ Forneça a explicação de forma concisa e didática.`;
           explanation: '',
           difficulty: 'media',
           exam_board: '',
-          year: new Date().getFullYear()
+          year: new Date().getFullYear().toString()
         });
         
         if (!subjects.includes(data.subject)) {
@@ -839,8 +865,8 @@ Forneça a explicação de forma concisa e didática.`;
         if (data.exam_board && !examBoards.includes(data.exam_board)) {
           setExamBoards([...examBoards, data.exam_board]);
         }
-        if (data.year && !years.includes(data.year)) {
-          setYears([...years, data.year].sort((a, b) => b - a));
+        if (data.year && !years.includes(data.year.toString())) {
+          setYears([...years, data.year.toString()].sort((a, b) => b.localeCompare(a)));
         }
         
         setViewMode('list');
@@ -924,7 +950,7 @@ Forneça a explicação de forma concisa e didática.`;
                 explanation: { type: Type.STRING, description: "Explicação detalhada de cada alternativa (A, B, C, D, E)" },
                 difficulty: { type: Type.STRING, description: "A dificuldade: 'facil', 'media' ou 'dificil'" },
                 exam_board: { type: Type.STRING, description: "A banca examinadora" },
-                year: { type: Type.INTEGER, description: "O ano da questão" }
+                year: { type: Type.STRING, description: "O ano da questão" }
               },
               required: ["subject", "topic", "statement", "options", "correct_answer", "explanation", "difficulty", "exam_board", "year"]
             }
@@ -933,17 +959,30 @@ Forneça a explicação de forma concisa e didática.`;
       });
 
       if (response.text) {
-        const generatedQuestions = JSON.parse(response.text);
+        const generatedQuestionsRaw = JSON.parse(response.text);
         
+        // Sanitize generated questions to ensure only valid columns are sent
+        const sanitizedInitialQuestions = generatedQuestionsRaw.map((q: any) => ({
+          subject: q.subject,
+          topic: q.topic,
+          statement: q.statement,
+          options: q.options,
+          correct_answer: q.correct_answer,
+          explanation: q.explanation,
+          difficulty: q.difficulty,
+          exam_board: q.exam_board,
+          year: q.year?.toString()
+        }));
+
         let { data, error } = await supabase
           .from('questions')
-          .insert(generatedQuestions)
+          .insert(sanitizedInitialQuestions)
           .select();
 
         // Fallback for missing exam_board column
         if (error && error.message?.includes("exam_board")) {
           console.warn("Column 'exam_board' not found, retrying without it...");
-          const sanitizedQuestions = generatedQuestions.map(({ exam_board, ...rest }: any) => rest);
+          const sanitizedQuestions = sanitizedInitialQuestions.map(({ exam_board, ...rest }: any) => rest);
           const retry = await supabase
             .from('questions')
             .insert(sanitizedQuestions)
@@ -968,8 +1007,8 @@ Forneça a explicação de forma concisa e didática.`;
           const newExamBoards = Array.from(new Set([...examBoards, ...data.map(q => q.exam_board)])).filter(Boolean) as string[];
           setExamBoards(newExamBoards);
 
-          const newYears = Array.from(new Set([...years, ...data.map(q => q.year)])).filter(Boolean) as number[];
-          setYears(newYears.sort((a, b) => b - a));
+          const newYears = Array.from(new Set([...years, ...data.map(q => q.year?.toString())])).filter(Boolean) as string[];
+          setYears(newYears.sort((a, b) => b.localeCompare(a)));
           
           setViewMode('list');
         }
@@ -1946,9 +1985,9 @@ Forneça a explicação de forma concisa e didática.`;
                 <div>
                   <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Ano (Opcional)</label>
                   <input
-                    type="number"
-                    value={newQuestion.year}
-                    onChange={e => setNewQuestion({...newQuestion, year: parseInt(e.target.value) || new Date().getFullYear()})}
+                    type="text"
+                    value={newQuestion.year || ''}
+                    onChange={e => setNewQuestion({...newQuestion, year: e.target.value})}
                     className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
                     placeholder="Ex: 2024"
                   />
