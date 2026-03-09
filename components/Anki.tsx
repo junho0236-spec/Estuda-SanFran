@@ -23,6 +23,9 @@ import {
   Sparkles,
   Zap,
   Save,
+  Flame,
+  Trophy,
+  TrendingUp,
   FileText,
   Upload,
   Link,
@@ -1262,6 +1265,46 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     });
   }, [studyableFlashcards, currentTime, isCramMode, selectedFolderIdsForSession, currentFolderId, currentContextIds, folders]);
 
+  const stats = useMemo(() => {
+    const dates = Object.keys(studyHistory).sort();
+    
+    // Total
+    const total = Object.values(studyHistory).reduce((a, b) => a + b, 0);
+
+    // Streak
+    let streak = 0;
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    
+    let checkDate = studyHistory[today] ? today : yesterday;
+    
+    if (studyHistory[checkDate]) {
+      let current = new Date(checkDate);
+      while (studyHistory[current.toISOString().split('T')[0]]) {
+        streak++;
+        current.setDate(current.getDate() - 1);
+      }
+    }
+
+    // Average (last 30 days)
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000);
+    let last30Count = 0;
+    Object.entries(studyHistory).forEach(([dateStr, count]) => {
+      if (new Date(dateStr) >= thirtyDaysAgo) {
+        last30Count += count;
+      }
+    });
+    const average = Math.round(last30Count / 30 * 10) / 10;
+
+    // Message
+    let message = "Mantenha o ritmo! 🚀";
+    if (!studyHistory[today]) message = "Não deixe a chama apagar! 🕯️";
+    if (streak >= 5) message = "Você está on fire! 🔥";
+    if (streak === 0 && !studyHistory[today]) message = "Comece sua jornada hoje! 📚";
+
+    return { streak, total, average, message };
+  }, [studyHistory]);
+
   // Derived state for safe card access
   const currentCard = reviewQueue[0] || null;
 
@@ -2159,48 +2202,85 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
           {currentFolderId === null && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 animate-in slide-in-from-top-4 duration-500">
               {/* Heatmap Widget */}
-              <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border-2 border-slate-200 dark:border-white/10 shadow-xl flex flex-col justify-between">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl">
-                      <Zap className="w-5 h-5 text-emerald-600 dark:text-emerald-400 fill-emerald-600 dark:fill-emerald-400" />
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-2 border-slate-200 dark:border-white/10 shadow-xl flex flex-col gap-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-2xl">
+                      <Flame className={`w-6 h-6 ${stats.streak > 0 ? 'text-orange-500 fill-orange-500 animate-pulse' : 'text-slate-400'}`} />
                     </div>
                     <div>
-                      <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-tight">Constância</h3>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{Object.keys(studyHistory).length} Dias de Estudo</p>
+                      <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-tight text-lg">Constância</h3>
+                      <p className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">{stats.message}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{Object.keys(studyHistory).length}</span>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Dias</span>
+                    <span className="text-3xl font-black text-slate-900 dark:text-white">{stats.streak}</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Dias de Streak</span>
                   </div>
                 </div>
                 
-                <div className="flex items-end gap-1.5 overflow-x-auto pb-2 custom-scrollbar">
-                  {Array.from({ length: 35 }).map((_, i) => {
-                    const date = new Date();
-                    date.setDate(date.getDate() - (34 - i));
-                    const dateStr = date.toISOString().split('T')[0];
-                    const count = studyHistory[dateStr] || 0;
-                    
-                    // Intensidade da cor baseada no número de sessões
-                    let colorClass = 'bg-slate-100 dark:bg-white/5';
-                    if (count > 10) colorClass = 'bg-emerald-600';
-                    else if (count > 5) colorClass = 'bg-emerald-500';
-                    else if (count > 2) colorClass = 'bg-emerald-400';
-                    else if (count > 0) colorClass = 'bg-emerald-300';
+                <div className="bg-slate-50 dark:bg-black/20 p-4 rounded-3xl">
+                  <div className="grid grid-rows-7 grid-flow-col gap-1 h-28 overflow-x-auto pb-2 custom-scrollbar">
+                    {Array.from({ length: 20 * 7 }).map((_, i) => {
+                      const date = new Date();
+                      const dayOffset = (20 * 7) - 1 - i;
+                      date.setDate(date.getDate() - dayOffset);
+                      const dateStr = date.toISOString().split('T')[0];
+                      const count = studyHistory[dateStr] || 0;
+                      
+                      let colorClass = 'bg-slate-200 dark:bg-white/5';
+                      if (count > 50) colorClass = 'bg-emerald-700';
+                      else if (count > 20) colorClass = 'bg-emerald-600';
+                      else if (count > 10) colorClass = 'bg-emerald-500';
+                      else if (count > 0) colorClass = 'bg-emerald-400';
 
-                    return (
-                      <div key={i} className="flex flex-col items-center gap-1 group relative">
+                      return (
                         <div 
-                          className={`w-4 h-4 sm:w-5 sm:h-5 rounded-md ${colorClass} transition-all hover:scale-110 hover:ring-2 ring-emerald-400 ring-offset-1 dark:ring-offset-slate-900`}
-                        />
-                        <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded whitespace-nowrap z-10 pointer-events-none">
-                          {date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}: {count} sessões
+                          key={i} 
+                          className={`w-3 h-3 rounded-sm ${colorClass} transition-all hover:scale-150 hover:z-10 group relative cursor-help`}
+                        >
+                          <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white text-[8px] font-bold px-2 py-1 rounded whitespace-nowrap z-20 pointer-events-none shadow-xl border border-white/10">
+                            {date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}: {count} cards
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
+                  <div className="flex justify-between items-center mt-2 px-1">
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Menos</span>
+                    <div className="flex gap-1">
+                      <div className="w-2 h-2 rounded-sm bg-slate-200 dark:bg-white/5"></div>
+                      <div className="w-2 h-2 rounded-sm bg-emerald-400"></div>
+                      <div className="w-2 h-2 rounded-sm bg-emerald-500"></div>
+                      <div className="w-2 h-2 rounded-sm bg-emerald-600"></div>
+                      <div className="w-2 h-2 rounded-sm bg-emerald-700"></div>
+                    </div>
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Mais</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="bg-slate-50 dark:bg-white/5 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Trophy size={12} className="text-usp-gold" />
+                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Recorde</span>
+                    </div>
+                    <div className="text-sm font-black text-slate-900 dark:text-white">{stats.streak} dias</div>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-white/5 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Activity size={12} className="text-emerald-500" />
+                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Total</span>
+                    </div>
+                    <div className="text-sm font-black text-slate-900 dark:text-white">{stats.total} cards</div>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-white/5 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <TrendingUp size={12} className="text-blue-500" />
+                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Ritmo</span>
+                    </div>
+                    <div className="text-sm font-black text-slate-900 dark:text-white">{stats.average}/dia</div>
+                  </div>
                 </div>
               </div>
 
