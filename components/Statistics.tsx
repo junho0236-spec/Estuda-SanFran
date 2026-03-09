@@ -12,7 +12,10 @@ import {
   Activity,
   Filter,
   Calendar as CalendarIconLucide,
-  ChevronDown
+  ChevronDown,
+  Sparkles,
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -31,6 +34,8 @@ import {
   Area
 } from 'recharts';
 import { StudySession, Flashcard, Task, Subject } from '../types';
+import { GoogleGenAI } from '@google/genai';
+import ReactMarkdown from 'react-markdown';
 
 interface StatisticsProps {
   studySessions: StudySession[];
@@ -160,6 +165,27 @@ const Statistics: React.FC<StatisticsProps> = ({
   }).reverse();
 
   const [chartView, setChartView] = React.useState<'weekly' | 'monthly'>('weekly');
+  const [simplifyingId, setSimplifyingId] = React.useState<string | null>(null);
+  const [simplifiedCards, setSimplifiedCards] = React.useState<Record<string, string>>({});
+
+  const handleSimplify = async (card: Flashcard) => {
+    setSimplifyingId(card.id);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const result = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: `Reescreva esta explicação jurídica de forma mais simples e didática, mantendo o rigor técnico, mas facilitando a memorização:\n\nPergunta: ${card.front}\nResposta Atual: ${card.back}`,
+      });
+      setSimplifiedCards(prev => ({ ...prev, [card.id]: result.text }));
+    } catch (err) {
+      console.error("Erro ao simplificar card:", err);
+      alert("Erro ao simplificar com IA. Tente novamente.");
+    } finally {
+      setSimplifyingId(null);
+    }
+  };
+
+  const leeches = flashcards.filter(f => (f.total_errors || 0) >= 5);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700 pb-20">
@@ -463,6 +489,72 @@ const Statistics: React.FC<StatisticsProps> = ({
           description="Frequência de dias estudados no período selecionado."
         />
       </div>
+
+      {/* Gargalos de Aprendizado (Leeches) */}
+      {leeches.length > 0 && (
+        <div className="bg-white dark:bg-sanfran-rubiDark/20 p-8 rounded-[2rem] border border-sanfran-rubi/30 shadow-xl animate-in slide-in-from-bottom-4 duration-500">
+          <div className="flex items-center gap-3 mb-8">
+            <div className="p-3 bg-sanfran-rubi/10 rounded-2xl">
+              <AlertCircle className="text-sanfran-rubi w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white">Gargalos de Aprendizado</h3>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Cards com 5 ou mais erros consecutivos</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            {leeches.map(card => (
+              <div key={card.id} className="group bg-slate-50 dark:bg-white/5 p-6 rounded-3xl border border-slate-100 dark:border-white/10 hover:border-sanfran-rubi/50 transition-all">
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+                  <div className="flex-1 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="px-3 py-1 bg-sanfran-rubi/10 text-sanfran-rubi text-[10px] font-black uppercase rounded-full">
+                        {card.total_errors} Erros Consecutivos
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">ID: {card.id.slice(0, 8)}</span>
+                    </div>
+                    <h4 className="text-sm font-black text-slate-900 dark:text-white leading-snug">{card.front}</h4>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium line-clamp-2 italic">
+                      {card.back}
+                    </div>
+                    
+                    {simplifiedCards[card.id] && (
+                      <div className="mt-4 p-4 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 rounded-2xl animate-in zoom-in-95 duration-300">
+                        <div className="flex items-center gap-2 mb-2 text-emerald-600 dark:text-emerald-400">
+                          <Sparkles className="w-4 h-4" />
+                          <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">Explicação Simplificada</span>
+                        </div>
+                        <div className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed prose prose-sm dark:prose-invert max-w-none">
+                          <ReactMarkdown>{simplifiedCards[card.id]}</ReactMarkdown>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => handleSimplify(card)}
+                    disabled={simplifyingId === card.id}
+                    className="flex items-center justify-center gap-2 px-6 py-3 bg-white dark:bg-sanfran-rubi text-sanfran-rubi dark:text-white border-2 border-sanfran-rubi rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-sanfran-rubi hover:text-white transition-all shadow-lg disabled:opacity-50"
+                  >
+                    {simplifyingId === card.id ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Simplificando...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        Simplificar com IA
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
     </div>
   );

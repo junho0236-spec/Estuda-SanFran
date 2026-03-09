@@ -1479,6 +1479,13 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     let offsetMinutes = 0;
     let offsetDays = 0;
 
+    let newTotalErrors = card.total_errors || 0;
+    if (quality === 0) {
+      newTotalErrors += 1;
+    } else if (quality > 0) {
+      newTotalErrors = 0;
+    }
+
     if (newStatus === 'new' || newStatus === 'learning') {
       if (quality === 0) { // Again
         newLearningStep = 0;
@@ -1559,7 +1566,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         nextReview, 
         status: newStatus,
         learningStep: newLearningStep,
-        easeFactor: newEaseFactor
+        easeFactor: newEaseFactor,
+        total_errors: newTotalErrors
       };
       
       // ALWAYS save to DB so the queue updates dynamically

@@ -139,6 +139,7 @@ export interface Flashcard {
   tags?: string[];
   source?: string;
   image?: string; // Base64 image data
+  total_errors?: number;
 }
 
 export interface Subject {

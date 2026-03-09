@@ -185,7 +185,8 @@ export const dataService = {
           archived_at: card.archived_at || null,
           tags: card.tags || [],
           source: card.source || null,
-          is_suspended: card.is_suspended || false
+          is_suspended: card.is_suspended || false,
+          total_errors: card.total_errors || 0
         };
 
         console.log(`[dataService] Salvando card ${card.id} no Supabase. Status: ${payload.status}`);

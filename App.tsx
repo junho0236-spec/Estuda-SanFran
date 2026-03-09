@@ -473,6 +473,7 @@ const App: React.FC = () => {
               status: c.status || local?.status || 'new',
               learningStep: c.learning_step != null ? c.learning_step : (local?.learningStep || 0),
               easeFactor: c.ease_factor != null ? c.ease_factor : (local?.easeFactor || 2.5),
+              total_errors: c.total_errors != null ? c.total_errors : (local?.total_errors || 0),
               archived_at: c.archived_at || null
             };
           });
