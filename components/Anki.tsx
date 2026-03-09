@@ -1,7 +1,7 @@
 // Anki.tsx - Community Features and Card Rating
 // Anki.tsx - Community Features and Card Rating
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
@@ -185,6 +185,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [undoStack, setUndoStack] = useState<any[]>([]);
   const [redoStack, setRedoStack] = useState<any[]>([]);
+  const utteranceRefs = useRef<SpeechSynthesisUtterance[]>([]);
 
   const pushToHistory = (card: Flashcard) => {
     const currentState = {
@@ -1271,7 +1272,10 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   // TTS Logic - Refactored for maximum stability and reliability
   useEffect(() => {
     // 1. Immediate Abort: Stop any ongoing speech as soon as dependencies change
-    window.speechSynthesis.cancel();
+    // Verificação de Fila Travada: se estiver falando mas mudou o card, força o reset
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+    }
     setIsSpeaking(false);
     
     if (!isAudioMode || mode !== 'study' || !currentCard) {
@@ -1280,6 +1284,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
     let retryCount = 0;
     const MAX_RETRIES = 2;
+    let currentDelay = 300; // Base delay increased for safety
 
     const speakText = (text: string) => {
       if (!text || text.trim().length === 0) return;
@@ -1297,6 +1302,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
       // 4. Queue Management: Clear any stuck state before speaking
       window.speechSynthesis.cancel();
+      utteranceRefs.current = []; // Clear old references
 
       chunks.forEach((chunk, index) => {
         const cleanChunk = chunk.trim();
@@ -1306,14 +1312,27 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         utterance.lang = 'pt-BR';
         utterance.rate = audioSpeed;
         
+        // Referência Global (Prevent Garbage Collection):
+        // Mantemos a referência viva no ref para evitar que o GC a delete durante a fala
+        utteranceRefs.current.push(utterance);
+        // Truque extra: anexar ao window para garantir visibilidade total ao motor de áudio
+        (window as any)._lastUtterance = utterance;
+
         // Start feedback
         if (index === 0) {
-          utterance.onstart = () => setIsSpeaking(true);
+          utterance.onstart = () => {
+            console.log("TTS Started speaking.");
+            setIsSpeaking(true);
+          };
         }
 
         // End feedback
         if (index === chunks.length - 1) {
-          utterance.onend = () => setIsSpeaking(false);
+          utterance.onend = () => {
+            console.log("TTS Finished speaking.");
+            setIsSpeaking(false);
+            utteranceRefs.current = []; // Limpa referências ao terminar
+          };
         }
 
         // 5. Error Handling & Retry Logic
@@ -1321,31 +1340,36 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
           console.error("TTS Error:", event);
           setIsSpeaking(false);
           
-          // If interrupted or failed, try one more time after a short delay
-          if (retryCount < MAX_RETRIES && event.error !== 'interrupted') {
+          // Ajuste no OnEnd/Error: Se interrompido, aumentamos o delay dinamicamente
+          if (event.error === 'interrupted') {
+            currentDelay = 400;
+          } else if (retryCount < MAX_RETRIES) {
             retryCount++;
-            setTimeout(() => speakText(text), 300);
+            setTimeout(() => speakText(text), currentDelay);
           }
         };
         
+        // O Truque do "Resume": Garante que a API não esteja em estado pausado
+        window.speechSynthesis.resume();
         window.speechSynthesis.speak(utterance);
       });
     };
 
-    // 6. Safety Delay: Wait 200ms after cancel() before starting new speak()
-    // This allows the OS audio buffer to clear and prevents intermittent failures
+    // 6. Safety Delay: Wait after cancel() before starting new speak()
+    // Isso permite que o buffer do SO limpe e evita falhas intermitentes
     const timer = setTimeout(() => {
       // Double check state after delay
       if (!isAudioMode || mode !== 'study' || !currentCard) return;
       
       const textToSpeak = isFlipped ? currentCard.back : currentCard.front;
       speakText(textToSpeak);
-    }, 250); // Increased slightly for extra safety
+    }, currentDelay);
 
     return () => {
       clearTimeout(timer);
       window.speechSynthesis.cancel();
       setIsSpeaking(false);
+      utteranceRefs.current = [];
     };
   }, [isAudioMode, mode, currentCard?.id, isFlipped, audioSpeed]);
 
