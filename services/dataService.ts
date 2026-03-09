@@ -370,7 +370,10 @@ export const dataService = {
           
           if (item.table === 'folders') {
              payload.parent_id = payload.parentId || null;
+             payload.target_date = payload.targetDate || null;
+             payload.icon = payload.icon || null;
              delete payload.parentId;
+             delete payload.targetDate;
           }
           
           if (item.table === 'notes') {
