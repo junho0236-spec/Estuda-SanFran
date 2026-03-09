@@ -575,13 +575,27 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       const cardsToReset = activeFlashcards.filter(f => subfolderIds.includes(f.folderId as string));
       
       await Promise.all(cardsToReset.map(card => {
-        const updatedCard = { ...card, interval: 0, nextReview: Date.now() };
+        const updatedCard: Flashcard = { 
+          ...card, 
+          interval: 0, 
+          nextReview: Date.now(),
+          status: 'new',
+          learningStep: 0,
+          easeFactor: 2.5
+        };
         return dataService.saveFlashcard(updatedCard, userId, isOnline);
       }));
       
       setFlashcards(prev => prev.map(f => {
         if (subfolderIds.includes(f.folderId as string)) {
-          return { ...f, interval: 0, nextReview: Date.now() };
+          return { 
+            ...f, 
+            interval: 0, 
+            nextReview: Date.now(),
+            status: 'new',
+            learningStep: 0,
+            easeFactor: 2.5
+          };
         }
         return f;
       }));
@@ -676,6 +690,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         folderId: folderId,
         nextReview: Date.now(),
         interval: 0,
+        status: 'new',
+        learningStep: 0,
+        easeFactor: 2.5,
         archived_at: null,
         is_suspended: false // Ensure cards are not suspended when forked
       }));
@@ -739,6 +756,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
           folder_id: currentFolderId,
           next_review: Date.now(),
           interval: 0,
+          status: 'new',
+          learningStep: 0,
+          easeFactor: 2.5,
           user_id: userId,
           archived_at: null
         };
@@ -908,6 +928,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         folderId: currentFolderId || null,
         nextReview: Date.now(),
         interval: 0,
+        status: 'new',
+        learningStep: 0,
+        easeFactor: 2.5,
         archived_at: null
       }));
 
@@ -984,6 +1007,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         folderId: currentFolderId || null, 
         nextReview: Date.now(), 
         interval: 0,
+        status: 'new',
+        learningStep: 0,
+        easeFactor: 2.5,
         archived_at: null
       };
 
@@ -1128,11 +1154,11 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     const folderCards = activeFlashcards.filter(f => subfolderIds.includes(f.folderId as string));
     
     const now = Date.now();
-    const newCount = folderCards.filter(f => f.interval === 0).length;
-    const learningCount = folderCards.filter(f => f.interval > 0 && f.interval < 3).length;
-    const reviewCount = folderCards.filter(f => f.interval >= 3 && f.nextReview <= now).length;
+    const newCount = folderCards.filter(f => f.status === 'new' || !f.status).length;
+    const learningCount = folderCards.filter(f => f.status === 'learning' || f.status === 'relearning').length;
+    const reviewCount = folderCards.filter(f => f.status === 'review' && f.nextReview <= now).length;
     
-    const matureCards = folderCards.filter(f => f.interval >= 21).length;
+    const matureCards = folderCards.filter(f => f.status === 'review' && f.interval >= 21).length;
     const mastery = folderCards.length > 0 ? Math.round((matureCards / folderCards.length) * 100) : 0;
     
     return { newCount, learningCount, reviewCount, mastery };
@@ -1182,19 +1208,21 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     }).sort((a, b) => {
       if (isCramMode) return Math.random() - 0.5; // Randomize in cram mode
       
-      // Sort logic:
-      // 1. Learning cards that are due
-      // 2. Review cards that are due
-      // 3. New cards
-      const order = { 'learning': 0, 'review': 1, 'new': 2 };
-      const statusA = a.status || 'new';
-      const statusB = b.status || 'new';
+      const getPriority = (card: Flashcard) => {
+        const status = card.status || 'new';
+        if (status === 'learning' || status === 'relearning') return 1;
+        if (status === 'review') return 2;
+        return 3; // 'new'
+      };
+
+      const priorityA = getPriority(a);
+      const priorityB = getPriority(b);
       
-      if (order[statusA] !== order[statusB]) {
-        return order[statusA] - order[statusB];
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
       }
       
-      // Within same status, sort by nextReview (oldest first)
+      // Within same priority, sort by nextReview (oldest first)
       return a.nextReview - b.nextReview;
     });
   }, [studyableFlashcards, currentTime, isCramMode, selectedFolderIdsForSession, currentFolderId, currentContextIds, folders]);
@@ -1355,57 +1383,82 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     pushToHistory(currentCard);
     const card = currentCard;
     
-    // Anki Logic:
+    // Anki Logic (SM-2 Modified):
     let newInterval = card.interval || 0;
-    let newStatus: 'new' | 'learning' | 'review' = card.status || 'new';
+    let newStatus: 'new' | 'learning' | 'review' | 'relearning' = card.status || 'new';
+    let newLearningStep = card.learningStep || 0;
+    let newEaseFactor = card.easeFactor || 2.5;
     let offsetMinutes = 0;
+    let offsetDays = 0;
 
-    if (newStatus === 'new') {
+    if (newStatus === 'new' || newStatus === 'learning') {
       if (quality === 0) { // Again
+        newLearningStep = 0;
+        newInterval = 1; // minutes
         newStatus = 'learning';
         offsetMinutes = 1;
       } else if (quality === 2) { // Hard
+        newInterval = newStatus === 'new' ? 6 : newInterval; // minutes
         newStatus = 'learning';
-        offsetMinutes = 6;
+        offsetMinutes = newInterval;
       } else if (quality === 3) { // Good
-        newStatus = 'learning';
-        offsetMinutes = 10;
+        if (newLearningStep === 0) {
+          newInterval = 10; // minutes
+          newLearningStep = 1;
+          newStatus = 'learning';
+          offsetMinutes = 10;
+        } else {
+          newInterval = 1; // days
+          newStatus = 'review';
+          offsetDays = 1;
+        }
       } else if (quality === 5) { // Easy
+        newInterval = 4; // days
         newStatus = 'review';
-        newInterval = 4;
-      }
-    } else if (newStatus === 'learning') {
-      if (quality === 0) { // Again
-        offsetMinutes = 1;
-      } else if (quality === 2) { // Hard
-        offsetMinutes = 6;
-      } else if (quality === 3) { // Good
-        newStatus = 'review';
-        newInterval = 1; // Graduate to 1 day
-      } else if (quality === 5) { // Easy
-        newStatus = 'review';
-        newInterval = 4;
+        offsetDays = 4;
       }
     } else if (newStatus === 'review') {
       if (quality === 0) { // Again
-        newStatus = 'learning';
-        offsetMinutes = 1;
-        newInterval = 0; // Reset interval
+        newEaseFactor = Math.max(1.3, newEaseFactor - 0.2);
+        newInterval = 10; // minutes
+        newStatus = 'relearning';
+        offsetMinutes = 10;
       } else if (quality === 2) { // Hard
-        newInterval = Math.max(1, Math.ceil(newInterval * 1.2));
+        newEaseFactor = Math.max(1.3, newEaseFactor - 0.15);
+        newInterval = Math.max(1, Math.ceil(newInterval * 1.2)); // days
+        offsetDays = newInterval;
       } else if (quality === 3) { // Good
-        newInterval = Math.max(1, Math.ceil(newInterval * 2.5));
+        newInterval = Math.max(1, Math.ceil(newInterval * newEaseFactor)); // days
+        offsetDays = newInterval;
       } else if (quality === 5) { // Easy
-        newInterval = Math.max(1, Math.ceil(newInterval * 4));
+        newEaseFactor = newEaseFactor + 0.15;
+        newInterval = Math.max(1, Math.ceil(newInterval * newEaseFactor * 1.3)); // days
+        offsetDays = newInterval;
+      }
+    } else if (newStatus === 'relearning') {
+      if (quality === 0) { // Again
+        newInterval = 1; // minutes
+        offsetMinutes = 1;
+      } else { // Good, Hard, Easy
+        newStatus = 'review';
+        newInterval = 1; // days
+        offsetDays = 1;
       }
     }
 
     const nextReview = offsetMinutes > 0 
       ? Date.now() + offsetMinutes * 60 * 1000 
-      : Date.now() + newInterval * 24 * 60 * 60 * 1000;
+      : Date.now() + offsetDays * 24 * 60 * 60 * 1000;
     
     try {
-      const updatedCard = { ...card, interval: newInterval, nextReview, status: newStatus };
+      const updatedCard = { 
+        ...card, 
+        interval: newInterval, 
+        nextReview, 
+        status: newStatus,
+        learningStep: newLearningStep,
+        easeFactor: newEaseFactor
+      };
       
       // ALWAYS save to DB so the queue updates dynamically
       setFlashcards(prev => prev.map(f => f.id === updatedCard.id ? updatedCard : f));
@@ -1472,6 +1525,29 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   }, [flashcards]);
 
   const maxForecast = Math.max(...forecast.map(f => f.count), 1);
+
+  const getButtonLabel = (quality: number, card: Flashcard) => {
+    const status = card.status || 'new';
+    const interval = card.interval || 0;
+    const step = card.learningStep || 0;
+    const ease = card.easeFactor || 2.5;
+
+    if (status === 'new' || status === 'learning') {
+      if (quality === 0) return '1 min';
+      if (quality === 2) return status === 'new' ? '6 min' : `${Math.ceil(interval)} min`;
+      if (quality === 3) return step === 0 ? '10 min' : '1d';
+      if (quality === 5) return '4d';
+    } else if (status === 'review') {
+      if (quality === 0) return '10 min';
+      if (quality === 2) return `${Math.max(1, Math.ceil(interval * 1.2))}d`;
+      if (quality === 3) return `${Math.max(1, Math.ceil(interval * ease))}d`;
+      if (quality === 5) return `${Math.max(1, Math.ceil(interval * (ease + 0.15) * 1.3))}d`;
+    } else if (status === 'relearning') {
+      if (quality === 0) return '1 min';
+      return '1d'; // Good, Hard, Easy fallback
+    }
+    return '1 min';
+  };
 
   if (!subjects || subjects.length === 0) {
     return (
@@ -1547,7 +1623,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                     </div>
                     <div className="flex items-center gap-3 text-[10px]">
                       <span className="text-blue-200" title="Novos">{reviewQueue.filter(c => c.status === 'new' || !c.status).length}</span>
-                      <span className="text-red-200" title="Aprendizagem">{reviewQueue.filter(c => c.status === 'learning').length}</span>
+                      <span className="text-red-200" title="Aprendizagem">{reviewQueue.filter(c => c.status === 'learning' || c.status === 'relearning').length}</span>
                       <span className="text-green-200" title="A Revisar">{reviewQueue.filter(c => c.status === 'review').length}</span>
                     </div>
                   </button>
@@ -2303,7 +2379,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
           <div className="space-y-2 max-w-md">
             <h2 className="text-2xl font-black text-slate-900 dark:text-white">Parabéns!</h2>
             <p className="text-slate-500 dark:text-slate-400">Você terminou suas revisões por agora.</p>
-            {studyableFlashcards.some(f => f.status === 'learning' && f.nextReview > currentTime) && (
+            {studyableFlashcards.some(f => (f.status === 'learning' || f.status === 'relearning') && f.nextReview > currentTime) && (
               <p className="text-sm text-orange-500 font-bold mt-4">
                 Alguns cards estão em aprendizado e estarão disponíveis em breve.
               </p>
@@ -2337,7 +2413,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 </span>
                 <span className="text-red-500 flex items-center gap-1" title="Aprendizagem">
                   <div className="w-2 h-2 rounded-full bg-red-500"></div> 
-                  {reviewQueue.filter(c => c.status === 'learning').length}
+                  {reviewQueue.filter(c => c.status === 'learning' || c.status === 'relearning').length}
                 </span>
                 <span className="text-green-500 flex items-center gap-1" title="A Revisar">
                   <div className="w-2 h-2 rounded-full bg-green-500"></div> 
@@ -2600,20 +2676,18 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 <div className="grid grid-cols-4 gap-4 w-full">
                   <button onClick={() => handleReview(0)} className="flex flex-col items-center gap-1 p-4 bg-red-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform">
                     <span>Errei</span>
-                    <span className="text-[8px] opacity-60">~1 min</span>
+                    <span className="text-[8px] opacity-60">~{getButtonLabel(0, currentCard)}</span>
                     <span className="px-2 py-0.5 bg-black/20 rounded text-[8px]">1</span>
                   </button>
                   <button onClick={() => handleReview(2)} className="flex flex-col items-center gap-1 p-4 bg-orange-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform">
                     <span>Difícil</span>
-                    <span className="text-[8px] opacity-60">~6 min</span>
+                    <span className="text-[8px] opacity-60">~{getButtonLabel(2, currentCard)}</span>
                     <span className="px-2 py-0.5 bg-black/20 rounded text-[8px]">2</span>
                   </button>
                   <button onClick={() => handleReview(3)} className="flex flex-col items-center gap-1 p-4 bg-usp-gold text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform">
                     <span>Bom</span>
                     <span className="text-[8px] opacity-60">
-                      {currentCard.status === 'learning' 
-                        ? '1d' 
-                        : (currentCard.status === 'new' || !currentCard.status ? '10 min' : Math.ceil(currentCard.interval * 2.5) + 'd')}
+                      {getButtonLabel(3, currentCard)}
                     </span>
                     <span className="px-2 py-0.5 bg-black/20 rounded text-[8px]">3</span>
                   </button>
@@ -2622,7 +2696,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                     className={`flex flex-col items-center gap-1 p-4 bg-usp-blue text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform`}
                   >
                     <span>Fácil</span>
-                    <span className="text-[8px] opacity-60">{currentCard.interval === 0 ? '4d' : Math.ceil(currentCard.interval * 4) + 'd'}</span>
+                    <span className="text-[8px] opacity-60">{getButtonLabel(5, currentCard)}</span>
                     <span className="px-2 py-0.5 bg-black/20 rounded text-[8px]">4</span>
                   </button>
                 </div>

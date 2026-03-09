@@ -129,7 +129,9 @@ export interface Flashcard {
   folderId: string | null;
   nextReview: number;
   interval: number;
-  status?: 'new' | 'learning' | 'review';
+  status?: 'new' | 'learning' | 'review' | 'relearning';
+  learningStep?: number;
+  easeFactor?: number;
   archived_at?: string | null;
   is_suspended?: boolean;
   tags?: string[];

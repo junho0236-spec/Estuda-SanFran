@@ -178,6 +178,8 @@ export const dataService = {
           next_review: card.nextReview ? Math.floor(card.nextReview) : Date.now(),
           interval: card.interval || 0,
           status: card.status || 'new',
+          learning_step: card.learningStep || 0,
+          ease_factor: card.easeFactor || 2.5,
           archived_at: card.archived_at || null,
           tags: card.tags || [],
           source: card.source || null,

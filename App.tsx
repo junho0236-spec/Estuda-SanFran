@@ -469,6 +469,8 @@ const App: React.FC = () => {
               nextReview: c.next_review != null ? Number(c.next_review) : (local?.nextReview || Date.now()), 
               interval: c.interval != null ? c.interval : (local?.interval || 0), 
               status: c.status || local?.status || 'new',
+              learningStep: c.learning_step != null ? c.learning_step : (local?.learningStep || 0),
+              easeFactor: c.ease_factor != null ? c.ease_factor : (local?.easeFactor || 2.5),
               archived_at: c.archived_at || null
             };
           });
