@@ -380,6 +380,21 @@ export interface Question {
   created_at?: string;
 }
 
+export interface QuestionNotebook {
+  id: string;
+  user_id: string;
+  name: string;
+  description?: string;
+  created_at: string;
+}
+
+export interface NotebookItem {
+  id: string;
+  notebook_id: string;
+  question_id: string;
+  created_at: string;
+}
+
 export interface Notebook {
   id: string;
   user_id: string;
