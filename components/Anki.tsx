@@ -1272,7 +1272,6 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   // TTS Logic - Refactored for maximum stability and reliability
   useEffect(() => {
     // 1. Immediate Abort: Stop any ongoing speech as soon as dependencies change
-    // Verificação de Fila Travada: se estiver falando mas mudou o card, força o reset
     if (window.speechSynthesis.speaking) {
       window.speechSynthesis.cancel();
     }
@@ -1284,25 +1283,31 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
     let retryCount = 0;
     const MAX_RETRIES = 2;
-    let currentDelay = 300; // Base delay increased for safety
+    let currentDelay = 400; // Increased base delay for safety on transitions
+
+    // O Truque do "Silêncio Inicial" (Fix do Início Cortado):
+    // "Acorda" o canal de áudio do SO sem emitir som
+    const acordaAudio = () => {
+      const wakeUp = new SpeechSynthesisUtterance(" ");
+      wakeUp.volume = 0;
+      window.speechSynthesis.speak(wakeUp);
+    };
 
     const speakText = (text: string) => {
       if (!text || text.trim().length === 0) return;
       
-      // 2. Browser Check: Ensure speechSynthesis is available and not in a broken state
       if (!window.speechSynthesis) {
         console.warn("Speech Synthesis not supported in this browser.");
         return;
       }
 
-      // 3. Chunking: Split text into manageable pieces to prevent timeouts/cuts
       const chunks = text.length > 200 
         ? (text.match(/[^.!?]+[.!?]+|[^.!?]+/g) || [text])
         : [text];
 
-      // 4. Queue Management: Clear any stuck state before speaking
       window.speechSynthesis.cancel();
-      utteranceRefs.current = []; // Clear old references
+      acordaAudio(); // Acorda o hardware antes da frase real
+      utteranceRefs.current = [];
 
       chunks.forEach((chunk, index) => {
         const cleanChunk = chunk.trim();
@@ -1312,13 +1317,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         utterance.lang = 'pt-BR';
         utterance.rate = audioSpeed;
         
-        // Referência Global (Prevent Garbage Collection):
-        // Mantemos a referência viva no ref para evitar que o GC a delete durante a fala
         utteranceRefs.current.push(utterance);
-        // Truque extra: anexar ao window para garantir visibilidade total ao motor de áudio
         (window as any)._lastUtterance = utterance;
 
-        // Start feedback
         if (index === 0) {
           utterance.onstart = () => {
             console.log("TTS Started speaking.");
@@ -1326,43 +1327,41 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
           };
         }
 
-        // End feedback
         if (index === chunks.length - 1) {
           utterance.onend = () => {
             console.log("TTS Finished speaking.");
             setIsSpeaking(false);
-            utteranceRefs.current = []; // Limpa referências ao terminar
+            utteranceRefs.current = [];
           };
         }
 
-        // 5. Error Handling & Retry Logic
         utterance.onerror = (event) => {
           console.error("TTS Error:", event);
           setIsSpeaking(false);
           
-          // Ajuste no OnEnd/Error: Se interrompido, aumentamos o delay dinamicamente
           if (event.error === 'interrupted') {
-            currentDelay = 400;
+            currentDelay = 500;
           } else if (retryCount < MAX_RETRIES) {
             retryCount++;
             setTimeout(() => speakText(text), currentDelay);
           }
         };
         
-        // O Truque do "Resume": Garante que a API não esteja em estado pausado
         window.speechSynthesis.resume();
         window.speechSynthesis.speak(utterance);
       });
     };
 
     // 6. Safety Delay: Wait after cancel() before starting new speak()
-    // Isso permite que o buffer do SO limpe e evita falhas intermitentes
+    // Encadeamento de Promessas (Sequenciamento Seguro)
     const timer = setTimeout(() => {
-      // Double check state after delay
       if (!isAudioMode || mode !== 'study' || !currentCard) return;
       
+      // Hook de Dependência Estrita: Garante que o texto existe e o card é o atual
       const textToSpeak = isFlipped ? currentCard.back : currentCard.front;
-      speakText(textToSpeak);
+      if (textToSpeak) {
+        speakText(textToSpeak);
+      }
     }, currentDelay);
 
     return () => {
