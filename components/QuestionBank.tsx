@@ -323,7 +323,15 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
     yearFilter: 'Últimos 2 anos' as '2025-2026' | 'Últimos 2 anos'
   });
   const [isGenerating, setIsGenerating] = useState(false);
+  const [aiCooldown, setAiCooldown] = useState(0);
   const [isSavingPrecedent, setIsSavingPrecedent] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (aiCooldown > 0) {
+      const timer = setTimeout(() => setAiCooldown(aiCooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [aiCooldown]);
 
   // Glossary States
   const [activeGlossaryTerm, setActiveGlossaryTerm] = useState<string | null>(null);
@@ -1105,7 +1113,14 @@ Forneça a explicação de forma concisa e didática.`;
       }
     } catch (error: any) {
       console.error('Error generating questions:', error);
-      showNotification(`Erro ao gerar questões: ${error.message}`, 'error');
+      
+      const errorMessage = error.message || "";
+      if (errorMessage.includes("429") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
+        showNotification("Limite da Inteligência Artificial atingido. Por favor, aguarde um minuto ou tente gerar uma quantidade menor de questões (Ex: 3 por vez).", 'error');
+        setAiCooldown(30);
+      } else {
+        showNotification(`Erro ao gerar questões: ${error.message}`, 'error');
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -2093,12 +2108,16 @@ Forneça a explicação de forma concisa e didática.`;
               <div className="pt-4">
                 <button
                   type="submit"
-                  disabled={isGenerating}
+                  disabled={isGenerating || aiCooldown > 0}
                   className="w-full py-4 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
                 >
                   {isGenerating ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin" /> Gerando...
+                    </>
+                  ) : aiCooldown > 0 ? (
+                    <>
+                      <Timer className="w-5 h-5" /> Aguarde ({aiCooldown}s)
                     </>
                   ) : (
                     <>
