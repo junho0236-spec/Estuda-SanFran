@@ -282,6 +282,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   }, [mode, isFlipped, isDissertativeMode, isCramMode, isFocusMode]);
 
   const handleNextCram = async () => {
+    window.speechSynthesis.cancel(); // Abort audio before transition
+    setIsFlipped(false); // Atomic Reset: Reset flip state BEFORE updating card data
     if (!currentCard) return;
     
     pushToHistory(currentCard);
@@ -1380,6 +1382,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
   const handleReview = async (quality: number) => {
     window.speechSynthesis.cancel(); // Abort audio before transition
+    setIsFlipped(false); // Atomic Reset: Reset flip state BEFORE updating card data
+    
     if (!currentCard) return;
     pushToHistory(currentCard);
     const card = currentCard;
@@ -2642,135 +2646,139 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                       </div>
                     </div>
                     <div className="absolute inset-0 w-full h-full bg-slate-50 dark:bg-black border-[6px] border-usp-blue/40 rounded-[3rem] shadow-2xl p-12 flex flex-col items-center justify-start text-center backface-hidden rotate-y-180 overflow-y-auto custom-scrollbar">
-                      {aiEvaluation ? (
-                        <div className="w-full mb-8 animate-in fade-in duration-500">
-                          <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-black text-purple-600 uppercase tracking-[0.3em]">Avaliação IA</span>
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); setAiEvaluation(null); setIsFlipped(false); setIsDissertativeMode(true); }}
-                                className="p-1 text-slate-400 hover:text-purple-600 transition-colors"
-                                title="Refazer Avaliação"
-                              >
-                                <RotateCcw size={14} />
-                              </button>
-                            </div>
-                            <div className="flex items-center gap-2 px-4 py-1 bg-purple-600 text-white rounded-full text-lg font-black">
-                              {aiEvaluation.score.toFixed(1)} / 10
-                            </div>
-                          </div>
-                          <div className="p-6 bg-white dark:bg-slate-900 rounded-3xl border-2 border-purple-500/30 text-left shadow-xl">
-                            <div className="mb-4 pb-4 border-b border-slate-100 dark:border-white/5">
-                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Sua Resposta:</span>
-                              <p className="text-sm font-medium text-slate-600 dark:text-slate-400 italic">"{userWrittenAnswer}"</p>
-                            </div>
-                            <div className="prose prose-sm dark:prose-invert max-w-none text-slate-700 dark:text-slate-200 leading-relaxed mb-4 font-bold">
-                              <ReactMarkdown>{aiEvaluation.feedback}</ReactMarkdown>
-                            </div>
-                            {aiEvaluation.missing_keywords.length > 0 && (
-                              <div className="space-y-2">
-                                <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">O que faltou:</span>
-                                <div className="flex flex-wrap gap-2">
-                                  {aiEvaluation.missing_keywords.map((kw, i) => (
-                                    <span key={i} className="px-2 py-1 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-[10px] font-black border border-red-100 dark:border-red-800/30">
-                                      {kw}
-                                    </span>
-                                  ))}
+                      {isFlipped && (
+                        <>
+                          {aiEvaluation ? (
+                            <div className="w-full mb-8 animate-in fade-in duration-500">
+                              <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-black text-purple-600 uppercase tracking-[0.3em]">Avaliação IA</span>
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); setAiEvaluation(null); setIsFlipped(false); setIsDissertativeMode(true); }}
+                                    className="p-1 text-slate-400 hover:text-purple-600 transition-colors"
+                                    title="Refazer Avaliação"
+                                  >
+                                    <RotateCcw size={14} />
+                                  </button>
+                                </div>
+                                <div className="flex items-center gap-2 px-4 py-1 bg-purple-600 text-white rounded-full text-lg font-black">
+                                  {aiEvaluation.score.toFixed(1)} / 10
                                 </div>
                               </div>
-                            )}
-
-                            {/* Follow-up Chat */}
-                            <div className="mt-6 pt-6 border-t border-slate-100 dark:border-white/5 space-y-4" onClick={(e) => e.stopPropagation()}>
-                              <div className="flex items-center gap-2 mb-2">
-                                <MessageSquareText size={16} className="text-purple-500" />
-                                <span className="text-[10px] font-black text-purple-600 uppercase tracking-widest">Aprofundar com Mentor IA</span>
-                              </div>
-                              
-                              <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-2">
-                                {followUpChat.map((msg, i) => (
-                                  <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[90%] p-4 rounded-2xl text-xs font-bold shadow-sm ${
-                                      msg.role === 'user' 
-                                        ? 'bg-purple-600 text-white rounded-tr-none' 
-                                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-tl-none border border-slate-100 dark:border-white/5'
-                                    }`}>
-                                      <div className="prose prose-xs dark:prose-invert max-w-none">
-                                        <ReactMarkdown>{msg.text}</ReactMarkdown>
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                                {isFollowUpLoading && (
-                                  <div className="flex justify-start">
-                                    <div className="bg-slate-100 dark:bg-white/5 p-3 rounded-2xl rounded-tl-none">
-                                      <Loader2 size={14} className="animate-spin text-purple-500" />
+                              <div className="p-6 bg-white dark:bg-slate-900 rounded-3xl border-2 border-purple-500/30 text-left shadow-xl">
+                                <div className="mb-4 pb-4 border-b border-slate-100 dark:border-white/5">
+                                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Sua Resposta:</span>
+                                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400 italic">"{userWrittenAnswer}"</p>
+                                </div>
+                                <div className="prose prose-sm dark:prose-invert max-w-none text-slate-700 dark:text-slate-200 leading-relaxed mb-4 font-bold">
+                                  <ReactMarkdown>{aiEvaluation.feedback}</ReactMarkdown>
+                                </div>
+                                {aiEvaluation.missing_keywords.length > 0 && (
+                                  <div className="space-y-2">
+                                    <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">O que faltou:</span>
+                                    <div className="flex flex-wrap gap-2">
+                                      {aiEvaluation.missing_keywords.map((kw, i) => (
+                                        <span key={i} className="px-2 py-1 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-[10px] font-black border border-red-100 dark:border-red-800/30">
+                                          {kw}
+                                        </span>
+                                      ))}
                                     </div>
                                   </div>
                                 )}
-                              </div>
 
-                              <div className="flex gap-2">
-                                <input 
-                                  type="text"
-                                  value={followUpInput}
-                                  onChange={(e) => setFollowUpInput(e.target.value)}
-                                  onKeyDown={(e) => e.key === 'Enter' && handleFollowUp()}
-                                  placeholder="Tire uma dúvida ou peça para aprofundar..."
-                                  className="flex-1 p-3 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold outline-none focus:border-purple-500"
-                                />
-                                <button 
-                                  onClick={handleFollowUp}
-                                  disabled={isFollowUpLoading || !followUpInput.trim()}
-                                  className="p-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors disabled:opacity-50"
-                                >
-                                  {isFollowUpLoading ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                  ) : (
-                                    <Send className="w-4 h-4" />
-                                  )}
-                                </button>
+                                {/* Follow-up Chat */}
+                                <div className="mt-6 pt-6 border-t border-slate-100 dark:border-white/5 space-y-4" onClick={(e) => e.stopPropagation()}>
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <MessageSquareText size={16} className="text-purple-500" />
+                                    <span className="text-[10px] font-black text-purple-600 uppercase tracking-widest">Aprofundar com Mentor IA</span>
+                                  </div>
+                                  
+                                  <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                                    {followUpChat.map((msg, i) => (
+                                      <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                        <div className={`max-w-[90%] p-4 rounded-2xl text-xs font-bold shadow-sm ${
+                                          msg.role === 'user' 
+                                            ? 'bg-purple-600 text-white rounded-tr-none' 
+                                            : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-tl-none border border-slate-100 dark:border-white/5'
+                                        }`}>
+                                          <div className="prose prose-xs dark:prose-invert max-w-none">
+                                            <ReactMarkdown>{msg.text}</ReactMarkdown>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                    {isFollowUpLoading && (
+                                      <div className="flex justify-start">
+                                        <div className="bg-slate-100 dark:bg-white/5 p-3 rounded-2xl rounded-tl-none">
+                                          <Loader2 size={14} className="animate-spin text-purple-500" />
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="flex gap-2">
+                                    <input 
+                                      type="text"
+                                      value={followUpInput}
+                                      onChange={(e) => setFollowUpInput(e.target.value)}
+                                      onKeyDown={(e) => e.key === 'Enter' && handleFollowUp()}
+                                      placeholder="Tire uma dúvida ou peça para aprofundar..."
+                                      className="flex-1 p-3 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold outline-none focus:border-purple-500"
+                                    />
+                                    <button 
+                                      onClick={handleFollowUp}
+                                      disabled={isFollowUpLoading || !followUpInput.trim()}
+                                      className="p-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors disabled:opacity-50"
+                                    >
+                                      {isFollowUpLoading ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                      ) : (
+                                        <Send className="w-4 h-4" />
+                                      )}
+                                    </button>
+                                  </div>
+                                </div>
                               </div>
                             </div>
+                          ) : (
+                            <span className="text-xs font-black text-usp-blue uppercase tracking-[0.3em] mb-4">Resposta</span>
+                          )}
+                          
+                          {currentCard.image && (
+                            <div className="w-full mb-6">
+                              <img src={currentCard.image} alt="Flashcard" className="max-w-full h-auto rounded-2xl border border-slate-200 dark:border-white/10 mx-auto shadow-lg" />
+                            </div>
+                          )}
+                          
+                          <div className="w-full text-left">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Gabarito Oficial</span>
+                            <div className="text-2xl font-black text-slate-900 dark:text-white leading-tight mb-6">
+                              <SmartText text={currentCard.back} />
+                            </div>
                           </div>
-                        </div>
-                      ) : (
-                        <span className="text-xs font-black text-usp-blue uppercase tracking-[0.3em] mb-4">Resposta</span>
+                          {currentCard.notes && (
+                            <div className="w-full mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-2xl text-left">
+                              <span className="text-[10px] font-black text-yellow-800 dark:text-yellow-500 uppercase tracking-widest block mb-2">Notas Pessoais</span>
+                              <div className="text-sm font-medium text-yellow-900 dark:text-yellow-100 whitespace-pre-wrap">
+                                <SmartText text={currentCard.notes} />
+                              </div>
+                            </div>
+                          )}
+                          <div className="w-full mt-4 flex flex-wrap gap-2 justify-center">
+                            {currentCard.source && (
+                              <div className="flex items-center gap-1 px-3 py-1 bg-slate-100 dark:bg-white/10 rounded-full text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-white/5">
+                                <Paperclip size={10} />
+                                {currentCard.source}
+                              </div>
+                            )}
+                            {currentCard.tags?.map((tag, idx) => (
+                              <div key={idx} className="px-3 py-1 bg-purple-50 dark:bg-purple-900/20 rounded-full text-[10px] font-black uppercase text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-purple-800/30">
+                                {tag}
+                              </div>
+                            ))}
+                          </div>
+                        </>
                       )}
-                      
-                      {currentCard.image && (
-                        <div className="w-full mb-6">
-                          <img src={currentCard.image} alt="Flashcard" className="max-w-full h-auto rounded-2xl border border-slate-200 dark:border-white/10 mx-auto shadow-lg" />
-                        </div>
-                      )}
-                      
-                      <div className="w-full text-left">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Gabarito Oficial</span>
-                        <div className="text-2xl font-black text-slate-900 dark:text-white leading-tight mb-6">
-                          <SmartText text={currentCard.back} />
-                        </div>
-                      </div>
-                      {currentCard.notes && (
-                        <div className="w-full mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-2xl text-left">
-                          <span className="text-[10px] font-black text-yellow-800 dark:text-yellow-500 uppercase tracking-widest block mb-2">Notas Pessoais</span>
-                          <div className="text-sm font-medium text-yellow-900 dark:text-yellow-100 whitespace-pre-wrap">
-                            <SmartText text={currentCard.notes} />
-                          </div>
-                        </div>
-                      )}
-                      <div className="w-full mt-4 flex flex-wrap gap-2 justify-center">
-                        {currentCard.source && (
-                          <div className="flex items-center gap-1 px-3 py-1 bg-slate-100 dark:bg-white/10 rounded-full text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-white/5">
-                            <Paperclip size={10} />
-                            {currentCard.source}
-                          </div>
-                        )}
-                        {currentCard.tags?.map((tag, idx) => (
-                          <div key={idx} className="px-3 py-1 bg-purple-50 dark:bg-purple-900/20 rounded-full text-[10px] font-black uppercase text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-purple-800/30">
-                            {tag}
-                          </div>
-                        ))}
-                      </div>
                     </div>
                   </div>
                 </motion.div>
