@@ -949,7 +949,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         folderId: currentFolderId || null,
         nextReview: Date.now(),
         interval: 0,
-        status: 'new',
+        status: 'new' as const,
         learningStep: 0,
         easeFactor: 2.5,
         archived_at: null
@@ -2256,13 +2256,17 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-10">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {currentFolders.map(folder => {
             const stats = getFolderStats(folder.id);
             const hasUpdate = folder.original_deck_id && publicDecks.some(pd => pd.id === folder.original_deck_id && (pd.version || 1) > (folder.version || 1));
             
             return (
-              <div key={folder.id} onClick={() => setCurrentFolderId(folder.id)} className={`group bg-white dark:bg-sanfran-rubiDark/50 p-10 rounded-[3rem] border-2 border-slate-200 dark:border-sanfran-rubi/40 shadow-xl cursor-pointer hover:shadow-2xl hover:-translate-y-1 border-l-[10px] ${folder.color || 'border-l-usp-gold'} transition-all relative`}>
+              <div 
+                key={folder.id} 
+                onClick={() => setCurrentFolderId(folder.id)} 
+                className={`group bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2.5rem] border-2 border-slate-200 dark:border-sanfran-rubi/40 shadow-xl cursor-pointer hover:shadow-2xl hover:-translate-y-1 border-l-[10px] ${folder.color || 'border-l-usp-gold'} transition-all relative flex flex-col justify-between min-h-[280px] h-auto overflow-hidden`}
+              >
                 {hasUpdate && (
                   <div className="absolute -top-3 -right-3 z-20 animate-bounce">
                     <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 text-white rounded-full shadow-lg border-2 border-white dark:border-slate-900">
@@ -2320,53 +2324,60 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                     )}
                   </div>
                 </div>
-                <div className="flex items-start justify-between mb-6">
-                  {(() => {
-                    const IconComp = FOLDER_ICONS.find(i => i.value === folder.icon)?.icon || FolderIcon;
-                    return <IconComp className={`${folder.color?.replace('border-l-', 'text-') || 'text-usp-gold'} w-10 h-10`} />;
-                  })()}
-                  
-                  {folder.targetDate && (
-                    <div className="px-3 py-1 bg-sanfran-rubi/10 border border-sanfran-rubi/20 rounded-full flex items-center gap-1.5">
-                      <Calendar size={10} className="text-sanfran-rubi" />
-                      <span className="text-[9px] font-black text-sanfran-rubi uppercase tracking-widest">
-                        {(() => {
-                          const d = new Date(folder.targetDate);
-                          return `${d.getUTCDate().toString().padStart(2, '0')}/${(d.getUTCMonth() + 1).toString().padStart(2, '0')}`;
-                        })()}
-                      </span>
-                    </div>
-                  )}
-                </div>
 
-                <h4 className="font-black text-slate-950 dark:text-white uppercase text-xl tracking-tight mb-6 line-clamp-1">{folder.name}</h4>
+                {/* Top Content */}
+                <div>
+                  <div className="flex items-start justify-between mb-6">
+                    {(() => {
+                      const IconComp = FOLDER_ICONS.find(i => i.value === folder.icon)?.icon || FolderIcon;
+                      return <IconComp className={`${folder.color?.replace('border-l-', 'text-') || 'text-usp-gold'} w-10 h-10`} />;
+                    })()}
+                    
+                    {folder.targetDate && (
+                      <div className="px-3 py-1 bg-sanfran-rubi/10 border border-sanfran-rubi/20 rounded-full flex items-center gap-1.5">
+                        <Calendar size={10} className="text-sanfran-rubi" />
+                        <span className="text-[9px] font-black text-sanfran-rubi uppercase tracking-widest">
+                          {(() => {
+                            const d = new Date(folder.targetDate);
+                            return `${d.getUTCDate().toString().padStart(2, '0')}/${(d.getUTCMonth() + 1).toString().padStart(2, '0')}`;
+                          })()}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <h4 className="font-black text-slate-950 dark:text-white uppercase text-lg leading-tight tracking-tight mb-6 line-clamp-3 break-words">
+                    {folder.name}
+                  </h4>
+                </div>
                 
-                {/* Anki Style Metrics */}
-                <div className="flex items-center gap-6 mb-6">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Novos</span>
-                    <span className="text-xl font-black text-blue-600 leading-none">{stats.newCount}</span>
+                {/* Bottom Content: Metrics & Mastery */}
+                <div className="mt-auto">
+                  <div className="flex items-center justify-between gap-4 mb-4">
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-1">Novos</span>
+                      <span className="text-lg font-black text-blue-600 leading-none">{stats.newCount}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-black text-orange-500 uppercase tracking-widest mb-1">Aprender</span>
+                      <span className="text-lg font-black text-orange-600 leading-none">{stats.learningCount}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest mb-1">Revisar</span>
+                      <span className="text-lg font-black text-emerald-600 leading-none">{stats.reviewCount}</span>
+                    </div>
+                    <div className="flex flex-col text-right">
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Domínio</span>
+                      <span className="text-lg font-black text-emerald-600 dark:text-emerald-400 leading-none">{stats.mastery}%</span>
+                    </div>
                   </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-orange-500 uppercase tracking-widest mb-1">Aprender</span>
-                    <span className="text-xl font-black text-orange-600 leading-none">{stats.learningCount}</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Revisar</span>
-                    <span className="text-xl font-black text-emerald-600 leading-none">{stats.reviewCount}</span>
-                  </div>
-                  <div className="flex flex-col ml-auto text-right">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Domínio</span>
-                    <span className="text-xl font-black text-emerald-600 dark:text-emerald-400 leading-none">{stats.mastery}%</span>
-                  </div>
-                </div>
 
-                {/* Mastery Bar */}
-                <div className="absolute bottom-0 left-0 right-0 h-2 bg-slate-100 dark:bg-white/5 overflow-hidden rounded-b-[1.8rem]">
-                  <div 
-                    className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 transition-all duration-1000 ease-out" 
-                    style={{ width: `${stats.mastery}%` }}
-                  />
+                  <div className="h-1.5 bg-slate-100 dark:bg-white/5 overflow-hidden rounded-full">
+                    <div 
+                      className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 transition-all duration-1000 ease-out" 
+                      style={{ width: `${stats.mastery}%` }}
+                    />
+                  </div>
                 </div>
               </div>
             );
