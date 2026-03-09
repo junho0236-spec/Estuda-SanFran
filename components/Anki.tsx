@@ -1268,52 +1268,84 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     }
   }, [mode]);
 
-  // TTS Logic - Refactored for better control and reliability
+  // TTS Logic - Refactored for maximum stability and reliability
   useEffect(() => {
-    // Abort any previous audio immediately before starting new one or cleanup
+    // 1. Immediate Abort: Stop any ongoing speech as soon as dependencies change
     window.speechSynthesis.cancel();
+    setIsSpeaking(false);
     
     if (!isAudioMode || mode !== 'study' || !currentCard) {
-      setIsSpeaking(false);
       return;
     }
 
+    let retryCount = 0;
+    const MAX_RETRIES = 2;
+
     const speakText = (text: string) => {
-      if (!text) return;
+      if (!text || text.trim().length === 0) return;
       
-      // Chunking: split text into sentences if it's too long (>200 chars)
-      // This prevents the API from cutting off long texts
+      // 2. Browser Check: Ensure speechSynthesis is available and not in a broken state
+      if (!window.speechSynthesis) {
+        console.warn("Speech Synthesis not supported in this browser.");
+        return;
+      }
+
+      // 3. Chunking: Split text into manageable pieces to prevent timeouts/cuts
       const chunks = text.length > 200 
         ? (text.match(/[^.!?]+[.!?]+|[^.!?]+/g) || [text])
         : [text];
 
+      // 4. Queue Management: Clear any stuck state before speaking
+      window.speechSynthesis.cancel();
+
       chunks.forEach((chunk, index) => {
-        const utterance = new SpeechSynthesisUtterance(chunk.trim());
+        const cleanChunk = chunk.trim();
+        if (!cleanChunk) return;
+
+        const utterance = new SpeechSynthesisUtterance(cleanChunk);
         utterance.lang = 'pt-BR';
         utterance.rate = audioSpeed;
         
+        // Start feedback
         if (index === 0) {
           utterance.onstart = () => setIsSpeaking(true);
         }
+
+        // End feedback
         if (index === chunks.length - 1) {
           utterance.onend = () => setIsSpeaking(false);
-          utterance.onerror = () => setIsSpeaking(false);
         }
+
+        // 5. Error Handling & Retry Logic
+        utterance.onerror = (event) => {
+          console.error("TTS Error:", event);
+          setIsSpeaking(false);
+          
+          // If interrupted or failed, try one more time after a short delay
+          if (retryCount < MAX_RETRIES && event.error !== 'interrupted') {
+            retryCount++;
+            setTimeout(() => speakText(text), 300);
+          }
+        };
         
         window.speechSynthesis.speak(utterance);
       });
     };
 
-    // Trava de Sincronia: 200ms delay to ensure card is rendered and state is stable
+    // 6. Safety Delay: Wait 200ms after cancel() before starting new speak()
+    // This allows the OS audio buffer to clear and prevents intermittent failures
     const timer = setTimeout(() => {
-      // Use the text from the card directly to avoid stale state
+      // Double check state after delay
+      if (!isAudioMode || mode !== 'study' || !currentCard) return;
+      
       const textToSpeak = isFlipped ? currentCard.back : currentCard.front;
       speakText(textToSpeak);
-    }, 200);
+    }, 250); // Increased slightly for extra safety
 
     return () => {
       clearTimeout(timer);
       window.speechSynthesis.cancel();
+      setIsSpeaking(false);
     };
   }, [isAudioMode, mode, currentCard?.id, isFlipped, audioSpeed]);
 
