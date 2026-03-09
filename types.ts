@@ -425,6 +425,7 @@ export interface UserProgress {
   correct_count: number;
   wrong_count: number;
   error_mastery?: Record<string, number>; // question_id -> consecutive_correct_count
+  confidence_logs?: Record<string, ConfidenceLevel>; // question_id -> confidence_level
   updated_at: string;
 }
 

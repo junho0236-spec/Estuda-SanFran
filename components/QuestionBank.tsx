@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
-import { Question, UserProgress, Notebook, Folder, Flashcard } from '../types';
+import { Question, UserProgress, Notebook, Folder, Flashcard, ConfidenceLevel } from '../types';
 import { sampleQuestions } from './sampleQuestions';
 import { GoogleGenAI, Type } from '@google/genai';
 import Markdown from 'react-markdown';
@@ -83,6 +83,28 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
+  const [showConfidenceSelection, setShowConfidenceSelection] = useState(false);
+  const [confidenceLevel, setConfidenceLevel] = useState<ConfidenceLevel | null>(null);
+  const [confidenceLogs, setConfidenceLogs] = useState<Record<string, ConfidenceLevel>>({});
+  const [pendingQuestion, setPendingQuestion] = useState<Question | null>(null);
+
+  const handleConfidenceSelection = (level: ConfidenceLevel) => {
+    if (!pendingQuestion || selectedOption === null) return;
+    
+    setConfidenceLevel(level);
+    setShowConfidenceSelection(false);
+    
+    // Update confidence logs
+    const newConfidenceLogs = { ...confidenceLogs, [pendingQuestion.id]: level };
+    setConfidenceLogs(newConfidenceLogs);
+    localStorage.setItem(`sanfran_confidence_logs_${userId}`, JSON.stringify(newConfidenceLogs));
+    
+    // Sync to DB
+    syncUserProgress({ confidenceLogs: newConfidenceLogs });
+    
+    // Proceed with answer processing
+    handleAnswer(selectedOption, pendingQuestion, true);
+  }
   
   // Filters
   const [subjects, setSubjects] = useState<string[]>([]);
@@ -127,7 +149,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
   // Mock Mode States
   const [isMockMode, setIsMockMode] = useState(false);
   const [mockTimeRemaining, setMockTimeRemaining] = useState(0);
-  const [mockAnswers, setMockAnswers] = useState<Record<string, number>>({});
+  const [mockAnswers, setMockAnswers] = useState<Record<string, { answer: number; confidence: ConfidenceLevel | null }>>({});
   const [isMockFinished, setIsMockFinished] = useState(false);
   const [mockStartTime, setMockStartTime] = useState<number | null>(null);
   const [showMockSetup, setShowMockSetup] = useState(false);
@@ -505,6 +527,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
         correct_count: updates.correctCount !== undefined ? updates.correctCount : (current?.correct_count || correctCount),
         wrong_count: updates.wrongCount !== undefined ? updates.wrongCount : (current?.wrong_count || wrongCount),
         error_mastery: updates.errorMastery !== undefined ? updates.errorMastery : (current?.error_mastery || errorMastery),
+        confidence_logs: updates.confidenceLogs !== undefined ? updates.confidenceLogs : (current?.confidence_logs || confidenceLogs),
         updated_at: new Date().toISOString()
       };
 
@@ -1171,12 +1194,12 @@ Forneça a explicação de forma concisa e didática.`;
 
   const currentQuestion = filteredQuestions[currentIndex];
 
-  const handleAnswer = (index: number, questionOverride?: Question) => {
+  const handleAnswer = (index: number, questionOverride?: Question, skipConfidence?: boolean) => {
     const targetQuestion = questionOverride || currentQuestion;
     
     if (isMockMode) {
       if (isMockFinished) return;
-      setMockAnswers(prev => ({ ...prev, [targetQuestion.id]: index }));
+      setMockAnswers(prev => ({ ...prev, [targetQuestion.id]: { answer: index, confidence: null } }));
       
       // Auto-advance in single view if not the last question
       if (viewMode === 'single' && currentIndex < filteredQuestions.length - 1) {
@@ -1186,6 +1209,13 @@ Forneça a explicação de forma concisa e didática.`;
     }
 
     if (showExplanation && !questionOverride) return; 
+    
+    if (!skipConfidence) {
+      setSelectedOption(index);
+      setPendingQuestion(targetQuestion);
+      setShowConfidenceSelection(true);
+      return;
+    }
     
     setSelectedOption(index);
     setShowExplanation(true);
@@ -2383,7 +2413,7 @@ Forneça a explicação de forma concisa e didática.`;
                         <div className="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-4 duration-300">
                           <div className="space-y-3">
                             {q.options.map((option, optIdx) => {
-                              const isSelected = isMockMode ? mockAnswers[q.id] === optIdx : selectedOption === optIdx;
+                              const isSelected = isMockMode ? mockAnswers[q.id]?.answer === optIdx : selectedOption === optIdx;
                               const isCorrect = q.correct_answer === optIdx;
                               const showStatus = isMockMode ? isMockFinished : showExplanation;
                               const isEliminated = (eliminatedOptions[q.id] || []).includes(optIdx);
@@ -2451,6 +2481,26 @@ Forneça a explicação de forma concisa e didática.`;
                                 </div>
                               );
                             })}
+                            
+                            {showConfidenceSelection && (
+                              <div className="mt-6 p-6 bg-slate-50 dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in duration-300">
+                                <p className="text-sm font-black text-slate-600 dark:text-slate-300 mb-4 text-center uppercase tracking-widest">Qual o seu nível de confiança?</p>
+                                <div className="grid grid-cols-3 gap-4">
+                                  <button onClick={() => handleConfidenceSelection('high')} className="flex flex-col items-center gap-2 p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800 hover:border-green-400 transition-colors">
+                                    <span className="text-2xl">🟢</span>
+                                    <span className="text-xs font-black text-green-700 dark:text-green-300 uppercase">Certeza</span>
+                                  </button>
+                                  <button onClick={() => handleConfidenceSelection('medium')} className="flex flex-col items-center gap-2 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl border border-yellow-200 dark:border-yellow-800 hover:border-yellow-400 transition-colors">
+                                    <span className="text-2xl">🟡</span>
+                                    <span className="text-xs font-black text-yellow-700 dark:text-yellow-300 uppercase">Dúvida</span>
+                                  </button>
+                                  <button onClick={() => handleConfidenceSelection('low')} className="flex flex-col items-center gap-2 p-4 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800 hover:border-red-400 transition-colors">
+                                    <span className="text-2xl">🔴</span>
+                                    <span className="text-xs font-black text-red-700 dark:text-red-300 uppercase">Chute</span>
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
 
                           {showExplanation && (
