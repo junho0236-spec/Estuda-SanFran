@@ -896,7 +896,7 @@ const App: React.FC = () => {
                 {currentView === View.PronunciationLab && <PronunciationLab userId={session.user.id} />}
                 {currentView === View.LyricalVibes && <LyricalVibes userId={session.user.id} />}
                 {currentView === View.TheExchangeStudent && <TheExchangeStudent userId={session.user.id} />}
-                {currentView === View.QuestionBank && <QuestionBank userId={session.user.id} onCorrectAnswer={incrementCorrectQuestions} />}
+                {currentView === View.QuestionBank && <QuestionBank userId={session.user.id} onCorrectAnswer={incrementCorrectQuestions} folders={folders} flashcards={flashcards} />}
                 {currentView === View.IntelligentSummarizer && <IntelligentSummarizer userId={session.user.id} />}
                 {currentView === View.StudyBuddy && <StudyBuddy userId={session.user.id} />}
                 {currentView === View.Certificates && <Certificates userId={session.user.id} userName={session.user.user_metadata?.full_name} />}

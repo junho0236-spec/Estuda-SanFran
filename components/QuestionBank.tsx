@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
-import { Question, UserProgress, Notebook } from '../types';
+import { Question, UserProgress, Notebook, Folder, Flashcard } from '../types';
 import { sampleQuestions } from './sampleQuestions';
 import { GoogleGenAI, Type } from '@google/genai';
 import { 
@@ -25,15 +25,24 @@ import {
   Eye,
   PlusSquare,
   NotebookText,
-  MessageSquareText
+  MessageSquareText,
+  Zap,
+  Lightbulb,
+  ExternalLink,
+  Scale,
+  Gavel,
+  ShieldCheck,
+  FileText
 } from 'lucide-react';
 
 interface QuestionBankProps {
   userId: string;
   onCorrectAnswer?: () => void;
+  folders?: Folder[];
+  flashcards?: Flashcard[];
 }
 
-const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer }) => {
+const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, folders = [], flashcards = [] }) => {
   const navigate = useNavigate();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
@@ -116,7 +125,12 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer }) 
     subject: '',
     topic: '',
     count: 3,
-    difficulty: 'media' as 'facil' | 'media' | 'dificil'
+    difficulty: 'media' as 'facil' | 'media' | 'dificil',
+    examStyle: 'OAB (FGV)' as 'OAB (FGV)' | 'Magistratura/Promotoria' | 'Acadêmico (SanFran)',
+    legalFocus: [] as string[],
+    statementType: 'Caso Prático (Situação Hipotética)' as 'Caso Prático (Situação Hipotética)' | 'Enunciado Direto',
+    baseOnFlashcards: false,
+    selectedFolderId: ''
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [newQuestion, setNewQuestion] = useState<Partial<Question>>({
@@ -305,23 +319,6 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer }) 
     syncUserProgress({ favorites: newFavorites });
   };
 
-  const handleCreateFlashcardFromError = (question: Question) => {
-    const front = question.statement;
-    const correctOptionText = question.options[question.correct_answer];
-    const back = `Resposta Correta: ${String.fromCharCode(65 + question.correct_answer)}) ${correctOptionText}\n\nExplicação: ${question.explanation || 'Nenhuma explicação fornecida.'}`;
-
-    // Encode the flashcard data to be passed via URL state
-    const flashcardData = {
-      front,
-      back,
-      subject: question.subject,
-      topic: question.topic,
-    };
-
-    // Navigate to Anki and pass the flashcard data in state
-    navigate('/anki', { state: { newFlashcard: flashcardData } });
-  };
-
   const handleJuridiquesTranslate = async () => {
     if (selectedText.trim() === '') {
       showNotification('Selecione um trecho de texto para traduzir.', 'error');
@@ -360,9 +357,78 @@ Forneça a explicação de forma concisa e didática.`;
     }
   };
 
-  // AI Commented Answer State
-  const [aiCommentary, setAiCommentary] = useState<string | null>(null);
-  const [loadingAiCommentary, setLoadingAiCommentary] = useState(false);
+  const [aiCommentary, setAiCommentary] = useState<Record<string, {
+    legalBasis: string;
+    alternativesAnalysis: string;
+    mnemonic: string;
+    doctrineLink?: string;
+  }>>({});
+  const [loadingAiCommentary, setLoadingAiCommentary] = useState<Record<string, boolean>>({});
+
+  const generateIntelligentCorrection = async (question: Question) => {
+    if (aiCommentary[question.id]) return;
+
+    try {
+      setLoadingAiCommentary(prev => ({ ...prev, [question.id]: true }));
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      
+      const prompt = `Como um professor de Direito especialista em concursos, forneça uma correção técnica e didática para esta questão:
+      
+      ENUNCIADO: ${question.statement}
+      ALTERNATIVAS: ${question.options.map((o, i) => `${String.fromCharCode(65 + i)}) ${o}`).join(' | ')}
+      GABARITO: Alternativa ${String.fromCharCode(65 + question.correct_answer)}
+      BANCA: ${question.exam_board || 'Geral'}
+      
+      Siga RIGOROSAMENTE este formato JSON:
+      {
+        "legalBasis": "Artigo da lei, súmula ou informativo que fundamenta a resposta",
+        "alternativesAnalysis": "Explicação curta do erro jurídico de cada alternativa incorreta",
+        "mnemonic": "Um 'Pulo do Gato' (dica ou mnemônico) para não errar mais",
+        "doctrineLink": "Referência curta ao tópico doutrinário (ex: Direito Penal - Teoria do Erro)"
+      }`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json"
+        }
+      });
+
+      if (response.text) {
+        const data = JSON.parse(response.text);
+        setAiCommentary(prev => ({ ...prev, [question.id]: data }));
+      }
+    } catch (error) {
+      console.error('Error generating intelligent correction:', error);
+    } finally {
+      setLoadingAiCommentary(prev => ({ ...prev, [question.id]: false }));
+    }
+  };
+
+  const handleCreateFlashcardFromError = (question: Question) => {
+    const commentary = aiCommentary[question.id];
+    const front = `[QUESTÃO] ${question.statement}`;
+    
+    let back = `**GABARITO: ${String.fromCharCode(65 + question.correct_answer)}**\n\n`;
+    
+    if (commentary) {
+      back += `⚖️ **Fundamentação:** ${commentary.legalBasis}\n\n`;
+      back += `❌ **Análise:** ${commentary.alternativesAnalysis}\n\n`;
+      back += `💡 **Pulo do Gato:** ${commentary.mnemonic}`;
+    } else {
+      back += `Explicação: ${question.explanation || 'Nenhuma explicação fornecida.'}`;
+    }
+
+    const flashcardData = {
+      front,
+      back,
+      subject: question.subject,
+      topic: question.topic,
+    };
+
+    navigate('/anki', { state: { newFlashcard: flashcardData } });
+  };
 
   // Juridiquês Translator States
   const [selectedText, setSelectedText] = useState<string>('');
@@ -532,8 +598,12 @@ Forneça a explicação de forma concisa e didática.`;
 
   const handleGenerateAI = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!aiConfig.subject) {
-      showNotification('Preencha a matéria/assunto.', 'error');
+    if (!aiConfig.subject && !aiConfig.baseOnFlashcards) {
+      showNotification('Preencha a matéria/assunto ou selecione uma pasta de flashcards.', 'error');
+      return;
+    }
+    if (aiConfig.baseOnFlashcards && !aiConfig.selectedFolderId) {
+      showNotification('Selecione uma pasta do acervo para usar como base.', 'error');
       return;
     }
 
@@ -541,10 +611,24 @@ Forneça a explicação de forma concisa e didática.`;
       setIsGenerating(true);
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       
+      let contextFromFlashcards = "";
+      if (aiConfig.baseOnFlashcards && aiConfig.selectedFolderId) {
+        const folderCards = flashcards.filter(c => c.folderId === aiConfig.selectedFolderId);
+        if (folderCards.length > 0) {
+          contextFromFlashcards = `Baseie as questões no seguinte conteúdo jurídico (flashcards):\n${folderCards.map(c => `- ${c.front}: ${c.back}`).join('\n')}`;
+        }
+      }
+
       const prompt = `Crie ${aiConfig.count} questões de múltipla escolha de nível ${aiConfig.difficulty} sobre a matéria "${aiConfig.subject}" e tópico "${aiConfig.topic}".
-      Cada questão deve ter 4 alternativas.
-      A explicação deve ser detalhada, explicando por que a alternativa correta está certa e por que cada uma das outras alternativas está incorreta.
-      Inclua também uma banca fictícia ou real (ex: CESPE, FGV, FCC) e o ano atual.
+      Estilo de Prova: ${aiConfig.examStyle}.
+      Foco Jurídico: ${aiConfig.legalFocus.join(', ') || 'Geral'}.
+      Tipo de Enunciado: ${aiConfig.statementType}.
+      ${contextFromFlashcards}
+      
+      Cada questão deve ter 5 alternativas (A, B, C, D, E).
+      A explicação deve ser EXTREMAMENTE detalhada, contendo uma análise individual para cada alternativa (A, B, C, D, E), explicando por que a alternativa correta está certa e por que cada uma das outras alternativas está incorreta, fundamentando com base no foco jurídico selecionado (${aiConfig.legalFocus.join(', ') || 'Lei, Jurisprudência e Doutrina'}).
+      
+      Inclua também uma banca real compatível com o estilo selecionado e o ano atual.
       Retorne as questões no formato JSON.`;
 
       const response = await ai.models.generateContent({
@@ -563,12 +647,12 @@ Forneça a explicação de forma concisa e didática.`;
                 options: {
                   type: Type.ARRAY,
                   items: { type: Type.STRING },
-                  description: "As 4 alternativas da questão"
+                  description: "As 5 alternativas da questão"
                 },
-                correct_answer: { type: Type.INTEGER, description: "O índice da alternativa correta (0 a 3)" },
-                explanation: { type: Type.STRING, description: "Explicação detalhada de cada alternativa" },
+                correct_answer: { type: Type.INTEGER, description: "O índice da alternativa correta (0 a 4)" },
+                explanation: { type: Type.STRING, description: "Explicação detalhada de cada alternativa (A, B, C, D, E)" },
                 difficulty: { type: Type.STRING, description: "A dificuldade: 'facil', 'media' ou 'dificil'" },
-                exam_board: { type: Type.STRING, description: "A banca examinadora (ex: FGV, CESPE)" },
+                exam_board: { type: Type.STRING, description: "A banca examinadora" },
                 year: { type: Type.INTEGER, description: "O ano da questão" }
               },
               required: ["subject", "topic", "statement", "options", "correct_answer", "explanation", "difficulty", "exam_board", "year"]
@@ -670,12 +754,13 @@ Forneça a explicação de forma concisa e didática.`;
 
   const handleAnswer = (index: number, questionOverride?: Question) => {
     const targetQuestion = questionOverride || currentQuestion;
-    if (showExplanation && !questionOverride) return; // Already answered in single view
-    // For inline view, we might need a separate state if we allow multiple answered questions in list
-    // But for now let's keep it simple: if it's the expanded one, we use the same states
+    if (showExplanation && !questionOverride) return; 
     
     setSelectedOption(index);
     setShowExplanation(true);
+    
+    // Trigger Intelligent Correction
+    generateIntelligentCorrection(targetQuestion);
     
     if (index === targetQuestion.correct_answer) {
       const newCount = correctCount + 1;
@@ -839,27 +924,103 @@ Forneça a explicação de forma concisa e didática.`;
             </div>
             
             <form onSubmit={handleGenerateAI} className="space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Matéria / Assunto *</label>
-                <input
-                  type="text"
-                  required
-                  value={aiConfig.subject}
-                  onChange={e => setAiConfig({...aiConfig, subject: e.target.value})}
-                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
-                  placeholder="Ex: Direito Penal"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Matéria / Assunto *</label>
+                  <input
+                    type="text"
+                    required={!aiConfig.baseOnFlashcards}
+                    value={aiConfig.subject}
+                    onChange={e => setAiConfig({...aiConfig, subject: e.target.value})}
+                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
+                    placeholder="Ex: Direito Penal"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Tópico Específico</label>
+                  <input
+                    type="text"
+                    value={aiConfig.topic}
+                    onChange={e => setAiConfig({...aiConfig, topic: e.target.value})}
+                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
+                    placeholder="Ex: Crimes contra a vida"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Tópico Específico (Opcional)</label>
-                <input
-                  type="text"
-                  value={aiConfig.topic}
-                  onChange={e => setAiConfig({...aiConfig, topic: e.target.value})}
-                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
-                  placeholder="Ex: Crimes contra a vida"
-                />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Estilo de Prova</label>
+                  <select
+                    value={aiConfig.examStyle}
+                    onChange={e => setAiConfig({...aiConfig, examStyle: e.target.value as any})}
+                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
+                  >
+                    <option value="OAB (FGV)">OAB (FGV)</option>
+                    <option value="Magistratura/Promotoria">Magistratura/Promotoria</option>
+                    <option value="Acadêmico (SanFran)">Acadêmico (SanFran)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Tipo de Enunciado</label>
+                  <select
+                    value={aiConfig.statementType}
+                    onChange={e => setAiConfig({...aiConfig, statementType: e.target.value as any})}
+                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
+                  >
+                    <option value="Caso Prático (Situação Hipotética)">Caso Prático</option>
+                    <option value="Enunciado Direto">Enunciado Direto</option>
+                  </select>
+                </div>
               </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Foco Jurídico</label>
+                <div className="flex flex-wrap gap-3">
+                  {['Lei Seca', 'Jurisprudência Atualizada', 'Doutrina Clássica'].map(focus => (
+                    <label key={focus} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={aiConfig.legalFocus.includes(focus)}
+                        onChange={e => {
+                          const newFocus = e.target.checked 
+                            ? [...aiConfig.legalFocus, focus]
+                            : aiConfig.legalFocus.filter(f => f !== focus);
+                          setAiConfig({...aiConfig, legalFocus: newFocus});
+                        }}
+                        className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                      />
+                      <span className="text-sm text-slate-600 dark:text-slate-400">{focus}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-2xl border border-purple-100 dark:border-purple-800/30">
+                <label className="flex items-center gap-2 cursor-pointer mb-3">
+                  <input
+                    type="checkbox"
+                    checked={aiConfig.baseOnFlashcards}
+                    onChange={e => setAiConfig({...aiConfig, baseOnFlashcards: e.target.checked})}
+                    className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                  />
+                  <span className="text-sm font-bold text-purple-800 dark:text-purple-300">Basear em meus Flashcards</span>
+                </label>
+                
+                {aiConfig.baseOnFlashcards && (
+                  <select
+                    value={aiConfig.selectedFolderId}
+                    onChange={e => setAiConfig({...aiConfig, selectedFolderId: e.target.value})}
+                    className="w-full p-3 rounded-xl bg-white dark:bg-slate-800 border border-purple-200 dark:border-purple-700 focus:ring-2 focus:ring-purple-500 outline-none text-sm"
+                  >
+                    <option value="">Selecione uma pasta do Acervo</option>
+                    {folders.map(f => (
+                      <option key={f.id} value={f.id}>{f.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Quantidade</label>
@@ -1386,20 +1547,85 @@ Forneça a explicação de forma concisa e didática.`;
                             })}
                           </div>
 
-                          {showExplanation && q.explanation && (
-                            <div className="mt-8 p-6 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30 animate-in slide-in-from-bottom-4">
-                              <h4 className="font-bold text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
-                                <BookOpen size={18} /> Explicação
-                              </h4>
-                              <p className="text-blue-900/80 dark:text-blue-200/80 leading-relaxed text-sm whitespace-pre-wrap">
-                                {q.explanation}
-                              </p>
-                              <button
-                                onClick={() => handleCreateFlashcardFromError(q)}
-                                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 hover:bg-blue-700 transition-colors"
-                              >
-                                <PlusSquare size={16} /> Criar Flashcard do Erro
-                              </button>
+                          {showExplanation && (
+                            <div className="mt-8 space-y-4 animate-in slide-in-from-bottom-4">
+                              {loadingAiCommentary[q.id] ? (
+                                <div className="p-8 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center gap-3">
+                                  <Loader2 className="w-6 h-6 text-purple-500 animate-spin" />
+                                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Gerando Correção Estratégica...</p>
+                                </div>
+                              ) : aiCommentary[q.id] ? (
+                                <div className="space-y-4">
+                                  {/* Fundamentação Legal */}
+                                  <div className="p-5 bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl border border-emerald-100 dark:border-emerald-900/30">
+                                    <h4 className="font-black text-emerald-800 dark:text-emerald-400 text-[10px] uppercase tracking-widest mb-2 flex items-center gap-2">
+                                      <Scale size={14} /> Fundamentação Legal
+                                    </h4>
+                                    <p className="text-emerald-900/80 dark:text-emerald-200/80 text-sm font-medium">
+                                      {aiCommentary[q.id].legalBasis}
+                                    </p>
+                                  </div>
+
+                                  {/* Análise das Alternativas */}
+                                  <div className="p-5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
+                                    <h4 className="font-black text-slate-700 dark:text-slate-300 text-[10px] uppercase tracking-widest mb-2 flex items-center gap-2">
+                                      <Gavel size={14} /> Análise das Alternativas
+                                    </h4>
+                                    <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">
+                                      {aiCommentary[q.id].alternativesAnalysis}
+                                    </p>
+                                  </div>
+
+                                  {/* Pulo do Gato */}
+                                  <div className="p-5 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-100 dark:border-amber-900/30 relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-2 opacity-10">
+                                      <Zap size={40} className="text-amber-500" />
+                                    </div>
+                                    <h4 className="font-black text-amber-800 dark:text-amber-400 text-[10px] uppercase tracking-widest mb-2 flex items-center gap-2">
+                                      <Lightbulb size={14} /> Pulo do Gato (Dica de Ouro)
+                                    </h4>
+                                    <p className="text-amber-900/80 dark:text-amber-200/80 text-sm font-bold italic">
+                                      "{aiCommentary[q.id].mnemonic}"
+                                    </p>
+                                  </div>
+
+                                  {/* Doctrine Link */}
+                                  {aiCommentary[q.id].doctrineLink && (
+                                    <div className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-900/30">
+                                      <div className="flex items-center gap-2">
+                                        <FileText size={16} className="text-blue-500" />
+                                        <span className="text-[10px] font-black text-blue-700 dark:text-blue-300 uppercase tracking-widest">Doutrina Relacionada:</span>
+                                        <span className="text-xs font-bold text-slate-600 dark:text-slate-400">{aiCommentary[q.id].doctrineLink}</span>
+                                      </div>
+                                      <button 
+                                        onClick={() => navigate('/library')}
+                                        className="text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1 text-[10px] font-black uppercase tracking-widest"
+                                      >
+                                        Ver Material <ExternalLink size={12} />
+                                      </button>
+                                    </div>
+                                  )}
+
+                                  <div className="flex gap-3 pt-2">
+                                    <button
+                                      onClick={() => handleCreateFlashcardFromError(q)}
+                                      className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${selectedOption === q.correct_answer ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-purple-600 text-white hover:bg-purple-700 shadow-lg shadow-purple-900/20'}`}
+                                      disabled={selectedOption === q.correct_answer}
+                                    >
+                                      <PlusSquare size={16} /> Virar Flashcard do Erro
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="p-6 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30">
+                                  <h4 className="font-bold text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
+                                    <BookOpen size={18} /> Explicação Padrão
+                                  </h4>
+                                  <p className="text-blue-900/80 dark:text-blue-200/80 leading-relaxed text-sm whitespace-pre-wrap">
+                                    {q.explanation}
+                                  </p>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
@@ -1539,14 +1765,93 @@ Forneça a explicação de forma concisa e didática.`;
                 </div>
 
                 {/* Explanation */}
-                {showExplanation && currentQuestion.explanation && (
-                  <div className="mt-8 p-6 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30 animate-in slide-in-from-bottom-4">
-                    <h4 className="font-bold text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
-                      <BookOpen size={18} /> Explicação
-                    </h4>
-                    <p className="text-blue-900/80 dark:text-blue-200/80 leading-relaxed text-sm whitespace-pre-wrap">
-                      {currentQuestion.explanation}
-                    </p>
+                {showExplanation && (
+                  <div className="mt-8 space-y-4 animate-in slide-in-from-bottom-4">
+                    {loadingAiCommentary[currentQuestion.id] ? (
+                      <div className="p-12 bg-slate-50 dark:bg-slate-800/50 rounded-[2rem] border-2 border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center gap-4">
+                        <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+                        <p className="text-xs font-black text-slate-500 uppercase tracking-[0.3em] animate-pulse">Consultando Jurisprudência...</p>
+                      </div>
+                    ) : aiCommentary[currentQuestion.id] ? (
+                      <div className="space-y-6">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800"></div>
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Correção Comentada IA</span>
+                          <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800"></div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="p-6 bg-emerald-50 dark:bg-emerald-900/10 rounded-[2rem] border-2 border-emerald-100 dark:border-emerald-900/30">
+                            <h4 className="font-black text-emerald-800 dark:text-emerald-400 text-[11px] uppercase tracking-widest mb-3 flex items-center gap-2">
+                              <Scale size={16} /> Fundamentação Legal
+                            </h4>
+                            <p className="text-emerald-900/80 dark:text-emerald-200/80 text-sm font-bold leading-relaxed">
+                              {aiCommentary[currentQuestion.id].legalBasis}
+                            </p>
+                          </div>
+
+                          <div className="p-6 bg-amber-50 dark:bg-amber-900/10 rounded-[2rem] border-2 border-amber-100 dark:border-amber-900/30 relative overflow-hidden">
+                            <div className="absolute -top-2 -right-2 opacity-10 rotate-12">
+                              <Zap size={80} className="text-amber-500" />
+                            </div>
+                            <h4 className="font-black text-amber-800 dark:text-amber-400 text-[11px] uppercase tracking-widest mb-3 flex items-center gap-2">
+                              <Lightbulb size={16} /> Pulo do Gato
+                            </h4>
+                            <p className="text-amber-900/80 dark:text-amber-200/80 text-sm font-black italic leading-relaxed">
+                              "{aiCommentary[currentQuestion.id].mnemonic}"
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-[2rem] border-2 border-slate-200 dark:border-slate-700">
+                          <h4 className="font-black text-slate-700 dark:text-slate-300 text-[11px] uppercase tracking-widest mb-3 flex items-center gap-2">
+                            <Gavel size={16} /> Análise Técnica das Alternativas
+                          </h4>
+                          <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed whitespace-pre-wrap">
+                            {aiCommentary[currentQuestion.id].alternativesAnalysis}
+                          </p>
+                        </div>
+
+                        {aiCommentary[currentQuestion.id].doctrineLink && (
+                          <div className="flex items-center justify-between p-5 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border-2 border-blue-100 dark:border-blue-900/30">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                                <FileText size={20} className="text-blue-600 dark:text-blue-400" />
+                              </div>
+                              <div>
+                                <span className="block text-[10px] font-black text-blue-700 dark:text-blue-300 uppercase tracking-widest">Referência Doutrinária</span>
+                                <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{aiCommentary[currentQuestion.id].doctrineLink}</span>
+                              </div>
+                            </div>
+                            <button 
+                              onClick={() => navigate('/library')}
+                              className="px-4 py-2 bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-50 transition-all flex items-center gap-2"
+                            >
+                              Abrir Biblioteca <ExternalLink size={14} />
+                            </button>
+                          </div>
+                        )}
+
+                        <div className="flex gap-4 pt-2">
+                          <button
+                            onClick={() => handleCreateFlashcardFromError(currentQuestion)}
+                            className={`flex-1 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-3 transition-all ${selectedOption === currentQuestion.correct_answer ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-purple-600 text-white hover:bg-purple-700 shadow-xl shadow-purple-900/20 active:scale-95'}`}
+                            disabled={selectedOption === currentQuestion.correct_answer}
+                          >
+                            <PlusSquare size={20} /> Virar Flashcard do Erro
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-6 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30">
+                        <h4 className="font-bold text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
+                          <BookOpen size={18} /> Explicação
+                        </h4>
+                        <p className="text-blue-900/80 dark:text-blue-200/80 leading-relaxed text-sm whitespace-pre-wrap">
+                          {currentQuestion.explanation}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 
