@@ -290,9 +290,71 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
     legalFocus: [] as string[],
     statementType: 'Caso Prático (Situação Hipotética)' as 'Caso Prático (Situação Hipotética)' | 'Enunciado Direto',
     baseOnFlashcards: false,
-    selectedFolderId: ''
+    selectedFolderId: '',
+    tribunal: 'Ambos' as 'Jurisprudência STF' | 'Jurisprudência STJ' | 'Ambos',
+    yearFilter: 'Últimos 2 anos' as '2025-2026' | 'Últimos 2 anos'
   });
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSavingPrecedent, setIsSavingPrecedent] = useState<Record<string, boolean>>({});
+
+  const handleSaveAsPrecedent = async (question: Question) => {
+    try {
+      setIsSavingPrecedent(prev => ({ ...prev, [question.id]: true }));
+      
+      // 1. Find or create the "Precedentes Relevantes" folder
+      let precedentFolder = folders.find(f => f.name === 'Precedentes Relevantes');
+      let folderId = precedentFolder?.id;
+
+      if (!folderId) {
+        const { data, error } = await supabase
+          .from('folders')
+          .insert({
+            user_id: userId,
+            name: 'Precedentes Relevantes',
+            color: '#8b5cf6' // Purple
+          })
+          .select()
+          .single();
+        
+        if (error) throw error;
+        folderId = data.id;
+      }
+
+      // 2. Create the flashcard
+      const commentary = aiCommentary[question.id];
+      const front = `[PRECEDENTE] ${question.statement}`;
+      let back = `**GABARITO: ${String.fromCharCode(65 + question.correct_answer)}**\n\n`;
+      
+      if (commentary) {
+        back += `⚖️ **Fundamentação:** ${commentary.legalBasis}\n\n`;
+        back += `❌ **Análise:** ${commentary.alternativesAnalysis}\n\n`;
+        back += `💡 **Pulo do Gato:** ${commentary.mnemonic}`;
+      } else {
+        back += `Explicação: ${question.explanation || 'Nenhuma explicação fornecida.'}`;
+      }
+
+      const { error: cardError } = await supabase
+        .from('flashcards')
+        .insert({
+          user_id: userId,
+          folder_id: folderId,
+          front,
+          back,
+          subject: question.subject,
+          topic: question.topic,
+          next_review: new Date().toISOString()
+        });
+
+      if (cardError) throw cardError;
+
+      showNotification('Salvo em Precedentes Relevantes!', 'success');
+    } catch (error: any) {
+      console.error('Error saving precedent:', error);
+      showNotification(`Erro ao salvar precedente: ${error.message}`, 'error');
+    } finally {
+      setIsSavingPrecedent(prev => ({ ...prev, [question.id]: false }));
+    }
+  };
   const [newQuestion, setNewQuestion] = useState<Partial<Question>>({
     subject: '',
     topic: '',
@@ -814,10 +876,24 @@ Forneça a explicação de forma concisa e didática.`;
         }
       }
 
+      const isJurisprudenceMode = aiConfig.legalFocus.includes('Jurisprudência Atualizada');
+      let jurisprudencePrompt = "";
+      if (isJurisprudenceMode) {
+        jurisprudencePrompt = `
+        MODO ESPECIALIZADO: JURISPRUDÊNCIA (${aiConfig.tribunal}).
+        FILTRO DE ANO: ${aiConfig.yearFilter}.
+        INSTRUÇÕES:
+        1. Baseie os enunciados em casos reais julgados recentemente pelo ${aiConfig.tribunal}.
+        2. Use frases como "Conforme informativo XXX do ${aiConfig.tribunal === 'Ambos' ? 'STF/STJ' : aiConfig.tribunal}, no caso de..." ou "Segundo o entendimento fixado no RE/ARE XXX...".
+        3. Na explicação, inclua OBRIGATORIAMENTE o número do informativo ou o Recurso Extraordinário (RE/ARE) que baseou a resposta.
+        `;
+      }
+
       const prompt = `Crie ${aiConfig.count} questões de múltipla escolha de nível ${aiConfig.difficulty} sobre a matéria "${aiConfig.subject}" e tópico "${aiConfig.topic}".
       Estilo de Prova: ${aiConfig.examStyle}.
       Foco Jurídico: ${aiConfig.legalFocus.join(', ') || 'Geral'}.
       Tipo de Enunciado: ${aiConfig.statementType}.
+      ${jurisprudencePrompt}
       ${contextFromFlashcards}
       
       Cada questão deve ter 5 alternativas (A, B, C, D, E).
@@ -1671,6 +1747,39 @@ Forneça a explicação de forma concisa e didática.`;
                 </div>
               </div>
 
+              {aiConfig.legalFocus.includes('Jurisprudência Atualizada') && (
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800/30 space-y-4 animate-in slide-in-from-top-2 duration-300">
+                  <div className="flex items-center gap-2 text-blue-800 dark:text-blue-300 font-bold text-sm mb-2">
+                    <Gavel size={18} /> Configurações de Jurisprudência
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-blue-700 dark:text-blue-400 mb-1 uppercase">Tribunal</label>
+                      <select
+                        value={aiConfig.tribunal}
+                        onChange={e => setAiConfig({...aiConfig, tribunal: e.target.value as any})}
+                        className="w-full p-2 rounded-lg bg-white dark:bg-slate-800 border border-blue-200 dark:border-blue-700 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                      >
+                        <option value="Jurisprudência STF">STF</option>
+                        <option value="Jurisprudência STJ">STJ</option>
+                        <option value="Ambos">Ambos (STF/STJ)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-blue-700 dark:text-blue-400 mb-1 uppercase">Ano / Período</label>
+                      <select
+                        value={aiConfig.yearFilter}
+                        onChange={e => setAiConfig({...aiConfig, yearFilter: e.target.value as any})}
+                        className="w-full p-2 rounded-lg bg-white dark:bg-slate-800 border border-blue-200 dark:border-blue-700 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                      >
+                        <option value="2025-2026">2025-2026</option>
+                        <option value="Últimos 2 anos">Últimos 2 anos</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-2xl border border-purple-100 dark:border-purple-800/30">
                 <label className="flex items-center gap-2 cursor-pointer mb-3">
                   <input
@@ -2139,18 +2248,29 @@ Forneça a explicação de forma concisa e didática.`;
                         </button>
                         
                         {!isMockMode && (
-                          <button
-                            onClick={() => {
-                              setCurrentIndex(idx);
-                              setViewMode('single');
-                              setSelectedOption(null);
-                              setShowExplanation(false);
-                              window.scrollTo({ top: 0, behavior: 'smooth' });
-                            }}
-                            className="px-4 py-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold transition-colors"
-                          >
-                            Modo Foco
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                setCurrentIndex(idx);
+                                setViewMode('single');
+                                setSelectedOption(null);
+                                setShowExplanation(false);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }}
+                              className="px-4 py-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold transition-colors"
+                            >
+                              Modo Foco
+                            </button>
+                            <button
+                              onClick={() => handleSaveAsPrecedent(q)}
+                              disabled={isSavingPrecedent[q.id]}
+                              className="px-4 py-2 text-purple-600 hover:text-purple-700 dark:text-purple-400 text-sm font-bold transition-colors flex items-center gap-2"
+                              title="Salvar como Precedente Relevante"
+                            >
+                              {isSavingPrecedent[q.id] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Gavel size={16} />}
+                              <span>Salvar Precedente</span>
+                            </button>
+                          </div>
                         )}
                       </div>
 
@@ -2295,6 +2415,14 @@ Forneça a explicação de forma concisa e didática.`;
                                       disabled={selectedOption === q.correct_answer}
                                     >
                                       <PlusSquare size={16} /> Virar Flashcard do Erro
+                                    </button>
+                                    <button
+                                      onClick={() => handleSaveAsPrecedent(q)}
+                                      disabled={isSavingPrecedent[q.id]}
+                                      className="flex-1 py-3 bg-white dark:bg-slate-800 border-2 border-purple-200 dark:border-purple-800 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-lg shadow-purple-900/5"
+                                    >
+                                      {isSavingPrecedent[q.id] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Gavel size={16} />}
+                                      Salvar como Precedente
                                     </button>
                                   </div>
                                 </div>
@@ -2525,7 +2653,15 @@ Forneça a explicação de forma concisa e didática.`;
                             className={`flex-1 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-3 transition-all ${selectedOption === currentQuestion.correct_answer ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-purple-600 text-white hover:bg-purple-700 shadow-xl shadow-purple-900/20 active:scale-95'}`}
                             disabled={selectedOption === currentQuestion.correct_answer}
                           >
-                            <PlusSquare size={20} /> Virar Flashcard do Erro
+                            <PlusSquare size={20} /> Flashcard do Erro
+                          </button>
+                          <button
+                            onClick={() => handleSaveAsPrecedent(currentQuestion)}
+                            disabled={isSavingPrecedent[currentQuestion.id]}
+                            className="flex-1 py-4 bg-white dark:bg-slate-800 border-2 border-purple-200 dark:border-purple-800 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-3 transition-all shadow-xl shadow-purple-900/5 active:scale-95"
+                          >
+                            {isSavingPrecedent[currentQuestion.id] ? <Loader2 className="w-5 h-5 animate-spin" /> : <Gavel size={20} />}
+                            Salvar como Precedente
                           </button>
                         </div>
                       </div>
