@@ -452,20 +452,26 @@ const App: React.FC = () => {
         if (resProgress.data) setCorrectQuestionsCount(resProgress.data.correct_count || 0);
         
         if (resCards.data) {
-          const formattedCards = resCards.data.map(c => ({
-            id: c.id, 
-            front: c.front, 
-            back: c.back, 
-            notes: c.notes || '',
-            tags: c.tags || [],
-            source: c.source || '',
-            subjectId: c.subject_id || '', 
-            folderId: c.folder_id || null, 
-            nextReview: Number(c.next_review) || Date.now(), 
-            interval: c.interval || 0, 
-            status: c.status || 'new',
-            archived_at: c.archived_at || null
-          }));
+          const localCards = await db.flashcards.toArray();
+          const localCardsMap = new Map(localCards.map(c => [c.id, c]));
+
+          const formattedCards = resCards.data.map(c => {
+            const local = localCardsMap.get(c.id);
+            return {
+              id: c.id, 
+              front: c.front, 
+              back: c.back, 
+              notes: c.notes || '',
+              tags: c.tags || [],
+              source: c.source || '',
+              subjectId: c.subject_id || '', 
+              folderId: c.folder_id || null, 
+              nextReview: c.next_review != null ? Number(c.next_review) : (local?.nextReview || Date.now()), 
+              interval: c.interval != null ? c.interval : (local?.interval || 0), 
+              status: c.status || local?.status || 'new',
+              archived_at: c.archived_at || null
+            };
+          });
           
           // Only update local DB if we are not in the middle of a sync
           const syncCount = await db.syncQueue.count();

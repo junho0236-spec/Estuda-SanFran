@@ -1167,11 +1167,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const reviewQueue = useMemo(() => {
     return studyableFlashcards.filter(f => {
       const isDue = f.nextReview <= currentTime;
-      const isLearning = f.status === 'learning';
       
       // In Cram Mode, we ignore the due date
-      // We also include learning cards even if not strictly due to prioritize them over new cards
-      if (!isDue && !isCramMode && !isLearning) return false;
+      if (!isDue && !isCramMode) return false;
       
       // If we have selected folders for a custom session, only include cards from those folders
       if (selectedFolderIdsForSession.size > 0) {
@@ -1185,7 +1183,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       if (isCramMode) return Math.random() - 0.5; // Randomize in cram mode
       
       // Sort logic:
-      // 1. Learning cards (always priority)
+      // 1. Learning cards that are due
       // 2. Review cards that are due
       // 3. New cards
       const order = { 'learning': 0, 'review': 1, 'new': 2 };
@@ -1356,42 +1354,50 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     if (!currentCard) return;
     pushToHistory(currentCard);
     const card = currentCard;
-    const isNew = card.status === 'new' || !card.status;
-    const isLearning = card.status === 'learning';
     
     // Anki Logic:
-    // If New and Good (3) -> Re-insert in 10m (offset ~10)
-    // If Learning and Good (3) -> Graduate to 1d
-    
-    let newInterval = card.interval;
+    let newInterval = card.interval || 0;
     let newStatus: 'new' | 'learning' | 'review' = card.status || 'new';
     let offsetMinutes = 0;
 
-    if (quality === 0) { // Again
-      newInterval = 0;
-      newStatus = 'learning';
-      offsetMinutes = 1; // ~1 min
-    } else if (quality === 2) { // Hard
-      if (isNew || isLearning) {
-        newInterval = 0;
+    if (newStatus === 'new') {
+      if (quality === 0) { // Again
         newStatus = 'learning';
-        offsetMinutes = 6; // ~6 min
-      } else {
-        newInterval = Math.ceil(card.interval * 1.2);
-        newStatus = 'review';
-      }
-    } else if (quality === 3) { // Good
-      if (isNew && !isLearning) {
-        newInterval = 0;
+        offsetMinutes = 1;
+      } else if (quality === 2) { // Hard
         newStatus = 'learning';
-        offsetMinutes = 10; // ~10 min
-      } else {
-        newInterval = isNew ? 1 : Math.ceil(card.interval * 2.5);
+        offsetMinutes = 6;
+      } else if (quality === 3) { // Good
+        newStatus = 'learning';
+        offsetMinutes = 10;
+      } else if (quality === 5) { // Easy
         newStatus = 'review';
+        newInterval = 4;
       }
-    } else if (quality === 5) { // Easy
-      newInterval = isNew ? 4 : Math.ceil(card.interval * 4);
-      newStatus = 'review';
+    } else if (newStatus === 'learning') {
+      if (quality === 0) { // Again
+        offsetMinutes = 1;
+      } else if (quality === 2) { // Hard
+        offsetMinutes = 6;
+      } else if (quality === 3) { // Good
+        newStatus = 'review';
+        newInterval = 1; // Graduate to 1 day
+      } else if (quality === 5) { // Easy
+        newStatus = 'review';
+        newInterval = 4;
+      }
+    } else if (newStatus === 'review') {
+      if (quality === 0) { // Again
+        newStatus = 'learning';
+        offsetMinutes = 1;
+        newInterval = 0; // Reset interval
+      } else if (quality === 2) { // Hard
+        newInterval = Math.max(1, Math.ceil(newInterval * 1.2));
+      } else if (quality === 3) { // Good
+        newInterval = Math.max(1, Math.ceil(newInterval * 2.5));
+      } else if (quality === 5) { // Easy
+        newInterval = Math.max(1, Math.ceil(newInterval * 4));
+      }
     }
 
     const nextReview = offsetMinutes > 0 
