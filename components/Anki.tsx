@@ -57,7 +57,14 @@ import {
   Minimize2,
   Smartphone,
   MessageSquareText,
-  Send
+  Send,
+  Book,
+  Scale,
+  Hammer,
+  Briefcase,
+  GraduationCap,
+  Landmark,
+  Library
 } from 'lucide-react';
 import JSZip from 'jszip';
 import { Flashcard, Subject, Folder, DeckRequest, StudySession } from '../types';
@@ -93,6 +100,18 @@ const FOLDER_COLORS = [
   { name: 'Indigo', border: 'border-l-indigo-500', text: 'text-indigo-500', bg: 'bg-indigo-500' },
 ];
 
+const FOLDER_ICONS = [
+  { name: 'Pasta', value: 'folder', icon: FolderIcon },
+  { name: 'Balança', value: 'scale', icon: Scale },
+  { name: 'Livro', value: 'book', icon: Book },
+  { name: 'Martelo', value: 'hammer', icon: Hammer },
+  { name: 'Maleta', value: 'briefcase', icon: Briefcase },
+  { name: 'Formatura', value: 'graduation', icon: GraduationCap },
+  { name: 'Tribunal', value: 'landmark', icon: Landmark },
+  { name: 'Biblioteca', value: 'library', icon: Library },
+  { name: 'Documento', value: 'document', icon: FileText }
+];
+
 const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folders, setFolders, userId, isOnline, initialText, setInitialText, setStudySessions }) => {
   const location = useLocation();
   const { state } = location;
@@ -116,6 +135,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [manualImage, setManualImage] = useState<string | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
   const [newFolderColor, setNewFolderColor] = useState(FOLDER_COLORS[0].border);
+  const [newFolderIcon, setNewFolderIcon] = useState(FOLDER_ICONS[0].value);
+  const [newFolderTargetDate, setNewFolderTargetDate] = useState<string>('');
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
 
   useEffect(() => {
@@ -1047,12 +1068,16 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         name: newFolderName, 
         parentId: currentFolderId, 
         color: newFolderColor,
+        icon: newFolderIcon,
+        targetDate: newFolderTargetDate ? new Date(newFolderTargetDate).getTime() : undefined,
         user_id: userId
       };
       await dataService.saveFolder(newFolder, userId, isOnline);
       setFolders(prev => [...prev, newFolder]);
       setNewFolderName(''); 
       setNewFolderColor(FOLDER_COLORS[0].border);
+      setNewFolderIcon(FOLDER_ICONS[0].value);
+      setNewFolderTargetDate('');
       setShowFolderInput(false);
     } catch (err) { 
       alert("Erro ao criar pasta."); 
@@ -1446,6 +1471,20 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       }
     }
 
+    // Target Date (Exam Mode) Logic
+    const folder = folders.find(f => f.id === card.folderId);
+    if (folder?.targetDate && offsetDays > 0) {
+      const daysUntilExam = (folder.targetDate - Date.now()) / (1000 * 60 * 60 * 24);
+      if (daysUntilExam > 0) {
+        // Compress the interval so the user sees the card more often before the exam
+        // Max interval is half the time until the exam, minimum 1 day
+        const maxInterval = Math.max(1, Math.ceil(daysUntilExam * 0.5));
+        offsetDays = Math.min(offsetDays, maxInterval);
+        // We don't change newInterval so the long-term SM-2 memory isn't destroyed, 
+        // we just force an earlier review.
+      }
+    }
+
     const nextReview = offsetMinutes > 0 
       ? Date.now() + offsetMinutes * 60 * 1000 
       : Date.now() + offsetDays * 24 * 60 * 60 * 1000;
@@ -1790,6 +1829,38 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 </div>
               </div>
               
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Ícone</label>
+                <div className="grid grid-cols-5 gap-2">
+                  {FOLDER_ICONS.map((iconObj) => {
+                    const IconComp = iconObj.icon;
+                    return (
+                      <button
+                        key={iconObj.value}
+                        onClick={() => setNewFolderIcon(iconObj.value)}
+                        className={`w-full aspect-square rounded-xl transition-all flex items-center justify-center border-2 ${newFolderIcon === iconObj.value ? 'bg-slate-100 dark:bg-white/10 border-sanfran-rubi text-sanfran-rubi' : 'border-slate-100 dark:border-white/5 text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}
+                        title={iconObj.name}
+                      >
+                        <IconComp className="w-6 h-6" />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Data da Prova (Opcional - Modo Véspera)</label>
+                <input 
+                  type="date"
+                  value={newFolderTargetDate} 
+                  onChange={(e) => setNewFolderTargetDate(e.target.value)} 
+                  className="w-full p-4 bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-white/10 rounded-2xl font-bold outline-none focus:border-sanfran-rubi transition-colors text-slate-700 dark:text-slate-300"
+                />
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                  Se definido, o algoritmo aumentará a frequência de revisão dos cards desta pasta conforme a data se aproxima.
+                </p>
+              </div>
+
               <button 
                 onClick={handleCreateFolder}
                 disabled={!newFolderName.trim()}
@@ -1840,6 +1911,38 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 </div>
               </div>
               
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Ícone</label>
+                <div className="grid grid-cols-5 gap-2">
+                  {FOLDER_ICONS.map((iconObj) => {
+                    const IconComp = iconObj.icon;
+                    return (
+                      <button
+                        key={iconObj.value}
+                        onClick={() => setEditingFolder({ ...editingFolder, icon: iconObj.value })}
+                        className={`w-full aspect-square rounded-xl transition-all flex items-center justify-center border-2 ${(editingFolder.icon || 'folder') === iconObj.value ? 'bg-slate-100 dark:bg-white/10 border-sanfran-rubi text-sanfran-rubi' : 'border-slate-100 dark:border-white/5 text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}
+                        title={iconObj.name}
+                      >
+                        <IconComp className="w-6 h-6" />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Data da Prova (Opcional - Modo Véspera)</label>
+                <input 
+                  type="date"
+                  value={editingFolder.targetDate ? new Date(editingFolder.targetDate).toISOString().split('T')[0] : ''} 
+                  onChange={(e) => setEditingFolder({ ...editingFolder, targetDate: e.target.value ? new Date(e.target.value).getTime() : undefined })} 
+                  className="w-full p-4 bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-white/10 rounded-2xl font-bold outline-none focus:border-sanfran-rubi transition-colors text-slate-700 dark:text-slate-300"
+                />
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                  Se definido, o algoritmo aumentará a frequência de revisão dos cards desta pasta conforme a data se aproxima.
+                </p>
+              </div>
+
               <button 
                 onClick={handleUpdateFolder}
                 disabled={!editingFolder.name.trim()}
@@ -2037,7 +2140,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   {forecast.map((day, i) => {
                     const heightPercent = Math.max((day.count / maxForecast) * 100, 4); // min 4% height for visibility
                     return (
-                      <div key={i} className="flex flex-col items-center gap-2 flex-1 group">
+                      <div key={i} className="flex flex-col items-center gap-2 flex-1 group h-full">
                         <div className="relative w-full flex justify-center h-full items-end">
                           <div 
                             className={`w-full max-w-[24px] rounded-t-lg transition-all duration-500 ${i === 0 ? 'bg-sanfran-rubi' : 'bg-blue-500 dark:bg-blue-600'} group-hover:opacity-80`}
@@ -2217,25 +2320,39 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                     )}
                   </div>
                 </div>
-                <FolderIcon className={`${folder.color?.replace('border-l-', 'text-') || 'text-usp-gold'} w-8 h-8 mb-4`} />
-                <h4 className="font-black text-slate-950 dark:text-white uppercase tracking-tight mb-2">{folder.name}</h4>
+                {(() => {
+                  const IconComp = FOLDER_ICONS.find(i => i.value === folder.icon)?.icon || FolderIcon;
+                  return <IconComp className={`${folder.color?.replace('border-l-', 'text-') || 'text-usp-gold'} w-8 h-8 mb-4`} />;
+                })()}
+                <h4 className="font-black text-slate-950 dark:text-white uppercase tracking-tight mb-1 line-clamp-1">{folder.name}</h4>
+                
+                {folder.targetDate && (
+                  <div className="flex items-center gap-1 text-[9px] font-black text-sanfran-rubi uppercase tracking-widest mb-3">
+                    <Calendar size={10} />
+                    Alvo: {(() => {
+                      const d = new Date(folder.targetDate);
+                      return `${d.getUTCDate().toString().padStart(2, '0')}/${(d.getUTCMonth() + 1).toString().padStart(2, '0')}/${d.getUTCFullYear()}`;
+                    })()}
+                  </div>
+                )}
+                {!folder.targetDate && <div className="mb-3 h-4"></div>}
                 
                 {/* Anki Style Metrics */}
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-blue-500 uppercase">Novos</span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+                  <div className="flex flex-col items-center text-center bg-blue-50 dark:bg-blue-900/20 p-2 rounded-xl">
+                    <span className="text-[8px] font-black text-blue-500 uppercase tracking-wider">Novos</span>
                     <span className="text-sm font-black text-blue-600">{stats.newCount}</span>
                   </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-orange-500 uppercase">Aprendendo</span>
+                  <div className="flex flex-col items-center text-center bg-orange-50 dark:bg-orange-900/20 p-2 rounded-xl">
+                    <span className="text-[8px] font-black text-orange-500 uppercase tracking-wider">Aprender</span>
                     <span className="text-sm font-black text-orange-600">{stats.learningCount}</span>
                   </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-emerald-500 uppercase">Revisar</span>
+                  <div className="flex flex-col items-center text-center bg-emerald-50 dark:bg-emerald-900/20 p-2 rounded-xl">
+                    <span className="text-[8px] font-black text-emerald-500 uppercase tracking-wider">Revisar</span>
                     <span className="text-sm font-black text-emerald-600">{stats.reviewCount}</span>
                   </div>
-                  <div className="flex flex-col ml-auto text-right">
-                    <span className="text-[10px] font-black text-slate-400 uppercase">Domínio</span>
+                  <div className="flex flex-col items-center text-center bg-slate-50 dark:bg-white/5 p-2 rounded-xl">
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider">Domínio</span>
                     <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">{stats.mastery}%</span>
                   </div>
                 </div>
@@ -2258,7 +2375,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               <div 
                 key={card.id} 
                 onClick={() => isSelectionMode ? toggleCardSelection(card.id) : setEditingCard(card)}
-                className={`group bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2rem] border-2 shadow-xl flex flex-col justify-between h-[240px] border-l-[10px] transition-all relative cursor-pointer ${isSelected ? 'border-sanfran-rubi bg-red-50/30 dark:bg-sanfran-rubi/10' : 'border-slate-200 dark:border-sanfran-rubi/40 hover:border-sanfran-rubi/50'}`} 
+                className={`group bg-white dark:bg-sanfran-rubiDark/50 p-8 rounded-[2rem] border-2 shadow-xl flex flex-col justify-between min-h-[240px] border-l-[10px] transition-all relative cursor-pointer ${isSelected ? 'border-sanfran-rubi bg-red-50/30 dark:bg-sanfran-rubi/10' : 'border-slate-200 dark:border-sanfran-rubi/40 hover:border-sanfran-rubi/50'}`} 
                 style={{ borderLeftColor: isSelected ? undefined : (subject?.color || '#9B111E') }}
               >
                 {!isSelectionMode && (
@@ -2280,7 +2397,11 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 </div>
                 {isGlobalSearch && (
                   <div className="mt-2 flex items-center gap-1 text-[9px] font-black text-slate-400 uppercase">
-                    <FolderIcon size={10} />
+                    {(() => {
+                      const folderObj = (folders || []).find(f => f.id === card.folderId);
+                      const IconComp = FOLDER_ICONS.find(i => i.value === folderObj?.icon)?.icon || FolderIcon;
+                      return <IconComp size={10} />;
+                    })()}
                     {(folders || []).find(f => f.id === card.folderId)?.name || 'Raiz'}
                   </div>
                 )}
@@ -2330,7 +2451,10 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                       }`}
                     >
                       <div className="flex items-center gap-4">
-                        <FolderIcon className={isSelected ? 'text-indigo-600' : 'text-slate-400'} />
+                        {(() => {
+                          const IconComp = FOLDER_ICONS.find(i => i.value === folder.icon)?.icon || FolderIcon;
+                          return <IconComp className={isSelected ? 'text-indigo-600' : 'text-slate-400'} />;
+                        })()}
                         <div>
                           <p className={`font-black uppercase text-xs tracking-tight ${isSelected ? 'text-indigo-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>
                             {folder.name}

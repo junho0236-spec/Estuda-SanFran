@@ -110,6 +110,8 @@ export interface Folder {
   original_deck_id?: string; // For update alerts
   version?: number; // For versioning
   color?: string;
+  icon?: string;
+  targetDate?: number; // Exam date timestamp
 }
 
 export interface DeckRequest {

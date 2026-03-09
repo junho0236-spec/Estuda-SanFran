@@ -447,7 +447,9 @@ const App: React.FC = () => {
           id: f.id, 
           name: f.name, 
           parentId: f.parent_id,
-          color: f.color 
+          color: f.color,
+          icon: f.icon || undefined,
+          targetDate: f.target_date || undefined
         })));
         if (resProgress.data) setCorrectQuestionsCount(resProgress.data.correct_count || 0);
         

@@ -13,6 +13,8 @@ export const dataService = {
         name: folder.name,
         parent_id: folder.parentId,
         color: folder.color,
+        icon: folder.icon || null,
+        target_date: folder.targetDate || null,
         shared: folder.shared || false,
         original_deck_id: folder.original_deck_id || null,
         version: folder.version || 1
