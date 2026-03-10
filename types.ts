@@ -380,6 +380,8 @@ export interface Question {
   created_at?: string;
   audio_hint?: string;
   listen_count?: number;
+  status?: 'Acertou' | 'Errado';
+  is_reinforcement?: boolean;
   ai_summary?: {
     tese: string;
     fundamentação: string;

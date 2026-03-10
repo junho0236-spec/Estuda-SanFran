@@ -1076,32 +1076,28 @@ Forneça a explicação de forma concisa e didática.`;
   const handleGenerateSmartReview = async () => {
     try {
       setIsGenerating(true);
-      showNotification('Analisando seu desempenho e preparando reforço...', 'info');
+      showNotification('Analisando seus pontos fracos...', 'info');
 
-      // 1. Fetch last 20 wrong questions
-      const { data: wrongQuestions, error } = await supabase
-        .from('questions')
-        .select('subject, topic')
+      // 1. Fetch weak topics from view
+      const { data: weakTopics, error: weakError } = await supabase
+        .from('user_weak_topics')
+        .select('topic, error_count')
         .eq('user_id', userId)
-        .eq('status', 'wrong') // Assuming 'wrong' is the status for incorrect
-        .order('created_at', { ascending: false })
-        .limit(20);
+        .gt('error_count', 3);
 
-      if (error) throw error;
+      if (weakError) throw weakError;
 
-      if (!wrongQuestions || wrongQuestions.length === 0) {
-        showNotification('Nenhuma questão errada encontrada para reforço.', 'info');
+      if (!weakTopics || weakTopics.length === 0) {
+        showNotification('Nenhum ponto fraco crítico encontrado para reforço.', 'info');
         setIsGenerating(false);
         return;
       }
 
-      // 2. Extract unique topics
-      const topics = Array.from(new Set(wrongQuestions.map(q => q.topic || q.subject))).filter(Boolean);
-
-      // 3. Generate questions with Gemini
+      // 2. Generate questions with Gemini
+      const topics = weakTopics.map(t => t.topic).join(', ');
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
-      const prompt = `Com base nestes temas que o aluno errou: ${topics.join(', ')}, gere 5 novas questões inéditas de nível Médio/Difícil para reforçar o aprendizado. Retorne em formato JSON array de objetos com: statement, options (array de 4 strings), correct_answer (index 0-3), explanation, subject, topic, difficulty.`;
-
+      const prompt = `Com base nestes temas que o aluno errou muito: ${topics}, gere 5 novas questões inéditas de nível Médio/Difícil para reforçar o aprendizado. Retorne em formato JSON array de objetos com: statement, options (array de 4 strings), correct_answer (index 0-3), explanation, subject, topic, difficulty.`;
+      
       const response = await ai.models.generateContent({
         model: GEMINI_MODEL,
         contents: prompt,
@@ -1112,11 +1108,12 @@ Forneça a explicação de forma concisa e didática.`;
 
       const newQuestions = JSON.parse(response.text || '[]');
       
-      // 4. Save new questions
+      // 3. Save new questions with is_reinforcement: true
       const questionsToSave = newQuestions.map((q: any) => ({
         ...q,
         user_id: userId,
-        difficulty: 'media'
+        difficulty: 'media',
+        is_reinforcement: true
       }));
 
       const { error: insertError } = await supabase.from('questions').insert(questionsToSave);
@@ -1448,6 +1445,7 @@ Forneça a explicação de forma concisa e didática.`;
     }
 
     if (index === targetQuestion.correct_answer) {
+      supabase.from('questions').update({ status: 'Acertou' }).eq('id', targetQuestion.id).then();
       const newCount = correctCount + 1;
       setCorrectCount(newCount);
       if (onCorrectAnswer) onCorrectAnswer();
@@ -1487,6 +1485,7 @@ Forneça a explicação de forma concisa e didática.`;
         confidence_levels: currentConfidenceLevels
       });
     } else {
+      supabase.from('questions').update({ status: 'Errado' }).eq('id', targetQuestion.id).then();
       const newCount = wrongCount + 1;
       setWrongCount(newCount);
       
@@ -2761,6 +2760,12 @@ Forneça a explicação de forma concisa e didática.`;
                           className="w-5 h-5 rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
                         />
                       </div>
+                      
+                      {q.status === 'Errado' && (
+                        <div className="absolute top-4 right-4 z-10 text-red-500">
+                          <Target size={20} />
+                        </div>
+                      )}
 
                       <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2 text-sm">
                         <span className="font-bold text-slate-900 dark:text-white">{idx + 1}</span>
