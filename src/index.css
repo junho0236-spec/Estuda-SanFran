@@ -1,6 +1,17 @@
-@import "tailwindcss/base";
-@import "tailwindcss/components";
-@import "tailwindcss/utilities";
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", ui-serif, Georgia, serif;
+}
+
+:root {
+  --bg-color: #F5F2ED; /* Aged paper */
+  --text-color: #1A202C; /* Dark blue-gray */
+  --accent-color: #8B1A1A; /* Bordô */
+  --border-color: #4A5568; /* Dark gray/bronze-ish */
+}
 
 /* Custom styles for Quill Editor */
 .quill-editor-custom {
@@ -10,19 +21,19 @@
 }
 
 .quill-editor-custom .ql-toolbar {
-  border-top-left-radius: 1rem;
-  border-top-right-radius: 1rem;
-  background-color: #f8fafc; /* slate-50 */
-  border-bottom: 1px solid #e2e8f0; /* slate-200 */
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  background-color: #e2dcd0;
+  border-bottom: 1px solid var(--border-color);
   padding: 1rem;
 }
 
 .quill-editor-custom .ql-container {
   flex-grow: 1;
-  border-bottom-left-radius: 1rem;
-  border-bottom-right-radius: 1rem;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
   border: none;
-  background-color: #ffffff; /* white */
+  background-color: var(--bg-color);
   font-family: var(--font-sans);
   font-size: 1rem;
   line-height: 1.5;
@@ -30,12 +41,12 @@
 }
 
 .quill-editor-custom .ql-editor {
-  min-height: 100%; /* Ensure editor fills container */
+  min-height: 100%;
   padding: 1rem;
 }
 
 .quill-editor-custom .ql-editor.ql-blank::before {
-  color: #94a3b8; /* slate-400 */
+  color: #718096;
   font-style: normal;
   left: 1rem;
   right: 1rem;
@@ -43,17 +54,17 @@
 
 /* Dark mode adjustments */
 .dark .quill-editor-custom .ql-toolbar {
-  background-color: #1e293b; /* slate-800 */
-  border-color: #334155; /* slate-700 */
+  background-color: #2D3748;
+  border-color: var(--border-color);
 }
 
 .dark .quill-editor-custom .ql-container {
-  background-color: #0f172a; /* slate-900 */
-  color: #f8fafc; /* slate-50 */
+  background-color: #1A202C;
+  color: #F5F2ED;
 }
 
 .dark .quill-editor-custom .ql-editor.ql-blank::before {
-  color: #64748b; /* slate-500 */
+  color: #A0AEC0;
 }
 
 /* Custom Markdown Styling */
@@ -71,6 +82,7 @@
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  font-family: var(--font-serif);
 }
 .prose p {
   margin-bottom: 1em;
@@ -111,19 +123,22 @@
 
 /* Custom header styles */
 .ql-editor h1 {
-  font-size: 2em; /* Tailwind text-2xl */
-  font-weight: 700; /* Tailwind font-bold */
+  font-size: 2em;
+  font-weight: 700;
   margin-bottom: 0.5em;
+  font-family: var(--font-serif);
 }
 .ql-editor h2 {
-  font-size: 1.5em; /* Tailwind text-xl */
-  font-weight: 600; /* Tailwind font-semibold */
+  font-size: 1.5em;
+  font-weight: 600;
   margin-bottom: 0.5em;
+  font-family: var(--font-serif);
 }
 .ql-editor h3 {
-  font-size: 1.17em; /* Tailwind text-lg */
-  font-weight: 500; /* Tailwind font-medium */
+  font-size: 1.17em;
+  font-weight: 500;
   margin-bottom: 0.5em;
+  font-family: var(--font-serif);
 }
 
 /* Custom list styles */
@@ -136,25 +151,25 @@
 
 /* Blockquote styles */
 .ql-editor blockquote {
-  border-left: 4px solid #e2e8f0; /* slate-200 */
+  border-left: 4px solid var(--border-color);
   margin-left: 1em;
   padding-left: 1em;
-  color: #64748b; /* slate-500 */
+  color: #4A5568;
 }
 
 /* Code block styles */
 .ql-editor pre.ql-syntax {
-  background-color: #1e293b; /* slate-800 */
-  color: #f8fafc; /* slate-50 */
+  background-color: #2D3748;
+  color: #F5F2ED;
   padding: 1em;
-  border-radius: 0.5rem;
+  border-radius: 0;
   font-family: 'JetBrains Mono', monospace;
   overflow-x: auto;
 }
 
 /* Link styles */
 .ql-editor a {
-  color: #6366f1; /* indigo-500 */
+  color: var(--accent-color);
   text-decoration: underline;
 }
 

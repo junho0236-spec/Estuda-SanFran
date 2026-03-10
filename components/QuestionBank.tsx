@@ -342,8 +342,6 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
     };
   }, []);
 
-  // Form for new question
-  const [showAddForm, setShowAddForm] = useState(false);
   const [showAIGenerator, setShowAIGenerator] = useState(false);
   const [aiConfig, setAiConfig] = useState({
     subject: '',
@@ -864,72 +862,6 @@ Forneça a explicação de forma concisa e didática.`;
     setYears(uniqueYears.sort((a, b) => b.localeCompare(a)));
   };
 
-  const handleImportSamples = async () => {
-    try {
-      setLoading(true);
-      
-      // Sanitize samples to ensure only valid columns are sent
-      const sanitizedInitialSamples = sampleQuestions.map((q: any) => ({
-        subject: q.subject,
-        topic: q.topic,
-        statement: q.statement,
-        options: q.options,
-        correct_answer: q.correct_answer,
-        explanation: q.explanation,
-        difficulty: q.difficulty,
-        exam_board: q.exam_board,
-        year: q.year?.toString()
-      }));
-
-      let { data, error } = await supabase
-        .from('questions')
-        .insert(sanitizedInitialSamples)
-        .select();
-
-      // Fallback for missing exam_board column
-      if (error && error.message?.includes("exam_board")) {
-        console.warn("Column 'exam_board' not found, retrying without it...");
-        const sanitizedSamples = sanitizedInitialSamples.map((q: any) => {
-          const { exam_board, ...rest } = q;
-          return rest;
-        });
-        const retry = await supabase
-          .from('questions')
-          .insert(sanitizedSamples)
-          .select();
-        data = retry.data;
-        error = retry.error;
-      }
-
-      if (error) throw error;
-
-      if (data) {
-        setQuestions([...data, ...questions]);
-        showNotification(`${data.length} questões importadas com sucesso!`, 'success');
-        
-        // Update filters
-        const newSubjects = Array.from(new Set([...subjects, ...data.map(q => q.subject)])).filter(Boolean);
-        setSubjects(newSubjects);
-        
-        const newTopics = Array.from(new Set([...topics, ...data.map(q => q.topic)])).filter(Boolean);
-        setTopics(newTopics);
-
-        const newExamBoards = Array.from(new Set([...examBoards, ...data.map(q => q.exam_board)])).filter(Boolean) as string[];
-        setExamBoards(newExamBoards);
-
-        const newYears = Array.from(new Set([...years, ...data.map(q => q.year?.toString())])).filter(Boolean) as string[];
-        setYears(newYears.sort((a, b) => b.localeCompare(a)));
-        
-        setViewMode('list');
-      }
-    } catch (error: any) {
-      console.error('Error importing questions:', error);
-      showNotification(`Erro ao importar questões: ${error.message}`, 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleAddQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -981,7 +913,6 @@ Forneça a explicação de forma concisa e didática.`;
 
       if (data) {
         setQuestions([data, ...questions]);
-        setShowAddForm(false);
         showNotification('Questão adicionada com sucesso!', 'success');
         // Reset form
         setNewQuestion({
@@ -1912,24 +1843,6 @@ Forneça a explicação de forma concisa e didática.`;
               <Timer size={16} /> Iniciar Simulado
             </button>
             <button
-                onClick={handleImportSamples}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-sm transition-colors"
-              >
-                <Download size={16} /> Importar Exemplos
-              </button>
-            <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-xl">
-              <Settings size={16} className="text-slate-500" />
-              <select 
-                value={voiceSpeed} 
-                onChange={(e) => setVoiceSpeed(parseFloat(e.target.value))}
-                className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-300 outline-none"
-              >
-                <option value={0.5}>0.5x</option>
-                <option value={1}>1x</option>
-                <option value={1.5}>1.5x</option>
-              </select>
-            </div>
-            <button
               onClick={() => setShowAIGenerator(true)}
               className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition-colors"
             >
@@ -1940,12 +1853,6 @@ Forneça a explicação de forma concisa e didática.`;
               className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-sm transition-colors shadow-lg shadow-amber-900/20"
             >
               <Zap size={16} /> Reforçar Pontos Fracos
-            </button>
-            <button
-              onClick={() => setShowAddForm(!showAddForm)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-colors"
-            >
-              {showAddForm ? 'Voltar para Questões' : <><Plus size={16} /> Nova Questão</>}
             </button>
             <button
               onClick={() => setShowNotebookCreationMode(prev => !prev)}
@@ -2367,135 +2274,8 @@ Forneça a explicação de forma concisa e didática.`;
       </div>
 
       <div id="add-form-portal">
-        {showAddForm ? (
-          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-xl border border-slate-200 dark:border-slate-800">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Adicionar Nova Questão</h2>
-            
-            <form onSubmit={handleAddQuestion} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Matéria *</label>
-                  <input
-                    type="text"
-                    required
-                    value={newQuestion.subject}
-                    onChange={e => setNewQuestion({...newQuestion, subject: e.target.value})}
-                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
-                    placeholder="Ex: Direito Civil"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Tópico</label>
-                  <input
-                    type="text"
-                    value={newQuestion.topic}
-                    onChange={e => setNewQuestion({...newQuestion, topic: e.target.value})}
-                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
-                    placeholder="Ex: Contratos"
-                  />
-                </div>
-              </div>
+      </div>
 
-              <div>
-                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Enunciado *</label>
-                <textarea
-                  required
-                  rows={4}
-                  value={newQuestion.statement}
-                  onChange={e => setNewQuestion({...newQuestion, statement: e.target.value})}
-                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
-                  placeholder="Digite o enunciado da questão..."
-                />
-              </div>
-
-              <div className="space-y-4">
-                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">Alternativas *</label>
-                {newQuestion.options?.map((opt, idx) => (
-                  <div key={idx} className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      name="correct_answer"
-                      checked={newQuestion.correct_answer === idx}
-                      onChange={() => setNewQuestion({...newQuestion, correct_answer: idx})}
-                      className="w-5 h-5 text-blue-600"
-                    />
-                    <input
-                      type="text"
-                      required
-                      value={opt}
-                      onChange={e => handleOptionChange(idx, e.target.value)}
-                      className="flex-1 p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
-                      placeholder={`Alternativa ${String.fromCharCode(65 + idx)}`}
-                    />
-                  </div>
-                ))}
-                <p className="text-xs text-slate-500">Selecione o botão ao lado da alternativa correta.</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Explicação (Opcional)</label>
-                <textarea
-                  rows={3}
-                  value={newQuestion.explanation}
-                  onChange={e => setNewQuestion({...newQuestion, explanation: e.target.value})}
-                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
-                  placeholder="Explique por que a alternativa está correta..."
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Banca (Opcional)</label>
-                  <input
-                    type="text"
-                    value={newQuestion.exam_board}
-                    onChange={e => setNewQuestion({...newQuestion, exam_board: e.target.value})}
-                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
-                    placeholder="Ex: FGV, CESPE"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Ano (Opcional)</label>
-                  <input
-                    type="text"
-                    value={newQuestion.year || ''}
-                    onChange={e => setNewQuestion({...newQuestion, year: e.target.value})}
-                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
-                    placeholder="Ex: 2024"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Dificuldade</label>
-                  <select
-                    value={newQuestion.difficulty}
-                    onChange={e => setNewQuestion({...newQuestion, difficulty: e.target.value as any})}
-                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
-                  >
-                    <option value="facil">Fácil</option>
-                    <option value="media">Média</option>
-                    <option value="dificil">Difícil</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" /> Salvando...
-                    </>
-                  ) : (
-                    'Salvar Questão'
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        ) : (
           <>
             {/* Filters & Stats */}
           <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 mb-6 overflow-hidden">
@@ -3321,7 +3101,6 @@ Forneça a explicação de forma concisa e didática.`;
               </p>
               {questions.length === 0 && (
                 <button
-                  onClick={() => setShowAddForm(true)}
                   className="mt-6 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors"
                 >
                   Adicionar Questão
@@ -3332,7 +3111,6 @@ Forneça a explicação de forma concisa e didática.`;
             </div>
           </div>
           </>
-        )}
         <div id="notification-portal">
           {notification && (
             <div className={`fixed bottom-6 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 z-50 animate-in slide-in-from-bottom-5 fade-in duration-300 ${
@@ -3554,7 +3332,6 @@ Forneça a explicação de forma concisa e didática.`;
           isSubmitting={isSubmitting}
         />
       )}
-      </div>
       </div>
   );
 };
