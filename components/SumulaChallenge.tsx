@@ -41,9 +41,24 @@ const SumulaChallenge: React.FC<{ userId: string; userName: string }> = ({ userI
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem('sanfran_sumula_pb');
-    if (saved) setPersonalBest(parseInt(saved));
-  }, []);
+    const fetchPB = async () => {
+      if (!userId) return;
+      try {
+        const { data, error } = await supabase
+          .from('user_progress')
+          .select('stats')
+          .eq('user_id', userId)
+          .maybeSingle();
+        
+        if (data?.stats?.sumula_pb) {
+          setPersonalBest(data.stats.sumula_pb);
+        }
+      } catch (err) {
+        console.error("Error fetching PB:", err);
+      }
+    };
+    fetchPB();
+  }, [userId]);
 
   const generateQuestion = () => {
     const isTextToNum = Math.random() > 0.5;
@@ -107,7 +122,29 @@ const SumulaChallenge: React.FC<{ userId: string; userName: string }> = ({ userI
     setGameState('gameover');
     if (score > personalBest) {
       setPersonalBest(score);
-      localStorage.setItem('sanfran_sumula_pb', score.toString());
+      
+      if (userId) {
+        try {
+          const { data: current } = await supabase
+            .from('user_progress')
+            .select('stats')
+            .eq('user_id', userId)
+            .maybeSingle();
+            
+          const newStats = { ...(current?.stats || {}), sumula_pb: score };
+          
+          await supabase
+            .from('user_progress')
+            .upsert({ 
+              user_id: userId, 
+              stats: newStats,
+              last_updated: new Date().toISOString()
+            });
+        } catch (err) {
+          console.error("Error saving PB:", err);
+        }
+      }
+      
       confetti({ particleCount: 200, spread: 100 });
       
       // Tentar salvar no Supabase se as tabelas existirem

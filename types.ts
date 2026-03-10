@@ -378,6 +378,8 @@ export interface Question {
   exam_board?: string;
   year?: string;
   created_at?: string;
+  audio_hint?: string;
+  listen_count?: number;
   ai_summary?: {
     tese: string;
     fundamentação: string;

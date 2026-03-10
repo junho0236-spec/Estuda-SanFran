@@ -358,6 +358,9 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
     yearFilter: 'Últimos 2 anos' as '2025-2026' | 'Últimos 2 anos'
   });
   const [isGenerating, setIsGenerating] = useState(false);
+  const [voiceSpeed, setVoiceSpeed] = useState(1);
+  const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
+  const [isGeneratingHint, setIsGeneratingHint] = useState(false);
   const [generatingStatus, setGeneratingStatus] = useState<string>('');
   const [aiCooldown, setAiCooldown] = useState(0);
   const [isSavingPrecedent, setIsSavingPrecedent] = useState<Record<string, boolean>>({});
@@ -492,6 +495,37 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
   useEffect(() => {
     fetchQuestions();
     fetchUserProgress();
+
+    if (userId) {
+      const channel = supabase.channel(`user_progress_${userId}`)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'user_progress',
+          filter: `user_id=eq.${userId}`
+        }, () => {
+          console.log("[QuestionBank] User progress changed remotely, fetching...");
+          fetchUserProgress();
+        })
+        .subscribe();
+
+      const notebookChannel = supabase.channel(`notebooks_${userId}`)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'question_notebooks',
+          filter: `user_id=eq.${userId}`
+        }, () => {
+          console.log("[QuestionBank] Notebooks changed remotely, fetching...");
+          fetchNotebooks();
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+        supabase.removeChannel(notebookChannel);
+      };
+    }
   }, [userId]);
 
   const fetchUserProgress = async () => {
@@ -516,37 +550,6 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
         setCorrectCount(data.correct_count || 0);
         setWrongCount(data.wrong_count || 0);
         setErrorMastery(data.error_mastery || {});
-        
-        // Sync to local storage as backup
-        localStorage.setItem(`sanfran_favorites_${userId}`, JSON.stringify(data.favorites || []));
-        localStorage.setItem(`sanfran_wrong_${userId}`, JSON.stringify(data.wrong_questions || []));
-        localStorage.setItem(`sanfran_correct_${userId}`, JSON.stringify(data.correct_questions || []));
-        localStorage.setItem(`sanfran_notes_${userId}`, JSON.stringify(data.notes || {}));
-        localStorage.setItem(`sanfran_correct_count_${userId}`, (data.correct_count || 0).toString());
-        localStorage.setItem(`sanfran_wrong_count_${userId}`, (data.wrong_count || 0).toString());
-        localStorage.setItem(`sanfran_error_mastery_${userId}`, JSON.stringify(data.error_mastery || {}));
-      } else {
-        // Fallback to local storage if no DB data yet
-        const storedFavorites = localStorage.getItem(`sanfran_favorites_${userId}`);
-        if (storedFavorites) setFavorites(JSON.parse(storedFavorites));
-        
-        const storedWrong = localStorage.getItem(`sanfran_wrong_${userId}`);
-        if (storedWrong) setWrongQuestions(JSON.parse(storedWrong));
-
-        const storedCorrectIds = localStorage.getItem(`sanfran_correct_${userId}`);
-        if (storedCorrectIds) setCorrectQuestions(JSON.parse(storedCorrectIds));
-        
-        const storedNotes = localStorage.getItem(`sanfran_notes_${userId}`);
-        if (storedNotes) setNotes(JSON.parse(storedNotes));
-
-        const storedCorrect = localStorage.getItem(`sanfran_correct_count_${userId}`);
-        if (storedCorrect) setCorrectCount(parseInt(storedCorrect));
-        
-        const storedWrongCount = localStorage.getItem(`sanfran_wrong_count_${userId}`);
-        if (storedWrongCount) setWrongCount(parseInt(storedWrongCount));
-
-        const storedMastery = localStorage.getItem(`sanfran_error_mastery_${userId}`);
-        if (storedMastery) setErrorMastery(JSON.parse(storedMastery));
       }
     } catch (err) {
       console.error('Failed to sync progress:', err);
@@ -668,7 +671,6 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
       showNotification('Adicionado aos favoritos', 'success');
     }
     setFavorites(newFavorites);
-    localStorage.setItem(`sanfran_favorites_${userId}`, JSON.stringify(newFavorites));
     syncUserProgress({ favorites: newFavorites });
   };
 
@@ -801,6 +803,7 @@ Forneça a explicação de forma concisa e didática.`;
       const { data, error } = await supabase
         .from('questions')
         .select('*')
+        .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -936,8 +939,12 @@ Forneça a explicação de forma concisa e didática.`;
 
     try {
       setIsSubmitting(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+
       // Sanitize question to ensure only valid columns are sent
       const sanitizedInitialQuestion = {
+        user_id: user.id,
         subject: newQuestion.subject,
         topic: newQuestion.topic,
         statement: newQuestion.statement,
@@ -1007,6 +1014,122 @@ Forneça a explicação de forma concisa e didática.`;
       showNotification(`Erro ao adicionar questão: ${error.message || JSON.stringify(error)}`, 'error');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleSpeak = (statement: string, hint: string, id: string) => {
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+      setActiveQuestionId(null);
+      return;
+    }
+    const textToSpeak = `${statement}. ${hint}`;
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    utterance.rate = voiceSpeed;
+    utterance.onstart = () => setActiveQuestionId(id);
+    utterance.onend = () => setActiveQuestionId(null);
+    utterance.onerror = () => setActiveQuestionId(null);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const handleAudioHint = async (question: Question) => {
+    try {
+      setIsGeneratingHint(true);
+      let hint = question.audio_hint;
+      let newListenCount = (question.listen_count || 0) + 1;
+
+      if (!hint) {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
+        const prompt = `Resuma o ponto jurídico desta questão em uma dica de 15 palavras para ser lida por áudio: ${question.statement}`;
+        
+        const response = await ai.models.generateContent({
+          model: GEMINI_MODEL,
+          contents: prompt,
+        });
+
+        hint = response.text || 'Sem dica disponível.';
+        
+        // Save to Supabase
+        const { error } = await supabase
+          .from('questions')
+          .update({ audio_hint: hint, listen_count: newListenCount })
+          .eq('id', question.id);
+        
+        if (error) throw error;
+      } else {
+        // Increment listen_count
+        await supabase
+          .from('questions')
+          .update({ listen_count: newListenCount })
+          .eq('id', question.id);
+      }
+
+      handleSpeak(question.statement, hint, question.id);
+    } catch (error) {
+      console.error('Error generating audio hint:', error);
+      showNotification('Erro ao gerar dica de áudio.', 'error');
+    } finally {
+      setIsGeneratingHint(false);
+    }
+  };
+
+  const handleGenerateSmartReview = async () => {
+    try {
+      setIsGenerating(true);
+      showNotification('Analisando seu desempenho e preparando reforço...', 'info');
+
+      // 1. Fetch last 20 wrong questions
+      const { data: wrongQuestions, error } = await supabase
+        .from('questions')
+        .select('subject, topic')
+        .eq('user_id', userId)
+        .eq('status', 'wrong') // Assuming 'wrong' is the status for incorrect
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+
+      if (!wrongQuestions || wrongQuestions.length === 0) {
+        showNotification('Nenhuma questão errada encontrada para reforço.', 'info');
+        setIsGenerating(false);
+        return;
+      }
+
+      // 2. Extract unique topics
+      const topics = Array.from(new Set(wrongQuestions.map(q => q.topic || q.subject))).filter(Boolean);
+
+      // 3. Generate questions with Gemini
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
+      const prompt = `Com base nestes temas que o aluno errou: ${topics.join(', ')}, gere 5 novas questões inéditas de nível Médio/Difícil para reforçar o aprendizado. Retorne em formato JSON array de objetos com: statement, options (array de 4 strings), correct_answer (index 0-3), explanation, subject, topic, difficulty.`;
+
+      const response = await ai.models.generateContent({
+        model: GEMINI_MODEL,
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+        },
+      });
+
+      const newQuestions = JSON.parse(response.text || '[]');
+      
+      // 4. Save new questions
+      const questionsToSave = newQuestions.map((q: any) => ({
+        ...q,
+        user_id: userId,
+        difficulty: 'media'
+      }));
+
+      const { error: insertError } = await supabase.from('questions').insert(questionsToSave);
+      if (insertError) throw insertError;
+
+      showNotification('Reforço gerado com sucesso!', 'success');
+      await fetchQuestions(); // Refresh list
+
+    } catch (error) {
+      console.error('Error generating smart review:', error);
+      showNotification('Erro ao gerar reforço. Tente novamente.', 'error');
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -1328,13 +1451,11 @@ Forneça a explicação de forma concisa e didática.`;
       const newCount = correctCount + 1;
       setCorrectCount(newCount);
       if (onCorrectAnswer) onCorrectAnswer();
-      localStorage.setItem(`sanfran_correct_count_${userId}`, newCount.toString());
       
       let newCorrect = [...correctQuestions];
       if (!correctQuestions.includes(targetQuestion.id)) {
         newCorrect.push(targetQuestion.id);
         setCorrectQuestions(newCorrect);
-        localStorage.setItem(`sanfran_correct_${userId}`, JSON.stringify(newCorrect));
       }
 
       let newWrong = [...wrongQuestions];
@@ -1348,14 +1469,12 @@ Forneça a explicação de forma concisa e didática.`;
           newWrong = wrongQuestions.filter(id => id !== targetQuestion.id);
           delete newMastery[targetQuestion.id];
           setWrongQuestions(newWrong);
-          localStorage.setItem(`sanfran_wrong_${userId}`, JSON.stringify(newWrong));
           showNotification('Questão vencida! Removida do Caderno de Erros.', 'success');
         } else {
           newMastery[targetQuestion.id] = currentMastery;
           showNotification(`Acerto consecutivo: ${currentMastery}/2 para vencer esta questão.`, 'success');
         }
         setErrorMastery(newMastery);
-        localStorage.setItem(`sanfran_error_mastery_${userId}`, JSON.stringify(newMastery));
       }
       
       const currentConfidenceLevels = { ...(userProgress?.confidence_levels || {}), [targetQuestion.id]: level };
@@ -1370,7 +1489,6 @@ Forneça a explicação de forma concisa e didática.`;
     } else {
       const newCount = wrongCount + 1;
       setWrongCount(newCount);
-      localStorage.setItem(`sanfran_wrong_count_${userId}`, newCount.toString());
       
       let newWrong = [...wrongQuestions];
       let newMastery = { ...errorMastery };
@@ -1378,12 +1496,10 @@ Forneça a explicação de forma concisa e didática.`;
       // Reset mastery on error
       newMastery[targetQuestion.id] = 0;
       setErrorMastery(newMastery);
-      localStorage.setItem(`sanfran_error_mastery_${userId}`, JSON.stringify(newMastery));
 
       if (!wrongQuestions.includes(targetQuestion.id)) {
         newWrong.push(targetQuestion.id);
         setWrongQuestions(newWrong);
-        localStorage.setItem(`sanfran_wrong_${userId}`, JSON.stringify(newWrong));
       }
       
       const currentConfidenceLevels = { ...(userProgress?.confidence_levels || {}), [targetQuestion.id]: level };
@@ -1410,25 +1526,16 @@ Forneça a explicação de forma concisa e didática.`;
   };
 
   const handleSaveNote = (questionId: string, noteText: string) => {
-    // Only save if content changed from storage
-    const storedNotes = localStorage.getItem(`sanfran_notes_${userId}`);
-    const parsedStored = storedNotes ? JSON.parse(storedNotes) : {};
-    
-    if (parsedStored[questionId] !== noteText) {
-       const newNotes = { ...notes, [questionId]: noteText };
-       setNotes(newNotes);
-       localStorage.setItem(`sanfran_notes_${userId}`, JSON.stringify(newNotes));
-       syncUserProgress({ notes: newNotes });
-       showNotification('Anotação salva com sucesso!', 'success');
-    }
+     const newNotes = { ...notes, [questionId]: noteText };
+     setNotes(newNotes);
+     syncUserProgress({ notes: newNotes });
+     showNotification('Anotação salva com sucesso!', 'success');
   };
 
   const resetStats = () => {
     if (confirm('Deseja realmente zerar suas estatísticas de acertos e erros?')) {
       setCorrectCount(0);
       setWrongCount(0);
-      localStorage.removeItem(`sanfran_correct_count_${userId}`);
-      localStorage.removeItem(`sanfran_wrong_count_${userId}`);
       syncUserProgress({ correctCount: 0, wrongCount: 0 });
       showNotification('Estatísticas zeradas', 'success');
     }
@@ -1549,8 +1656,12 @@ Forneça a explicação de forma concisa e didática.`;
                   <span className="text-2xl font-black text-emerald-500">{mockResults.confidenceStats.certeza}</span>
                 </div>
                 <div className="space-y-1">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Dúvidas (Acertos)</span>
+                  <span className="text-2xl font-black text-amber-500">{mockResults.doubtGuesses.length}</span>
+                </div>
+                <div className="space-y-1">
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Chutes (Sorte)</span>
-                  <span className="text-2xl font-black text-red-500">{mockResults.confidenceStats.chute}</span>
+                  <span className="text-2xl font-black text-red-500">{mockResults.luckyGuesses.length}</span>
                 </div>
                 <div className="space-y-1">
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Status</span>
@@ -1652,6 +1763,8 @@ Forneça a explicação de forma concisa e didática.`;
                       <span className="text-sm font-bold text-slate-700 dark:text-slate-300 truncate max-w-[70%]">{q.statement.substring(0, 50)}...</span>
                       <button 
                         onClick={() => {
+                          const level = sessionConfidenceStats[q.id] || 'certeza';
+                          handleCreateFlashcardFromError(q, mockAnswers[q.id], mockAnswers[q.id] === q.correct_answer);
                           showNotification('Flashcard criado!', 'success');
                         }}
                         className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all"
@@ -1670,6 +1783,7 @@ Forneça a explicação de forma concisa e didática.`;
   }
 
   return (
+    <>
     <div className={`${isMockMode ? 'fixed inset-0 z-[100] bg-slate-50 dark:bg-slate-950 overflow-y-auto' : 'max-w-4xl mx-auto p-4 md:p-8 animate-in fade-in duration-500 pb-24'}`}>
       {/* Confidence Selection Modal */}
       <AnimatePresence>
@@ -1803,11 +1917,29 @@ Forneça a explicação de forma concisa e didática.`;
               >
                 <Download size={16} /> Importar Exemplos
               </button>
+            <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-xl">
+              <Settings size={16} className="text-slate-500" />
+              <select 
+                value={voiceSpeed} 
+                onChange={(e) => setVoiceSpeed(parseFloat(e.target.value))}
+                className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-300 outline-none"
+              >
+                <option value={0.5}>0.5x</option>
+                <option value={1}>1x</option>
+                <option value={1.5}>1.5x</option>
+              </select>
+            </div>
             <button
               onClick={() => setShowAIGenerator(true)}
               className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition-colors"
             >
               <Sparkles size={16} /> Gerar com IA
+            </button>
+            <button
+              onClick={handleGenerateSmartReview}
+              className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-sm transition-colors shadow-lg shadow-amber-900/20"
+            >
+              <Zap size={16} /> Reforçar Pontos Fracos
             </button>
             <button
               onClick={() => setShowAddForm(!showAddForm)}
@@ -2232,6 +2364,7 @@ Forneça a explicação de forma concisa e didática.`;
           </div>
         </div>
       )}
+      </div>
 
       <div id="add-form-portal">
         {showAddForm ? (
@@ -2423,7 +2556,7 @@ Forneça a explicação de forma concisa e didática.`;
                 </div>
               </div>
             )}
-            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900">
               <div className="flex-1 relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -2438,6 +2571,17 @@ Forneça a explicação de forma concisa e didática.`;
                   className="block w-full pl-10 pr-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md leading-5 bg-slate-50 dark:bg-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 />
               </div>
+              
+              {selectedQuestionsForNotebook.size > 0 && (
+                <div className="ml-4 animate-in slide-in-from-right-4 duration-300">
+                  <button
+                    onClick={() => setShowNotebookCreationMode(true)}
+                    className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 shadow-lg shadow-orange-900/20"
+                  >
+                    <NotebookText size={14} /> Adicionar ao Caderno ({selectedQuestionsForNotebook.size})
+                  </button>
+                </div>
+              )}
             </div>
             
             <div className="p-4 bg-slate-50 dark:bg-slate-800/50">
@@ -2565,25 +2709,61 @@ Forneça a explicação de forma concisa e didática.`;
           </div>
 
           {/* Question Area */}
-          <div key="question-area-container">
-            {filteredQuestions.length > 0 && currentQuestion ? (
-              viewMode === 'list' ? (
-              <div className="grid grid-cols-1 gap-4">
-                {filteredQuestions.map((q, idx) => (
-                  <div 
-                    key={q.id}
-                    className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden"
+          <div key="question-area-container" className="flex flex-col md:flex-row gap-8">
+            {/* Sidebar: Meus Cadernos */}
+            <div className="w-full md:w-64 shrink-0 space-y-4">
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm sticky top-24">
+                <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2">
+                  <NotebookText size={14} /> Meus Cadernos
+                </h3>
+                <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                  <button 
+                    onClick={() => setSelectedNotebookId('')}
+                    className={`w-full text-left p-3 rounded-xl text-sm font-bold transition-all ${!selectedNotebookId ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
                   >
-                    <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2 text-sm">
-                      {showNotebookCreationMode && (
-                        <input
+                    Todas as Questões
+                  </button>
+                  {notebooks.map(n => (
+                    <button 
+                      key={n.id}
+                      onClick={() => setSelectedNotebookId(n.id)}
+                      className={`w-full text-left p-3 rounded-xl text-sm font-bold transition-all flex items-center justify-between ${selectedNotebookId === n.id ? 'bg-orange-50 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                    >
+                      <span className="truncate">{n.name}</span>
+                      <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">{n.question_ids.length}</span>
+                    </button>
+                  ))}
+                </div>
+                <button 
+                  onClick={() => setShowNotebookCreationMode(true)}
+                  className="w-full mt-4 p-3 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl text-xs font-black uppercase tracking-widest text-slate-400 hover:text-blue-500 hover:border-blue-500 transition-all flex items-center justify-center gap-2"
+                >
+                  <Plus size={14} /> Novo Caderno
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1">
+              {filteredQuestions.length > 0 && currentQuestion ? (
+                viewMode === 'list' ? (
+                <div className="grid grid-cols-1 gap-4">
+                  {filteredQuestions.map((q, idx) => (
+                    <div 
+                      key={q.id}
+                      className={`bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden relative pl-12 transition-all duration-300 ${activeQuestionId === q.id ? 'ring-2 ring-purple-500 shadow-lg' : ''}`}
+                    >
+                      {/* Checkbox for Notebook Selection */}
+                      <div className="absolute top-4 left-4 z-10">
+                        <input 
                           type="checkbox"
-                          className="w-4 h-4 accent-orange-500"
                           checked={selectedQuestionsForNotebook.has(q.id)}
                           onChange={() => toggleQuestionSelection(q.id)}
+                          className="w-5 h-5 rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
                         />
-                      )}
-                      <span className="font-bold text-slate-900 dark:text-white">{idx + 1}</span>
+                      </div>
+
+                      <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2 text-sm">
+                        <span className="font-bold text-slate-900 dark:text-white">{idx + 1}</span>
                       <span className="text-blue-600 dark:text-blue-400 font-medium">{q.id.substring(0, 8)}</span>
                       <span className="text-slate-400 mx-1">•</span>
                       <span className="text-blue-600 dark:text-blue-400 font-medium">{q.subject}</span>
@@ -2630,6 +2810,14 @@ Forneça a explicação de forma concisa e didática.`;
                           }`}
                         >
                           {expandedQuestionId === q.id ? 'Fechar Questão' : 'Resolver Questão'}
+                        </button>
+                        
+                        <button
+                          onClick={() => handleAudioHint(q)}
+                          disabled={isGeneratingHint}
+                          className={`p-2 rounded-full ${activeQuestionId === q.id ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-600'}`}
+                        >
+                          {isGeneratingHint ? <Loader2 size={16} className="animate-spin" /> : <Volume2 size={16} />}
                         </button>
                         
                       </div>
@@ -3027,11 +3215,15 @@ Forneça a explicação de forma concisa e didática.`;
 
                         <div className="flex gap-4 pt-2">
                           <button
-                            onClick={() => handleCreateFlashcardFromError(currentQuestion)}
-                            className={`flex-1 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-3 transition-all ${selectedOption === currentQuestion.correct_answer ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-purple-600 text-white hover:bg-purple-700 shadow-xl shadow-purple-900/20 active:scale-95'}`}
-                            disabled={selectedOption === currentQuestion.correct_answer}
+                            onClick={() => handleCreateFlashcardFromError(currentQuestion, selectedOption, selectedOption === currentQuestion.correct_answer)}
+                            className={`flex-1 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-3 transition-all ${
+                              (selectedOption === currentQuestion.correct_answer && confidenceLevel === 'certeza') 
+                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                                : 'bg-purple-600 text-white hover:bg-purple-700 shadow-xl shadow-purple-900/20 active:scale-95'
+                            }`}
+                            disabled={selectedOption === currentQuestion.correct_answer && confidenceLevel === 'certeza'}
                           >
-                            <PlusSquare size={20} /> Flashcard do Erro
+                            <PlusSquare size={20} /> {selectedOption === currentQuestion.correct_answer ? 'Flashcard da Dúvida' : 'Flashcard do Erro'}
                           </button>
                           <button
                             onClick={() => handleSaveAsPrecedent(currentQuestion)}
@@ -3131,6 +3323,12 @@ Forneça a explicação de forma concisa e didática.`;
               )}
             </div>
           )}
+            </div>
+          </div>
+          </>
+        )}
+      </div>
+      </div>
       </div>
 
       <div id="notification-portal">
@@ -3354,6 +3552,7 @@ Forneça a explicação de forma concisa e didática.`;
           isSubmitting={isSubmitting}
         />
       )}
+    </div>
     </>
   );
 };

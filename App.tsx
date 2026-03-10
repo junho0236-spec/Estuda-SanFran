@@ -288,6 +288,65 @@ const App: React.FC = () => {
     };
   }, [isAuthenticated, session, currentView, timerIsActive, timerSelectedSubjectId, subjects, currentRoomId, roomStartTime]);
 
+  // --- Realtime Data Sync Listener ---
+  useEffect(() => {
+    if (!isAuthenticated || !session?.user) return;
+
+    const userId = session.user.id;
+
+    const dataChannel = supabase.channel('realtime_data_sync')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'questions', 
+        filter: `user_id=eq.${userId}` 
+      }, () => {
+        console.log("[Realtime] Questions changed, reloading...");
+        loadUserData();
+      })
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'flashcards', 
+        filter: `user_id=eq.${userId}` 
+      }, () => {
+        console.log("[Realtime] Flashcards changed, reloading...");
+        loadUserData();
+      })
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'tasks', 
+        filter: `user_id=eq.${userId}` 
+      }, () => {
+        console.log("[Realtime] Tasks changed, reloading...");
+        loadUserData();
+      })
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'folders', 
+        filter: `user_id=eq.${userId}` 
+      }, () => {
+        console.log("[Realtime] Folders changed, reloading...");
+        loadUserData();
+      })
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'user_progress', 
+        filter: `user_id=eq.${userId}` 
+      }, () => {
+        console.log("[Realtime] User progress changed, reloading...");
+        loadUserData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(dataChannel);
+    };
+  }, [isAuthenticated, session]);
+
   // Pomodoro Logic
   useEffect(() => {
     if (timerIsActive && timerSecondsLeft > 0) {
@@ -356,17 +415,41 @@ const App: React.FC = () => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setIsAuthenticated(!!session);
-      if (session?.user) syncProfile(session.user);
+      if (session?.user) {
+        syncProfile(session.user);
+        clearOldLocalStorage(session.user.id);
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setIsAuthenticated(!!session);
-      if (session?.user) syncProfile(session.user);
+      if (session?.user) {
+        syncProfile(session.user);
+        clearOldLocalStorage(session.user.id);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const clearOldLocalStorage = (userId: string) => {
+    const keysToRemove = [
+      `sanfran_favorites_${userId}`,
+      `sanfran_wrong_${userId}`,
+      `sanfran_correct_${userId}`,
+      `sanfran_notes_${userId}`,
+      `sanfran_correct_count_${userId}`,
+      `sanfran_wrong_count_${userId}`,
+      `sanfran_error_mastery_${userId}`,
+      'sanfran_citation_history',
+      'sanfran_sumula_pb',
+      'sanfran_oral_argument_notes',
+      'sanfran_grades_sim'
+    ];
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    console.log("[App] Local storage cleaned up for user:", userId);
+  };
 
   const syncProfile = async (user: any) => {
     const name = user.user_metadata?.full_name;
@@ -415,6 +498,7 @@ const App: React.FC = () => {
     if (!session?.user) return;
     setIsSyncing(true);
     try {
+      clearOldLocalStorage(session.user.id);
       await dataService.syncOfflineData(session.user.id);
       await loadUserData();
     } catch (err) {
