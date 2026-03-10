@@ -103,30 +103,29 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
       const contentWidth = pageWidth - 2 * margin;
       let currentY = margin;
       
-      const scaleSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 24 24" fill="none" stroke="#800020" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>`;
-      const scaleDataUrl = 'data:image/svg+xml;base64,' + btoa(scaleSvg);
-
       const addWatermark = (page: number) => {
         doc.setPage(page);
         
         // Double Border
-        doc.setDrawColor(128, 0, 32); // Bordô
+        doc.setDrawColor(122, 0, 0); // Bordô
         doc.setLineWidth(0.5);
-        doc.rect(10, 10, pageWidth - 20, pageHeight - 20);
+        doc.rect(5, 5, 200, 287);
         doc.setLineWidth(0.2);
-        doc.rect(12, 12, pageWidth - 24, pageHeight - 24);
+        doc.rect(7, 7, 196, 283);
 
         // Corner Ornaments
         doc.setLineWidth(0.5);
-        doc.line(10, 15, 15, 10); // Top Left
-        doc.line(pageWidth - 15, 10, pageWidth - 10, 15); // Top Right
-        doc.line(10, pageHeight - 15, 15, pageHeight - 10); // Bottom Left
-        doc.line(pageWidth - 15, pageHeight - 10, pageWidth - 10, pageHeight - 15); // Bottom Right
+        doc.line(5, 10, 10, 5); // Top Left
+        doc.line(205, 5, 200, 10); // Top Right
+        doc.line(5, 282, 10, 287); // Bottom Left
+        doc.line(205, 287, 200, 282); // Bottom Right
 
-        // Watermark
-        doc.setGState(new (doc as any).GState({opacity: 0.02}));
-        doc.addImage(scaleDataUrl, 'SVG', pageWidth / 2 - 60, pageHeight / 2 - 60, 120, 120);
-        doc.setGState(new (doc as any).GState({opacity: 1}));
+        // Watermark via Text (Lighter, faster)
+        doc.setTextColor(238, 238, 238); // #EEEEEE
+        doc.setFontSize(60);
+        doc.setFont('helvetica', 'bold');
+        doc.text('SANFRAN ACADEMY', pageWidth / 2, pageHeight / 2, { align: 'center', angle: 45 });
+        doc.setTextColor(0, 0, 0);
       };
 
       // Capture Cover
@@ -3477,7 +3476,7 @@ Forneça a explicação de forma concisa e didática.`;
       {isExporting && (
         <div style={{ position: 'absolute', left: '-9999px', top: 0, width: '800px', backgroundColor: '#ffffff', zIndex: -1 }}>
           <div id="pdf-cover" className="p-16 bg-white flex flex-col items-center justify-center text-center h-[1100px]">
-            <div className="w-32 h-32 bg-[#800020] rounded-3xl flex items-center justify-center shadow-xl mb-12">
+            <div className="w-32 h-32 bg-[#800020] rounded-3xl flex items-center justify-center mb-12 border border-gray-200">
               <Scale className="w-16 h-16 text-white" />
             </div>
             
@@ -3514,9 +3513,9 @@ Forneça a explicação de forma concisa e didática.`;
             </div>
           </div>
 
-          <div id="pdf-header" className="p-8 bg-gray-50/80 border-b border-gray-200 flex items-center justify-between shadow-sm">
+          <div id="pdf-header" className="p-8 bg-gray-50/80 border-b border-gray-200 flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-[#800020] rounded-xl flex items-center justify-center shadow-md">
+              <div className="w-12 h-12 bg-[#800020] rounded-xl flex items-center justify-center border border-gray-200">
                 <Scale className="w-6 h-6 text-white" />
               </div>
               <div>
@@ -3534,9 +3533,9 @@ Forneça a explicação de forma concisa e didática.`;
             {filteredQuestions.map((q, idx) => {
               const isShortOptions = q.options.every(opt => opt.length < 60);
               return (
-              <div key={idx} className="pdf-question-card bg-white rounded-2xl p-6 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100 relative overflow-hidden">
+              <div key={idx} className="pdf-question-card bg-white rounded-2xl p-6 border border-gray-200 relative overflow-hidden">
                 <div className="flex gap-4 mb-6">
-                  <div className="w-12 h-12 rounded-xl bg-white border border-gray-100 flex items-center justify-center flex-shrink-0 shadow-[0_4px_10px_rgb(0,0,0,0.05)]">
+                  <div className="w-12 h-12 rounded-xl bg-white border border-gray-200 flex items-center justify-center flex-shrink-0">
                     <span className="text-lg font-black text-[#800020]">{idx + 1}</span>
                   </div>
                   <div className="flex-1 pt-1">
@@ -3545,7 +3544,7 @@ Forneça a explicação de forma concisa e didática.`;
                 </div>
                 <div className={`grid gap-3 ml-16 ${isShortOptions ? 'grid-cols-2' : 'grid-cols-1'}`}>
                   {q.options.map((opt, optIdx) => (
-                    <div key={optIdx} className="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50/50 shadow-sm">
+                    <div key={optIdx} className="flex items-start gap-3 p-4 rounded-xl border border-gray-200 bg-gray-50/50">
                       <div className="w-6 h-6 rounded-full border-2 border-gray-300 bg-white flex-shrink-0 mt-0.5 flex items-center justify-center">
                         <span className="text-xs font-bold text-gray-400">{String.fromCharCode(65 + optIdx)}</span>
                       </div>
@@ -3560,8 +3559,8 @@ Forneça a explicação de forma concisa e didática.`;
           </div>
 
           <div id="pdf-answer-key" className="p-8 mt-4">
-            <div className="bg-white rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100">
-              <div className="flex items-center gap-3 mb-8 pb-6 border-b border-gray-100">
+            <div className="bg-white rounded-3xl p-8 border border-gray-200">
+              <div className="flex items-center gap-3 mb-8 pb-6 border-b border-gray-200">
                 <div className="w-12 h-12 bg-[#800020] rounded-xl flex items-center justify-center">
                   <CheckCircle2 className="w-6 h-6 text-white" />
                 </div>
@@ -3572,7 +3571,7 @@ Forneça a explicação de forma concisa e didática.`;
               </div>
               <div className="grid grid-cols-2 gap-x-12 gap-y-6">
                 {filteredQuestions.map((q, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-2 border-b border-gray-100">
+                  <div key={idx} className="flex items-center justify-between p-2 border-b border-gray-200">
                     <span className="text-sm font-bold text-gray-700 w-8">{idx + 1}.</span>
                     <div className="flex gap-2">
                       {['A', 'B', 'C', 'D', 'E'].slice(0, q.options.length).map((letter, lIdx) => {
