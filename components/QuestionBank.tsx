@@ -52,7 +52,9 @@ import {
   BookX,
   Sword,
   Book,
-  Search
+  Search,
+  Settings,
+  Volume2
 } from 'lucide-react';
 import { GlossaryText } from './GlossaryText.tsx';
 import { GlossaryPopover } from './GlossaryPopover.tsx';
@@ -205,7 +207,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
     
     // Calculate results
     let correct = 0;
-    const subjectMap: Record<string, { correct: number; total: number; confidence: Record<string, number> }> = {};
+    const subjectMap: Record<string, { correct: number; total: number; confidence: Record<string, number>; correctConfidence: Record<string, number> }> = {};
     const confidenceStats = { certeza: 0, duvida: 0, chute: 0 };
     const luckyGuesses: string[] = [];
     const doubtGuesses: string[] = [];
@@ -1076,7 +1078,7 @@ Forneça a explicação de forma concisa e didática.`;
   const handleGenerateSmartReview = async () => {
     try {
       setIsGenerating(true);
-      showNotification('Analisando seus pontos fracos...', 'info');
+      showNotification('Analisando seus pontos fracos...', 'success');
 
       // 1. Fetch weak topics from view
       const { data: weakTopics, error: weakError } = await supabase
@@ -1088,7 +1090,7 @@ Forneça a explicação de forma concisa e didática.`;
       if (weakError) throw weakError;
 
       if (!weakTopics || weakTopics.length === 0) {
-        showNotification('Nenhum ponto fraco crítico encontrado para reforço.', 'info');
+        showNotification('Nenhum ponto fraco crítico encontrado para reforço.', 'success');
         setIsGenerating(false);
         return;
       }
@@ -3341,8 +3343,6 @@ Forneça a explicação de forma concisa e didática.`;
             </div>
           )}
         </div>
-    );
-  };
   
   export default QuestionBank;
       {showAiLesson && (
@@ -3554,8 +3554,8 @@ Forneça a explicação de forma concisa e didática.`;
           isSubmitting={isSubmitting}
         />
       )}
-    </div>
-    </div>
+      </div>
+      </div>
   );
 };
 
