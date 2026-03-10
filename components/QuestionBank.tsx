@@ -128,12 +128,12 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
         doc.setTextColor(0, 0, 0);
       };
 
+      // Native PDF Generation for Questions
+      let processedElements = 0;
+      const totalElements = filteredQuestions.length + 3; // cover + header + questions + answer key
+
       // Capture Cover
       const coverEl = document.getElementById('pdf-cover');
-      let processedElements = 0;
-      const questionCards = document.querySelectorAll('.pdf-question-card');
-      const totalElements = questionCards.length + 3; // cover + header + questions + answer key
-
       if (coverEl) {
         let canvas: HTMLCanvasElement | null = await html2canvas(coverEl, { scale: 1.5, useCORS: true, logging: false });
         const imgData = canvas.toDataURL('image/jpeg', 0.8);
@@ -164,50 +164,145 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
         setExportProgress(Math.round((processedElements / totalElements) * 100));
       }
 
-      // Capture Questions
-      for (let i = 0; i < questionCards.length; i++) {
-        const card = questionCards[i] as HTMLElement;
-        let canvas: HTMLCanvasElement | null = await html2canvas(card, { scale: 1.5, useCORS: true, logging: false });
-        const imgData = canvas.toDataURL('image/jpeg', 0.8);
-        canvas = null; // Free memory
-        const imgProps = doc.getImageProperties(imgData);
-        const imgHeight = (imgProps.height * contentWidth) / imgProps.width;
-
-        if (currentY + imgHeight > pageHeight - margin) {
-          doc.addPage();
-          currentY = margin;
+      // Native PDF Generation for Questions
+      for (let i = 0; i < filteredQuestions.length; i++) {
+        const q = filteredQuestions[i];
+        
+        // Calculate text heights
+        doc.setFontSize(11);
+        doc.setFont('times', 'normal');
+        
+        const statementLines = doc.splitTextToSize(q.statement, contentWidth - 20);
+        const statementHeight = statementLines.length * 6;
+        
+        let optionsHeight = 0;
+        const optionsLines: string[][] = [];
+        
+        q.options.forEach(opt => {
+           const lines = doc.splitTextToSize(opt, contentWidth - 30);
+           optionsLines.push(lines);
+           optionsHeight += lines.length * 6 + 4; // 4mm padding between options
+        });
+        
+        const cardHeight = statementHeight + optionsHeight + 20; // paddings
+        
+        // Check page break
+        if (currentY + cardHeight > pageHeight - margin) {
+           doc.addPage();
+           currentY = margin;
         }
-
-        doc.addImage(imgData, 'JPEG', margin, currentY, contentWidth, imgHeight, undefined, 'FAST');
-        currentY += imgHeight + 10;
+        
+        // Draw Card Border
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.2);
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(margin, currentY, contentWidth, cardHeight, 3, 3, 'FD');
+        
+        let cardY = currentY + 10;
+        
+        // Draw Question Number
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.setTextColor(122, 0, 0);
+        doc.text(`${i + 1}.`, margin + 5, cardY);
+        
+        // Draw Statement
+        doc.setFont('times', 'normal');
+        doc.setFontSize(11);
+        doc.setTextColor(0, 0, 0);
+        doc.text(statementLines, margin + 15, cardY, { align: 'justify', maxWidth: contentWidth - 20 });
+        
+        cardY += statementHeight + 5;
+        
+        // Draw Options
+        q.options.forEach((opt, optIdx) => {
+           const lines = optionsLines[optIdx];
+           
+           // Draw checkbox
+           doc.setDrawColor(150, 150, 150);
+           doc.rect(margin + 15, cardY - 4, 4, 4);
+           
+           // Draw Option Letter
+           doc.setFont('helvetica', 'bold');
+           doc.setFontSize(10);
+           doc.setTextColor(100, 100, 100);
+           doc.text(String.fromCharCode(65 + optIdx), margin + 17, cardY - 0.5, { align: 'center' });
+           
+           // Draw Option Text
+           doc.setFont('times', 'normal');
+           doc.setFontSize(11);
+           doc.setTextColor(50, 50, 50);
+           doc.text(lines, margin + 22, cardY, { align: 'justify', maxWidth: contentWidth - 30 });
+           
+           cardY += lines.length * 6 + 4;
+        });
+        
+        currentY += cardHeight + 5;
         
         processedElements++;
         setExportProgress(Math.round((processedElements / totalElements) * 100));
-
-        // Batch processing delay every 5 questions to free up main thread
-        if ((i + 1) % 5 === 0) {
-          await new Promise(resolve => setTimeout(resolve, 150));
+        
+        if ((i + 1) % 10 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 50));
         }
       }
 
-      // Capture Answer Key
-      const answerKeyEl = document.getElementById('pdf-answer-key');
-      if (answerKeyEl) {
-        let canvas: HTMLCanvasElement | null = await html2canvas(answerKeyEl, { scale: 1.5, useCORS: true, logging: false });
-        const imgData = canvas.toDataURL('image/jpeg', 0.8);
-        canvas = null; // Free memory
-        const imgProps = doc.getImageProperties(imgData);
-        const imgHeight = (imgProps.height * contentWidth) / imgProps.width;
-
-        if (currentY + imgHeight > pageHeight - margin) {
-          doc.addPage();
-          currentY = margin;
+      // Answer Key
+      doc.addPage();
+      currentY = margin;
+      
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.setTextColor(122, 0, 0);
+      doc.text('Cartão de Respostas', pageWidth / 2, currentY + 10, { align: 'center' });
+      
+      let akCurrentY = currentY + 25;
+      const cols = 2;
+      const colWidth = contentWidth / cols;
+      const rowHeight = 12;
+      
+      doc.setFontSize(11);
+      
+      for (let i = 0; i < filteredQuestions.length; i++) {
+        const q = filteredQuestions[i];
+        const col = i % cols;
+        
+        if (col === 0 && i > 0) {
+          akCurrentY += rowHeight;
         }
-
-        doc.addImage(imgData, 'JPEG', margin, currentY, contentWidth, imgHeight, undefined, 'FAST');
-        processedElements++;
-        setExportProgress(Math.round((processedElements / totalElements) * 100));
+        
+        if (akCurrentY > pageHeight - margin - 20 && col === 0) {
+           doc.addPage();
+           akCurrentY = margin + 10;
+        }
+        
+        const x = margin + col * colWidth;
+        
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(0, 0, 0);
+        doc.text(`${i + 1}.`, x + 5, akCurrentY);
+        
+        for (let lIdx = 0; lIdx < Math.min(5, q.options.length); lIdx++) {
+           const letterX = x + 20 + lIdx * 12;
+           const isCorrect = q.correct_answer === lIdx;
+           
+           if (isCorrect) {
+             doc.setFillColor(122, 0, 0);
+             doc.circle(letterX + 2, akCurrentY - 1.5, 3.5, 'F');
+             doc.setTextColor(255, 255, 255);
+           } else {
+             doc.setDrawColor(150, 150, 150);
+             doc.circle(letterX + 2, akCurrentY - 1.5, 3.5, 'S');
+             doc.setTextColor(100, 100, 100);
+           }
+           
+           doc.setFontSize(9);
+           doc.text(String.fromCharCode(65 + lIdx), letterX + 2, akCurrentY, { align: 'center' });
+        }
       }
+      
+      processedElements++;
+      setExportProgress(Math.round((processedElements / totalElements) * 100));
 
       // Add watermark and page numbers to all pages
       const pageCount = (doc.internal as any).getNumberOfPages();
