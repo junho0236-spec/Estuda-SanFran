@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef, Suspense } from 'react';
+import { Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
 import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map as MapIcon, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck, BookX, ScrollText, FileText, Repeat, UserX, ListTodo, Handshake, Eye, Key, CalendarCheck, Loader2, BarChart3, Search, Command } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel, StudyMode } from './types';
 import Login from './components/Login';
@@ -165,8 +166,37 @@ const BrasiliaClock: React.FC = () => {
   );
 };
 
+const getPathFromView = (view: View): string => {
+  if (view === View.Dashboard) return '/';
+  if (view === View.QuestionBank) return '/questoes';
+  if (view === View.Anki) return '/flashcards';
+  if (view === View.ErrorLog) return '/caderno-erros';
+  return `/${view}`;
+};
+
+const getViewFromPath = (pathname: string): View => {
+  if (pathname === '/' || pathname === '') return View.Dashboard;
+  if (pathname === '/questoes') return View.QuestionBank;
+  if (pathname === '/flashcards') return View.Anki;
+  if (pathname === '/simulados') return View.QuestionBank;
+  if (pathname === '/caderno-erros') return View.ErrorLog;
+  
+  const pathWithoutSlash = pathname.substring(1);
+  if (Object.values(View).includes(pathWithoutSlash as View)) {
+    return pathWithoutSlash as View;
+  }
+  return View.Dashboard;
+};
+
 const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<View>(View.Dashboard);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const currentView = getViewFromPath(location.pathname);
+  
+  const setCurrentView = (view: View) => {
+    navigate(getPathFromView(view));
+  };
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -830,9 +860,10 @@ const App: React.FC = () => {
       <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${isExtremeFocus ? '-translate-x-full lg:-translate-x-full lg:w-0' : 'lg:relative lg:translate-x-0 lg:w-72'} fixed inset-y-0 left-0 z-40 bg-white dark:bg-[#0d0303] border-r border-slate-200 dark:border-sanfran-rubi/30 transition-all duration-700 flex flex-col shadow-2xl lg:shadow-none`}>
         <div className="p-6 border-b border-slate-100 dark:border-sanfran-rubi/20 flex flex-col">
           <div className="flex items-center justify-between mb-4">
-            <button
-              onClick={() => { setCurrentView(View.Profile); closeSidebar(); }}
-              className="w-full group text-left p-2 -m-2 rounded-xl transition-all duration-200 hover:bg-slate-50 dark:hover:bg-white/5"
+            <Link
+              to={getPathFromView(View.Profile)}
+              onClick={() => closeSidebar()}
+              className="w-full group text-left p-2 -m-2 rounded-xl transition-all duration-200 hover:bg-slate-50 dark:hover:bg-white/5 block"
             >
               <div className="flex items-center gap-4">
                 {/* Ícone do Livro (Mantido e Restaurado) */}
@@ -853,7 +884,7 @@ const App: React.FC = () => {
                    </span>
                 </div>
               </div>
-            </button>
+            </Link>
             <button onClick={closeSidebar} className="lg:hidden p-2 text-slate-400 hover:text-sanfran-rubi transition-colors self-start">
               <X className="w-6 h-6" />
             </button>
@@ -885,9 +916,10 @@ const App: React.FC = () => {
                              (item.id === View.SanFranOAB && isOABChild);
             
             return (
-              <button 
+              <Link 
                 key={item.id} 
-                onClick={() => { setCurrentView(item.id); closeSidebar(); }} 
+                to={getPathFromView(item.id)}
+                onClick={() => closeSidebar()} 
                 className={`group w-full flex items-center gap-4 p-3 rounded-2xl transition-all duration-300 border ${
                   isActive
                     ? 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 shadow-xl scale-[1.02] z-10' 
@@ -919,7 +951,7 @@ const App: React.FC = () => {
                     {presenceUsers.length}
                   </span>
                 )}
-              </button>
+              </Link>
             )
           })}
         </nav>
@@ -961,7 +993,8 @@ const App: React.FC = () => {
           )}
           <div className={`${isExtremeFocus ? 'max-w-none h-full flex items-center justify-center' : 'max-w-6xl mx-auto h-full'}`}>
              <Suspense fallback={<PageLoader />}>
-                {currentView === View.Dashboard && (
+<Routes>
+                <Route path={getPathFromView(View.Dashboard)} element={
                   <Dashboard 
                     subjects={subjects} 
                     flashcards={flashcards} 
@@ -970,29 +1003,29 @@ const App: React.FC = () => {
                     readings={readings} 
                     onNavigate={setCurrentView}
                   />
-                )}
+                } />
                 
                 {/* HUBS */}
-                {currentView === View.SanFranEssential && <SanFranEssential onNavigate={setCurrentView} />}
-                {currentView === View.SanFranCommunity && <SanFranCommunity onNavigate={setCurrentView} />}
-                {currentView === View.SanFranImprovement && <SanFranImprovement onNavigate={setCurrentView} />}
-                {currentView === View.SanFranLanguages && <SanFranLanguages onNavigate={setCurrentView} />}
-                {currentView === View.SanFranLife && <SanFranLife onNavigate={setCurrentView} />}
-                {currentView === View.SanFranGames && <SanFranGames onNavigate={setCurrentView} />}
-                {currentView === View.SanFranHelp && <SanFranHelp onNavigate={setCurrentView} />}
-                {currentView === View.SanFranOAB && <SanFranOAB onNavigate={setCurrentView} />}
+                <Route path={getPathFromView(View.SanFranEssential)} element={<SanFranEssential onNavigate={setCurrentView} />} />
+                <Route path={getPathFromView(View.SanFranCommunity)} element={<SanFranCommunity onNavigate={setCurrentView} />} />
+                <Route path={getPathFromView(View.SanFranImprovement)} element={<SanFranImprovement onNavigate={setCurrentView} />} />
+                <Route path={getPathFromView(View.SanFranLanguages)} element={<SanFranLanguages onNavigate={setCurrentView} />} />
+                <Route path={getPathFromView(View.SanFranLife)} element={<SanFranLife onNavigate={setCurrentView} />} />
+                <Route path={getPathFromView(View.SanFranGames)} element={<SanFranGames onNavigate={setCurrentView} />} />
+                <Route path={getPathFromView(View.SanFranHelp)} element={<SanFranHelp onNavigate={setCurrentView} />} />
+                <Route path={getPathFromView(View.SanFranOAB)} element={<SanFranOAB onNavigate={setCurrentView} />} />
 
-                {currentView === View.Profile && <Profile />}
-                {currentView === View.DominioJuridico && <DominioJuridico subjects={subjects} studySessions={studySessions} />}
-                {currentView === View.DigitalID && <DigitalID userId={session.user.id} userName={session.user.user_metadata?.full_name} studySessions={studySessions} tasks={tasks} />}
-                {currentView === View.Office && <VirtualOffice studySessions={studySessions} userName={session.user.user_metadata?.full_name} />}
-                {currentView === View.Sebo && <Sebo userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
-                {currentView === View.ClassificadosPatio && <ClassificadosPatio userId={session.user.id} userName={session.user.user_metadata?.full_name} studySessions={studySessions} />}
-                {currentView === View.Specialization && <SpecializationTree subjects={subjects} studySessions={studySessions} />}
-                {currentView === View.SumulaChallenge && <SumulaChallenge userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
-                {currentView === View.JurisprudenceMural && <JurisprudenceMural userId={session.user.id} userName={session.user.user_metadata?.full_name} onNavigate={setCurrentView} />}
-                {currentView === View.CaseAnalyzer && <CaseAnalyzer onBack={() => setCurrentView(View.JurisprudenceMural)} />}
-                {currentView === View.NoteView && selectedSubjectIdForNotes && (
+                <Route path={getPathFromView(View.Profile)} element={<Profile />} />
+                <Route path={getPathFromView(View.DominioJuridico)} element={<DominioJuridico subjects={subjects} studySessions={studySessions} />} />
+                <Route path={getPathFromView(View.DigitalID)} element={<DigitalID userId={session.user.id} userName={session.user.user_metadata?.full_name} studySessions={studySessions} tasks={tasks} />} />
+                <Route path={getPathFromView(View.Office)} element={<VirtualOffice studySessions={studySessions} userName={session.user.user_metadata?.full_name} />} />
+                <Route path={getPathFromView(View.Sebo)} element={<Sebo userId={session.user.id} userName={session.user.user_metadata?.full_name} />} />
+                <Route path={getPathFromView(View.ClassificadosPatio)} element={<ClassificadosPatio userId={session.user.id} userName={session.user.user_metadata?.full_name} studySessions={studySessions} />} />
+                <Route path={getPathFromView(View.Specialization)} element={<SpecializationTree subjects={subjects} studySessions={studySessions} />} />
+                <Route path={getPathFromView(View.SumulaChallenge)} element={<SumulaChallenge userId={session.user.id} userName={session.user.user_metadata?.full_name} />} />
+                <Route path={getPathFromView(View.JurisprudenceMural)} element={<JurisprudenceMural userId={session.user.id} userName={session.user.user_metadata?.full_name} onNavigate={setCurrentView} />} />
+                <Route path={getPathFromView(View.CaseAnalyzer)} element={<CaseAnalyzer onBack={() => setCurrentView(View.JurisprudenceMural)} />} />
+                <Route path={getPathFromView(View.NoteView)} element={selectedSubjectIdForNotes ? (
                   <NoteView 
                     subjectId={selectedSubjectIdForNotes} 
                     userId={session.user.id} 
@@ -1005,14 +1038,14 @@ const App: React.FC = () => {
                     subjects={subjects}
                     onToggleSidebar={setIsSidebarOpen}
                   />
-                )}
-                {currentView === View.Societies && <Societies userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
-                {currentView === View.LeiSeca && <LeiSeca userId={session.user.id} />}
-                {currentView === View.CitationGenerator && <CitationGenerator />}
-                {currentView === View.Editais && <Editais userId={session.user.id} />}
-                {currentView === View.Timeline && <TimelineBuilder />}
-                {currentView === View.DeadArchive && <DeadArchive userId={session.user.id} />}
-                {currentView === View.Anki && (
+                ) : null} />
+                <Route path={getPathFromView(View.Societies)} element={<Societies userId={session.user.id} userName={session.user.user_metadata?.full_name} />} />
+                <Route path={getPathFromView(View.LeiSeca)} element={<LeiSeca userId={session.user.id} />} />
+                <Route path={getPathFromView(View.CitationGenerator)} element={<CitationGenerator />} />
+                <Route path={getPathFromView(View.Editais)} element={<Editais userId={session.user.id} />} />
+                <Route path={getPathFromView(View.Timeline)} element={<TimelineBuilder />} />
+                <Route path={getPathFromView(View.DeadArchive)} element={<DeadArchive userId={session.user.id} />} />
+                <Route path={getPathFromView(View.Anki)} element={
                   <Anki 
                     subjects={subjects} 
                     flashcards={flashcards} 
@@ -1025,78 +1058,78 @@ const App: React.FC = () => {
                     isOnline={isOnline}
                     setStudySessions={setStudySessions}
                   />
-                )}
-                {currentView === View.Library && <Library readings={readings} setReadings={setReadings} subjects={subjects} userId={session.user.id} />}
-                {currentView === View.Largo && <Largo presenceUsers={presenceUsers} currentUserId={session.user.id} />}
-                {currentView === View.Mural && <Mural userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-                {currentView === View.Calculator && <GradeCalculator subjects={subjects} />}
-                {currentView === View.DeadlineCalculator && <DeadlineCalculator />}
-                {currentView === View.Dosimetria && <Dosimetria userId={session.user.id} />}
-                {currentView === View.Honorarios && <Honorarios userId={session.user.id} />}
-                {currentView === View.Checklist && <Checklist userId={session.user.id} />}
-                {currentView === View.InvestigationBoard && <InvestigationBoard userId={session.user.id} />}
-                {currentView === View.LatinGame && <LatinGame userId={session.user.id} />}
-                {currentView === View.Debate && <Debate userId={session.user.id} />}
-                {currentView === View.Trunfo && <Trunfo userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
-                {currentView === View.OabCountdown && <OabCountdown userId={session.user.id} />}
-                {currentView === View.TypingChallenge && <TypingChallenge userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
-                {currentView === View.Petitum && <Petitum userId={session.user.id} />}
-                {currentView === View.SucessaoSimulator && <SucessaoSimulator />}
-                {currentView === View.JurisTinder && <JurisTinder />}
-                {currentView === View.InternRPG && <InternRPG />}
-                {currentView === View.PrescriptionCalculator && <PrescriptionCalculator userId={session.user.id} />}
-                {currentView === View.SanFranIdiomas && <SanFranIdiomas userId={session.user.id} />}
-                {currentView === View.LegalCinema && <LegalCinema userId={session.user.id} />}
-                {currentView === View.GeneralLanguages && <GeneralLanguages userId={session.user.id} />}
-                {currentView === View.LegalSimplifier && <LegalSimplifier userId={session.user.id} />}
-                {currentView === View.PronunciationLab && <PronunciationLab userId={session.user.id} />}
-                {currentView === View.LyricalVibes && <LyricalVibes userId={session.user.id} />}
-                {currentView === View.TheExchangeStudent && <TheExchangeStudent userId={session.user.id} />}
-                {currentView === View.QuestionBank && <QuestionBank userId={session.user.id} onCorrectAnswer={incrementCorrectQuestions} folders={folders} flashcards={flashcards} />}
-                {currentView === View.IntelligentSummarizer && <IntelligentSummarizer userId={session.user.id} />}
-                {currentView === View.StudyBuddy && <StudyBuddy userId={session.user.id} />}
-                {currentView === View.Certificates && <Certificates userId={session.user.id} userName={session.user.user_metadata?.full_name} />}
-                {currentView === View.VisualFlashcards && <VisualFlashcards userId={session.user.id} />}
-                {currentView === View.BilingualNews && <BilingualNews userId={session.user.id} />}
-                {currentView === View.SlangChallenge && <SlangChallenge userId={session.user.id} />}
-                {currentView === View.ErrorLog && <ErrorLog userId={session.user.id} />}
-                {currentView === View.CodeTracker && <CodeTracker userId={session.user.id} />}
-                {currentView === View.IracMethod && <IracMethod userId={session.user.id} />}
-                {currentView === View.SpacedRepetition && <SpacedRepetition userId={session.user.id} />}
-                {currentView === View.AttendanceCalculator && <AttendanceCalculator userId={session.user.id} />}
-                {currentView === View.SyllabusTracker && <SyllabusTracker userId={session.user.id} />}
-                {currentView === View.DeadlinePlanner && <DeadlinePlanner userId={session.user.id} />}
-                {currentView === View.Mentorship && <Mentorship userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-                {currentView === View.MockJury && <MockJury userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-                {currentView === View.PetitionWiki && <PetitionWiki userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-                {currentView === View.StudyPact && <StudyPact userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-                {currentView === View.LargoAuction && <LargoAuction userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-                {currentView === View.SocialEvents && <SocialEvents userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-                {currentView === View.TheVault && <TheVault userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-                {currentView === View.CaronasRepublicas && <CaronasRepublicas userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-                {currentView === View.BalcaoEstagios && <BalcaoEstagios userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-                {currentView === View.TribunalOpiniao && <TribunalOpiniao userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-                {currentView === View.BussolaOptativas && <BussolaOptativas userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-                {currentView === View.AchadosPerdidos && <AchadosPerdidos userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-                {currentView === View.PerolasTribuna && <PerolasTribuna userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-                {currentView === View.GuiaSobrevivencia && <GuiaSobrevivencia userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-                {currentView === View.ClubeLivro && <ClubeLivro userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />}
-                {currentView === View.GuerraTurmas && <GuerraTurmas userId={session.user.id} />}
-                {currentView === View.SpeedReader && <SpeedReader />}
-                {currentView === View.Mnemonics && <Mnemonics userId={session.user.id} />}
-                {currentView === View.ReverseSchedule && <ReverseStudyPlanner userId={session.user.id} />}
-                {currentView === View.Statistics && <Statistics studySessions={studySessions} flashcards={flashcards} tasks={tasks} subjects={subjects} correctQuestionsCount={correctQuestionsCount} confidenceLevels={confidenceLevels} />}
+                } />
+                <Route path={getPathFromView(View.Library)} element={<Library readings={readings} setReadings={setReadings} subjects={subjects} userId={session.user.id} />} />
+                <Route path={getPathFromView(View.Largo)} element={<Largo presenceUsers={presenceUsers} currentUserId={session.user.id} />} />
+                <Route path={getPathFromView(View.Mural)} element={<Mural userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />} />
+                <Route path={getPathFromView(View.Calculator)} element={<GradeCalculator subjects={subjects} />} />
+                <Route path={getPathFromView(View.DeadlineCalculator)} element={<DeadlineCalculator />} />
+                <Route path={getPathFromView(View.Dosimetria)} element={<Dosimetria userId={session.user.id} />} />
+                <Route path={getPathFromView(View.Honorarios)} element={<Honorarios userId={session.user.id} />} />
+                <Route path={getPathFromView(View.Checklist)} element={<Checklist userId={session.user.id} />} />
+                <Route path={getPathFromView(View.InvestigationBoard)} element={<InvestigationBoard userId={session.user.id} />} />
+                <Route path={getPathFromView(View.LatinGame)} element={<LatinGame userId={session.user.id} />} />
+                <Route path={getPathFromView(View.Debate)} element={<Debate userId={session.user.id} />} />
+                <Route path={getPathFromView(View.Trunfo)} element={<Trunfo userId={session.user.id} userName={session.user.user_metadata?.full_name} />} />
+                <Route path={getPathFromView(View.OabCountdown)} element={<OabCountdown userId={session.user.id} />} />
+                <Route path={getPathFromView(View.TypingChallenge)} element={<TypingChallenge userId={session.user.id} userName={session.user.user_metadata?.full_name} />} />
+                <Route path={getPathFromView(View.Petitum)} element={<Petitum userId={session.user.id} />} />
+                <Route path={getPathFromView(View.SucessaoSimulator)} element={<SucessaoSimulator />} />
+                <Route path={getPathFromView(View.JurisTinder)} element={<JurisTinder />} />
+                <Route path={getPathFromView(View.InternRPG)} element={<InternRPG />} />
+                <Route path={getPathFromView(View.PrescriptionCalculator)} element={<PrescriptionCalculator userId={session.user.id} />} />
+                <Route path={getPathFromView(View.SanFranIdiomas)} element={<SanFranIdiomas userId={session.user.id} />} />
+                <Route path={getPathFromView(View.LegalCinema)} element={<LegalCinema userId={session.user.id} />} />
+                <Route path={getPathFromView(View.GeneralLanguages)} element={<GeneralLanguages userId={session.user.id} />} />
+                <Route path={getPathFromView(View.LegalSimplifier)} element={<LegalSimplifier userId={session.user.id} />} />
+                <Route path={getPathFromView(View.PronunciationLab)} element={<PronunciationLab userId={session.user.id} />} />
+                <Route path={getPathFromView(View.LyricalVibes)} element={<LyricalVibes userId={session.user.id} />} />
+                <Route path={getPathFromView(View.TheExchangeStudent)} element={<TheExchangeStudent userId={session.user.id} />} />
+                <Route path={getPathFromView(View.QuestionBank)} element={<QuestionBank userId={session.user.id} onCorrectAnswer={incrementCorrectQuestions} folders={folders} flashcards={flashcards} />} />
+                <Route path={getPathFromView(View.IntelligentSummarizer)} element={<IntelligentSummarizer userId={session.user.id} />} />
+                <Route path={getPathFromView(View.StudyBuddy)} element={<StudyBuddy userId={session.user.id} />} />
+                <Route path={getPathFromView(View.Certificates)} element={<Certificates userId={session.user.id} userName={session.user.user_metadata?.full_name} />} />
+                <Route path={getPathFromView(View.VisualFlashcards)} element={<VisualFlashcards userId={session.user.id} />} />
+                <Route path={getPathFromView(View.BilingualNews)} element={<BilingualNews userId={session.user.id} />} />
+                <Route path={getPathFromView(View.SlangChallenge)} element={<SlangChallenge userId={session.user.id} />} />
+                <Route path={getPathFromView(View.ErrorLog)} element={<ErrorLog userId={session.user.id} />} />
+                <Route path={getPathFromView(View.CodeTracker)} element={<CodeTracker userId={session.user.id} />} />
+                <Route path={getPathFromView(View.IracMethod)} element={<IracMethod userId={session.user.id} />} />
+                <Route path={getPathFromView(View.SpacedRepetition)} element={<SpacedRepetition userId={session.user.id} />} />
+                <Route path={getPathFromView(View.AttendanceCalculator)} element={<AttendanceCalculator userId={session.user.id} />} />
+                <Route path={getPathFromView(View.SyllabusTracker)} element={<SyllabusTracker userId={session.user.id} />} />
+                <Route path={getPathFromView(View.DeadlinePlanner)} element={<DeadlinePlanner userId={session.user.id} />} />
+                <Route path={getPathFromView(View.Mentorship)} element={<Mentorship userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />} />
+                <Route path={getPathFromView(View.MockJury)} element={<MockJury userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />} />
+                <Route path={getPathFromView(View.PetitionWiki)} element={<PetitionWiki userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />} />
+                <Route path={getPathFromView(View.StudyPact)} element={<StudyPact userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />} />
+                <Route path={getPathFromView(View.LargoAuction)} element={<LargoAuction userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />} />
+                <Route path={getPathFromView(View.SocialEvents)} element={<SocialEvents userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />} />
+                <Route path={getPathFromView(View.TheVault)} element={<TheVault userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />} />
+                <Route path={getPathFromView(View.CaronasRepublicas)} element={<CaronasRepublicas userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />} />
+                <Route path={getPathFromView(View.BalcaoEstagios)} element={<BalcaoEstagios userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />} />
+                <Route path={getPathFromView(View.TribunalOpiniao)} element={<TribunalOpiniao userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />} />
+                <Route path={getPathFromView(View.BussolaOptativas)} element={<BussolaOptativas userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />} />
+                <Route path={getPathFromView(View.AchadosPerdidos)} element={<AchadosPerdidos userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />} />
+                <Route path={getPathFromView(View.PerolasTribuna)} element={<PerolasTribuna userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />} />
+                <Route path={getPathFromView(View.GuiaSobrevivencia)} element={<GuiaSobrevivencia userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />} />
+                <Route path={getPathFromView(View.ClubeLivro)} element={<ClubeLivro userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />} />
+                <Route path={getPathFromView(View.GuerraTurmas)} element={<GuerraTurmas userId={session.user.id} />} />
+                <Route path={getPathFromView(View.SpeedReader)} element={<SpeedReader />} />
+                <Route path={getPathFromView(View.Mnemonics)} element={<Mnemonics userId={session.user.id} />} />
+                <Route path={getPathFromView(View.ReverseSchedule)} element={<ReverseStudyPlanner userId={session.user.id} />} />
+                <Route path={getPathFromView(View.Statistics)} element={<Statistics studySessions={studySessions} flashcards={flashcards} tasks={tasks} subjects={subjects} correctQuestionsCount={correctQuestionsCount} confidenceLevels={confidenceLevels} />} />
                 
-                {currentView === View.Duel && activeDuel && (
+                <Route path={getPathFromView(View.Duel)} element={activeDuel ? 
                   <DuelArena 
                     duel={activeDuel} 
                     userId={session.user.id} 
                     onFinished={() => { setActiveDuel(null); setCurrentView(View.Largo); }} 
                     onCorrectAnswer={incrementCorrectQuestions}
                   />
-                )}
+                 : null} />
                 
-                {currentView === View.StudyRoom && (
+                <Route path={getPathFromView(View.StudyRoom)} element={
                   <StudyRooms 
                     presenceUsers={presenceUsers} 
                     currentUserId={session.user.id}
@@ -1104,9 +1137,9 @@ const App: React.FC = () => {
                     setCurrentRoomId={setCurrentRoomId}
                     setRoomStartTime={setRoomStartTime}
                   />
-                )}
+                } />
 
-                {currentView === View.Timer && (
+                <Route path={getPathFromView(View.Timer)} element={
                   <Pomodoro 
                     subjects={subjects} 
                     readings={readings}
@@ -1129,12 +1162,12 @@ const App: React.FC = () => {
                     studyMode={timerStudyMode}
                     setStudyMode={setTimerStudyMode}
                   />
-                )}
+                } />
 
-                {currentView === View.OralArgument && <OralArgument />}
-                {currentView === View.Calendar && <CalendarView subjects={subjects} tasks={tasks} userId={session.user.id} studySessions={studySessions} />}
-                {currentView === View.Ranking && <Ranking userId={session.user.id} session={session} />}
-                {currentView === View.Subjects && (
+                <Route path={getPathFromView(View.OralArgument)} element={<OralArgument />} />
+                <Route path={getPathFromView(View.Calendar)} element={<CalendarView subjects={subjects} tasks={tasks} userId={session.user.id} studySessions={studySessions} />} />
+                <Route path={getPathFromView(View.Ranking)} element={<Ranking userId={session.user.id} session={session} />} />
+                <Route path={getPathFromView(View.Subjects)} element={
                   <Subjects 
                     subjects={subjects} 
                     setSubjects={setSubjects} 
@@ -1153,8 +1186,12 @@ const App: React.FC = () => {
                     }}
                     tasks={tasks}
                   />
-                )}
-                {currentView === View.Tasks && <Tasks subjects={subjects} tasks={tasks} setTasks={setTasks} userId={session.user.id} isOnline={isOnline} />}
+                } />
+                <Route path={getPathFromView(View.Tasks)} element={<Tasks subjects={subjects} tasks={tasks} setTasks={setTasks} userId={session.user.id} isOnline={isOnline} />} />
+
+                <Route path="/simulados" element={<QuestionBank userId={session.user.id} onCorrectAnswer={incrementCorrectQuestions} folders={folders} flashcards={flashcards} />} />
+
+              </Routes>
              </Suspense>
           </div>
         </main>
