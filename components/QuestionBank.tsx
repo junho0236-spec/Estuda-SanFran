@@ -7,6 +7,8 @@ import { NotebookModal } from './NotebookModal';
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { GEMINI_MODEL, extractPrecedent } from '../services/geminiService';
 import Markdown from 'react-markdown';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 import { 
   BookOpen, 
   CheckCircle2, 
@@ -83,6 +85,58 @@ interface QuestionBankProps {
 
 const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, folders = [], flashcards = [] }) => {
   const navigate = useNavigate();
+  // ... (rest of the component)
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    doc.setFont('helvetica');
+    
+    // Header
+    doc.setFontSize(18);
+    doc.text('SANFRAN ACADEMY - Simulado Personalizado', 105, 20, { align: 'center' });
+    doc.setFontSize(12);
+    doc.text(`Data: ${new Date().toLocaleDateString()}`, 20, 30);
+    doc.text(`Aluno: Aluno`, 20, 35);
+    
+    // Questions
+    let y = 45;
+    filteredQuestions.forEach((q, idx) => {
+      if (y > 270) {
+        doc.addPage();
+        y = 20;
+      }
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${idx + 1}. ${q.statement}`, 20, y);
+      y += 10;
+      doc.setFont('helvetica', 'normal');
+      q.options.forEach((opt, optIdx) => {
+        doc.text(`[ ] ${String.fromCharCode(65 + optIdx)}) ${opt}`, 25, y);
+        y += 7;
+      });
+      y += 10;
+    });
+    
+    // Answer Key
+    doc.addPage();
+    doc.setFontSize(16);
+    doc.text('Gabarito', 105, 20, { align: 'center' });
+    (doc as any).autoTable({
+      startY: 30,
+      head: [['Questão', 'Alternativa']],
+      body: filteredQuestions.map((q, idx) => [idx + 1, String.fromCharCode(65 + q.correct_answer)]),
+    });
+    
+    // Footer (Page Numbering)
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.text(`Página ${i} de ${pageCount}`, 105, 290, { align: 'center' });
+    }
+    
+    doc.save('simulado.pdf');
+  };
+
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -1843,6 +1897,12 @@ Forneça a explicação de forma concisa e didática.`;
               <Timer size={14} /> Simulado
             </button>
             <button
+              onClick={handleExportPDF}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors shadow-lg shadow-slate-900/20"
+            >
+              <FileText size={14} /> Exportar PDF
+            </button>
+            <button
               onClick={() => setShowAIGenerator(true)}
               className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors shadow-lg shadow-purple-900/20"
             >
@@ -2337,7 +2397,7 @@ Forneça a explicação de forma concisa e didática.`;
               </div>
             )}
             <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900">
-              <div className="flex-1 relative">
+              <div className="flex-1 relative max-w-3xl">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -2451,19 +2511,19 @@ Forneça a explicação de forma concisa e didática.`;
                   <div className="flex gap-2 flex-wrap">
                     <button 
                       onClick={() => setQuestionStatus('all')}
-                      className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${questionStatus === 'all' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700 dark:hover:bg-slate-800'}`}
+                      className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${questionStatus === 'all' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800 shadow-inner' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700 dark:hover:bg-slate-800'}`}
                     >
                       Todas
                     </button>
                     <button 
                       onClick={() => setQuestionStatus('correct')}
-                      className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${questionStatus === 'correct' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700 dark:hover:bg-slate-800'}`}
+                      className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${questionStatus === 'correct' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800 shadow-inner' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700 dark:hover:bg-slate-800'}`}
                     >
                       Certas
                     </button>
                     <button 
                       onClick={() => setQuestionStatus('wrong')}
-                      className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${questionStatus === 'wrong' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700 dark:hover:bg-slate-800'}`}
+                      className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${questionStatus === 'wrong' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800 shadow-inner' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700 dark:hover:bg-slate-800'}`}
                     >
                       Erradas
                     </button>
