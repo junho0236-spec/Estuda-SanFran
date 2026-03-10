@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
 import { Question, UserProgress, Notebook, Folder, Flashcard } from '../types';
 import { sampleQuestions } from './sampleQuestions';
+import { NotebookModal } from './NotebookModal';
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
-import { GEMINI_MODEL } from '../services/geminiService';
+import { GEMINI_MODEL, extractPrecedent } from '../services/geminiService';
 import Markdown from 'react-markdown';
 import { 
   BookOpen, 
   CheckCircle2, 
+  Check,
   XCircle, 
   ChevronRight, 
   ChevronLeft,
@@ -104,11 +106,36 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
   const [viewMode, setViewMode] = useState<'list' | 'single'>('list');
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [generatingPrecedentId, setGeneratingPrecedentId] = useState<string | null>(null);
+
+  const handleSavePrecedent = async (q: Question) => {
+    try {
+      setGeneratingPrecedentId(q.id);
+      const summary = await extractPrecedent(q.statement, q.options[q.correct_answer]);
+      
+      const { error } = await supabase
+        .from('questions')
+        .update({ ai_summary: summary })
+        .eq('id', q.id);
+
+      if (error) throw error;
+
+      setQuestions(prev => prev.map(item => item.id === q.id ? { ...item, ai_summary: summary } : item));
+      showNotification('Precedente salvo com sucesso!', 'success');
+    } catch (error) {
+      console.error('Error saving precedent:', error);
+      showNotification('Erro ao gerar precedente.', 'error');
+    } finally {
+      setGeneratingPrecedentId(null);
+    }
+  };
   const [notes, setNotes] = useState<Record<string, string>>({});
   // Notebooks and Selection States
   const [selectedQuestionsForNotebook, setSelectedQuestionsForNotebook] = useState<Set<string>>(new Set());
   const [showNotebookCreationMode, setShowNotebookCreationMode] = useState(false);
+  const [isNotebookModalOpen, setIsNotebookModalOpen] = useState(false);
   const [newNotebookName, setNewNotebookName] = useState('');
+  const [newNotebookDescription, setNewNotebookDescription] = useState('');
   const [notebooks, setNotebooks] = useState<Notebook[]>([]);
   const [selectedNotebookId, setSelectedNotebookId] = useState<string>('');
 
@@ -143,10 +170,11 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
     score: number;
     total: number;
     timeSpent: number;
-    subjectStats: { subject: string; correct: number; total: number; confidence: Record<string, number> }[];
+    subjectStats: { subject: string; correct: number; total: number; confidence: Record<string, number>; correctConfidence: Record<string, number> }[];
     avgTimePerQuestion: number;
     confidenceStats: { certeza: number; duvida: number; chute: number };
     luckyGuesses: string[];
+    doubtGuesses: string[];
   } | null>(null);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -180,6 +208,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
     const subjectMap: Record<string, { correct: number; total: number; confidence: Record<string, number> }> = {};
     const confidenceStats = { certeza: 0, duvida: 0, chute: 0 };
     const luckyGuesses: string[] = [];
+    const doubtGuesses: string[] = [];
     
     mockQuestions.forEach(q => {
       const userAnswer = mockAnswers[q.id];
@@ -189,15 +218,19 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
       if (isCorrect) {
         correct++;
         if (confidence === 'chute') luckyGuesses.push(q.id);
+        if (confidence === 'duvida') doubtGuesses.push(q.id);
       }
       
       if (!subjectMap[q.subject]) {
-        subjectMap[q.subject] = { correct: 0, total: 0, confidence: { certeza: 0, duvida: 0, chute: 0 } };
+        subjectMap[q.subject] = { correct: 0, total: 0, confidence: { certeza: 0, duvida: 0, chute: 0 }, correctConfidence: { certeza: 0, duvida: 0, chute: 0 } };
       }
       subjectMap[q.subject].total++;
       subjectMap[q.subject].confidence[confidence]++;
       confidenceStats[confidence]++;
-      if (isCorrect) subjectMap[q.subject].correct++;
+      if (isCorrect) {
+        subjectMap[q.subject].correct++;
+        subjectMap[q.subject].correctConfidence[confidence]++;
+      }
     });
     
     const subjectStats = Object.entries(subjectMap).map(([subject, stats]) => ({
@@ -212,7 +245,8 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
       subjectStats,
       avgTimePerQuestion: timeSpent / (Object.keys(mockAnswers).length || 1),
       confidenceStats,
-      luckyGuesses
+      luckyGuesses,
+      doubtGuesses
     });
     
     setIsMockFinished(true);
@@ -601,6 +635,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
         .insert({
           user_id: userId,
           name: newNotebookName.trim(),
+          description: newNotebookDescription.trim(),
           question_ids: Array.from(selectedQuestionsForNotebook),
         })
         .select()
@@ -1524,6 +1559,12 @@ Forneça a explicação de forma concisa e didática.`;
                   </span>
                 </div>
               </div>
+              {mockResults.luckyGuesses.length > 0 && (
+                <div className="mt-6 p-4 bg-red-50 dark:bg-red-900/20 rounded-2xl border border-red-100 dark:border-red-800 text-red-600 dark:text-red-400 font-bold text-sm flex items-center gap-3">
+                  <AlertTriangle size={20} />
+                  Revisar fundamento ({mockResults.luckyGuesses.length} acertos por sorte)
+                </div>
+              )}
             </div>
 
             {/* Quick Stats */}
@@ -1595,6 +1636,34 @@ Forneça a explicação de forma concisa e didática.`;
               </ResponsiveContainer>
             </div>
           </div>
+
+          {/* Review Section */}
+          {(mockResults.luckyGuesses.length > 0 || mockResults.doubtGuesses.length > 0) && (
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl">
+              <h3 className="text-xl font-black text-slate-900 dark:text-white mb-8 flex items-center gap-3">
+                <BookOpen className="text-amber-500" /> Questões para Revisão
+              </h3>
+              <div className="space-y-4">
+                {[...new Set([...mockResults.luckyGuesses, ...mockResults.doubtGuesses])].map(qId => {
+                  const q = mockQuestions.find(q => q.id === qId);
+                  if (!q) return null;
+                  return (
+                    <div key={q.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700">
+                      <span className="text-sm font-bold text-slate-700 dark:text-slate-300 truncate max-w-[70%]">{q.statement.substring(0, 50)}...</span>
+                      <button 
+                        onClick={() => {
+                          showNotification('Flashcard criado!', 'success');
+                        }}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all"
+                      >
+                        Flashcard
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1752,6 +1821,14 @@ Forneça a explicação de forma concisa e didática.`;
             >
               <NotebookText size={16} /> {showNotebookCreationMode ? 'Sair do Modo Caderno' : 'Criar Caderno'}
             </button>
+            {selectedQuestionsForNotebook.size > 0 && (
+              <button
+                onClick={() => setIsNotebookModalOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-colors"
+              >
+                <Plus size={16} /> Adicionar ao Caderno
+              </button>
+            )}
             <button
               onClick={() => {
                 if (isErrorNotebookMode) {
@@ -2155,7 +2232,6 @@ Forneça a explicação de forma concisa e didática.`;
           </div>
         </div>
       )}
-      </div>
 
       <div id="add-form-portal">
         {showAddForm ? (
@@ -2317,6 +2393,13 @@ Forneça a explicação de forma concisa e didática.`;
                   placeholder="Nome do Caderno (Ex: Reta Final OAB - Ética)"
                   value={newNotebookName}
                   onChange={(e) => setNewNotebookName(e.target.value)}
+                  className="flex-1 p-3 rounded-xl bg-white dark:bg-slate-800 border border-orange-200 dark:border-orange-700 focus:ring-2 focus:ring-orange-500 outline-none text-slate-900 dark:text-white"
+                />
+                <input
+                  type="text"
+                  placeholder="Descrição (Opcional)"
+                  value={newNotebookDescription}
+                  onChange={(e) => setNewNotebookDescription(e.target.value)}
                   className="flex-1 p-3 rounded-xl bg-white dark:bg-slate-800 border border-orange-200 dark:border-orange-700 focus:ring-2 focus:ring-orange-500 outline-none text-slate-900 dark:text-white"
                 />
                 <div className="flex gap-2">
@@ -2549,6 +2632,8 @@ Forneça a explicação de forma concisa e didática.`;
                           {expandedQuestionId === q.id ? 'Fechar Questão' : 'Resolver Questão'}
                         </button>
                         
+                      </div>
+                        
                         {!isMockMode && (
                           <div className="flex items-center gap-2">
                             <button
@@ -2718,14 +2803,6 @@ Forneça a explicação de forma concisa e didática.`;
                                     >
                                       <PlusSquare size={16} /> Virar Flashcard do Erro
                                     </button>
-                                    <button
-                                      onClick={() => handleSaveAsPrecedent(q)}
-                                      disabled={isSavingPrecedent[q.id]}
-                                      className="flex-1 py-3 bg-white dark:bg-slate-800 border-2 border-purple-200 dark:border-purple-800 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-lg shadow-purple-900/5"
-                                    >
-                                      {isSavingPrecedent[q.id] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Gavel size={16} />}
-                                      Salvar como Precedente
-                                    </button>
                                   </div>
                                 </div>
                               ) : (
@@ -2743,7 +2820,6 @@ Forneça a explicação de forma concisa e didática.`;
                         </div>
                       )}
                     </div>
-                  </div>
                 ))}
               </div>
             ) : (
@@ -3055,9 +3131,6 @@ Forneça a explicação de forma concisa e didática.`;
               )}
             </div>
           )}
-          </div>
-          </>
-        )}
       </div>
 
       <div id="notification-portal">
@@ -3241,7 +3314,47 @@ Forneça a explicação de forma concisa e didática.`;
           <span className="text-sm font-bold text-slate-600">Buscando definição...</span>
         </div>
       )}
-    </div>
+      {isNotebookModalOpen && (
+        <NotebookModal
+          isOpen={isNotebookModalOpen}
+          onClose={() => setIsNotebookModalOpen(false)}
+          notebooks={notebooks}
+          selectedQuestionIds={Array.from(selectedQuestionsForNotebook)}
+          onCreateNotebook={async (name, description) => {
+            setNewNotebookName(name);
+            setNewNotebookDescription(description);
+            await handleCreateNotebook();
+            setIsNotebookModalOpen(false);
+          }}
+          onAddToNotebook={async (notebookId) => {
+            try {
+              setIsSubmitting(true);
+              const notebook = notebooks.find(n => n.id === notebookId);
+              if (!notebook) return;
+              
+              const updatedQuestionIds = Array.from(new Set([...notebook.question_ids, ...Array.from(selectedQuestionsForNotebook)]));
+              
+              const { error } = await supabase
+                .from('notebooks')
+                .update({ question_ids: updatedQuestionIds })
+                .eq('id', notebookId);
+              
+              if (error) throw error;
+              
+              setNotebooks(prev => prev.map(n => n.id === notebookId ? {...n, question_ids: updatedQuestionIds} : n));
+              showNotification('Questões adicionadas ao caderno!', 'success');
+              setSelectedQuestionsForNotebook(new Set());
+              setIsNotebookModalOpen(false);
+            } catch (error: any) {
+              showNotification('Erro ao adicionar ao caderno.', 'error');
+            } finally {
+              setIsSubmitting(false);
+            }
+          }}
+          isSubmitting={isSubmitting}
+        />
+      )}
+    </>
   );
 };
 

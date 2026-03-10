@@ -378,12 +378,18 @@ export interface Question {
   exam_board?: string;
   year?: string;
   created_at?: string;
+  ai_summary?: {
+    tese: string;
+    fundamentação: string;
+    jurisprudencia: string;
+  };
 }
 
 export interface Notebook {
   id: string;
   user_id: string;
   name: string;
+  description?: string;
   question_ids: string[];
   created_at: string;
 }

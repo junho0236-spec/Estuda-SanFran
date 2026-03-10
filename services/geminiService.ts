@@ -842,3 +842,52 @@ export const fetchTermDefinition = async (term: string) => {
     throw error;
   }
 };
+
+/**
+ * Extrai precedentes jurídicos (tese, fundamentação, jurisprudência) de uma questão.
+ */
+export const extractPrecedent = async (statement: string, correctAnswer: string) => {
+  try {
+    const ai = getAiClient();
+    const apiKey = getApiKey();
+
+    if (!apiKey || apiKey === "missing_key") {
+      throw new Error("Chave de API não configurada.");
+    }
+
+    const response = await ai.models.generateContent({
+      model: GEMINI_MODEL,
+      contents: `Você é um especialista em análise jurídica para concursos e OAB.
+      Analise a questão e a alternativa correta abaixo e extraia o resumo jurídico (precedente).
+      
+      Questão: "${statement}"
+      Alternativa Correta: "${correctAnswer}"
+      
+      Retorne um JSON com:
+      - tese: A tese jurídica central (ex: "Impenhorabilidade do bem de família").
+      - fundamentação: Artigos de lei ou súmulas citados (ex: "Art. 1º da Lei 8.009/90").
+      - jurisprudencia: Se há menção a entendimento do STF/STJ.`,
+      config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            tese: { type: Type.STRING },
+            fundamentação: { type: Type.STRING },
+            jurisprudencia: { type: Type.STRING },
+          },
+          required: ['tese', 'fundamentação', 'jurisprudencia'],
+        },
+      },
+    });
+
+    const resultText = response.text;
+    if (!resultText) throw new Error("Resposta vazia da IA.");
+    
+    return JSON.parse(resultText);
+  } catch (error) {
+    console.error("Erro ao extrair precedente:", error);
+    throw error;
+  }
+};
