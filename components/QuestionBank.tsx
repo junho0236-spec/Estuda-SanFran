@@ -8,7 +8,7 @@ import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { GEMINI_MODEL, extractPrecedent } from '../services/geminiService';
 import Markdown from 'react-markdown';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { 
   BookOpen, 
   CheckCircle2, 
@@ -121,7 +121,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
     doc.addPage();
     doc.setFontSize(16);
     doc.text('Gabarito', 105, 20, { align: 'center' });
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: 30,
       head: [['Questão', 'Alternativa']],
       body: filteredQuestions.map((q, idx) => [idx + 1, String.fromCharCode(65 + q.correct_answer)]),
