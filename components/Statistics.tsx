@@ -34,7 +34,8 @@ import {
   Area
 } from 'recharts';
 import { StudySession, Flashcard, Task, Subject } from '../types';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI } from "@google/genai";
+import { GEMINI_MODEL } from '../services/geminiService';
 import ReactMarkdown from 'react-markdown';
 
 interface StatisticsProps {
@@ -175,7 +176,7 @@ const Statistics: React.FC<StatisticsProps> = ({
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       const result = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: GEMINI_MODEL,
         contents: `Reescreva esta explicação jurídica de forma mais simples e didática, mantendo o rigor técnico, mas facilitando a memorização:\n\nPergunta: ${card.front}\nResposta Atual: ${card.back}`,
       });
       setSimplifiedCards(prev => ({ ...prev, [card.id]: result.text }));

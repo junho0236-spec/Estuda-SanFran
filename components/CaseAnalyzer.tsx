@@ -14,6 +14,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
+import { GEMINI_MODEL } from '../services/geminiService';
 import Markdown from 'react-markdown';
 
 interface CaseAnalyzerProps {
@@ -33,7 +34,6 @@ const CaseAnalyzer: React.FC<CaseAnalyzerProps> = ({ onBack }) => {
 
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
-      const model = "gemini-3-flash-preview";
       
       const prompt = `Analise o seguinte caso jurídico concreto:
       
@@ -50,7 +50,7 @@ const CaseAnalyzer: React.FC<CaseAnalyzerProps> = ({ onBack }) => {
       Formate a resposta em Markdown claro e estruturado.`;
 
       const response = await ai.models.generateContent({
-        model: model,
+        model: GEMINI_MODEL,
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         config: {
           thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },

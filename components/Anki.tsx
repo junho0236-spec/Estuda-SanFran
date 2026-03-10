@@ -6,6 +6,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform } from 'motion/re
 import { useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import { GoogleGenAI, Type, ThinkingLevel } from '@google/genai';
+import { GEMINI_MODEL } from '../services/geminiService';
 import confetti from 'canvas-confetti';
 import { 
   Plus, 
@@ -1602,7 +1603,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       ];
 
       const result = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: GEMINI_MODEL,
         contents: chatContext,
         config: {
           thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },

@@ -13,7 +13,8 @@ import {
   BrainCircuit,
   Gavel
 } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
+import { GEMINI_MODEL } from '../services/geminiService';
 import Markdown from 'react-markdown';
 
 interface Message {
@@ -60,8 +61,7 @@ const StudyBuddy: React.FC<StudyBuddyProps> = ({ userId }) => {
     setIsLoading(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const model = "gemini-3-flash-preview";
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
       
       const systemInstruction = `Você é o "Amigo de Estudo da SanFran", um assistente de IA especializado em Direito Brasileiro e voltado para estudantes da Faculdade de Direito da USP (SanFran).
       Seu tom deve ser profissional, porém encorajador e acadêmico.
@@ -73,13 +73,6 @@ const StudyBuddy: React.FC<StudyBuddyProps> = ({ userId }) => {
       5. Se o usuário perguntar algo fora do escopo jurídico ou acadêmico, gentilmente redirecione-o para os estudos.
       Use Markdown para formatar suas respostas, especialmente para listas, negrito e blocos de código/citações.`;
 
-      const chat = ai.chats.create({
-        model: model,
-        config: {
-          systemInstruction: systemInstruction,
-        },
-      });
-
       // Prepare history for context
       const history = messages.map(m => ({
         role: m.role === 'user' ? 'user' : 'model',
@@ -87,12 +80,13 @@ const StudyBuddy: React.FC<StudyBuddyProps> = ({ userId }) => {
       }));
 
       const response = await ai.models.generateContent({
-        model: model,
+        model: GEMINI_MODEL,
         contents: [
           ...history.map(h => ({ role: h.role, parts: h.parts })),
           { role: 'user', parts: [{ text: input }] }
         ],
         config: {
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
           systemInstruction: systemInstruction
         }
       });

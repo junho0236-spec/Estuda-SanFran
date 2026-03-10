@@ -19,6 +19,7 @@ import {
 import { supabase } from '../services/supabaseClient';
 import { StudyPlan, PlanSubject, DailyPlan } from '../types';
 import { GoogleGenAI, Type, ThinkingLevel } from '@google/genai';
+import { GEMINI_MODEL } from '../services/geminiService';
 
 interface ReverseStudyPlannerProps {
   userId: string;
@@ -138,7 +139,7 @@ A soma das horas de cada dia deve ser no máximo ${newHours}.
 Seja realista e distribua bem o conteúdo. Foque nos tópicos principais.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: GEMINI_MODEL,
         contents: prompt,
         config: {
           thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },

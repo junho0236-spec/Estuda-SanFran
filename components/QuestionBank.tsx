@@ -1014,57 +1014,71 @@ Forneça a explicação de forma concisa e didática.`;
         3. Na explicação, inclua OBRIGATORIAMENTE o número do informativo ou o Recurso Extraordinário (RE/ARE) que baseou a resposta.
         `;
       }
-
-      const prompt = `Crie ${aiConfig.count} questões de múltipla escolha de nível ${aiConfig.difficulty} sobre a matéria "${aiConfig.subject}" e tópico "${aiConfig.topic}".
-      Estilo de Prova: ${aiConfig.examStyle}.
-      Foco Jurídico: ${aiConfig.legalFocus.join(', ') || 'Geral'}.
-      Tipo de Enunciado: ${aiConfig.statementType}.
-      ${jurisprudencePrompt}
-      ${contextFromFlashcards}
-      ${contextFromText}
       
-      Cada questão deve ter 5 alternativas (A, B, C, D, E).
-      A explicação deve ser EXTREMAMENTE detalhada, contendo uma análise individual para cada alternativa (A, B, C, D, E), explicando por que a alternativa correta está certa e por que cada uma das outras alternativas está incorreta, fundamentando com base no foco jurídico selecionado (${aiConfig.legalFocus.join(', ') || 'Lei, Jurisprudência e Doutrina'}).
-      
-      Inclua também uma banca real compatível com o estilo selecionado e o ano atual.
-      Retorne as questões no formato JSON.`;
+      const totalQuestions = aiConfig.count;
+      const chunkSize = 3;
+      const allGeneratedQuestions = [];
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-        config: {
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                subject: { type: Type.STRING, description: "A matéria (ex: Direito Civil)" },
-                topic: { type: Type.STRING, description: "O tópico (ex: Contratos)" },
-                statement: { type: Type.STRING, description: "O enunciado da questão" },
-                options: {
-                  type: Type.ARRAY,
-                  items: { type: Type.STRING },
-                  description: "As 5 alternativas da questão"
+      for (let i = 0; i < totalQuestions; i += chunkSize) {
+        const currentBatchSize = Math.min(chunkSize, totalQuestions - i);
+        setGeneratingStatus(`Gerando lote ${Math.floor(i / chunkSize) + 1} de ${Math.ceil(totalQuestions / chunkSize)}... (${i + currentBatchSize}/${totalQuestions} concluídas)`);
+
+        const prompt = `Crie ${currentBatchSize} questões de múltipla escolha de nível ${aiConfig.difficulty} sobre a matéria "${aiConfig.subject}" e tópico "${aiConfig.topic}".
+        Estilo de Prova: ${aiConfig.examStyle}.
+        Foco Jurídico: ${aiConfig.legalFocus.join(', ') || 'Geral'}.
+        Tipo de Enunciado: ${aiConfig.statementType}.
+        ${jurisprudencePrompt}
+        ${contextFromFlashcards}
+        ${contextFromText}
+        
+        Cada questão deve ter 5 alternativas (A, B, C, D, E).
+        A explicação deve ser EXTREMAMENTE detalhada, contendo uma análise individual para cada alternativa (A, B, C, D, E), explicando por que a alternativa correta está certa e por que cada uma das outras alternativas está incorreta, fundamentando com base no foco jurídico selecionado (${aiConfig.legalFocus.join(', ') || 'Lei, Jurisprudência e Doutrina'}).
+        
+        Inclua também uma banca real compatível com o estilo selecionado e o ano atual.
+        Retorne as questões no formato JSON.`;
+
+        const response = await ai.models.generateContent({
+          model: GEMINI_MODEL,
+          contents: prompt,
+          config: {
+            thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  subject: { type: Type.STRING, description: "A matéria (ex: Direito Civil)" },
+                  topic: { type: Type.STRING, description: "O tópico (ex: Contratos)" },
+                  statement: { type: Type.STRING, description: "O enunciado da questão" },
+                  options: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                    description: "As 5 alternativas da questão"
+                  },
+                  correct_answer: { type: Type.INTEGER, description: "O índice da alternativa correta (0 a 4)" },
+                  explanation: { type: Type.STRING, description: "Explicação detalhada de cada alternativa (A, B, C, D, E)" },
+                  difficulty: { type: Type.STRING, description: "A dificuldade: 'facil', 'media' ou 'dificil'" },
+                  exam_board: { type: Type.STRING, description: "A banca examinadora" },
+                  year: { type: Type.STRING, description: "O ano da questão" }
                 },
-                correct_answer: { type: Type.INTEGER, description: "O índice da alternativa correta (0 a 4)" },
-                explanation: { type: Type.STRING, description: "Explicação detalhada de cada alternativa (A, B, C, D, E)" },
-                difficulty: { type: Type.STRING, description: "A dificuldade: 'facil', 'media' ou 'dificil'" },
-                exam_board: { type: Type.STRING, description: "A banca examinadora" },
-                year: { type: Type.STRING, description: "O ano da questão" }
-              },
-              required: ["subject", "topic", "statement", "options", "correct_answer", "explanation", "difficulty", "exam_board", "year"]
+                required: ["subject", "topic", "statement", "options", "correct_answer", "explanation", "difficulty", "exam_board", "year"]
+              }
             }
           }
-        }
-      });
+        });
 
-      if (response.text) {
-        const generatedQuestionsRaw = JSON.parse(response.text);
-        
-        // Sanitize generated questions to ensure only valid columns are sent
-        const sanitizedInitialQuestions = generatedQuestionsRaw.map((q: any) => ({
+        if (response.text) {
+          allGeneratedQuestions.push(...JSON.parse(response.text));
+        }
+
+        if (i + chunkSize < totalQuestions) {
+          await new Promise(resolve => setTimeout(resolve, 3000));
+        }
+      }
+
+      if (allGeneratedQuestions.length > 0) {
+        const sanitizedInitialQuestions = allGeneratedQuestions.map((q: any) => ({
           subject: q.subject,
           topic: q.topic,
           statement: q.statement,
@@ -1075,6 +1089,7 @@ Forneça a explicação de forma concisa e didática.`;
           exam_board: q.exam_board,
           year: q.year?.toString()
         }));
+        // ... (rest of the insertion logic) ...
 
         let { data, error } = await supabase
           .from('questions')

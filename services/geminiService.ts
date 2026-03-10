@@ -1,6 +1,8 @@
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { supabase } from '../services/supabaseClient';
 
+export const GEMINI_MODEL = 'gemini-3.1-flash-lite-preview';
+
 // Inicializa o cliente Google GenAI de forma preguiçosa (lazy)
 let aiInstance: GoogleGenAI | null = null;
 
@@ -243,7 +245,7 @@ export const generateFlashcards = async (
     );
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview', 
+      model: GEMINI_MODEL, 
       contents: { parts },
       config: {
         thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
@@ -390,7 +392,7 @@ export const generateFlashcardsStream = async (
     );
 
     const responseStream = await ai.models.generateContentStream({
-      model: 'gemini-3-flash-preview',
+      model: GEMINI_MODEL,
       contents: { parts },
       config: {
         thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
@@ -474,7 +476,7 @@ export const getStudyMotivation = async (subjects: string[]) => {
   try {
     const ai = getAiClient();
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: GEMINI_MODEL,
       contents: `Sou um estudante de Direito na SanFran (USP). Atualmente estudo: ${list}. Dê uma frase curta de motivação em latim relevante ao estudo jurídico e sua tradução em português.`,
       config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
     });
@@ -498,7 +500,7 @@ export const simplifyLegalText = async (complexText: string) => {
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview', 
+      model: GEMINI_MODEL, 
       contents: `Você é um professor assistente da Faculdade de Direito do Largo São Francisco. 
       Sua tarefa é "traduzir" o seguinte texto jurídico complexo (juridiquês) para uma linguagem clara, didática e direta, acessível a um estudante de primeiro ano.
       Mantenha a precisão técnica, mas explique termos difíceis se necessário.
@@ -528,7 +530,7 @@ export const explainLegalTerm = async (term: string, context: string) => {
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: GEMINI_MODEL,
       contents: `Você é um glossário jurídico inteligente.
       
       O usuário selecionou o termo: "${term}"
@@ -624,7 +626,7 @@ export const summarizeText = async (text: string) => {
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: GEMINI_MODEL,
       contents: `Você é um assistente de estudo jurídico.
       Resuma o seguinte texto de forma concisa e didática, focando nos pontos mais importantes. O resumo deve ter entre 3 a 5 parágrafos.
       
@@ -652,7 +654,7 @@ export const extractKeyPoints = async (text: string) => {
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: GEMINI_MODEL,
       contents: `Você é um assistente de estudo jurídico.
       Extraia os 5 a 10 pontos-chave mais importantes do seguinte texto. Apresente-os como uma lista numerada.
       
@@ -680,7 +682,7 @@ export const generateMindMap = async (text: string) => {
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: GEMINI_MODEL,
       contents: `Você é um assistente de estudo jurídico.
       Crie um mapa mental textual (usando tópicos e sub-tópicos com indentação) dos principais conceitos e suas relações no seguinte texto.
       Comece com o tema central e ramifique para os sub-temas e detalhes.
@@ -709,7 +711,7 @@ export const evaluateDissertativeAnswer = async (question: string, correctAnswer
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: GEMINI_MODEL,
       contents: `AVALIAÇÃO DE FLASHCARD:
       Pergunta: "${question}"
       Gabarito Esperado: "${correctAnswer}"
@@ -774,7 +776,7 @@ export const fetchLegalReference = async (reference: string) => {
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: GEMINI_MODEL,
       contents: `Você é um Vade Mecum inteligente. 
       O usuário quer saber o conteúdo da seguinte referência legal: "${reference}".
       
