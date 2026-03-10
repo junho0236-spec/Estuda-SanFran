@@ -4,6 +4,7 @@ import { supabase } from '../services/supabaseClient';
 import { Question, UserProgress, Notebook, Folder, Flashcard } from '../types';
 import { sampleQuestions } from './sampleQuestions';
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
+import { GEMINI_MODEL } from '../services/geminiService';
 import Markdown from 'react-markdown';
 import { 
   BookOpen, 
