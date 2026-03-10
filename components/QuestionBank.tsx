@@ -136,12 +136,13 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
       const totalElements = questionCards.length + 3; // cover + header + questions + answer key
 
       if (coverEl) {
-        const canvas = await html2canvas(coverEl, { scale: 1.5, useCORS: true, logging: false });
+        let canvas: HTMLCanvasElement | null = await html2canvas(coverEl, { scale: 1.5, useCORS: true, logging: false });
         const imgData = canvas.toDataURL('image/jpeg', 0.8);
+        canvas = null; // Free memory
         const imgProps = doc.getImageProperties(imgData);
         const imgHeight = (imgProps.height * contentWidth) / imgProps.width;
         
-        doc.addImage(imgData, 'JPEG', margin, currentY, contentWidth, imgHeight);
+        doc.addImage(imgData, 'JPEG', margin, currentY, contentWidth, imgHeight, undefined, 'FAST');
         processedElements++;
         setExportProgress(Math.round((processedElements / totalElements) * 100));
         
@@ -152,12 +153,13 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
       // Capture Header
       const headerEl = document.getElementById('pdf-header');
       if (headerEl) {
-        const canvas = await html2canvas(headerEl, { scale: 1.5, useCORS: true, logging: false });
+        let canvas: HTMLCanvasElement | null = await html2canvas(headerEl, { scale: 1.5, useCORS: true, logging: false });
         const imgData = canvas.toDataURL('image/jpeg', 0.8);
+        canvas = null; // Free memory
         const imgProps = doc.getImageProperties(imgData);
         const imgHeight = (imgProps.height * contentWidth) / imgProps.width;
         
-        doc.addImage(imgData, 'JPEG', margin, currentY, contentWidth, imgHeight);
+        doc.addImage(imgData, 'JPEG', margin, currentY, contentWidth, imgHeight, undefined, 'FAST');
         currentY += imgHeight + 10;
         processedElements++;
         setExportProgress(Math.round((processedElements / totalElements) * 100));
@@ -166,8 +168,9 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
       // Capture Questions
       for (let i = 0; i < questionCards.length; i++) {
         const card = questionCards[i] as HTMLElement;
-        const canvas = await html2canvas(card, { scale: 1.5, useCORS: true, logging: false });
+        let canvas: HTMLCanvasElement | null = await html2canvas(card, { scale: 1.5, useCORS: true, logging: false });
         const imgData = canvas.toDataURL('image/jpeg', 0.8);
+        canvas = null; // Free memory
         const imgProps = doc.getImageProperties(imgData);
         const imgHeight = (imgProps.height * contentWidth) / imgProps.width;
 
@@ -176,7 +179,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
           currentY = margin;
         }
 
-        doc.addImage(imgData, 'JPEG', margin, currentY, contentWidth, imgHeight);
+        doc.addImage(imgData, 'JPEG', margin, currentY, contentWidth, imgHeight, undefined, 'FAST');
         currentY += imgHeight + 10;
         
         processedElements++;
@@ -191,8 +194,9 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
       // Capture Answer Key
       const answerKeyEl = document.getElementById('pdf-answer-key');
       if (answerKeyEl) {
-        const canvas = await html2canvas(answerKeyEl, { scale: 1.5, useCORS: true, logging: false });
+        let canvas: HTMLCanvasElement | null = await html2canvas(answerKeyEl, { scale: 1.5, useCORS: true, logging: false });
         const imgData = canvas.toDataURL('image/jpeg', 0.8);
+        canvas = null; // Free memory
         const imgProps = doc.getImageProperties(imgData);
         const imgHeight = (imgProps.height * contentWidth) / imgProps.width;
 
@@ -201,7 +205,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
           currentY = margin;
         }
 
-        doc.addImage(imgData, 'JPEG', margin, currentY, contentWidth, imgHeight);
+        doc.addImage(imgData, 'JPEG', margin, currentY, contentWidth, imgHeight, undefined, 'FAST');
         processedElements++;
         setExportProgress(Math.round((processedElements / totalElements) * 100));
       }
@@ -219,10 +223,13 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
         doc.text(`Página ${i}`, pageWidth / 2, pageHeight - 11, { align: 'center' });
       }
 
+      // Final delay to allow memory cleanup before saving
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       doc.save('simulado-sanfran.pdf');
     } catch (error) {
       console.error('Error generating PDF:', error);
-      alert('Erro ao gerar o PDF. Tente novamente.');
+      alert('Erro ao gerar o PDF. Verifique o console para mais detalhes.');
     } finally {
       setIsExporting(false);
       setExportProgress(0);
