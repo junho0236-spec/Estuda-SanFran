@@ -121,10 +121,11 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
         doc.line(205, 287, 200, 282); // Bottom Right
 
         // Watermark via Text (Lighter, faster)
-        doc.setTextColor(238, 238, 238); // #EEEEEE
-        doc.setFontSize(60);
+        doc.setTextColor(229, 229, 229); // #E5E5E5
+        doc.setFontSize(24);
         doc.setFont('helvetica', 'bold');
-        doc.text('SANFRAN ACADEMY', pageWidth / 2, pageHeight / 2, { align: 'center', angle: 45 });
+        doc.text('SANFRAN ACADEMY', pageWidth / 2, 20, { align: 'center' }); // Header
+        doc.text('SANFRAN ACADEMY', pageWidth / 2, pageHeight - 20, { align: 'center' }); // Footer
         doc.setTextColor(0, 0, 0);
       };
 
@@ -210,7 +211,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
         doc.setFont('times', 'normal');
         doc.setFontSize(11);
         doc.setTextColor(0, 0, 0);
-        doc.text(statementLines, margin + 15, cardY, { align: 'justify', maxWidth: contentWidth - 20 });
+        doc.text(statementLines, margin + 15, cardY, { align: 'left', maxWidth: contentWidth - 20 });
         
         cardY += statementHeight + 5;
         
@@ -232,7 +233,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
            doc.setFont('times', 'normal');
            doc.setFontSize(11);
            doc.setTextColor(50, 50, 50);
-           doc.text(lines, margin + 22, cardY, { align: 'justify', maxWidth: contentWidth - 30 });
+           doc.text(lines, margin + 22, cardY, { align: 'left', maxWidth: contentWidth - 30 });
            
            cardY += lines.length * 6 + 4;
         });
@@ -3621,72 +3622,6 @@ Forneça a explicação de forma concisa e didática.`;
             <div className="text-right">
               <p className="text-lg font-bold text-[#800020]">Simulado Oficial</p>
               <p className="text-sm text-gray-500 font-medium">{new Date().toLocaleDateString()}</p>
-            </div>
-          </div>
-          
-          <div className="p-8 space-y-8">
-            {filteredQuestions.map((q, idx) => {
-              const isShortOptions = q.options.every(opt => opt.length < 60);
-              return (
-              <div key={idx} className="pdf-question-card bg-white rounded-2xl p-6 border border-gray-200 relative overflow-hidden">
-                <div className="flex gap-4 mb-6">
-                  <div className="w-12 h-12 rounded-xl bg-white border border-gray-200 flex items-center justify-center flex-shrink-0">
-                    <span className="text-lg font-black text-[#800020]">{idx + 1}</span>
-                  </div>
-                  <div className="flex-1 pt-1">
-                    <p className="text-gray-900 font-medium leading-relaxed text-justify font-serif text-lg">{q.statement}</p>
-                  </div>
-                </div>
-                <div className={`grid gap-3 ml-16 ${isShortOptions ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                  {q.options.map((opt, optIdx) => (
-                    <div key={optIdx} className="flex items-start gap-3 p-4 rounded-xl border border-gray-200 bg-gray-50/50">
-                      <div className="w-6 h-6 rounded-full border-2 border-gray-300 bg-white flex-shrink-0 mt-0.5 flex items-center justify-center">
-                        <span className="text-xs font-bold text-gray-400">{String.fromCharCode(65 + optIdx)}</span>
-                      </div>
-                      <span className="text-gray-700 text-sm leading-relaxed text-justify font-serif">
-                        {opt}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )})}
-          </div>
-
-          <div id="pdf-answer-key" className="p-8 mt-4">
-            <div className="bg-white rounded-3xl p-8 border border-gray-200">
-              <div className="flex items-center gap-3 mb-8 pb-6 border-b border-gray-200">
-                <div className="w-12 h-12 bg-[#800020] rounded-xl flex items-center justify-center">
-                  <CheckCircle2 className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Cartão de Respostas</h2>
-                  <p className="text-sm text-gray-500">Gabarito Oficial</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-x-12 gap-y-6">
-                {filteredQuestions.map((q, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-2 border-b border-gray-200">
-                    <span className="text-sm font-bold text-gray-700 w-8">{idx + 1}.</span>
-                    <div className="flex gap-2">
-                      {['A', 'B', 'C', 'D', 'E'].slice(0, q.options.length).map((letter, lIdx) => {
-                        const isCorrect = q.correct_answer === lIdx;
-                        return (
-                          <div 
-                            key={letter} 
-                            className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold
-                              ${isCorrect 
-                                ? 'bg-[#800020]/20 border-[#800020] text-[#800020]' 
-                                : 'border-gray-300 text-gray-400'}`}
-                          >
-                            {letter}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
         </div>
