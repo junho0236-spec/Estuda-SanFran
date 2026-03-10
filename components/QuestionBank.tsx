@@ -103,6 +103,9 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
       const contentWidth = pageWidth - 2 * margin;
       let currentY = margin;
       
+      const scaleSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 24 24" fill="none" stroke="#800020" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>`;
+      const scaleDataUrl = 'data:image/svg+xml;base64,' + btoa(scaleSvg);
+
       const addWatermark = (page: number) => {
         doc.setPage(page);
         
@@ -121,22 +124,33 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
         doc.line(pageWidth - 15, pageHeight - 10, pageWidth - 10, pageHeight - 15); // Bottom Right
 
         // Watermark
-        doc.setTextColor(128, 0, 32);
-        doc.setFontSize(60);
-        doc.setFont('helvetica', 'bold');
-        doc.setGState(new (doc as any).GState({opacity: 0.03}));
-        doc.text('SANFRAN', pageWidth / 2, pageHeight / 2 - 10, { align: 'center', angle: 45 });
-        doc.text('ACADEMY', pageWidth / 2, pageHeight / 2 + 15, { align: 'center', angle: 45 });
+        doc.setGState(new (doc as any).GState({opacity: 0.02}));
+        doc.addImage(scaleDataUrl, 'SVG', pageWidth / 2 - 60, pageHeight / 2 - 60, 120, 120);
         doc.setGState(new (doc as any).GState({opacity: 1}));
-        doc.setTextColor(0, 0, 0);
       };
+
+      // Capture Cover
+      const coverEl = document.getElementById('pdf-cover');
+      let processedElements = 0;
+      const questionCards = document.querySelectorAll('.pdf-question-card');
+      const totalElements = questionCards.length + 3; // cover + header + questions + answer key
+
+      if (coverEl) {
+        const canvas = await html2canvas(coverEl, { scale: 1.5, useCORS: true, logging: false });
+        const imgData = canvas.toDataURL('image/jpeg', 0.8);
+        const imgProps = doc.getImageProperties(imgData);
+        const imgHeight = (imgProps.height * contentWidth) / imgProps.width;
+        
+        doc.addImage(imgData, 'JPEG', margin, currentY, contentWidth, imgHeight);
+        processedElements++;
+        setExportProgress(Math.round((processedElements / totalElements) * 100));
+        
+        doc.addPage();
+        currentY = margin;
+      }
 
       // Capture Header
       const headerEl = document.getElementById('pdf-header');
-      let processedElements = 0;
-      const questionCards = document.querySelectorAll('.pdf-question-card');
-      const totalElements = questionCards.length + 2; // header + questions + answer key
-
       if (headerEl) {
         const canvas = await html2canvas(headerEl, { scale: 1.5, useCORS: true, logging: false });
         const imgData = canvas.toDataURL('image/jpeg', 0.8);
@@ -3455,6 +3469,44 @@ Forneça a explicação de forma concisa e didática.`;
       {/* Hidden container for PDF export */}
       {isExporting && (
         <div style={{ position: 'absolute', left: '-9999px', top: 0, width: '800px', backgroundColor: '#ffffff', zIndex: -1 }}>
+          <div id="pdf-cover" className="p-16 bg-white flex flex-col items-center justify-center text-center h-[1100px]">
+            <div className="w-32 h-32 bg-[#800020] rounded-3xl flex items-center justify-center shadow-xl mb-12">
+              <Scale className="w-16 h-16 text-white" />
+            </div>
+            
+            <h1 className="text-5xl font-black text-gray-900 tracking-tight mb-4 font-serif">
+              CADERNO DE QUESTÕES
+            </h1>
+            <h2 className="text-2xl font-bold text-[#800020] tracking-widest uppercase mb-24">
+              Exame de Proficiência Jurídica
+            </h2>
+
+            <div className="w-full max-w-2xl space-y-8 text-left mb-24">
+              <div className="border-b-2 border-gray-300 pb-2">
+                <span className="text-sm font-bold text-gray-500 uppercase tracking-wider">Nome do Aluno</span>
+              </div>
+              <div className="grid grid-cols-2 gap-8">
+                <div className="border-b-2 border-gray-300 pb-2">
+                  <span className="text-sm font-bold text-gray-500 uppercase tracking-wider">Número USP</span>
+                </div>
+                <div className="border-b-2 border-gray-300 pb-2">
+                  <span className="text-sm font-bold text-gray-500 uppercase tracking-wider">Data</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="w-full max-w-2xl bg-gray-50 p-8 rounded-2xl border border-gray-200 text-left">
+              <h3 className="text-lg font-bold text-gray-900 mb-4 uppercase tracking-wider">Instruções ao Candidato</h3>
+              <ul className="space-y-3 text-gray-600 text-sm font-medium list-disc list-inside">
+                <li>Verifique se este caderno contém todas as questões solicitadas.</li>
+                <li>Leia atentamente cada questão antes de assinalar a resposta.</li>
+                <li>Preencha o gabarito ao final do caderno com caneta esferográfica de tinta azul ou preta.</li>
+                <li>Não é permitido o uso de material de consulta durante a resolução.</li>
+                <li>O tempo sugerido para resolução é de 3 minutos por questão.</li>
+              </ul>
+            </div>
+          </div>
+
           <div id="pdf-header" className="p-8 bg-gray-50/80 border-b border-gray-200 flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-[#800020] rounded-xl flex items-center justify-center shadow-md">
@@ -3481,7 +3533,7 @@ Forneça a explicação de forma concisa e didática.`;
                     <span className="text-lg font-black text-[#800020]">{idx + 1}</span>
                   </div>
                   <div className="flex-1 pt-1">
-                    <p className="text-gray-900 font-medium leading-relaxed text-justify">{q.statement}</p>
+                    <p className="text-gray-900 font-medium leading-relaxed text-justify font-serif text-lg">{q.statement}</p>
                   </div>
                 </div>
                 <div className={`grid gap-3 ml-16 ${isShortOptions ? 'grid-cols-2' : 'grid-cols-1'}`}>
@@ -3490,7 +3542,7 @@ Forneça a explicação de forma concisa e didática.`;
                       <div className="w-6 h-6 rounded-full border-2 border-gray-300 bg-white flex-shrink-0 mt-0.5 flex items-center justify-center">
                         <span className="text-xs font-bold text-gray-400">{String.fromCharCode(65 + optIdx)}</span>
                       </div>
-                      <span className="text-gray-700 text-sm leading-relaxed text-justify">
+                      <span className="text-gray-700 text-sm leading-relaxed text-justify font-serif">
                         {opt}
                       </span>
                     </div>
@@ -3503,20 +3555,33 @@ Forneça a explicação de forma concisa e didática.`;
           <div id="pdf-answer-key" className="p-8 mt-4">
             <div className="bg-white rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100">
               <div className="flex items-center gap-3 mb-8 pb-6 border-b border-gray-100">
-                <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
-                  <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+                <div className="w-12 h-12 bg-[#800020] rounded-xl flex items-center justify-center">
+                  <CheckCircle2 className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Gabarito Oficial</h2>
-                  <p className="text-sm text-gray-500">Confira suas respostas</p>
+                  <h2 className="text-2xl font-bold text-gray-900">Cartão de Respostas</h2>
+                  <p className="text-sm text-gray-500">Gabarito Oficial</p>
                 </div>
               </div>
-              <div className="grid grid-cols-5 gap-4">
+              <div className="grid grid-cols-2 gap-x-12 gap-y-6">
                 {filteredQuestions.map((q, idx) => (
-                  <div key={idx} className="flex flex-col items-center justify-center p-4 rounded-2xl border border-gray-100 bg-gray-50 shadow-sm">
-                    <span className="text-xs font-bold text-gray-400 mb-2">QUESTÃO {idx + 1}</span>
-                    <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-emerald-500/20">
-                      {String.fromCharCode(65 + q.correct_answer)}
+                  <div key={idx} className="flex items-center justify-between p-2 border-b border-gray-100">
+                    <span className="text-sm font-bold text-gray-700 w-8">{idx + 1}.</span>
+                    <div className="flex gap-2">
+                      {['A', 'B', 'C', 'D', 'E'].slice(0, q.options.length).map((letter, lIdx) => {
+                        const isCorrect = q.correct_answer === lIdx;
+                        return (
+                          <div 
+                            key={letter} 
+                            className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold
+                              ${isCorrect 
+                                ? 'bg-[#800020]/20 border-[#800020] text-[#800020]' 
+                                : 'border-gray-300 text-gray-400'}`}
+                          >
+                            {letter}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
