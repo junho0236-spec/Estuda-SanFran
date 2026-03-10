@@ -323,6 +323,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
     yearFilter: 'Últimos 2 anos' as '2025-2026' | 'Últimos 2 anos'
   });
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generatingStatus, setGeneratingStatus] = useState<string>('');
   const [aiCooldown, setAiCooldown] = useState(0);
   const [isSavingPrecedent, setIsSavingPrecedent] = useState<Record<string, boolean>>({});
 
@@ -2145,6 +2146,9 @@ Forneça a explicação de forma concisa e didática.`;
                     </>
                   )}
                 </button>
+                {isGenerating && generatingStatus && (
+                  <p className="text-center text-sm text-purple-300 mt-2">{generatingStatus}</p>
+                )}
               </div>
             </form>
           </div>
