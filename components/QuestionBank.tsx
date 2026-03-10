@@ -9,6 +9,7 @@ import { GEMINI_MODEL, extractPrecedent } from '../services/geminiService';
 import Markdown from 'react-markdown';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import html2canvas from 'html2canvas';
 import { 
   BookOpen, 
   CheckCircle2, 
@@ -87,115 +88,98 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
   const navigate = useNavigate();
   // ... (rest of the component)
 
-  const handleExportPDF = () => {
-    const doc = new jsPDF();
-    const margin = 15;
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const contentWidth = pageWidth - 2 * margin;
-    const bordô = [128, 0, 32]; // RGB for SanFran bordô
+  const handleExportPDF = async () => {
+    setIsExporting(true);
+    
+    // Wait for React to render the hidden container
+    await new Promise(resolve => setTimeout(resolve, 500));
 
-    const addWatermark = (page: number) => {
-      doc.setPage(page);
-      doc.setTextColor(230, 230, 230);
-      doc.setFontSize(60);
-      doc.setFont('helvetica', 'bold');
-      doc.text('SanFran Academy', pageWidth / 2, pageHeight / 2, { align: 'center', angle: 45 });
-      doc.setTextColor(0, 0, 0);
-    };
-
-    const drawBorder = (page: number) => {
-      doc.setPage(page);
-      doc.setDrawColor(bordô[0], bordô[1], bordô[2]);
-      doc.setLineWidth(1);
-      doc.rect(5, 5, pageWidth - 10, pageHeight - 10);
-    };
-
-    const addWrappedText = (text: string, x: number, y: number, fontSize: number, fontStyle: 'normal' | 'bold' = 'normal', color: [number, number, number] = [0, 0, 0]) => {
-      doc.setFontSize(fontSize);
-      doc.setFont('helvetica', fontStyle);
-      doc.setTextColor(color[0], color[1], color[2]);
-      const lines = doc.splitTextToSize(text, contentWidth);
-      const lineHeight = fontSize * 0.5;
+    try {
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 15;
+      const contentWidth = pageWidth - 2 * margin;
+      let currentY = margin;
       
-      if (y + (lines.length * lineHeight) > pageHeight - 25) {
-        doc.addPage();
-        drawBorder((doc.internal as any).getNumberOfPages());
-        addWatermark((doc.internal as any).getNumberOfPages());
-        y = 30;
+      const addWatermark = (page: number) => {
+        doc.setPage(page);
+        doc.setTextColor(200, 200, 200);
+        doc.setFontSize(40);
+        doc.setFont('helvetica', 'bold');
+        // 5% opacity watermark
+        doc.setGState(new (doc as any).GState({opacity: 0.05}));
+        doc.text('SanFran Academy', pageWidth / 2, pageHeight / 2, { align: 'center', angle: 45 });
+        doc.setGState(new (doc as any).GState({opacity: 1}));
+        doc.setTextColor(0, 0, 0);
+      };
+
+      // Capture Header
+      const headerEl = document.getElementById('pdf-header');
+      if (headerEl) {
+        const canvas = await html2canvas(headerEl, { scale: 2, useCORS: true, logging: false });
+        const imgData = canvas.toDataURL('image/png');
+        const imgProps = doc.getImageProperties(imgData);
+        const imgHeight = (imgProps.height * contentWidth) / imgProps.width;
+        
+        doc.addImage(imgData, 'PNG', margin, currentY, contentWidth, imgHeight);
+        currentY += imgHeight + 10;
       }
-      
-      doc.text(lines, x, y);
-      doc.setTextColor(0, 0, 0);
-      return y + (lines.length * lineHeight) + 5;
-    };
 
-    // Initial setup
-    drawBorder(1);
-    addWatermark(1);
+      // Capture Questions
+      const questionCards = document.querySelectorAll('.pdf-question-card');
+      for (let i = 0; i < questionCards.length; i++) {
+        const card = questionCards[i] as HTMLElement;
+        const canvas = await html2canvas(card, { scale: 2, useCORS: true, logging: false });
+        const imgData = canvas.toDataURL('image/png');
+        const imgProps = doc.getImageProperties(imgData);
+        const imgHeight = (imgProps.height * contentWidth) / imgProps.width;
 
-    // Header
-    doc.setFillColor(bordô[0], bordô[1], bordô[2]);
-    doc.rect(margin, 15, contentWidth, 25, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(22);
-    doc.setFont('helvetica', 'bold');
-    doc.text('SANFRAN ACADEMY', pageWidth / 2, 25, { align: 'center' });
-    doc.setFontSize(10);
-    doc.text('Excelência no Ensino Jurídico - XI de Agosto', pageWidth / 2, 32, { align: 'center' });
-    doc.setTextColor(0, 0, 0);
-    let y = 45;
+        if (currentY + imgHeight > pageHeight - margin) {
+          doc.addPage();
+          currentY = margin;
+        }
 
-    // Questions
-    filteredQuestions.forEach((q, idx) => {
-      // Question number in styled box
-      doc.setFillColor(240, 240, 240);
-      doc.roundedRect(margin, y - 5, 8, 8, 2, 2, 'F');
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`${idx + 1}`, margin + 4, y + 1, { align: 'center' });
-      
-      y = addWrappedText(q.statement, margin + 12, y, 12, 'bold');
-      q.options.forEach((opt, optIdx) => {
-        // Custom checkbox
-        doc.setDrawColor(100, 100, 100);
-        doc.rect(margin + 5, y - 3, 4, 4);
-        y = addWrappedText(`${String.fromCharCode(65 + optIdx)}) ${opt}`, margin + 12, y, 11, 'normal', [50, 50, 50]);
-      });
-      y += 5;
-    });
+        doc.addImage(imgData, 'PNG', margin, currentY, contentWidth, imgHeight);
+        currentY += imgHeight + 10;
+      }
 
-    // Answer Key
-    doc.addPage();
-    drawBorder((doc.internal as any).getNumberOfPages());
-    addWatermark((doc.internal as any).getNumberOfPages());
-    
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Gabarito', pageWidth / 2, 25, { align: 'center' });
-    
-    autoTable(doc, {
-      startY: 35,
-      head: [['Questão', 'Alternativa']],
-      body: filteredQuestions.map((q, idx) => [idx + 1, String.fromCharCode(65 + q.correct_answer)]),
-      margin: { left: margin, right: margin },
-      theme: 'striped',
-      headStyles: { fillColor: bordô as [number, number, number] },
-      alternateRowStyles: { fillColor: [245, 245, 245] as [number, number, number] },
-      styles: { halign: 'center', fontSize: 12 }
-    });
+      // Capture Answer Key
+      const answerKeyEl = document.getElementById('pdf-answer-key');
+      if (answerKeyEl) {
+        const canvas = await html2canvas(answerKeyEl, { scale: 2, useCORS: true, logging: false });
+        const imgData = canvas.toDataURL('image/png');
+        const imgProps = doc.getImageProperties(imgData);
+        const imgHeight = (imgProps.height * contentWidth) / imgProps.width;
 
-    // Footer (Page Numbering)
-    const pageCount = (doc.internal as any).getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(9);
-      doc.text(`Página ${i} de ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+        if (currentY + imgHeight > pageHeight - margin) {
+          doc.addPage();
+          currentY = margin;
+        }
+
+        doc.addImage(imgData, 'PNG', margin, currentY, contentWidth, imgHeight);
+      }
+
+      // Add watermark and page numbers to all pages
+      const pageCount = (doc.internal as any).getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        addWatermark(i);
+        doc.setPage(i);
+        doc.setFontSize(9);
+        doc.setTextColor(100, 100, 100);
+        doc.text(`Página ${i} de ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+      }
+
+      doc.save('simulado-sanfran.pdf');
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Erro ao gerar o PDF. Tente novamente.');
+    } finally {
+      setIsExporting(false);
     }
-
-    doc.save('simulado.pdf');
   };
 
+  const [isExporting, setIsExporting] = useState(false);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -1957,9 +1941,11 @@ Forneça a explicação de forma concisa e didática.`;
             </button>
             <button
               onClick={handleExportPDF}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors shadow-lg shadow-slate-900/20"
+              disabled={isExporting}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 disabled:opacity-50 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors shadow-lg shadow-slate-900/20"
             >
-              <FileText size={14} /> Exportar PDF
+              {isExporting ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />} 
+              {isExporting ? 'Gerando...' : 'Exportar PDF'}
             </button>
             <button
               onClick={() => setShowAIGenerator(true)}
@@ -3427,6 +3413,72 @@ Forneça a explicação de forma concisa e didática.`;
           }}
           isSubmitting={isSubmitting}
         />
+      )}
+
+      {/* Hidden container for PDF export */}
+      {isExporting && (
+        <div style={{ position: 'absolute', left: '-9999px', top: 0, width: '800px', backgroundColor: '#f8fafc', zIndex: -1 }}>
+          <div id="pdf-header" className="p-8 bg-white border-b border-gray-200 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-[#800020] rounded-xl flex items-center justify-center shadow-lg">
+                <Scale className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900 tracking-tight">SANFRAN ACADEMY</h1>
+                <p className="text-sm text-gray-500 font-medium">Excelência no Ensino Jurídico - XI de Agosto</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-medium text-gray-900">Simulado Personalizado</p>
+              <p className="text-sm text-gray-500">{new Date().toLocaleDateString()}</p>
+            </div>
+          </div>
+          
+          <div className="p-8 space-y-8">
+            {filteredQuestions.map((q, idx) => (
+              <div key={idx} className="pdf-question-card bg-white rounded-2xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 relative overflow-hidden">
+                <div className="flex gap-4 mb-6">
+                  <div className="w-10 h-10 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center flex-shrink-0 shadow-inner">
+                    <span className="text-sm font-bold text-gray-700">{idx + 1}</span>
+                  </div>
+                  <div className="flex-1 pt-2">
+                    <p className="text-gray-900 font-medium leading-relaxed">{q.statement}</p>
+                  </div>
+                </div>
+                <div className="space-y-3 ml-14">
+                  {q.options.map((opt, optIdx) => (
+                    <div key={optIdx} className="flex items-start gap-3 p-3 rounded-xl border border-gray-100 bg-gray-50/50">
+                      <div className="w-5 h-5 rounded border border-gray-300 bg-white flex-shrink-0 mt-0.5" />
+                      <span className="text-gray-700 text-sm leading-relaxed">
+                        <span className="font-semibold mr-2">{String.fromCharCode(65 + optIdx)})</span>
+                        {opt}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div id="pdf-answer-key" className="p-8">
+            <div className="bg-white rounded-2xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100">
+              <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                <CheckCircle2 className="w-6 h-6 text-[#800020]" />
+                Gabarito Oficial
+              </h2>
+              <div className="grid grid-cols-4 gap-4">
+                {filteredQuestions.map((q, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50">
+                    <span className="text-sm font-medium text-gray-500">Questão {idx + 1}</span>
+                    <span className="text-sm font-bold text-[#800020] bg-[#800020]/10 px-2 py-1 rounded-md">
+                      {String.fromCharCode(65 + q.correct_answer)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
       </div>
   );
