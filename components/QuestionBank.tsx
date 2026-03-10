@@ -93,53 +93,103 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const contentWidth = pageWidth - 2 * margin;
+    const bordô = [128, 0, 32]; // RGB for SanFran bordô
 
-    let y = 20; // Top margin
+    const addWatermark = (page: number) => {
+      doc.setPage(page);
+      doc.setTextColor(230, 230, 230);
+      doc.setFontSize(60);
+      doc.setFont('helvetica', 'bold');
+      doc.text('SanFran Academy', pageWidth / 2, pageHeight / 2, { align: 'center', angle: 45 });
+      doc.setTextColor(0, 0, 0);
+    };
 
-    const addWrappedText = (text: string, x: number, y: number, fontSize: number, fontStyle: 'normal' | 'bold' = 'normal') => {
+    const drawBorder = (page: number) => {
+      doc.setPage(page);
+      doc.setDrawColor(bordô[0], bordô[1], bordô[2]);
+      doc.setLineWidth(1);
+      doc.rect(5, 5, pageWidth - 10, pageHeight - 10);
+    };
+
+    const addWrappedText = (text: string, x: number, y: number, fontSize: number, fontStyle: 'normal' | 'bold' = 'normal', color: [number, number, number] = [0, 0, 0]) => {
       doc.setFontSize(fontSize);
       doc.setFont('helvetica', fontStyle);
+      doc.setTextColor(color[0], color[1], color[2]);
       const lines = doc.splitTextToSize(text, contentWidth);
-      const lineHeight = fontSize * 0.4; // Approximation for line height
+      const lineHeight = fontSize * 0.5;
       
-      if (y + (lines.length * lineHeight) > pageHeight - 20) {
+      if (y + (lines.length * lineHeight) > pageHeight - 25) {
         doc.addPage();
-        y = 20;
+        drawBorder((doc.internal as any).getNumberOfPages());
+        addWatermark((doc.internal as any).getNumberOfPages());
+        y = 30;
       }
       
       doc.text(lines, x, y);
-      return y + (lines.length * lineHeight) + 5; // +5 for spacing
+      doc.setTextColor(0, 0, 0);
+      return y + (lines.length * lineHeight) + 5;
     };
 
+    // Initial setup
+    drawBorder(1);
+    addWatermark(1);
+
     // Header
-    y = addWrappedText('SANFRAN ACADEMY - Simulado Personalizado', margin, y, 18, 'bold');
-    y = addWrappedText(`Data: ${new Date().toLocaleDateString()} | Aluno: Aluno`, margin, y, 12);
-    y += 5;
+    doc.setFillColor(bordô[0], bordô[1], bordô[2]);
+    doc.rect(margin, 15, contentWidth, 25, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text('SANFRAN ACADEMY', pageWidth / 2, 25, { align: 'center' });
+    doc.setFontSize(10);
+    doc.text('Excelência no Ensino Jurídico - XI de Agosto', pageWidth / 2, 32, { align: 'center' });
+    doc.setTextColor(0, 0, 0);
+    let y = 45;
 
     // Questions
     filteredQuestions.forEach((q, idx) => {
-      y = addWrappedText(`${idx + 1}. ${q.statement}`, margin, y, 12, 'bold');
+      // Question number in styled box
+      doc.setFillColor(240, 240, 240);
+      doc.roundedRect(margin, y - 5, 8, 8, 2, 2, 'F');
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${idx + 1}`, margin + 4, y + 1, { align: 'center' });
+      
+      y = addWrappedText(q.statement, margin + 12, y, 12, 'bold');
       q.options.forEach((opt, optIdx) => {
-        y = addWrappedText(`[ ] ${String.fromCharCode(65 + optIdx)}) ${opt}`, margin + 5, y, 11);
+        // Custom checkbox
+        doc.setDrawColor(100, 100, 100);
+        doc.rect(margin + 5, y - 3, 4, 4);
+        y = addWrappedText(`${String.fromCharCode(65 + optIdx)}) ${opt}`, margin + 12, y, 11, 'normal', [50, 50, 50]);
       });
       y += 5;
     });
 
     // Answer Key
     doc.addPage();
+    drawBorder((doc.internal as any).getNumberOfPages());
+    addWatermark((doc.internal as any).getNumberOfPages());
+    
     doc.setFontSize(16);
-    doc.text('Gabarito', pageWidth / 2, 20, { align: 'center' });
+    doc.setFont('helvetica', 'bold');
+    doc.text('Gabarito', pageWidth / 2, 25, { align: 'center' });
+    
     autoTable(doc, {
-      startY: 30,
+      startY: 35,
       head: [['Questão', 'Alternativa']],
       body: filteredQuestions.map((q, idx) => [idx + 1, String.fromCharCode(65 + q.correct_answer)]),
-      margin: { left: margin, right: margin }
+      margin: { left: margin, right: margin },
+      theme: 'striped',
+      headStyles: { fillColor: bordô as [number, number, number] },
+      alternateRowStyles: { fillColor: [245, 245, 245] as [number, number, number] },
+      styles: { halign: 'center', fontSize: 12 }
     });
 
     // Footer (Page Numbering)
     const pageCount = (doc.internal as any).getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
+      doc.setFontSize(9);
       doc.text(`Página ${i} de ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
     }
 
