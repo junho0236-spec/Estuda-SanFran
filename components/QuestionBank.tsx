@@ -1782,7 +1782,6 @@ Forneça a explicação de forma concisa e didática.`;
   }
 
   return (
-    <>
     <div className={`${isMockMode ? 'fixed inset-0 z-[100] bg-slate-50 dark:bg-slate-950 overflow-y-auto' : 'max-w-4xl mx-auto p-4 md:p-8 animate-in fade-in duration-500 pb-24'}`}>
       {/* Confidence Selection Modal */}
       <AnimatePresence>
@@ -3332,22 +3331,20 @@ Forneça a explicação de forma concisa e didática.`;
           </div>
           </>
         )}
-      </div>
-      </div>
-      </div>
-
-      <div id="notification-portal">
-        {notification && (
-          <div className={`fixed bottom-6 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 z-50 animate-in slide-in-from-bottom-5 fade-in duration-300 ${
-            notification.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-          }`}>
-            {notification.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
-            <span className="font-bold text-sm">{notification.message}</span>
-          </div>
-        )}
-      </div>
-
-      {/* AI Lesson Modal */}
+        <div id="notification-portal">
+          {notification && (
+            <div className={`fixed bottom-6 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 z-50 animate-in slide-in-from-bottom-5 fade-in duration-300 ${
+              notification.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+            }`}>
+              {notification.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
+              <span className="font-bold text-sm">{notification.message}</span>
+            </div>
+          )}
+        </div>
+    );
+  };
+  
+  export default QuestionBank;
       {showAiLesson && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[130] flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 md:p-10 shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-3xl animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-hidden flex flex-col">
@@ -3558,7 +3555,7 @@ Forneça a explicação de forma concisa e didática.`;
         />
       )}
     </div>
-    </>
+    </div>
   );
 };
 
