@@ -120,12 +120,15 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
         doc.line(5, 282, 10, 287); // Bottom Left
         doc.line(205, 287, 200, 282); // Bottom Right
 
-        // Watermark via Text (Lighter, faster)
-        doc.setTextColor(229, 229, 229); // #E5E5E5
-        doc.setFontSize(24);
+        // Watermark via Text (Diagonal, 4% opacity)
+        doc.setGState(new (doc as any).GState({opacity: 0.04}));
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(60);
         doc.setFont('helvetica', 'bold');
-        doc.text('SANFRAN ACADEMY', pageWidth / 2, 20, { align: 'center' }); // Header
-        doc.text('SANFRAN ACADEMY', pageWidth / 2, pageHeight - 20, { align: 'center' }); // Footer
+        doc.text('SANFRAN ACADEMY', pageWidth / 2, pageHeight / 2, { align: 'center', angle: 45 });
+        
+        // Reset state to avoid bugging the rest of the PDF
+        doc.setGState(new (doc as any).GState({opacity: 1.0}));
         doc.setTextColor(0, 0, 0);
       };
 
