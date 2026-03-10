@@ -89,51 +89,60 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
 
   const handleExportPDF = () => {
     const doc = new jsPDF();
-    doc.setFont('helvetica');
-    
-    // Header
-    doc.setFontSize(18);
-    doc.text('SANFRAN ACADEMY - Simulado Personalizado', 105, 20, { align: 'center' });
-    doc.setFontSize(12);
-    doc.text(`Data: ${new Date().toLocaleDateString()}`, 20, 30);
-    doc.text(`Aluno: Aluno`, 20, 35);
-    
-    // Questions
-    let y = 45;
-    filteredQuestions.forEach((q, idx) => {
-      if (y > 270) {
+    const margin = 15;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const contentWidth = pageWidth - 2 * margin;
+
+    let y = 20; // Top margin
+
+    const addWrappedText = (text: string, x: number, y: number, fontSize: number, fontStyle: 'normal' | 'bold' = 'normal') => {
+      doc.setFontSize(fontSize);
+      doc.setFont('helvetica', fontStyle);
+      const lines = doc.splitTextToSize(text, contentWidth);
+      const lineHeight = fontSize * 0.4; // Approximation for line height
+      
+      if (y + (lines.length * lineHeight) > pageHeight - 20) {
         doc.addPage();
         y = 20;
       }
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`${idx + 1}. ${q.statement}`, 20, y);
-      y += 10;
-      doc.setFont('helvetica', 'normal');
+      
+      doc.text(lines, x, y);
+      return y + (lines.length * lineHeight) + 5; // +5 for spacing
+    };
+
+    // Header
+    y = addWrappedText('SANFRAN ACADEMY - Simulado Personalizado', margin, y, 18, 'bold');
+    y = addWrappedText(`Data: ${new Date().toLocaleDateString()} | Aluno: Aluno`, margin, y, 12);
+    y += 5;
+
+    // Questions
+    filteredQuestions.forEach((q, idx) => {
+      y = addWrappedText(`${idx + 1}. ${q.statement}`, margin, y, 12, 'bold');
       q.options.forEach((opt, optIdx) => {
-        doc.text(`[ ] ${String.fromCharCode(65 + optIdx)}) ${opt}`, 25, y);
-        y += 7;
+        y = addWrappedText(`[ ] ${String.fromCharCode(65 + optIdx)}) ${opt}`, margin + 5, y, 11);
       });
-      y += 10;
+      y += 5;
     });
-    
+
     // Answer Key
     doc.addPage();
     doc.setFontSize(16);
-    doc.text('Gabarito', 105, 20, { align: 'center' });
+    doc.text('Gabarito', pageWidth / 2, 20, { align: 'center' });
     autoTable(doc, {
       startY: 30,
       head: [['Questão', 'Alternativa']],
       body: filteredQuestions.map((q, idx) => [idx + 1, String.fromCharCode(65 + q.correct_answer)]),
+      margin: { left: margin, right: margin }
     });
-    
+
     // Footer (Page Numbering)
-    const pageCount = (doc as any).internal.getNumberOfPages();
+    const pageCount = (doc.internal as any).getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
-      doc.text(`Página ${i} de ${pageCount}`, 105, 290, { align: 'center' });
+      doc.text(`Página ${i} de ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
     }
-    
+
     doc.save('simulado.pdf');
   };
 
