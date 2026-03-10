@@ -90,6 +90,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
 
   const handleExportPDF = async () => {
     setIsExporting(true);
+    setExportProgress(0);
     
     // Wait for React to render the hidden container
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -116,22 +117,27 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
 
       // Capture Header
       const headerEl = document.getElementById('pdf-header');
+      let processedElements = 0;
+      const questionCards = document.querySelectorAll('.pdf-question-card');
+      const totalElements = questionCards.length + 2; // header + questions + answer key
+
       if (headerEl) {
-        const canvas = await html2canvas(headerEl, { scale: 2, useCORS: true, logging: false });
-        const imgData = canvas.toDataURL('image/png');
+        const canvas = await html2canvas(headerEl, { scale: 1.5, useCORS: true, logging: false });
+        const imgData = canvas.toDataURL('image/jpeg', 0.8);
         const imgProps = doc.getImageProperties(imgData);
         const imgHeight = (imgProps.height * contentWidth) / imgProps.width;
         
-        doc.addImage(imgData, 'PNG', margin, currentY, contentWidth, imgHeight);
+        doc.addImage(imgData, 'JPEG', margin, currentY, contentWidth, imgHeight);
         currentY += imgHeight + 10;
+        processedElements++;
+        setExportProgress(Math.round((processedElements / totalElements) * 100));
       }
 
       // Capture Questions
-      const questionCards = document.querySelectorAll('.pdf-question-card');
       for (let i = 0; i < questionCards.length; i++) {
         const card = questionCards[i] as HTMLElement;
-        const canvas = await html2canvas(card, { scale: 2, useCORS: true, logging: false });
-        const imgData = canvas.toDataURL('image/png');
+        const canvas = await html2canvas(card, { scale: 1.5, useCORS: true, logging: false });
+        const imgData = canvas.toDataURL('image/jpeg', 0.8);
         const imgProps = doc.getImageProperties(imgData);
         const imgHeight = (imgProps.height * contentWidth) / imgProps.width;
 
@@ -140,15 +146,23 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
           currentY = margin;
         }
 
-        doc.addImage(imgData, 'PNG', margin, currentY, contentWidth, imgHeight);
+        doc.addImage(imgData, 'JPEG', margin, currentY, contentWidth, imgHeight);
         currentY += imgHeight + 10;
+        
+        processedElements++;
+        setExportProgress(Math.round((processedElements / totalElements) * 100));
+
+        // Batch processing delay every 5 questions to free up main thread
+        if ((i + 1) % 5 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 150));
+        }
       }
 
       // Capture Answer Key
       const answerKeyEl = document.getElementById('pdf-answer-key');
       if (answerKeyEl) {
-        const canvas = await html2canvas(answerKeyEl, { scale: 2, useCORS: true, logging: false });
-        const imgData = canvas.toDataURL('image/png');
+        const canvas = await html2canvas(answerKeyEl, { scale: 1.5, useCORS: true, logging: false });
+        const imgData = canvas.toDataURL('image/jpeg', 0.8);
         const imgProps = doc.getImageProperties(imgData);
         const imgHeight = (imgProps.height * contentWidth) / imgProps.width;
 
@@ -157,7 +171,9 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
           currentY = margin;
         }
 
-        doc.addImage(imgData, 'PNG', margin, currentY, contentWidth, imgHeight);
+        doc.addImage(imgData, 'JPEG', margin, currentY, contentWidth, imgHeight);
+        processedElements++;
+        setExportProgress(Math.round((processedElements / totalElements) * 100));
       }
 
       // Add watermark and page numbers to all pages
@@ -176,10 +192,12 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
       alert('Erro ao gerar o PDF. Tente novamente.');
     } finally {
       setIsExporting(false);
+      setExportProgress(0);
     }
   };
 
   const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -1945,7 +1963,7 @@ Forneça a explicação de forma concisa e didática.`;
               className="flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 disabled:opacity-50 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors shadow-lg shadow-slate-900/20"
             >
               {isExporting ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />} 
-              {isExporting ? 'Gerando...' : 'Exportar PDF'}
+              {isExporting ? `Gerando (${exportProgress}%)...` : 'Exportar PDF'}
             </button>
             <button
               onClick={() => setShowAIGenerator(true)}
