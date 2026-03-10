@@ -105,6 +105,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
   const [wrongQuestions, setWrongQuestions] = useState<string[]>([]);
   const [correctQuestions, setCorrectQuestions] = useState<string[]>([]);
   const [questionStatus, setQuestionStatus] = useState<'all' | 'resolved' | 'unresolved' | 'correct' | 'wrong'>('all');
+  const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'single'>('list');
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1827,45 +1828,44 @@ Forneça a explicação de forma concisa e didática.`;
             </p>
           </div>
           
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-3 mb-8">
             <button
               onClick={() => setShowManualGlossarySearch(!showManualGlossarySearch)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${showManualGlossarySearch ? 'bg-indigo-600 text-white' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-200'}`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors ${showManualGlossarySearch ? 'bg-indigo-600 text-white' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-200'}`}
               title="Dicionário Jurídico"
             >
-              <Book size={16} />
-              <Search size={14} className="-ml-1" />
+              <Book size={14} /> Dicionário
             </button>
             <button
               onClick={() => setShowMockSetup(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-colors shadow-lg shadow-emerald-900/20"
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors shadow-lg shadow-emerald-900/20"
             >
-              <Timer size={16} /> Iniciar Simulado
+              <Timer size={14} /> Simulado
             </button>
             <button
               onClick={() => setShowAIGenerator(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors shadow-lg shadow-purple-900/20"
             >
-              <Sparkles size={16} /> Gerar com IA
+              <Sparkles size={14} /> IA
             </button>
             <button
               onClick={handleGenerateSmartReview}
-              className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-sm transition-colors shadow-lg shadow-amber-900/20"
+              className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors shadow-lg shadow-amber-900/20"
             >
-              <Zap size={16} /> Reforçar Pontos Fracos
+              <Zap size={14} /> Reforço
             </button>
             <button
               onClick={() => setShowNotebookCreationMode(prev => !prev)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${showNotebookCreationMode ? 'bg-orange-600 hover:bg-orange-700 text-white' : 'bg-orange-100 dark:bg-orange-800 hover:bg-orange-200 dark:hover:bg-orange-700 text-orange-700 dark:text-orange-300'}`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors ${showNotebookCreationMode ? 'bg-orange-600 text-white' : 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 hover:bg-orange-200'}`}
             >
-              <NotebookText size={16} /> {showNotebookCreationMode ? 'Sair do Modo Caderno' : 'Criar Caderno'}
+              <NotebookText size={14} /> Caderno
             </button>
             {selectedQuestionsForNotebook.size > 0 && (
               <button
                 onClick={() => setIsNotebookModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors"
               >
-                <Plus size={16} /> Adicionar ao Caderno
+                <Plus size={14} /> Adicionar ({selectedQuestionsForNotebook.size})
               </button>
             )}
             <button
@@ -1878,9 +1878,9 @@ Forneça a explicação de forma concisa e didática.`;
                   setViewMode('list');
                 }
               }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${isErrorNotebookMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50 text-red-700 dark:text-red-400'}`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors ${isErrorNotebookMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50 text-red-700 dark:text-red-400'}`}
             >
-              <BookX size={16} /> {isErrorNotebookMode ? 'Sair dos Erros' : 'Caderno de Erros'}
+              <BookX size={14} /> {isErrorNotebookMode ? 'Sair dos Erros' : 'Caderno de Erros'}
             </button>
           </div>
         </header>
@@ -2280,20 +2280,20 @@ Forneça a explicação de forma concisa e didática.`;
             {/* Filters & Stats */}
           <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 mb-6 overflow-hidden">
             {/* Quick Stats */}
-            <div className="p-4 grid grid-cols-3 gap-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-              <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white dark:bg-slate-900 shadow-sm">
-                <span className="text-2xl font-bold text-slate-900 dark:text-white">{correctCount + wrongCount}</span>
-                <span className="text-xs text-slate-500 font-medium">Questões Hoje</span>
+            <div className="p-4 grid grid-cols-3 gap-6 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+              <div className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white dark:bg-slate-900 shadow-[5px_5px_10px_#d1d9e6,-5px_-5px_10px_#ffffff] dark:shadow-[5px_5px_10px_#000000,-5px_-5px_10px_#2a2a2a]">
+                <span className="text-3xl font-black text-slate-900 dark:text-white">{correctCount + wrongCount}</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-1">Questões</span>
               </div>
-              <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white dark:bg-slate-900 shadow-sm">
-                <span className="text-2xl font-bold text-green-600 dark:text-green-400">{correctCount}</span>
-                <span className="text-xs text-slate-500 font-medium">Acertos</span>
+              <div className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white dark:bg-slate-900 shadow-[5px_5px_10px_#d1d9e6,-5px_-5px_10px_#ffffff] dark:shadow-[5px_5px_10px_#000000,-5px_-5px_10px_#2a2a2a]">
+                <span className="text-3xl font-black text-green-600 dark:text-green-400">{correctCount}</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-1">Acertos</span>
               </div>
-              <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white dark:bg-slate-900 shadow-sm">
-                <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+              <div className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white dark:bg-slate-900 shadow-[5px_5px_10px_#d1d9e6,-5px_-5px_10px_#ffffff] dark:shadow-[5px_5px_10px_#000000,-5px_-5px_10px_#2a2a2a]">
+                <span className="text-3xl font-black text-blue-600 dark:text-blue-400">
                   {correctCount + wrongCount > 0 ? ((correctCount / (correctCount + wrongCount)) * 100).toFixed(0) : 0}%
                 </span>
-                <span className="text-xs text-slate-500 font-medium">Aproveitamento</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-1">Aproveit.</span>
               </div>
             </div>
             {showNotebookCreationMode && (
@@ -2365,63 +2365,73 @@ Forneça a explicação de forma concisa e didática.`;
             </div>
             
             <div className="p-4 bg-slate-50 dark:bg-slate-800/50">
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
-                <select
-                  value={selectedSubject}
-                  onChange={(e) => setSelectedSubject(e.target.value)}
-                  className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
-                >
-                  <option value="">Disciplina</option>
-                  {subjects.map(s => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
+              <button 
+                onClick={() => setShowFilters(!showFilters)}
+                className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-300 mb-4 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              >
+                <Filter size={16} /> {showFilters ? 'Ocultar Filtros' : 'Filtros Avançados'}
+              </button>
+              {showFilters && (
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4 animate-in slide-in-from-top-2 duration-300">
+                  <select
+                    value={selectedSubject}
+                    onChange={(e) => setSelectedSubject(e.target.value)}
+                    className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
+                  >
+                    <option value="">Disciplina</option>
+                    {subjects.map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
 
-                <select
-                  value={selectedTopic}
-                  onChange={(e) => setSelectedTopic(e.target.value)}
-                  className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
-                >
-                  <option value="">Assunto</option>
-                  {topics.map(t => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
+                  <select
+                    value={selectedTopic}
+                    onChange={(e) => setSelectedTopic(e.target.value)}
+                    className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
+                  >
+                    <option value="">Assunto</option>
+                    {topics.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
 
-                <select
-                  value={selectedExamBoard}
-                  onChange={(e) => setSelectedExamBoard(e.target.value)}
-                  className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
-                >
-                  <option value="">Banca</option>
-                  {examBoards.map(b => (
-                    <option key={b} value={b}>{b}</option>
-                  ))}
-                </select>
+                  <select
+                    value={selectedExamBoard}
+                    onChange={(e) => setSelectedExamBoard(e.target.value)}
+                    className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
+                  >
+                    <option value="">Banca</option>
+                    {examBoards.map(b => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
+                  </select>
 
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(e.target.value)}
-                  className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
-                >
-                  <option value="">Ano</option>
-                  {years.map(y => (
-                    <option key={y} value={y.toString()}>{y}</option>
-                  ))}
-                </select>
+                  <select
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(e.target.value)}
+                    className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
+                  >
+                    <option value="">Ano</option>
+                    {years.map(y => (
+                      <option key={y} value={y.toString()}>{y}</option>
+                    ))}
+                  </select>
 
-                <select
-                  value={difficultyFilter}
-                  onChange={(e) => setDifficultyFilter(e.target.value)}
-                  className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
-                >
-                  <option value="">Dificuldade</option>
-                  <option value="facil">Fácil</option>
-                  <option value="media">Média</option>
-                  <option value="dificil">Difícil</option>
-                </select>
-
-                {notebooks.length > 0 && (
+                  <select
+                    value={difficultyFilter}
+                    onChange={(e) => setDifficultyFilter(e.target.value)}
+                    className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
+                  >
+                    <option value="">Dificuldade</option>
+                    <option value="facil">Fácil</option>
+                    <option value="media">Média</option>
+                    <option value="dificil">Difícil</option>
+                  </select>
+                </div>
+              )}
+              
+              {notebooks.length > 0 && (
+                <div className="mb-4">
                   <select
                     value={selectedNotebookId}
                     onChange={(e) => setSelectedNotebookId(e.target.value)}
@@ -2432,10 +2442,10 @@ Forneça a explicação de forma concisa e didática.`;
                       <option key={n.id} value={n.id}>{n.name} ({n.question_ids.length})</option>
                     ))}
                   </select>
-                )}
-              </div>
+                </div>
+              )}
 
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-4 mb-12">
                 <div className="flex items-center gap-4 flex-wrap">
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300 min-w-[120px]">Minhas questões:</span>
                   <div className="flex gap-2 flex-wrap">
@@ -2489,62 +2499,29 @@ Forneça a explicação de forma concisa e didática.`;
           </div>
 
           {/* Question Area */}
-          <div key="question-area-container" className="flex flex-col md:flex-row gap-8">
-            {/* Sidebar: Meus Cadernos */}
-            <div className="w-full md:w-64 shrink-0 space-y-4">
-              <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm sticky top-24">
-                <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2">
-                  <NotebookText size={14} /> Meus Cadernos
-                </h3>
-                <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                  <button 
-                    onClick={() => setSelectedNotebookId('')}
-                    className={`w-full text-left p-3 rounded-xl text-sm font-bold transition-all ${!selectedNotebookId ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                  >
-                    Todas as Questões
-                  </button>
-                  {notebooks.map(n => (
-                    <button 
-                      key={n.id}
-                      onClick={() => setSelectedNotebookId(n.id)}
-                      className={`w-full text-left p-3 rounded-xl text-sm font-bold transition-all flex items-center justify-between ${selectedNotebookId === n.id ? 'bg-orange-50 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                    >
-                      <span className="truncate">{n.name}</span>
-                      <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">{n.question_ids.length}</span>
-                    </button>
-                  ))}
-                </div>
-                <button 
-                  onClick={() => setShowNotebookCreationMode(true)}
-                  className="w-full mt-4 p-3 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl text-xs font-black uppercase tracking-widest text-slate-400 hover:text-blue-500 hover:border-blue-500 transition-all flex items-center justify-center gap-2"
-                >
-                  <Plus size={14} /> Novo Caderno
-                </button>
-              </div>
-            </div>
-
+          <div key="question-area-container" className="w-full">
             <div className="flex-1">
               {filteredQuestions.length > 0 && currentQuestion ? (
                 viewMode === 'list' ? (
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 gap-8">
                   {filteredQuestions.map((q, idx) => (
                     <div 
                       key={q.id}
-                      className={`bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden relative pl-12 transition-all duration-300 ${activeQuestionId === q.id ? 'ring-2 ring-purple-500 shadow-lg' : ''}`}
+                      className={`bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden relative pl-20 p-8 transition-all duration-300 ${activeQuestionId === q.id ? 'ring-2 ring-purple-500 shadow-lg' : ''}`}
                     >
                       {/* Checkbox for Notebook Selection */}
-                      <div className="absolute top-4 left-4 z-10">
+                      <div className="absolute top-8 left-6 z-10">
                         <input 
                           type="checkbox"
                           checked={selectedQuestionsForNotebook.has(q.id)}
                           onChange={() => toggleQuestionSelection(q.id)}
-                          className="w-5 h-5 rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                          className="w-6 h-6 rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
                         />
                       </div>
                       
                       {q.status === 'Errado' && (
-                        <div className="absolute top-4 right-4 z-10 text-red-500">
-                          <Target size={20} />
+                        <div className="absolute top-8 right-8 z-10 text-red-500">
+                          <Target size={24} />
                         </div>
                       )}
 
