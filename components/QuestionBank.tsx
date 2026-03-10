@@ -105,12 +105,28 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
       
       const addWatermark = (page: number) => {
         doc.setPage(page);
-        doc.setTextColor(200, 200, 200);
-        doc.setFontSize(40);
+        
+        // Double Border
+        doc.setDrawColor(128, 0, 32); // Bordô
+        doc.setLineWidth(0.5);
+        doc.rect(10, 10, pageWidth - 20, pageHeight - 20);
+        doc.setLineWidth(0.2);
+        doc.rect(12, 12, pageWidth - 24, pageHeight - 24);
+
+        // Corner Ornaments
+        doc.setLineWidth(0.5);
+        doc.line(10, 15, 15, 10); // Top Left
+        doc.line(pageWidth - 15, 10, pageWidth - 10, 15); // Top Right
+        doc.line(10, pageHeight - 15, 15, pageHeight - 10); // Bottom Left
+        doc.line(pageWidth - 15, pageHeight - 10, pageWidth - 10, pageHeight - 15); // Bottom Right
+
+        // Watermark
+        doc.setTextColor(128, 0, 32);
+        doc.setFontSize(60);
         doc.setFont('helvetica', 'bold');
-        // 5% opacity watermark
-        doc.setGState(new (doc as any).GState({opacity: 0.05}));
-        doc.text('SanFran Academy', pageWidth / 2, pageHeight / 2, { align: 'center', angle: 45 });
+        doc.setGState(new (doc as any).GState({opacity: 0.03}));
+        doc.text('SANFRAN', pageWidth / 2, pageHeight / 2 - 10, { align: 'center', angle: 45 });
+        doc.text('ACADEMY', pageWidth / 2, pageHeight / 2 + 15, { align: 'center', angle: 45 });
         doc.setGState(new (doc as any).GState({opacity: 1}));
         doc.setTextColor(0, 0, 0);
       };
@@ -183,7 +199,10 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
         doc.setPage(i);
         doc.setFontSize(9);
         doc.setTextColor(100, 100, 100);
-        doc.text(`Página ${i} de ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+        doc.setFont('helvetica', 'italic');
+        doc.text('SanFran Academy - XI de Agosto', pageWidth / 2, pageHeight - 15, { align: 'center' });
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Página ${i}`, pageWidth / 2, pageHeight - 11, { align: 'center' });
       }
 
       doc.save('simulado-sanfran.pdf');
@@ -3435,10 +3454,10 @@ Forneça a explicação de forma concisa e didática.`;
 
       {/* Hidden container for PDF export */}
       {isExporting && (
-        <div style={{ position: 'absolute', left: '-9999px', top: 0, width: '800px', backgroundColor: '#f8fafc', zIndex: -1 }}>
-          <div id="pdf-header" className="p-8 bg-white border-b border-gray-200 flex items-center justify-between">
+        <div style={{ position: 'absolute', left: '-9999px', top: 0, width: '800px', backgroundColor: '#ffffff', zIndex: -1 }}>
+          <div id="pdf-header" className="p-8 bg-gray-50/80 border-b border-gray-200 flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-[#800020] rounded-xl flex items-center justify-center shadow-lg">
+              <div className="w-12 h-12 bg-[#800020] rounded-xl flex items-center justify-center shadow-md">
                 <Scale className="w-6 h-6 text-white" />
               </div>
               <div>
@@ -3447,50 +3466,58 @@ Forneça a explicação de forma concisa e didática.`;
               </div>
             </div>
             <div className="text-right">
-              <p className="text-sm font-medium text-gray-900">Simulado Personalizado</p>
-              <p className="text-sm text-gray-500">{new Date().toLocaleDateString()}</p>
+              <p className="text-lg font-bold text-[#800020]">Simulado Oficial</p>
+              <p className="text-sm text-gray-500 font-medium">{new Date().toLocaleDateString()}</p>
             </div>
           </div>
           
           <div className="p-8 space-y-8">
-            {filteredQuestions.map((q, idx) => (
-              <div key={idx} className="pdf-question-card bg-white rounded-2xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 relative overflow-hidden">
+            {filteredQuestions.map((q, idx) => {
+              const isShortOptions = q.options.every(opt => opt.length < 60);
+              return (
+              <div key={idx} className="pdf-question-card bg-white rounded-2xl p-6 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100 relative overflow-hidden">
                 <div className="flex gap-4 mb-6">
-                  <div className="w-10 h-10 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center flex-shrink-0 shadow-inner">
-                    <span className="text-sm font-bold text-gray-700">{idx + 1}</span>
+                  <div className="w-12 h-12 rounded-xl bg-white border border-gray-100 flex items-center justify-center flex-shrink-0 shadow-[0_4px_10px_rgb(0,0,0,0.05)]">
+                    <span className="text-lg font-black text-[#800020]">{idx + 1}</span>
                   </div>
-                  <div className="flex-1 pt-2">
-                    <p className="text-gray-900 font-medium leading-relaxed">{q.statement}</p>
+                  <div className="flex-1 pt-1">
+                    <p className="text-gray-900 font-medium leading-relaxed text-justify">{q.statement}</p>
                   </div>
                 </div>
-                <div className="space-y-3 ml-14">
+                <div className={`grid gap-3 ml-16 ${isShortOptions ? 'grid-cols-2' : 'grid-cols-1'}`}>
                   {q.options.map((opt, optIdx) => (
-                    <div key={optIdx} className="flex items-start gap-3 p-3 rounded-xl border border-gray-100 bg-gray-50/50">
-                      <div className="w-5 h-5 rounded border border-gray-300 bg-white flex-shrink-0 mt-0.5" />
-                      <span className="text-gray-700 text-sm leading-relaxed">
-                        <span className="font-semibold mr-2">{String.fromCharCode(65 + optIdx)})</span>
+                    <div key={optIdx} className="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50/50 shadow-sm">
+                      <div className="w-6 h-6 rounded-full border-2 border-gray-300 bg-white flex-shrink-0 mt-0.5 flex items-center justify-center">
+                        <span className="text-xs font-bold text-gray-400">{String.fromCharCode(65 + optIdx)}</span>
+                      </div>
+                      <span className="text-gray-700 text-sm leading-relaxed text-justify">
                         {opt}
                       </span>
                     </div>
                   ))}
                 </div>
               </div>
-            ))}
+            )})}
           </div>
 
-          <div id="pdf-answer-key" className="p-8">
-            <div className="bg-white rounded-2xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100">
-              <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-                <CheckCircle2 className="w-6 h-6 text-[#800020]" />
-                Gabarito Oficial
-              </h2>
-              <div className="grid grid-cols-4 gap-4">
+          <div id="pdf-answer-key" className="p-8 mt-4">
+            <div className="bg-white rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100">
+              <div className="flex items-center gap-3 mb-8 pb-6 border-b border-gray-100">
+                <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Gabarito Oficial</h2>
+                  <p className="text-sm text-gray-500">Confira suas respostas</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-5 gap-4">
                 {filteredQuestions.map((q, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50">
-                    <span className="text-sm font-medium text-gray-500">Questão {idx + 1}</span>
-                    <span className="text-sm font-bold text-[#800020] bg-[#800020]/10 px-2 py-1 rounded-md">
+                  <div key={idx} className="flex flex-col items-center justify-center p-4 rounded-2xl border border-gray-100 bg-gray-50 shadow-sm">
+                    <span className="text-xs font-bold text-gray-400 mb-2">QUESTÃO {idx + 1}</span>
+                    <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-emerald-500/20">
                       {String.fromCharCode(65 + q.correct_answer)}
-                    </span>
+                    </div>
                   </div>
                 ))}
               </div>
