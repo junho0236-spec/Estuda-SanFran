@@ -9,6 +9,8 @@ import {
   MapPin, Calendar, Languages, Plane, FileText, Image as ImageIcon, Heart, Briefcase, GraduationCap as GradIcon, Search, RefreshCw, Plus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import imageCompression from 'browser-image-compression';
+import * as pdfjsLib from 'pdfjs-dist';
 import { dataService } from '../services/dataService';
 import { geminiService } from '../services/geminiService';
 import { supabase } from '../services/supabaseClient';
@@ -176,12 +178,20 @@ const Profile: React.FC = () => {
     setIsSyncing(true);
     setSyncStatus('Analisando histórico...');
     try {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = async () => {
-        const base64PDF = (reader.result as string).split(',')[1];
-        setSyncStatus('Mapeando matérias das Arcadas...');
-        const data = await geminiService.analyzeJupiterPDF(base64PDF);
+      console.log("Testing handleJupiterSync");
+      const arrayBuffer = await file.arrayBuffer();
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      
+      let fullText = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        fullText += textContent.items.map((item: any) => item.str).join(' ');
+      }
+
+      setSyncStatus('Mapeando matérias das Arcadas...');
+      const data = await geminiService.analyzeJupiterText(fullText);
         
         if (data) {
           setSyncStatus('Perfil atualizado!');
@@ -211,11 +221,7 @@ const Profile: React.FC = () => {
             setIsSyncing(false);
             alert("Perfil sincronizado com sucesso via Júpiter!");
           }, 1500);
-        } else {
-          setIsSyncing(false);
-          setSyncStatus('');
         }
-      };
     } catch (error) {
       console.error("Erro na sincronização Júpiter:", error);
       alert("Erro ao analisar PDF do Júpiter.");
@@ -643,8 +649,19 @@ const Profile: React.FC = () => {
                       if (file && session?.user) {
                         try {
                           setLoading(true);
-                          const path = `${session.user.id}/mural_${Date.now()}_${file.name}`;
-                          const url = await dataService.uploadFile(file, path, 'mural_fotos', file.type);
+                          setSyncStatus('Otimizando foto...');
+                          
+                          const options = {
+                            maxSizeMB: 0.8,
+                            maxWidthOrHeight: 1200,
+                            useWebWorker: true,
+                            initialQuality: 0.8
+                          };
+                          const compressedFile = await imageCompression(file, options);
+                          
+                          setSyncStatus('Enviando...');
+                          const path = `${session.user.id}/mural_${Date.now()}_${compressedFile.name}`;
+                          const url = await dataService.uploadFile(compressedFile, path, 'mural_fotos', compressedFile.type);
                           const newFoto = { url, caption: '', date: new Date().toISOString() };
                           const updatedProfile = {
                             ...profile,
@@ -653,9 +670,11 @@ const Profile: React.FC = () => {
                           await dataService.saveUserProfile(updatedProfile, session.user.id, navigator.onLine);
                           setProfile(updatedProfile);
                         } catch (err) {
-                          console.error(err);
+                          console.error("[Profile] Mural photo upload error:", err);
+                          alert("Erro ao enviar foto. Verifique as permissões ou tente novamente.");
                         } finally {
                           setLoading(false);
+                          setSyncStatus('');
                         }
                       }
                     }}

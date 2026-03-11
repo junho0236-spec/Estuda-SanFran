@@ -397,6 +397,76 @@ export const geminiService = {
     return JSON.parse(response.text || '{}');
   },
 
+  analyzeJupiterText: async (text: string) => {
+    const prompt = `
+      Analise o texto extraído de uma Ficha do Aluno da USP (JúpiterWeb). 
+      Extraia as seguintes informações:
+      - full_name: Nome Completo
+      - turma: Ano de Ingresso (Turma)
+      - progresso_obrigatorias: Porcentagem de Disciplinas Obrigatórias concluídas (0-100)
+      - progresso_optativas: Porcentagem de Optativas concluídas (0-100)
+      - progresso_total: Porcentagem de Progresso Total no curso (0-100)
+      - status_geral_integralizacao: Status Geral de Integralização (0-100)
+      - aniversario: Data de nascimento (se disponível)
+      - trajetoria: Objeto contendo booleanos para:
+        - monitoria: se há registros de monitoria
+        - pesquisa: se há registros de iniciação científica/pesquisa
+        - intercambio: se há registros de intercâmbio
+      - disciplinas: Lista de disciplinas do semestre atual contendo:
+        - codigo: Código da disciplina (ex: DIN0123)
+        - nome: Nome da disciplina
+        - turma_sala: Turma e/ou Sala (ex: Turma 11 / Sala 201)
+        - horarios: Objeto com os dias da semana e horários (ex: {"segunda": "08:00", "quarta": "08:00"})
+      
+      Ignore informações sensíveis como CPF ou endereço residencial.
+      Retorne apenas um JSON.
+      
+      Texto: "${text}"
+    `;
+
+    const response = await ai.models.generateContent({
+      model: GEMINI_MODEL,
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            full_name: { type: Type.STRING },
+            turma: { type: Type.NUMBER },
+            progresso_obrigatorias: { type: Type.NUMBER },
+            progresso_optativas: { type: Type.NUMBER },
+            progresso_total: { type: Type.NUMBER },
+            status_geral_integralizacao: { type: Type.NUMBER },
+            aniversario: { type: Type.STRING },
+            trajetoria: {
+              type: Type.OBJECT,
+              properties: {
+                monitoria: { type: Type.BOOLEAN },
+                pesquisa: { type: Type.BOOLEAN },
+                intercambio: { type: Type.BOOLEAN }
+              }
+            },
+            disciplinas: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  codigo: { type: Type.STRING },
+                  nome: { type: Type.STRING },
+                  turma_sala: { type: Type.STRING },
+                  horarios: { type: Type.OBJECT }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    return JSON.parse(response.text || '{}');
+  },
+
   analyzeProfile: async (profile: any) => {
     const prompt = `
       Analise o seguinte perfil de estudante de Direito da USP (SanFran) e forneça insights personalizados:
