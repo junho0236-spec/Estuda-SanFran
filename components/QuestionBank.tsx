@@ -834,13 +834,19 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
   };
 
   const syncUserProgress = async (updates: any) => {
+    console.log('DEBUG: syncUserProgress called with:', updates);
+    console.log('DEBUG: Current userId:', userId);
     try {
       // Get current state to ensure we don't overwrite with old data
-      const { data: current } = await supabase
+      const { data: current, error: fetchError } = await supabase
         .from('user_progress')
         .select('*')
         .eq('user_id', userId)
         .maybeSingle();
+
+      if (fetchError) {
+        console.error('DEBUG: Error fetching current progress:', fetchError);
+      }
 
       const payload = {
         user_id: userId,
@@ -856,17 +862,19 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
         updated_at: new Date().toISOString()
       };
 
+      console.log('DEBUG: Payload to upsert:', payload);
+
       const { error } = await supabase
         .from('user_progress')
         .upsert(payload, { onConflict: 'user_id' });
       
       if (error) {
-        console.error('Error syncing user progress:', error);
+        console.error('DEBUG: Error syncing user progress:', error);
       } else {
-        console.log('User progress synced successfully:', payload);
+        console.log('DEBUG: Sync successful!');
       }
     } catch (err) {
-      console.error('Failed to sync progress:', err);
+      console.error('DEBUG: Unexpected error in syncUserProgress:', err);
     }
   };
 
