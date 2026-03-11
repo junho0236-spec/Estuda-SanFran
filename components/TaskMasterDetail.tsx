@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Calendar, Clock, ChevronRight, FileText } from 'lucide-react';
+import { Plus, Calendar, Clock, ChevronRight, FileText, Trash2, CheckCircle2 } from 'lucide-react';
 import { Task, Subject } from '../types';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
 
@@ -25,11 +25,22 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({ tasks, subjects }) 
   const selectedTask = tasks.find(t => t.id === selectedTaskId) || null;
 
   return (
-    <div className="flex h-[calc(100vh-100px)] bg-white rounded-[24px] overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
-      {/* Left Pane (30%) */}
-      <div className="w-[30%] bg-[#F9FAFB] p-6 overflow-y-auto border-r border-slate-100 flex flex-col">
-        <h2 className="text-2xl font-bold text-slate-900 mb-6 px-2">Tarefas</h2>
-        <div className="space-y-3 flex-1">
+    <div className="flex h-[calc(100vh-120px)] bg-[#F8F9FA] rounded-[32px] overflow-hidden border border-slate-200 shadow-sm">
+      
+      {/* PAINEL ESQUERDO: LISTA DE TAREFAS */}
+      <div className="w-[350px] bg-white border-r border-slate-200 flex flex-col">
+        <div className="p-8 pb-4">
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Tarefas</h2>
+          <button 
+            onClick={() => alert('Abrir Modal de Nova Tarefa')}
+            className="mt-6 w-full py-4 bg-[#800000] text-white rounded-2xl font-bold hover:bg-red-900 transition-all shadow-lg shadow-red-900/10 flex items-center justify-center gap-2 group"
+          >
+            <Plus size={20} className="group-hover:rotate-90 transition-transform" /> 
+            Autuar Novo Processo
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 pb-8 space-y-2">
           {tasks.map(task => {
             const subject = subjects.find(s => s.id === task.subjectId);
             const isActive = selectedTaskId === task.id;
@@ -37,24 +48,23 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({ tasks, subjects }) 
               <button
                 key={task.id}
                 onClick={() => setSelectedTaskId(task.id)}
-                className={`w-full p-5 text-left rounded-[24px] transition-all duration-300 group ${
+                className={`w-full p-5 text-left rounded-[24px] transition-all duration-200 ${
                   isActive 
-                    ? 'bg-white shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-slate-100' 
-                    : 'bg-transparent hover:bg-slate-100/80 border border-transparent'
+                    ? 'bg-slate-900 text-white shadow-xl shadow-slate-900/20' 
+                    : 'bg-transparent hover:bg-slate-100 text-slate-700'
                 }`}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-[#800000]' : 'bg-slate-300 group-hover:bg-slate-400'}`} />
-                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{subject?.name || 'Geral'}</span>
-                  </div>
-                  <ChevronRight size={16} className={`${isActive ? 'text-[#800000]' : 'text-slate-300 opacity-0 group-hover:opacity-100'} transition-all`} />
+                <div className="flex items-center justify-between mb-3">
+                  <span className={`text-[10px] font-black uppercase tracking-[0.15em] ${isActive ? 'text-slate-400' : 'text-slate-500'}`}>
+                    {subject?.name || 'Geral'}
+                  </span>
+                  {isActive && <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
                 </div>
-                <h3 className={`font-semibold text-base mb-3 ${isActive ? 'text-[#800000]' : 'text-slate-800'}`}>
+                <h3 className={`font-bold leading-tight mb-3 ${isActive ? 'text-white' : 'text-slate-900'}`}>
                   {task.title}
                 </h3>
-                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-400">
-                  <Calendar size={14} />
+                <div className={`flex items-center gap-1.5 text-[11px] font-medium ${isActive ? 'text-slate-400' : 'text-slate-500'}`}>
+                  <Calendar size={12} />
                   {task.dueDate || 'Sem prazo'}
                 </div>
               </button>
@@ -63,82 +73,90 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({ tasks, subjects }) 
         </div>
       </div>
 
-      {/* Right Pane (70%) */}
-      <div className="w-[70%] bg-white relative">
+      {/* PAINEL DIREITO: CONTEÚDO DINÂMICO */}
+      <div className="flex-1 bg-white relative overflow-y-auto">
         {selectedTask ? (
-          <div className="w-full h-full flex flex-col p-12 overflow-y-auto">
-            <div className="mb-8">
-              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-bold uppercase tracking-widest mb-4">
-                <FileText size={14} /> Detalhes da Tarefa
-              </span>
-              <h1 className="text-4xl font-bold text-slate-900">{selectedTask.title}</h1>
+          <div className="max-w-4xl mx-auto p-12 py-16">
+            <div className="flex justify-between items-start mb-10">
+              <div>
+                <div className="flex items-center gap-2 text-[#800000] font-bold text-xs uppercase tracking-widest mb-4">
+                  <div className="w-8 h-[2px] bg-[#800000]" />
+                  Gabinete de Instrução
+                </div>
+                <h1 className="text-5xl font-serif text-slate-900 leading-tight">{selectedTask.title}</h1>
+              </div>
+              <div className="flex gap-2">
+                <button className="p-3 rounded-full bg-slate-100 text-slate-600 hover:bg-emerald-100 hover:text-emerald-700 transition-colors">
+                  <CheckCircle2 size={24} />
+                </button>
+                <button className="p-3 rounded-full bg-slate-100 text-slate-600 hover:bg-red-100 hover:text-red-700 transition-colors">
+                  <Trash2 size={24} />
+                </button>
+              </div>
             </div>
-            <div className="flex-1 bg-[#F9FAFB] rounded-[24px] p-8 border border-slate-100">
-              <p className="text-slate-500 text-lg">Selecione as ações desejadas para esta tarefa ou adicione anotações.</p>
+
+            <div className="prose prose-slate max-w-none">
+              <div className="p-8 bg-slate-50 rounded-[32px] border border-slate-100 min-h-[400px]">
+                <p className="text-slate-400 italic mb-4">Clique para começar a redigir sua tese jurídica ou anotações de aula...</p>
+                <div className="h-px bg-slate-200 w-full my-6" />
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 text-slate-600">
+                    <div className="w-2 h-2 rounded-full bg-slate-300" />
+                    <span className="font-medium text-sm text-slate-400">Anexo: Memorial_Descritivo.pdf</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-between p-12">
-            {/* Greeting */}
-            <div className="text-center mt-4">
-              <h1 className="text-5xl font-serif font-bold text-slate-900 mb-3 tracking-tight">Salve, Júnior!</h1>
-              <p className="text-slate-500 text-lg font-medium">Seu gabinete está pronto para a sessão de hoje.</p>
+          /* ESTADO VAZIO: DASHBOARD CONTEXTUAL */
+          <div className="h-full flex flex-col items-center justify-center p-12 text-center">
+            <div className="mb-8">
+              <h1 className="text-6xl font-serif text-slate-900 mb-4 tracking-tight">Salve, Júnior!</h1>
+              <p className="text-slate-500 text-lg max-w-md mx-auto leading-relaxed">
+                Seu gabinete está pronto para a sessão de hoje. Revise suas métricas antes de autuar novos processos.
+              </p>
             </div>
 
-            {/* Central Hero: Radar Chart */}
-            <div className="w-full max-w-2xl h-[400px] my-6 relative">
+            <div className="w-full max-w-2xl h-[450px] relative drop-shadow-2xl">
               <ResponsiveContainer width="100%" height="100%">
-                <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData}>
-                  <defs>
-                    <linearGradient id="radarGradient" x1="0" y1="0" x2="1" y2="1">
-                      <stop offset="0%" stopColor="#800000" stopOpacity={0.85}/>
-                      <stop offset="50%" stopColor="#1d4ed8" stopOpacity={0.7}/>
-                      <stop offset="100%" stopColor="#0f766e" stopOpacity={0.8}/>
-                    </linearGradient>
-                  </defs>
-                  <PolarGrid stroke="#f1f5f9" strokeWidth={2} />
-                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 13, fontWeight: 600 }} />
-                  <PolarRadiusAxis angle={30} domain={[0, 150]} tick={false} axisLine={false} />
-                  <Radar name="Competência" dataKey="A" stroke="#800000" strokeWidth={3} fill="url(#radarGradient)" fillOpacity={0.6} />
+                <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
+                  <PolarGrid stroke="#e2e8f0" />
+                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 700 }} />
+                  <Radar
+                    name="Nível"
+                    dataKey="A"
+                    stroke="#800000"
+                    strokeWidth={3}
+                    fill="#800000"
+                    fillOpacity={0.5}
+                  />
                 </RadarChart>
               </ResponsiveContainer>
             </div>
 
-            {/* Bottom Widgets */}
-            <div className="w-full max-w-md flex flex-col items-center gap-8 mb-4">
-              {/* Urgency Widget */}
-              <div className="w-full bg-white p-6 rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-slate-100 flex flex-col items-center text-center transform transition-transform hover:scale-[1.02]">
-                <div className="flex items-center gap-2 text-[#800000] font-black mb-3">
-                  <Clock size={18} />
-                  <span className="uppercase tracking-widest text-[11px]">Próxima Audiência</span>
-                </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-2">Entrega de Petição - Civil III</h3>
-                <div className="bg-red-50 text-[#800000] px-5 py-2 rounded-full text-sm font-bold mt-2 flex items-center gap-2 border border-red-100">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                  </span>
-                  Hoje, 14:00
-                </div>
+            <div className="mt-12 space-y-8">
+              <div className="inline-flex flex-col items-center p-6 bg-white rounded-[32px] shadow-xl shadow-slate-200/50 border border-slate-100">
+                 <div className="flex items-center gap-2 text-[#800000] font-black text-[10px] uppercase tracking-[0.2em] mb-2">
+                    <Clock size={14} /> Próxima Audiência
+                 </div>
+                 <span className="text-slate-900 font-bold text-xl">Entrega de Petição - Civil III</span>
+                 <div className="mt-4 px-4 py-2 bg-red-50 text-red-700 rounded-full text-xs font-bold border border-red-100">
+                    Hoje, às 14:00
+                 </div>
               </div>
 
-              {/* Legal Quote */}
-              <blockquote className="text-center">
-                <p className="italic text-slate-500 text-lg font-serif leading-relaxed">
+              <blockquote className="max-w-lg">
+                <p className="text-xl font-serif italic text-slate-400 leading-relaxed">
                   "Direito é a técnica da coexistência humana."
                 </p>
-                <footer className="text-xs font-sans font-bold text-slate-400 mt-3 uppercase tracking-widest">
+                <footer className="mt-4 text-[10px] font-bold tracking-[0.3em] text-slate-300 uppercase">
                   — Norberto Bobbio
                 </footer>
               </blockquote>
             </div>
           </div>
         )}
-
-        {/* FAB */}
-        <button className="absolute bottom-8 right-8 w-16 h-16 rounded-full bg-[#800000] flex items-center justify-center text-white shadow-[0_8px_30px_rgb(128,0,0,0.3)] hover:scale-105 hover:bg-red-900 transition-all z-10">
-          <Plus size={32} />
-        </button>
       </div>
     </div>
   );
