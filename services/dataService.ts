@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 import { db, addToSyncQueue } from './offlineService';
-import { Flashcard, Task, StudySession, Note, SubjectFile, Folder, Board } from '../types';
+import { Flashcard, Task, StudySession, Note, SubjectFile, Folder, Board, UserProgress } from '../types';
 
 export const dataService = {
   // BOARDS
@@ -120,36 +120,8 @@ export const dataService = {
         const { error } = await supabase.from('user_persona').upsert(cloudPayload);
         if (error) {
           console.warn("[dataService] Full upsert failed, falling back to field-by-field update:", error.message);
-          // ... (rest of the function)
-        }
-      } catch (e) {
-        console.error("[dataService] Error saving user profile:", e);
-      }
-    }
-  },
-
-  async updateQuestionProgress(userId: string, progress: UserProgress) {
-    const { error } = await supabase
-      .from('user_progress')
-      .upsert({
-        user_id: userId,
-        favorites: progress.favorites,
-        wrong_questions: progress.wrong_questions,
-        correct_questions: progress.correct_questions,
-        notes: progress.notes,
-        correct_count: progress.correct_count,
-        wrong_count: progress.wrong_count,
-        error_mastery: progress.error_mastery,
-        confidence_levels: progress.confidence_levels,
-        question_stats: progress.question_stats,
-        updated_at: new Date().toISOString()
-      });
-
-    if (error) {
-      console.error("[dataService] Error updating user progress:", error);
-      throw error;
-    }
-  },  // Fallback: try to update field by field to ignore problematic columns
+          
+          // Fallback: try to update field by field to ignore problematic columns
           // First ensure row exists with minimal data
           await supabase.from('user_persona').upsert({ id: userId });
           
@@ -158,19 +130,15 @@ export const dataService = {
             try {
               const { error: fieldError } = await supabase.from('user_persona').update({ [key]: value }).eq('id', userId);
               if (fieldError) {
-                console.warn(`[dataService] Ignored field ${key} due to error:`, fieldError.message);
+                console.warn(`[dataService] Field update failed for ${key}:`, fieldError.message);
               }
-            } catch (err) {
-              console.warn(`[dataService] Exception on field ${key}:`, err);
+            } catch (e) {
+              console.error(`[dataService] Error updating field ${key}:`, e);
             }
           }
-          console.log("[dataService] Field-by-field update completed.");
-        } else {
-          console.log("[dataService] User persona upserted successfully");
         }
-      } catch (err) {
-        console.error("[dataService] Exception during upsert:", err);
-        alert(`Erro crítico ao salvar: ${err instanceof Error ? err.message : String(err)}`);
+      } catch (e) {
+        console.error("[dataService] Error saving user profile:", e);
       }
     } else {
       await addToSyncQueue({ table: 'user_profile' as any, action: 'update', data: profile });
