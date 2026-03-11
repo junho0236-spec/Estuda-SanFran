@@ -1,8 +1,86 @@
 import { supabase } from './supabaseClient';
 import { db, addToSyncQueue } from './offlineService';
-import { Flashcard, Task, StudySession, Note, SubjectFile, Folder } from '../types';
+import { Flashcard, Task, StudySession, Note, SubjectFile, Folder, Board } from '../types';
 
 export const dataService = {
+  // BOARDS
+  async saveBoard(board: Board, userId: string, isOnline: boolean) {
+    await db.boards.put(board);
+    if (isOnline) {
+      const { error } = await supabase.from('boards').upsert({
+        id: board.id,
+        user_id: userId,
+        name: board.name,
+        columns: board.columns,
+        created_at: board.createdAt
+      });
+      if (error) {
+        await addToSyncQueue({ table: 'boards', action: 'update', data: board });
+      }
+    } else {
+      await addToSyncQueue({ table: 'boards', action: 'update', data: board });
+    }
+  },
+
+  async deleteBoard(id: string, userId: string, isOnline: boolean) {
+    await db.boards.delete(id);
+    // Also delete tasks associated with this board? 
+    // Usually better to just unassign them or delete them.
+    // For now, let's just delete the board.
+    if (isOnline) {
+      const { error } = await supabase.from('boards').delete().eq('id', id).eq('user_id', userId);
+      if (error) {
+        await addToSyncQueue({ table: 'boards', action: 'delete', data: { id } });
+      }
+    } else {
+      await addToSyncQueue({ table: 'boards', action: 'delete', data: { id } });
+    }
+  },
+
+  // USER PROFILE
+  async saveUserProfile(profile: any, userId: string, isOnline: boolean) {
+    const cloudPayload = {
+      id: userId,
+      persona_data: {
+        archetype: profile.archetype,
+        answers: profile.answers,
+        scores: profile.scores,
+        matrix: profile.matrix,
+        tags: profile.tags,
+        answeredQuestionIds: profile.answeredQuestionIds
+      },
+      profile_completion: profile.arcadia_score || 0
+    };
+
+    await db.user_profile.put({ ...profile, id: userId });
+    
+    if (isOnline) {
+      const { error } = await supabase.from('user_persona').upsert(cloudPayload);
+      if (error) {
+        await addToSyncQueue({ table: 'user_profile' as any, action: 'update', data: profile });
+      }
+    } else {
+      await addToSyncQueue({ table: 'user_profile' as any, action: 'update', data: profile });
+    }
+  },
+
+  async getUserProfile(userId: string, isOnline: boolean) {
+    const local = await db.user_profile.get(userId);
+    if (isOnline) {
+      const { data, error } = await supabase.from('user_persona').select('*').eq('id', userId).single();
+      if (!error && data) {
+        const profile = {
+          ...data.persona_data,
+          id: data.id,
+          arcadia_score: data.profile_completion,
+          last_updated: data.updated_at
+        };
+        await db.user_profile.put(profile);
+        return profile;
+      }
+    }
+    return local;
+  },
   // FOLDERS
   async saveFolder(folder: Folder, userId: string, isOnline: boolean) {
     await db.folders.put(folder);
@@ -123,21 +201,35 @@ export const dataService = {
     return publicUrl;
   },
   // TASKS
-  async saveTask(task: any, userId: string, isOnline: boolean) {
+  async saveTask(task: Task, userId: string, isOnline: boolean) {
     // Optimistic update in local DB
     await db.tasks.put(task);
 
     if (isOnline) {
-      const payload = {
-        ...task,
+      const payload: any = {
+        id: task.id,
         user_id: userId,
-        subject_id: task.subjectId || null,
+        title: task.title,
+        notes: task.notes || null,
         due_date: task.dueDate || null,
-        completed_at: task.completedAt || null
+        completed_at: task.completedAt || null,
+        category: task.category || 'Geral',
+        priority: task.priority === 'urgente' || task.priority === 'alta' ? 'Alta' : 'Média',
+        status: task.completed ? 'Concluido' : 'Pendente',
+        subtasks: task.subtasks || [],
+        delegated_to: task.delegatedTo || null,
+        delegated_by: task.delegatedBy || null,
+        description: JSON.stringify({
+          syllabusLink: task.syllabusLink,
+          importantCitations: task.importantCitations,
+          revisionStatus: task.revisionStatus,
+          boardId: task.boardId,
+          columnId: task.columnId,
+          subjectId: task.subjectId,
+          delegatedByName: task.delegatedByName,
+          delegatedToName: task.delegatedToName
+        })
       };
-      delete payload.subjectId;
-      delete payload.dueDate;
-      delete payload.completedAt;
 
       const { error } = await supabase.from('tasks').upsert(payload);
       if (error) {
@@ -146,6 +238,113 @@ export const dataService = {
       }
     } else {
       await addToSyncQueue({ table: 'tasks', action: 'update', data: task });
+    }
+  },
+
+  async getTasks(userId: string, isOnline: boolean): Promise<Task[]> {
+    if (isOnline) {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .or(`user_id.eq.${userId},delegated_to.eq.${userId}`);
+      
+      if (!error && data) {
+        const mappedTasks: Task[] = data.map(t => {
+          const desc = t.description ? JSON.parse(t.description) : {};
+          return {
+            id: t.id,
+            title: t.title,
+            completed: t.status === 'Concluido',
+            notes: t.notes,
+            dueDate: t.due_date,
+            completedAt: t.completed_at,
+            category: t.category,
+            priority: t.priority === 'Alta' ? 'alta' : 'normal',
+            subtasks: t.subtasks,
+            delegatedTo: t.delegated_to,
+            delegatedBy: t.delegated_by,
+            delegatedByName: desc.delegatedByName,
+            delegatedToName: desc.delegatedToName,
+            syllabusLink: desc.syllabusLink,
+            importantCitations: desc.importantCitations,
+            revisionStatus: desc.revisionStatus,
+            boardId: desc.boardId,
+            columnId: desc.columnId,
+            subjectId: desc.subjectId
+          };
+        });
+        await db.tasks.bulkPut(mappedTasks);
+        return mappedTasks;
+      }
+    }
+    return await db.tasks.toArray();
+  },
+
+  // COLLABORATION
+  async getFriends(userId: string) {
+    // Tenta buscar amizades aceitas
+    const { data, error } = await supabase
+      .from('friendships')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'accepted');
+    
+    if (error || !data) return [];
+
+    // Busca os nomes dos amigos na tabela user_persona
+    const friendIds = data.map(f => f.friend_id);
+    const { data: profiles } = await supabase
+      .from('user_persona')
+      .select('id, persona_data')
+      .in('id', friendIds);
+
+    return data.map(f => {
+      const profile = profiles?.find(p => p.id === f.friend_id);
+      return {
+        ...f,
+        friend_name: profile?.persona_data?.answers?.['nome'] || profile?.persona_data?.name || 'Amigo'
+      };
+    });
+  },
+
+  async getNotifications(userId: string) {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    return data || [];
+  },
+
+  async markNotificationAsRead(id: string) {
+    await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+  },
+
+  async markAllNotificationsAsRead(userId: string) {
+    await supabase.from('notifications').update({ is_read: true }).eq('user_id', userId).eq('is_read', false);
+  },
+
+  async createNotification(userId: string, message: string, linkTask?: string, type?: string) {
+    await supabase.from('notifications').insert({
+      user_id: userId,
+      message,
+      link_task: linkTask,
+      type
+    });
+  },
+
+  async archiveTasks(userId: string, isOnline: boolean) {
+    if (isOnline) {
+      const { error } = await supabase.rpc('archive_completed_tasks');
+      if (error) {
+        console.error("Error calling archive_completed_tasks RPC:", error);
+        throw error;
+      }
+    }
+    // Locally, we filter them out in the component or delete them if we want to match the RPC behavior
+    const completedTasks = await db.tasks.where('completed').equals(1).toArray();
+    for (const task of completedTasks) {
+      await db.tasks.delete(task.id);
     }
   },
 
@@ -371,12 +570,39 @@ export const dataService = {
           const payload = { ...item.data, user_id: userId };
           // Map camelCase to snake_case for Supabase if needed
           if (item.table === 'tasks') {
-             payload.subject_id = payload.subjectId || null;
-             payload.due_date = payload.dueDate || null;
-             payload.completed_at = payload.completedAt || null;
+             const task = item.data as Task;
+             payload.user_id = userId;
+             payload.title = task.title;
+             payload.notes = task.notes || null;
+             payload.due_date = task.dueDate || null;
+             payload.completed_at = task.completedAt || null;
+             payload.category = task.category || 'Geral';
+             payload.priority = task.priority === 'urgente' || task.priority === 'alta' ? 'Alta' : 'Média';
+             payload.status = task.completed ? 'Concluido' : 'Pendente';
+             payload.subtasks = task.subtasks || [];
+             payload.description = JSON.stringify({
+               syllabusLink: task.syllabusLink,
+               importantCitations: task.importantCitations,
+               revisionStatus: task.revisionStatus,
+               boardId: task.boardId,
+               columnId: task.columnId,
+               subjectId: task.subjectId
+             });
+             // Remove camelCase fields
              delete payload.subjectId;
              delete payload.dueDate;
              delete payload.completedAt;
+             delete payload.boardId;
+             delete payload.columnId;
+             delete payload.syllabusLink;
+             delete payload.importantCitations;
+             delete payload.revisionStatus;
+             delete payload.completed;
+          }
+          if (item.table === 'boards') {
+             payload.user_id = userId;
+             payload.created_at = payload.createdAt;
+             delete payload.createdAt;
           }
           if (item.table === 'flashcards') {
              payload.subject_id = payload.subjectId || null;
@@ -406,8 +632,14 @@ export const dataService = {
             payload.subject_id = payload.subject_id || payload.subjectId;
             delete payload.subjectId;
           }
+
+          const tableName = item.table as string;
+          if (tableName === 'user_profile') {
+            // No special mapping needed, but ensure id is userId
+            payload.id = userId;
+          }
           
-          const { error } = await supabase.from(item.table).upsert(payload);
+          const { error } = await supabase.from(tableName === 'user_profile' ? 'user_profiles' : (item.table as any)).upsert(payload);
           if (error) throw error;
         }
         await db.syncQueue.delete(item.id!);

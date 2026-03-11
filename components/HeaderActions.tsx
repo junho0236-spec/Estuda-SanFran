@@ -1,55 +1,132 @@
-import React, { useState } from 'react';
-import { HelpCircle, Bell, ChevronDown, User, Settings, LogOut } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { HelpCircle, Bell, ChevronDown, User, Settings, LogOut, ShieldAlert } from 'lucide-react';
 
 const HeaderActions: React.FC = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+        setIsNotificationsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
-    <div className="flex items-center gap-4 p-2 bg-white/80 dark:bg-[#0d0303]/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm">
+    <div className="flex items-center gap-4 p-2.5 bg-[#FFFFF0]/80 backdrop-blur-xl rounded-full border border-white/40 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8),0_4px_15px_rgba(0,0,0,0.05)] relative z-50">
       {/* Help */}
-      <button className="w-10 h-10 rounded-full border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-500 hover:text-sanfran-rubi transition-colors">
+      <button className="w-11 h-11 rounded-full bg-gradient-to-b from-white to-[#F8F9FA] border border-slate-200/60 shadow-[0_2px_5px_rgba(0,0,0,0.05),inset_0_1px_0_white] flex items-center justify-center text-slate-500 hover:text-[#800000] transition-all active:scale-95">
         <HelpCircle size={20} />
       </button>
 
       {/* Notifications */}
-      <button className="relative w-10 h-10 rounded-full border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-500 hover:text-sanfran-rubi transition-colors">
-        <Bell size={20} />
-        <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white dark:border-[#0d0303]">
-          3
-        </span>
-      </button>
-
-      {/* Profile */}
-      <div className="relative">
+      <div className="relative" ref={notifRef}>
         <button 
-          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-          className="flex items-center gap-3 pl-2 pr-4 py-1 rounded-full hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
+          onClick={() => {
+            setIsNotificationsOpen(!isNotificationsOpen);
+            setIsDropdownOpen(false);
+          }}
+          className={`relative w-11 h-11 rounded-full border flex items-center justify-center transition-all active:scale-95 ${
+            isNotificationsOpen 
+              ? 'bg-slate-100 border-slate-300 shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)] text-[#800000]' 
+              : 'bg-gradient-to-b from-white to-[#F8F9FA] border-slate-200/60 shadow-[0_2px_5px_rgba(0,0,0,0.05),inset_0_1px_0_white] text-slate-500 hover:text-[#800000]'
+          }`}
         >
-          <img 
-            src="https://picsum.photos/seed/junior/40/40" 
-            alt="Júnior Souza" 
-            className="w-8 h-8 rounded-full object-cover"
-            referrerPolicy="no-referrer"
-          />
-          <span className="text-sm font-semibold text-slate-900 dark:text-white">Júnior Souza</span>
-          <ChevronDown size={16} className="text-slate-400" />
+          <Bell size={20} className={isNotificationsOpen ? 'fill-[#800000]/10' : ''} />
+          <span className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-b from-[#A00000] to-[#600000] text-[#FFFFF0] text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-[#FFFFF0] shadow-sm">
+            3
+          </span>
         </button>
 
-        {/* Dropdown */}
+        {/* Notifications Dropdown */}
+        {isNotificationsOpen && (
+          <div className="absolute right-0 mt-4 w-80 bg-[#FFFFF0]/95 backdrop-blur-2xl rounded-2xl shadow-[0_20px_40px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] p-2 z-50 transform origin-top-right transition-all animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-4 py-3 border-b border-slate-200/50 flex justify-between items-center">
+              <h3 className="font-serif font-bold text-slate-900">Notificações</h3>
+              <span className="text-xs font-bold text-[#800000] bg-red-50 px-2 py-1 rounded-full">3 Novas</span>
+            </div>
+            <div className="py-2 space-y-1">
+              <div className="px-4 py-3 hover:bg-white rounded-xl cursor-pointer transition-colors flex gap-3 relative overflow-hidden group">
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#800000] rounded-r-full"></div>
+                <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center text-[#800000] shrink-0">
+                  <ShieldAlert size={16} />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Prazo Urgente</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Petição Inicial - Civil III vence hoje.</p>
+                </div>
+              </div>
+              <div className="px-4 py-3 hover:bg-white rounded-xl cursor-pointer transition-colors flex gap-3">
+                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
+                  <Bell size={16} />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Nova Jurisprudência</p>
+                  <p className="text-xs text-slate-500 mt-0.5">STF atualizou entendimento sobre o tema.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Profile */}
+      <div className="relative" ref={dropdownRef}>
+        <button 
+          onClick={() => {
+            setIsDropdownOpen(!isDropdownOpen);
+            setIsNotificationsOpen(false);
+          }}
+          className={`flex items-center gap-3 pl-2 pr-4 py-1.5 rounded-full transition-all active:scale-95 ${
+            isDropdownOpen
+              ? 'bg-slate-100 shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)] border border-slate-200'
+              : 'bg-gradient-to-b from-white to-[#F8F9FA] border border-slate-200/60 shadow-[0_2px_5px_rgba(0,0,0,0.05),inset_0_1px_0_white] hover:shadow-md'
+          }`}
+        >
+          <div className="relative">
+            <img 
+              src="https://picsum.photos/seed/junior/40/40" 
+              alt="Júnior Souza" 
+              className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm"
+              referrerPolicy="no-referrer"
+            />
+            <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full"></div>
+          </div>
+          <span className="text-sm font-bold text-slate-800 font-serif">Júnior Souza</span>
+          <ChevronDown size={16} className={`text-slate-400 transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {/* Profile Dropdown */}
         {isDropdownOpen && (
-          <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-[#1a1a1a] rounded-xl shadow-xl border border-slate-200 dark:border-white/10 py-2 z-50">
-            <button className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-2">
-              <User size={16} /> Minha Conta
+          <div className="absolute right-0 mt-4 w-64 bg-[#FFFFF0]/95 backdrop-blur-2xl rounded-2xl shadow-[0_20px_40px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] p-2 z-50 transform origin-top-right transition-all animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-4 py-3 border-b border-slate-200/50 mb-2">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Gabinete</p>
+              <p className="text-sm font-serif font-bold text-slate-900">Dr. Júnior Souza</p>
+            </div>
+            
+            <button className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-white rounded-xl transition-colors flex items-center gap-3">
+              <User size={16} className="text-slate-400" /> Minha Conta
             </button>
-            <button className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-2">
-              <Settings size={16} /> Configurações
+            <button className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-white rounded-xl transition-colors flex items-center gap-3">
+              <Settings size={16} className="text-slate-400" /> Configurações
             </button>
-            <button className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-2">
-              <HelpCircle size={16} /> Ajuda
+            <button className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-white rounded-xl transition-colors flex items-center gap-3">
+              <HelpCircle size={16} className="text-slate-400" /> Ajuda
             </button>
-            <div className="border-t border-slate-100 dark:border-white/10 my-1"></div>
-            <button className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2">
-              <LogOut size={16} /> Sair
+            
+            <div className="border-t border-slate-200/50 my-2"></div>
+            
+            <button className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#800000] hover:bg-red-50 rounded-xl transition-colors flex items-center gap-3">
+              <LogOut size={16} /> Encerrar Sessão
             </button>
           </div>
         )}

@@ -159,6 +159,26 @@ export interface Subject {
 export type TaskPriority = 'urgente' | 'alta' | 'normal';
 export type TaskCategory = 'peticao' | 'estudo' | 'audiencia' | 'admin' | 'geral';
 
+export interface SubTask {
+  id: string;
+  title: string;
+  completed: boolean;
+}
+
+export interface BoardColumn {
+  id: string;
+  name: string;
+  order: number;
+}
+
+export interface Board {
+  id: string;
+  name: string;
+  columns: BoardColumn[];
+  userId: string;
+  createdAt: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -169,6 +189,24 @@ export interface Task {
   priority?: TaskPriority;
   category?: TaskCategory;
   archived_at?: string | null;
+  boardId?: string;
+  columnId?: string;
+  notes?: string;
+  subtasks?: SubTask[];
+  attachments?: string[];
+  links?: { url: string; title?: string; icon?: string }[];
+  syllabusLink?: string;
+  importantCitations?: string;
+  waitingOn?: string;
+  delegatedTo?: string;
+  delegatedBy?: string;
+  delegatedByName?: string;
+  delegatedToName?: string;
+  revisionStatus?: {
+    firstReading: boolean;
+    summary: boolean;
+    preExamReview: boolean;
+  };
 }
 
 export interface StudySession {
@@ -422,8 +460,40 @@ export interface Duel {
   created_at: string;
 }
 
+export interface UserProfile {
+  id: string;
+  archetype: string;
+  answers: Record<string, string>;
+  lastQuestionDate?: string;
+  answeredQuestionIds: string[];
+  scores: {
+    social: number;
+    corporativo: number;
+    academico: number;
+    politico: number;
+    resiliencia: number;
+    tecnologico: number;
+  };
+  matrix: {
+    academicoVsPratico: number; // -5 (Teórico) to +5 (Prático)
+    extensaoVsCarreira: number; // -5 (Extensão) to +5 (Carreira)
+    socialVsReservado: number; // -5 (Social) to +5 (Reservado)
+    urgenciaVsPlanejamento: number; // -5 (Urgência) to +5 (Planejamento)
+  };
+  tags: string[];
+  arcadia_score: number;
+  last_updated?: string;
+  lastInteractionDate?: string;
+  productivityStats?: {
+    completedToday: number;
+    completedYesterday: number;
+    streak: number;
+  };
+}
+
 export interface UserConfig {
   oab_exam_date: string;
+  profile?: UserProfile;
 }
 
 export interface UserProgress {
@@ -731,6 +801,25 @@ export interface StudyPact {
   stake_amount: number;
   status: 'open' | 'active' | 'completed' | 'failed';
   start_date?: string;
+  created_at: string;
+}
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  message: string;
+  is_read: boolean;
+  link_task?: string;
+  created_at: string;
+  type?: 'delegated' | 'completed' | 'friend_request';
+}
+
+export interface Friendship {
+  id: string;
+  user_id: string;
+  friend_id: string;
+  friend_name: string;
+  status: 'pending' | 'accepted';
   created_at: string;
 }
 

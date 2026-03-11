@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
 import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map as MapIcon, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck, BookX, ScrollText, FileText, Repeat, UserX, ListTodo, Handshake, Eye, Key, CalendarCheck, Loader2, BarChart3, Search, Command } from 'lucide-react';
-import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel, StudyMode } from './types';
+import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel, StudyMode, Board } from './types';
 import Login from './components/Login';
 import Atmosphere from './components/Atmosphere';
 import Scratchpad from './components/Scratchpad';
@@ -219,6 +219,7 @@ const App: React.FC = () => {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [boards, setBoards] = useState<Board[]>([]);
   const [readings, setReadings] = useState<Reading[]>([]);
   const [studySessions, setStudySessions] = useState<StudySession[]>([]);
   const [correctQuestionsCount, setCorrectQuestionsCount] = useState(0);
@@ -550,10 +551,11 @@ const App: React.FC = () => {
         if (subs) setSubjects(subs);
 
         // Fetch others in parallel but handle them individually to avoid one failure crashing everything
-        const [resFlds, resCards, resTks, resSessions, resReadings, resProgress] = await Promise.all([
+        const [resFlds, resCards, resTks, resBoards, resSessions, resReadings, resProgress] = await Promise.all([
           supabase.from('folders').select('*').eq('user_id', userId),
           supabase.from('flashcards').select('*').eq('user_id', userId).is('archived_at', null),
           supabase.from('tasks').select('*').eq('user_id', userId).is('archived_at', null).order('created_at', { ascending: false }),
+          supabase.from('boards').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
           supabase.from('study_sessions').select('*').eq('user_id', userId).order('start_time', { ascending: false }),
           supabase.from('readings').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
           supabase.from('user_progress').select('correct_count, confidence_levels').eq('user_id', userId).maybeSingle()
@@ -660,6 +662,17 @@ const App: React.FC = () => {
           }
           setTasks(formattedTasks);
         }
+
+        if (resBoards.data) {
+          const formattedBoards = resBoards.data.map(b => ({
+            id: b.id, name: b.name, columns: b.columns, userId: b.user_id, createdAt: b.created_at
+          }));
+          const syncCount = await db.syncQueue.count();
+          if (syncCount === 0) {
+            await db.boards.bulkPut(formattedBoards);
+          }
+          setBoards(formattedBoards);
+        }
         
         if (resSessions.data) {
           const syncCount = await db.syncQueue.count();
@@ -675,27 +688,31 @@ const App: React.FC = () => {
 
         if (resReadings.data) setReadings(resReadings.data);
       } else {
-        const [localCards, localTasks, localSessions, localFolders] = await Promise.all([
+        const [localCards, localTasks, localBoards, localSessions, localFolders] = await Promise.all([
           db.flashcards.toArray(),
           db.tasks.toArray(),
+          db.boards.toArray(),
           db.study_sessions.toArray(),
           db.folders.toArray()
         ]);
         setFlashcards(localCards);
         setTasks(localTasks);
+        setBoards(localBoards);
         setStudySessions(localSessions);
         setFolders(localFolders);
       }
     } catch (err) {
       console.error("Erro no carregamento dos dados:", err);
-      const [localCards, localTasks, localSessions, localFolders] = await Promise.all([
+      const [localCards, localTasks, localBoards, localSessions, localFolders] = await Promise.all([
         db.flashcards.toArray(),
         db.tasks.toArray(),
+        db.boards.toArray(),
         db.study_sessions.toArray(),
         db.folders.toArray()
       ]);
       setFlashcards(localCards);
       setTasks(localTasks);
+      setBoards(localBoards);
       setStudySessions(localSessions);
       setFolders(localFolders);
     }
@@ -1193,7 +1210,19 @@ const App: React.FC = () => {
                     tasks={tasks}
                   />
                 } />
-                <Route path={getPathFromView(View.Tasks)} element={<TaskMasterDetail tasks={tasks} subjects={subjects} setTasks={setTasks} userId={session.user.id} isOnline={isOnline} />} />
+                <Route path={getPathFromView(View.Tasks)} element={
+                  <TaskMasterDetail 
+                    tasks={tasks} 
+                    subjects={subjects} 
+                    setTasks={setTasks} 
+                    boards={boards}
+                    setBoards={setBoards}
+                    studySessions={studySessions}
+                    setStudySessions={setStudySessions}
+                    userId={session.user.id} 
+                    isOnline={isOnline} 
+                  />
+                } />
 
                 <Route path="/simulados" element={<QuestionBank userId={session.user.id} onCorrectAnswer={incrementCorrectQuestions} folders={folders} flashcards={flashcards} />} />
 

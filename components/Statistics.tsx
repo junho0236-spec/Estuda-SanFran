@@ -15,7 +15,8 @@ import {
   ChevronDown,
   Sparkles,
   AlertCircle,
-  Loader2
+  Loader2,
+  Quote
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -31,7 +32,8 @@ import {
   LineChart,
   Line,
   AreaChart,
-  Area
+  Area,
+  LabelList
 } from 'recharts';
 import { StudySession, Flashcard, Task, Subject } from '../types';
 import { GoogleGenAI } from "@google/genai";
@@ -86,49 +88,60 @@ const Statistics: React.FC<StatisticsProps> = ({
     });
 
     const filteredTasks = tasks.filter(t => {
-      if (!t.completedAt) return true; // Keep uncompleted tasks or handle them differently? 
-      // Usually statistics for a period should show what was DONE in that period.
+      if (!t.completedAt) return false; 
       const tDate = new Date(t.completedAt);
       if (startDate && tDate < startDate) return false;
       if (tDate > endDate) return false;
       return true;
     });
 
-    // Flashcards don't have a clear "reviewed at" timestamp in the current type, 
-    // but we can assume sessions cover the study time. 
-    // For now, we'll just filter sessions and tasks as they are the most time-sensitive.
+    const totalTasksInPeriod = tasks.filter(t => {
+      // If it was completed in the period, or if it's due in the period and not completed yet
+      const tDate = t.completedAt ? new Date(t.completedAt) : (t.dueDate ? new Date(t.dueDate) : null);
+      if (!tDate) return false;
+      if (startDate && tDate < startDate) return false;
+      if (tDate > endDate) return false;
+      return true;
+    }).length;
     
-    return { filteredSessions, filteredTasks };
+    return { filteredSessions, filteredTasks, totalTasksInPeriod };
   };
 
-  const { filteredSessions, filteredTasks } = getFilteredData();
+  const { filteredSessions, filteredTasks, totalTasksInPeriod } = getFilteredData();
 
   // Calculations using filtered data
   const totalStudySeconds = filteredSessions.reduce((acc, s) => acc + s.duration, 0);
   const totalStudyHours = (totalStudySeconds / 3600).toFixed(1);
   
-  const completedTasks = filteredTasks.filter(t => t.completed).length;
-  const totalTasks = filteredTasks.length;
-  const taskCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const completedTasks = filteredTasks.length;
+  const taskCompletionRate = totalTasksInPeriod > 0 ? Math.round((completedTasks / totalTasksInPeriod) * 100) : 0;
 
   const reviewedCards = flashcards.filter(f => f.interval > 0).length;
   const totalCards = flashcards.length;
   const cardMasteryRate = totalCards > 0 ? Math.round((reviewedCards / totalCards) * 100) : 0;
+
+  const [distributionType, setDistributionType] = React.useState<'time' | 'tasks'>('time');
 
   // Data for Charts
   const sessionsBySubject = subjects.map(subject => {
     const duration = filteredSessions
       .filter(s => s.subject_id === subject.id)
       .reduce((acc, s) => acc + s.duration, 0);
+    
+    const taskCount = filteredTasks
+      .filter(t => t.subjectId === subject.id)
+      .length;
+
     return {
       name: subject.name,
-      value: Math.round(duration / 60), // in minutes
-      color: subject.color
+      value: distributionType === 'time' ? Math.round(duration / 60) : taskCount,
+      color: subject.color,
+      duration: Math.round(duration / 60),
+      tasks: taskCount
     };
   }).filter(s => s.value > 0);
 
-  // Last 7 days study time (always 7 days for this specific chart or should it follow filter?)
-  // Let's make it follow the filter if it's 7 or 30 days, otherwise show last 7.
+  // Last 7 days study time
   const chartDays = dateFilter === '30days' ? 30 : 7;
   const trendData = [...Array(chartDays)].map((_, i) => {
     const d = new Date();
@@ -140,10 +153,15 @@ const Statistics: React.FC<StatisticsProps> = ({
       .filter(s => s.start_time.startsWith(dateStr))
       .reduce((acc, s) => acc + s.duration, 0);
       
+    const dayTasks = tasks
+      .filter(t => t.completedAt && t.completedAt.startsWith(dateStr))
+      .length;
+
     return {
       date: dateStr,
       day: dayName,
-      minutes: Math.round(dayDuration / 60)
+      minutes: Math.round(dayDuration / 60),
+      tasks: dayTasks
     };
   }).reverse();
 
@@ -260,6 +278,35 @@ const Statistics: React.FC<StatisticsProps> = ({
           )}
         </div>
       </header>
+
+      {/* Effort vs Delivery Explanation */}
+      <div className="p-6 bg-slate-900 rounded-[2rem] border border-slate-800 shadow-2xl overflow-hidden relative group">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-sanfran-rubi/10 blur-[100px] rounded-full -mr-32 -mt-32 group-hover:bg-sanfran-rubi/20 transition-all duration-700"></div>
+        <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
+          <div className="w-16 h-16 bg-sanfran-rubi/20 rounded-2xl flex items-center justify-center shrink-0 border border-sanfran-rubi/30">
+            <Sparkles className="text-sanfran-rubi w-8 h-8" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-black uppercase tracking-tight text-white mb-2">Esforço vs. Entrega</h3>
+            <p className="text-sm text-slate-400 leading-relaxed max-w-3xl">
+              O <span className="text-white font-bold">Ranking</span> mede seu <span className="text-sanfran-rubi font-bold italic">Esforço (Tempo)</span>. 
+              As <span className="text-white font-bold">Estatísticas</span> medem sua <span className="text-emerald-400 font-bold italic">Entrega (Tarefas)</span>. 
+              Use as categorias nas tarefas para conectar os dois: o cronômetro alimenta o Ranking, enquanto o check alimenta sua eficiência.
+            </p>
+          </div>
+          <div className="flex gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-black text-white">{totalStudyHours}h</div>
+              <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Esforço</div>
+            </div>
+            <div className="w-px h-10 bg-slate-800"></div>
+            <div className="text-center">
+              <div className="text-2xl font-black text-emerald-400">{completedTasks}</div>
+              <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Entrega</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Key Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -404,7 +451,25 @@ const Statistics: React.FC<StatisticsProps> = ({
                       fontWeight: 'bold'
                     }}
                   />
-                  <Bar dataKey="minutes" fill="#9B111E" radius={[8, 8, 0, 0]} barSize={chartDays === 30 ? 15 : 40} />
+                  <Bar dataKey="minutes" fill="#9B111E" radius={[8, 8, 0, 0]} barSize={chartDays === 30 ? 15 : 40}>
+                    {trendData.map((entry, index) => (
+                      entry.tasks > 0 && (
+                        <LabelList 
+                          key={`label-${index}`}
+                          dataKey="tasks" 
+                          position="top" 
+                          content={({ x, y, value }) => (
+                            <g transform={`translate(${Number(x) + (chartDays === 30 ? 7 : 20)},${Number(y) - 15})`}>
+                              <circle r="8" fill="#10b981" />
+                              <text x="0" y="3" textAnchor="middle" fontSize="8" fontWeight="bold" fill="white">
+                                {value}
+                              </text>
+                            </g>
+                          )}
+                        />
+                      )
+                    ))}
+                  </Bar>
                 </BarChart>
               ) : (
                 <BarChart data={last4Weeks}>
@@ -448,7 +513,20 @@ const Statistics: React.FC<StatisticsProps> = ({
               <PieChartIcon className="text-usp-gold w-5 h-5" />
               <h3 className="text-lg font-black uppercase tracking-tight text-slate-900 dark:text-white">Distribuição por Matéria</h3>
             </div>
-            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Tempo Total</span>
+            <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-xl">
+              <button 
+                onClick={() => setDistributionType('time')}
+                className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-all ${distributionType === 'time' ? 'bg-white dark:bg-sanfran-rubi text-slate-900 dark:text-white shadow-sm' : 'text-slate-400'}`}
+              >
+                Tempo
+              </button>
+              <button 
+                onClick={() => setDistributionType('tasks')}
+                className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-all ${distributionType === 'tasks' ? 'bg-white dark:bg-sanfran-rubi text-slate-900 dark:text-white shadow-sm' : 'text-slate-400'}`}
+              >
+                Tarefas
+              </button>
+            </div>
           </div>
 
           <div className="h-[300px] w-full flex flex-col md:flex-row items-center">
@@ -479,7 +557,9 @@ const Statistics: React.FC<StatisticsProps> = ({
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }}></div>
                     <span className="text-[10px] font-black uppercase text-slate-600 dark:text-slate-400 truncate max-w-[120px]">{s.name}</span>
                   </div>
-                  <span className="text-[10px] font-black text-slate-900 dark:text-white">{s.value} min</span>
+                  <span className="text-[10px] font-black text-slate-900 dark:text-white">
+                    {distributionType === 'time' ? `${s.duration} min` : `${s.tasks} tarefas`}
+                  </span>
                 </div>
               ))}
               {sessionsBySubject.length > 5 && (
@@ -627,6 +707,50 @@ const Statistics: React.FC<StatisticsProps> = ({
           </div>
         </div>
       )}
+
+      {/* Log de Tarefas Concluídas */}
+      <div className="bg-white dark:bg-sanfran-rubiDark/20 p-8 rounded-[2rem] border border-slate-200 dark:border-sanfran-rubi/20 shadow-xl">
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="text-emerald-500 w-5 h-5" />
+            <h3 className="text-lg font-black uppercase tracking-tight text-slate-900 dark:text-white">Log de Conclusão (Tarefas Mortas)</h3>
+          </div>
+          <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Histórico Recente</span>
+        </div>
+
+        <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+          {filteredTasks.length === 0 ? (
+            <div className="text-center py-12 text-slate-400 font-serif italic">
+              Nenhuma tarefa concluída no período selecionado.
+            </div>
+          ) : (
+            filteredTasks.sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime()).map(task => (
+              <div key={task.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/10 group hover:border-emerald-500/30 transition-all">
+                <div className="flex items-center gap-4">
+                  <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                    <CheckCircle2 size={16} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-800 dark:text-white leading-tight">{task.title}</h4>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[10px] font-black uppercase text-slate-400">
+                        {task.subjectId ? subjects.find(s => s.id === task.subjectId)?.name : 'Geral'}
+                      </span>
+                      <span className="text-slate-300">•</span>
+                      <span className="text-[10px] font-bold text-slate-400">
+                        Concluída em {new Date(task.completedAt!).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span className="text-[10px] font-black uppercase text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full">+10 XP</span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
 
     </div>
   );
