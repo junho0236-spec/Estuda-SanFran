@@ -247,7 +247,7 @@ const Profile: React.FC = () => {
     
     await dataService.saveUserProfile(updatedProfile, session.user.id, navigator.onLine);
     
-    if (data.disciplinas && data.disciplinas.length > 0) {
+    if (Array.isArray(data.disciplinas) && data.disciplinas.length > 0) {
       try {
         await dataService.saveDisciplinas(data.disciplinas, session.user.id);
       } catch (err) {
@@ -315,30 +315,30 @@ const Profile: React.FC = () => {
             <div className="flex-1 text-center md:text-left space-y-3">
               <div className="space-y-1">
                 <h1 className="text-4xl font-serif font-bold text-sanfran-rubi dark:text-white tracking-tight">
-                  {profile?.full_name || session?.user?.user_metadata?.full_name || 'Estudante SanFran'}
+                  {typeof profile?.full_name === 'string' ? profile.full_name : (profile?.full_name ? JSON.stringify(profile.full_name) : (session?.user?.user_metadata?.full_name || 'Estudante SanFran'))}
                 </h1>
                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
                   <span className="px-4 py-1.5 bg-sanfran-rubi text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-red-900/20">
-                    Turma {profile?.turma || profile?.turma_ano || '---'}
+                    Turma {typeof profile?.turma === 'number' || typeof profile?.turma === 'string' ? profile.turma : (typeof profile?.turma_ano === 'number' || typeof profile?.turma_ano === 'string' ? profile.turma_ano : '---')}
                   </span>
                   {profile?.sala && (
                     <span className="px-4 py-1.5 bg-white dark:bg-white/10 text-slate-600 dark:text-slate-300 rounded-full text-[10px] font-black uppercase tracking-widest border border-slate-200 dark:border-white/10 shadow-sm">
-                      Sala {profile.sala}
+                      Sala {typeof profile.sala === 'string' ? profile.sala : JSON.stringify(profile.sala)}
                     </span>
                   )}
                   <span className="px-4 py-1.5 bg-white dark:bg-white/10 text-slate-600 dark:text-slate-300 rounded-full text-[10px] font-black uppercase tracking-widest border border-slate-200 dark:border-white/10 shadow-sm">
-                    {profile?.archetype || 'Novato'}
+                    {typeof profile?.archetype === 'string' ? profile.archetype : (profile?.archetype ? JSON.stringify(profile.archetype) : 'Novato')}
                   </span>
                   {profile?.cargos_academicos?.diretoria?.[0] && (
                     <span className="px-4 py-1.5 bg-amber-500 text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-amber-900/20">
-                      {profile.cargos_academicos.diretoria[0]}
+                      {typeof profile.cargos_academicos.diretoria[0] === 'string' ? profile.cargos_academicos.diretoria[0] : JSON.stringify(profile.cargos_academicos.diretoria[0])}
                     </span>
                   )}
                 </div>
               </div>
               <div className="relative group max-w-2xl">
                 <p className="text-slate-600 dark:text-slate-400 font-medium leading-relaxed italic">
-                  "{profile?.bio || 'Nenhuma biografia definida. Clique em editar para adicionar.'}"
+                  "{typeof profile?.bio === 'string' ? profile.bio : (profile?.bio ? JSON.stringify(profile.bio) : 'Nenhuma biografia definida. Clique em editar para adicionar.')}"
                 </p>
                 <button 
                   onClick={() => setIsEditing(true)}
@@ -448,12 +448,12 @@ const Profile: React.FC = () => {
             <div className="space-y-2">
               <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500">
                 <span>Integralização</span>
-                <span>{profile?.progresso_total || 0}%</span>
+                <span>{typeof profile?.progresso_total === 'number' || typeof profile?.progresso_total === 'string' ? profile.progresso_total : 0}%</span>
               </div>
               <div className="h-2 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
                 <motion.div 
                   initial={{ width: 0 }}
-                  animate={{ width: `${profile?.progresso_total || 0}%` }}
+                  animate={{ width: `${typeof profile?.progresso_total === 'number' || typeof profile?.progresso_total === 'string' ? profile.progresso_total : 0}%` }}
                   className="h-full bg-blue-500 rounded-full"
                 />
               </div>
@@ -470,12 +470,12 @@ const Profile: React.FC = () => {
             <div className="space-y-2">
               <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500">
                 <span>Concluído</span>
-                <span>{profile?.progresso_obrigatorias || 0}%</span>
+                <span>{typeof profile?.progresso_obrigatorias === 'number' || typeof profile?.progresso_obrigatorias === 'string' ? profile.progresso_obrigatorias : 0}%</span>
               </div>
               <div className="h-2 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
                 <motion.div 
                   initial={{ width: 0 }}
-                  animate={{ width: `${profile?.progresso_obrigatorias || 0}%` }}
+                  animate={{ width: `${typeof profile?.progresso_obrigatorias === 'number' || typeof profile?.progresso_obrigatorias === 'string' ? profile.progresso_obrigatorias : 0}%` }}
                   className="h-full bg-emerald-500 rounded-full"
                 />
               </div>
@@ -492,12 +492,12 @@ const Profile: React.FC = () => {
             <div className="space-y-2">
               <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500">
                 <span>Concluído</span>
-                <span>{profile?.progresso_optativas || 0}%</span>
+                <span>{typeof profile?.progresso_optativas === 'number' || typeof profile?.progresso_optativas === 'string' ? profile.progresso_optativas : 0}%</span>
               </div>
               <div className="h-2 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
                 <motion.div 
                   initial={{ width: 0 }}
-                  animate={{ width: `${profile?.progresso_optativas || 0}%` }}
+                  animate={{ width: `${typeof profile?.progresso_optativas === 'number' || typeof profile?.progresso_optativas === 'string' ? profile.progresso_optativas : 0}%` }}
                   className="h-full bg-amber-500 rounded-full"
                 />
               </div>
@@ -526,7 +526,7 @@ const Profile: React.FC = () => {
               <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Créditos Aula</h3>
             </div>
             <div className="flex items-end gap-2">
-              <span className="text-2xl font-serif font-bold text-indigo-600 dark:text-indigo-400">{profile?.creditos_aula || 0}</span>
+              <span className="text-2xl font-serif font-bold text-indigo-600 dark:text-indigo-400">{typeof profile?.creditos_aula === 'number' || typeof profile?.creditos_aula === 'string' ? profile.creditos_aula : 0}</span>
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Créditos</span>
             </div>
           </div>
@@ -539,7 +539,7 @@ const Profile: React.FC = () => {
               <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Créditos Trabalho</h3>
             </div>
             <div className="flex items-end gap-2">
-              <span className="text-2xl font-serif font-bold text-teal-600 dark:text-teal-400">{profile?.creditos_trabalho || 0}</span>
+              <span className="text-2xl font-serif font-bold text-teal-600 dark:text-teal-400">{typeof profile?.creditos_trabalho === 'number' || typeof profile?.creditos_trabalho === 'string' ? profile.creditos_trabalho : 0}</span>
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Créditos</span>
             </div>
           </div>
@@ -552,7 +552,7 @@ const Profile: React.FC = () => {
               <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Média Ponderada</h3>
             </div>
             <div className="flex items-end gap-2">
-              <span className="text-2xl font-serif font-bold text-rose-600 dark:text-rose-400">{profile?.media || '0.0'}</span>
+              <span className="text-2xl font-serif font-bold text-rose-600 dark:text-rose-400">{typeof profile?.media === 'number' || typeof profile?.media === 'string' ? profile.media : '0.0'}</span>
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Média</span>
             </div>
           </div>
@@ -565,7 +565,7 @@ const Profile: React.FC = () => {
               <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Horas de Extensão</h3>
             </div>
             <div className="flex items-end gap-2">
-              <span className="text-2xl font-serif font-bold text-orange-600 dark:text-orange-400">{profile?.horas_extensao || 0}h</span>
+              <span className="text-2xl font-serif font-bold text-orange-600 dark:text-orange-400">{typeof profile?.horas_extensao === 'number' || typeof profile?.horas_extensao === 'string' ? profile.horas_extensao : 0}h</span>
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Horas</span>
             </div>
           </div>
@@ -578,9 +578,9 @@ const Profile: React.FC = () => {
               <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Entidades</h3>
             </div>
             <div className="flex flex-wrap gap-2">
-              {profile?.entidades?.length ? profile.entidades.map(ent => (
-                <span key={ent} className="px-2 py-1 bg-cyan-50 dark:bg-cyan-900/10 text-cyan-600 dark:text-cyan-400 rounded-lg text-[9px] font-black uppercase tracking-widest border border-cyan-100 dark:border-cyan-900/20">
-                  {ent}
+              {profile?.entidades?.length ? profile.entidades.map((ent, idx) => (
+                <span key={idx} className="px-2 py-1 bg-cyan-50 dark:bg-cyan-900/10 text-cyan-600 dark:text-cyan-400 rounded-lg text-[9px] font-black uppercase tracking-widest border border-cyan-100 dark:border-cyan-900/20">
+                  {typeof ent === 'string' ? ent : JSON.stringify(ent)}
                 </span>
               )) : <span className="text-[9px] text-slate-400 uppercase font-black">Nenhuma</span>}
             </div>
@@ -594,9 +594,9 @@ const Profile: React.FC = () => {
               <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Idiomas</h3>
             </div>
             <div className="flex flex-wrap gap-2">
-              {profile?.idiomas?.length ? profile.idiomas.map(lang => (
-                <span key={lang} className="px-2 py-1 bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 rounded-lg text-[9px] font-black uppercase tracking-widest border border-emerald-100 dark:border-emerald-900/20">
-                  {lang}
+              {profile?.idiomas?.length ? profile.idiomas.map((lang, idx) => (
+                <span key={idx} className="px-2 py-1 bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 rounded-lg text-[9px] font-black uppercase tracking-widest border border-emerald-100 dark:border-emerald-900/20">
+                  {typeof lang === 'string' ? lang : JSON.stringify(lang)}
                 </span>
               )) : <span className="text-[9px] text-slate-400 uppercase font-black">Nenhum</span>}
             </div>
@@ -610,7 +610,7 @@ const Profile: React.FC = () => {
               <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Intercâmbio</h3>
             </div>
             <p className="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase leading-tight">
-              {profile?.intercambio || 'Não realizado'}
+              {typeof profile?.intercambio === 'string' ? profile.intercambio : (profile?.intercambio ? JSON.stringify(profile.intercambio) : 'Não realizado')}
             </p>
           </div>
 
@@ -652,15 +652,15 @@ const Profile: React.FC = () => {
               {disciplinas.map((disc, idx) => (
                 <div key={idx} className="p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/5 hover:border-emerald-200 dark:hover:border-emerald-900/30 transition-all group">
                   <div className="flex justify-between items-start mb-2">
-                    <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">{disc.codigo}</span>
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{disc.turma_sala}</span>
+                    <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">{typeof disc.codigo === 'string' ? disc.codigo : JSON.stringify(disc.codigo)}</span>
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{typeof disc.turma_sala === 'string' ? disc.turma_sala : JSON.stringify(disc.turma_sala)}</span>
                   </div>
-                  <h4 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-tight mb-3 group-hover:text-emerald-600 transition-colors">{disc.nome}</h4>
+                  <h4 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-tight mb-3 group-hover:text-emerald-600 transition-colors">{typeof disc.nome === 'string' ? disc.nome : JSON.stringify(disc.nome)}</h4>
                   <div className="flex flex-wrap gap-2">
                     {Object.entries(disc.horarios || {}).map(([dia, hora]) => (
                       <div key={dia} className="flex items-center gap-1 px-2 py-1 bg-white dark:bg-white/10 rounded-lg border border-slate-200 dark:border-white/10">
                         <span className="text-[8px] font-black text-slate-400 uppercase">{dia.substring(0, 3)}</span>
-                        <span className="text-[8px] font-bold text-slate-600 dark:text-slate-300">{hora as string}</span>
+                        <span className="text-[8px] font-bold text-slate-600 dark:text-slate-300">{typeof hora === 'string' ? hora : JSON.stringify(hora)}</span>
                       </div>
                     ))}
                   </div>
@@ -721,8 +721,8 @@ const Profile: React.FC = () => {
             {/* Linear Progress Bars */}
             <div className="lg:col-span-2 space-y-8">
               {[
-                { label: 'Disciplinas Obrigatórias', progress: profile?.progresso_obrigatorias || 0, color: 'bg-sanfran-rubi' },
-                { label: 'Disciplinas Optativas', progress: profile?.progresso_optativas || 0, color: 'bg-sanfran-rubi/60' },
+                { label: 'Disciplinas Obrigatórias', progress: typeof profile?.progresso_obrigatorias === 'number' || typeof profile?.progresso_obrigatorias === 'string' ? profile.progresso_obrigatorias : 0, color: 'bg-sanfran-rubi' },
+                { label: 'Disciplinas Optativas', progress: typeof profile?.progresso_optativas === 'number' || typeof profile?.progresso_optativas === 'string' ? profile.progresso_optativas : 0, color: 'bg-sanfran-rubi/60' },
                 { label: 'Atividades Complementares', progress: 90, color: 'bg-emerald-500' },
               ].map((item) => (
                 <div key={item.label} className="space-y-3">
@@ -823,7 +823,7 @@ const Profile: React.FC = () => {
                   <div className="aspect-square overflow-hidden mb-3">
                     <img src={foto.url} alt={foto.caption} className="w-full h-full object-cover" />
                   </div>
-                  <p className="text-[10px] font-serif italic text-slate-500 text-center truncate px-2">{foto.caption || 'Sem legenda'}</p>
+                  <p className="text-[10px] font-serif italic text-slate-500 text-center truncate px-2">{typeof foto.caption === 'string' ? foto.caption : (foto.caption ? JSON.stringify(foto.caption) : 'Sem legenda')}</p>
                 </motion.div>
               )) : (
                 <div className="col-span-full py-20 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-white/10 rounded-[2rem]">

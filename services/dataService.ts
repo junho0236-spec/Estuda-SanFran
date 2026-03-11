@@ -154,10 +154,30 @@ export const dataService = {
 
   async getUserProfile(userId: string, isOnline: boolean) {
     const local = await db.user_profile.get(userId);
+    const sanitizeProfile = (p: any) => {
+      if (!p) return null;
+      return {
+        ...p,
+        idiomas: Array.isArray(p.idiomas) ? p.idiomas : (p.idiomas ? [p.idiomas] : []),
+        mural_fotos: Array.isArray(p.mural_fotos) ? p.mural_fotos : [],
+        experiencias_lideranca: Array.isArray(p.experiencias_lideranca) ? p.experiencias_lideranca : [],
+        badges: Array.isArray(p.badges) ? p.badges : [],
+        social_links: p.social_links || {},
+        entidades: Array.isArray(p.entidades) ? p.entidades : (p.entidades ? [p.entidades] : []),
+        cargos_academicos: {
+          monitoria: Array.isArray(p.cargos_academicos?.monitoria) ? p.cargos_academicos.monitoria : [],
+          pesquisa: Array.isArray(p.cargos_academicos?.pesquisa) ? p.cargos_academicos.pesquisa : [],
+          pites: Array.isArray(p.cargos_academicos?.pites) ? p.cargos_academicos.pites : [],
+          diretoria: Array.isArray(p.cargos_academicos?.diretoria) ? p.cargos_academicos.diretoria : [],
+          coordenacao: Array.isArray(p.cargos_academicos?.coordenacao) ? p.cargos_academicos.coordenacao : []
+        }
+      };
+    };
+
     if (isOnline) {
       const { data, error } = await supabase.from('user_persona').select('*').eq('id', userId).single();
       if (!error && data) {
-        const profile = {
+        const profile = sanitizeProfile({
           ...data.persona_data,
           id: data.id,
           arcadia_score: data.profile_completion,
@@ -180,17 +200,27 @@ export const dataService = {
           curriculo_url: data.curriculo_url,
           badges: data.badges,
           social_links: data.social_links,
+          creditos_aula: data.creditos_aula,
+          creditos_trabalho: data.creditos_trabalho,
+          media: data.media,
+          horas_extensao: data.horas_extensao,
+          entidades: data.entidades,
+          cargos_academicos: data.cargos_academicos,
           last_updated: data.updated_at
-        };
+        });
         await db.user_profile.put(profile);
         return profile;
       }
     }
-    return local;
+    return sanitizeProfile(local);
   },
 
   async saveDisciplinas(disciplinas: any[], userId: string) {
     try {
+      if (!Array.isArray(disciplinas)) {
+        console.warn("[dataService] disciplinas is not an array:", disciplinas);
+        return;
+      }
       // First, delete existing disciplines for this user to avoid duplicates
       await supabase.from('disciplinas').delete().eq('user_id', userId);
       
