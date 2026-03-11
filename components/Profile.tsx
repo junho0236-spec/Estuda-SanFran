@@ -230,13 +230,16 @@ const Profile: React.FC = () => {
     setSyncStatus('Perfil atualizado!');
     const updatedProfile = {
       ...profile,
-      full_name: data.full_name || profile?.full_name,
-      turma: data.turma || profile?.turma,
+      full_name: data.full_name || profile?.full_name || "Edvando Santos Alves Junior",
+      turma: data.turma || profile?.turma || 2025,
       progresso_obrigatorias: data.progresso_obrigatorias || profile?.progresso_obrigatorias,
       progresso_optativas: data.progresso_optativas || profile?.progresso_optativas,
       progresso_total: data.progresso_total || profile?.progresso_total,
       status_geral_integralizacao: data.status_geral_integralizacao || profile?.status_geral_integralizacao,
       aniversario: data.aniversario || profile?.aniversario,
+      creditos_aula: data.creditos_aula || profile?.creditos_aula || 52,
+      entidades: data.entidades || profile?.entidades || ["Departamento Jurídico XI de Agosto", "SanFran Jr."],
+      idiomas: data.idiomas || profile?.idiomas || [],
     };
     
     await dataService.saveUserProfile(updatedProfile, session.user.id, navigator.onLine);

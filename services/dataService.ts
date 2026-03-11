@@ -87,7 +87,7 @@ export const dataService = {
       bio: profile.bio || null,
       avatar_url: profile.avatar_url || null,
       turma_ano: profile.turma_ano || null,
-      turma: profile.turma || null,
+      turma: Number(profile.turma) || null,
       sala: profile.sala || null,
       aniversario: profile.aniversario || null,
       idiomas: profile.idiomas || [],
@@ -102,7 +102,10 @@ export const dataService = {
       integralizacao_curriculo: profile.integralizacao_curriculo || {},
       curriculo_url: profile.curriculo_url || null,
       badges: profile.badges || [],
-      social_links: profile.social_links || {}
+      social_links: profile.social_links || {},
+      // New fields
+      creditos_aula: Number(profile.creditos_aula) || null,
+      entidades: profile.entidades || []
     };
 
     console.log("[dataService] Saving user profile, mural_fotos:", cloudPayload.mural_fotos);
@@ -110,14 +113,22 @@ export const dataService = {
     await db.user_profile.put({ ...profile, id: userId });
     
     if (isOnline) {
-      const { error } = await supabase.from('user_persona').upsert(cloudPayload);
-      if (error) {
-        console.error("[dataService] Error upserting user_persona:", error);
-        // Improved logging for the user to see
-        alert(`Erro Supabase: ${error.message} - ${error.details || 'Sem detalhes'}`);
-        await addToSyncQueue({ table: 'user_profile' as any, action: 'update', data: profile });
-      } else {
-        console.log("[dataService] User persona upserted successfully");
+      try {
+        // Força a atualização da sessão para garantir que o schema do banco esteja atualizado
+        await supabase.auth.refreshSession();
+        
+        const { error } = await supabase.from('user_persona').upsert(cloudPayload);
+        if (error) {
+          console.error("[dataService] Error upserting user_persona:", error);
+          // Improved logging for the user to see
+          alert(`Erro Supabase: ${error.message} - ${error.details || 'Sem detalhes'}`);
+          await addToSyncQueue({ table: 'user_profile' as any, action: 'update', data: profile });
+        } else {
+          console.log("[dataService] User persona upserted successfully");
+        }
+      } catch (err) {
+        console.error("[dataService] Exception during upsert:", err);
+        alert(`Erro crítico ao salvar: ${err instanceof Error ? err.message : String(err)}`);
       }
     } else {
       await addToSyncQueue({ table: 'user_profile' as any, action: 'update', data: profile });

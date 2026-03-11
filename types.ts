@@ -522,6 +522,8 @@ export interface UserProfile {
     completedYesterday: number;
     streak: number;
   };
+  creditos_aula?: number;
+  entidades?: string[];
 }
 
 export interface UserConfig {
