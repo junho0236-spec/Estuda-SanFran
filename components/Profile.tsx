@@ -24,6 +24,8 @@ const Profile: React.FC = () => {
   const [isClearing, setIsClearing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string>('');
+  const [manualText, setManualText] = useState('');
+  const [showManualInput, setShowManualInput] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [showAiModal, setShowAiModal] = useState(false);
@@ -175,6 +177,7 @@ const Profile: React.FC = () => {
   const handleJupiterSync = async (file: File) => {
     if (!session?.user || !profile) return;
     setIsSyncing(true);
+    setShowManualInput(false);
     setSyncStatus('Enviando para análise...');
     try {
       // 1. Upload to Supabase Storage
@@ -193,39 +196,62 @@ const Profile: React.FC = () => {
       const data = await geminiService.analyzeJupiterPDF(base64PDF);
       
       if (data) {
-        setSyncStatus('Perfil atualizado!');
-        const updatedProfile = {
-          ...profile,
-          full_name: data.full_name || profile.full_name,
-          turma: data.turma || profile.turma,
-          progresso_obrigatorias: data.progresso_obrigatorias || profile.progresso_obrigatorias,
-          progresso_optativas: data.progresso_optativas || profile.progresso_optativas,
-          progresso_total: data.progresso_total || profile.progresso_total,
-          status_geral_integralizacao: data.status_geral_integralizacao || profile.status_geral_integralizacao,
-          aniversario: data.aniversario || profile.aniversario,
-        };
-        
-        await dataService.saveUserProfile(updatedProfile, session.user.id, navigator.onLine);
-        
-        if (data.disciplinas && data.disciplinas.length > 0) {
-          await dataService.saveDisciplinas(data.disciplinas, session.user.id);
-          const { data: discData } = await supabase.from('disciplinas').select('*').eq('user_id', session.user.id);
-          if (discData) setDisciplinas(discData);
-        }
-        
-        setProfile(updatedProfile);
-        setTimeout(() => {
-          setSyncStatus('');
-          setIsSyncing(false);
-          alert("Perfil sincronizado com sucesso via Júpiter!");
-        }, 1500);
+        await updateProfileWithJupiterData(data);
       }
     } catch (error) {
       console.error("Erro na sincronização Júpiter:", error);
       alert("Erro ao analisar PDF do Júpiter.");
       setIsSyncing(false);
       setSyncStatus('');
+      setShowManualInput(true);
     }
+  };
+
+  const handleManualJupiterSync = async (text: string) => {
+    if (!session?.user || !profile) return;
+    setIsSyncing(true);
+    setShowManualInput(false);
+    setSyncStatus('Analisando texto...');
+    try {
+      const data = await geminiService.analyzeJupiterText(text);
+      if (data) {
+        await updateProfileWithJupiterData(data);
+      }
+    } catch (error) {
+      console.error("Erro na sincronização manual Júpiter:", error);
+      alert("Erro ao analisar texto do Júpiter.");
+      setIsSyncing(false);
+      setSyncStatus('');
+    }
+  };
+
+  const updateProfileWithJupiterData = async (data: any) => {
+    setSyncStatus('Perfil atualizado!');
+    const updatedProfile = {
+      ...profile,
+      full_name: data.full_name || profile?.full_name,
+      turma: data.turma || profile?.turma,
+      progresso_obrigatorias: data.progresso_obrigatorias || profile?.progresso_obrigatorias,
+      progresso_optativas: data.progresso_optativas || profile?.progresso_optativas,
+      progresso_total: data.progresso_total || profile?.progresso_total,
+      status_geral_integralizacao: data.status_geral_integralizacao || profile?.status_geral_integralizacao,
+      aniversario: data.aniversario || profile?.aniversario,
+    };
+    
+    await dataService.saveUserProfile(updatedProfile, session.user.id, navigator.onLine);
+    
+    if (data.disciplinas && data.disciplinas.length > 0) {
+      await dataService.saveDisciplinas(data.disciplinas, session.user.id);
+      const { data: discData } = await supabase.from('disciplinas').select('*').eq('user_id', session.user.id);
+      if (discData) setDisciplinas(discData);
+    }
+    
+    setProfile(updatedProfile);
+    setTimeout(() => {
+      setSyncStatus('');
+      setIsSyncing(false);
+      alert("Perfil sincronizado com sucesso via Júpiter!");
+    }, 1500);
   };
 
   if (loading && !profile) {
@@ -348,6 +374,24 @@ const Profile: React.FC = () => {
                     <span className="text-[8px] text-white/70 font-bold uppercase tracking-tighter">{isSyncing ? syncStatus : 'Via JúpiterWeb'}</span>
                   </div>
                 </label>
+                {showManualInput && (
+                  <div className="mt-4 p-4 bg-white dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm animate-in slide-in-from-top-4">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-900 dark:text-white mb-3">Ou cole o texto manualmente:</p>
+                    <textarea
+                      value={manualText}
+                      onChange={(e) => setManualText(e.target.value)}
+                      className="w-full p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10 text-[10px] text-slate-700 dark:text-slate-300 mb-3"
+                      rows={5}
+                      placeholder="Cole aqui o texto copiado do Júpiter..."
+                    />
+                    <button
+                      onClick={() => handleManualJupiterSync(manualText)}
+                      className="w-full py-3 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-red-700 transition-all"
+                    >
+                      Analisar Texto
+                    </button>
+                  </div>
+                )}
               </div>
 
               <button 
