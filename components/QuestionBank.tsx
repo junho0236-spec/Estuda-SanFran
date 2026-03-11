@@ -805,17 +805,19 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
 
   const fetchUserProgress = async () => {
     try {
+      console.log('Fetching user progress for userId:', userId);
       const { data, error } = await supabase
         .from('user_progress')
         .select('*')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+      if (error) {
         console.error('Error fetching user progress:', error);
         return;
       }
 
+      console.log('User progress fetched:', data);
       if (data) {
         setUserProgress(data);
         setFavorites(data.favorites || []);
@@ -857,12 +859,14 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
       const { error } = await supabase
         .from('user_progress')
         .upsert(payload, { onConflict: 'user_id' });
-
-      if (error) throw error;
+      
+      if (error) {
+        console.error('Error syncing user progress:', error);
+      } else {
+        console.log('User progress synced successfully:', payload);
+      }
     } catch (err) {
-      console.error('Error syncing to Supabase:', err);
-      // We don't show notification for background sync errors to avoid annoying the user
-      // but we keep local storage updated
+      console.error('Failed to sync progress:', err);
     }
   };
 
