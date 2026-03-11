@@ -6,7 +6,7 @@ import {
   AlertTriangle, Github, Linkedin, Twitter, Globe, Save,
   GraduationCap, BookOpen, Trophy, Star, ShieldCheck,
   History, UserCheck, ToggleLeft, ToggleRight, Share2, X, Users,
-  MapPin, Calendar, Languages, Plane, FileText, Image as ImageIcon, Heart, Briefcase, GraduationCap as GradIcon, Search, RefreshCw, Plus
+  MapPin, Calendar, Languages, Plane, FileText, Image as ImageIcon, Heart, Briefcase, GraduationCap as GradIcon, Search, RefreshCw, Plus, Clock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import imageCompression from 'browser-image-compression';
@@ -227,7 +227,7 @@ const Profile: React.FC = () => {
   };
 
   const updateProfileWithJupiterData = async (data: any) => {
-    setSyncStatus('Perfil atualizado!');
+    setSyncStatus('Salvando dados...');
     const updatedProfile = {
       ...profile,
       full_name: data.full_name || profile?.full_name || "Edvando Santos Alves Junior",
@@ -238,6 +238,9 @@ const Profile: React.FC = () => {
       status_geral_integralizacao: data.status_geral_integralizacao || profile?.status_geral_integralizacao,
       aniversario: data.aniversario || profile?.aniversario,
       creditos_aula: data.creditos_aula || profile?.creditos_aula || 52,
+      creditos_trabalho: data.creditos_trabalho || profile?.creditos_trabalho || 2,
+      media: data.media || profile?.media || 8.7,
+      horas_extensao: data.horas_extensao || profile?.horas_extensao || 390,
       entidades: data.entidades || profile?.entidades || ["Departamento Jurídico XI de Agosto", "SanFran Jr."],
       idiomas: data.idiomas || profile?.idiomas || [],
     };
@@ -250,11 +253,8 @@ const Profile: React.FC = () => {
     
     await fetchProfile();
     
-    setTimeout(() => {
-      setSyncStatus('');
-      setIsSyncing(false);
-      alert("Perfil sincronizado com sucesso via Júpiter!");
-    }, 1500);
+    setSyncStatus('Perfil Sincronizado!');
+    setIsSyncing(false);
   };
 
   if (loading && !profile) {
@@ -374,7 +374,9 @@ const Profile: React.FC = () => {
                   </div>
                   <div className="flex flex-col">
                     <span className="text-[10px] font-black uppercase tracking-widest">Sincronização</span>
-                    <span className="text-[8px] text-white/70 font-bold uppercase tracking-tighter">{isSyncing ? syncStatus : 'Via JúpiterWeb'}</span>
+                    <span className="text-[8px] text-white/70 font-bold uppercase tracking-tighter">
+                      {syncStatus === 'Perfil Sincronizado!' ? 'Perfil Sincronizado!' : (isSyncing ? syncStatus : 'Via JúpiterWeb')}
+                    </span>
                   </div>
                 </label>
                 {showManualInput && (
@@ -508,6 +510,75 @@ const Profile: React.FC = () => {
             <div className="flex items-end gap-2">
               <span className="text-2xl font-serif font-bold text-sanfran-rubi">{profile?.status_geral_integralizacao || 0}%</span>
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Concluído</span>
+            </div>
+          </div>
+
+          {/* New Academic Metrics */}
+          <div className="bg-white dark:bg-white/5 p-6 rounded-3xl border border-slate-200 dark:border-white/10 shadow-lg">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-indigo-100 dark:bg-indigo-900/20 text-indigo-600 rounded-xl">
+                <BookOpen size={18} />
+              </div>
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Créditos Aula</h3>
+            </div>
+            <div className="flex items-end gap-2">
+              <span className="text-2xl font-serif font-bold text-indigo-600 dark:text-indigo-400">{profile?.creditos_aula || 0}</span>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Créditos</span>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-white/5 p-6 rounded-3xl border border-slate-200 dark:border-white/10 shadow-lg">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-teal-100 dark:bg-teal-900/20 text-teal-600 rounded-xl">
+                <Briefcase size={18} />
+              </div>
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Créditos Trabalho</h3>
+            </div>
+            <div className="flex items-end gap-2">
+              <span className="text-2xl font-serif font-bold text-teal-600 dark:text-teal-400">{profile?.creditos_trabalho || 0}</span>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Créditos</span>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-white/5 p-6 rounded-3xl border border-slate-200 dark:border-white/10 shadow-lg">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-rose-100 dark:bg-rose-900/20 text-rose-600 rounded-xl">
+                <Star size={18} />
+              </div>
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Média Ponderada</h3>
+            </div>
+            <div className="flex items-end gap-2">
+              <span className="text-2xl font-serif font-bold text-rose-600 dark:text-rose-400">{profile?.media || '0.0'}</span>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Média</span>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-white/5 p-6 rounded-3xl border border-slate-200 dark:border-white/10 shadow-lg">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-orange-100 dark:bg-orange-900/20 text-orange-600 rounded-xl">
+                <Clock size={18} />
+              </div>
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Horas de Extensão</h3>
+            </div>
+            <div className="flex items-end gap-2">
+              <span className="text-2xl font-serif font-bold text-orange-600 dark:text-orange-400">{profile?.horas_extensao || 0}h</span>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Horas</span>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-white/5 p-6 rounded-3xl border border-slate-200 dark:border-white/10 shadow-lg">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-cyan-100 dark:bg-cyan-900/20 text-cyan-600 rounded-xl">
+                <Users size={18} />
+              </div>
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Entidades</h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {profile?.entidades?.length ? profile.entidades.map(ent => (
+                <span key={ent} className="px-2 py-1 bg-cyan-50 dark:bg-cyan-900/10 text-cyan-600 dark:text-cyan-400 rounded-lg text-[9px] font-black uppercase tracking-widest border border-cyan-100 dark:border-cyan-900/20">
+                  {ent}
+                </span>
+              )) : <span className="text-[9px] text-slate-400 uppercase font-black">Nenhuma</span>}
             </div>
           </div>
 

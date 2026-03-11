@@ -523,6 +523,9 @@ export interface UserProfile {
     streak: number;
   };
   creditos_aula?: number;
+  creditos_trabalho?: number;
+  media?: number;
+  horas_extensao?: number;
   entidades?: string[];
 }
 

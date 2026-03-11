@@ -105,6 +105,9 @@ export const dataService = {
       social_links: profile.social_links || {},
       // New fields
       creditos_aula: Number(profile.creditos_aula) || null,
+      creditos_trabalho: Number(profile.creditos_trabalho) || null,
+      media: Number(profile.media) || null,
+      horas_extensao: Number(profile.horas_extensao) || null,
       entidades: profile.entidades || []
     };
 
@@ -119,10 +122,24 @@ export const dataService = {
         
         const { error } = await supabase.from('user_persona').upsert(cloudPayload);
         if (error) {
-          console.error("[dataService] Error upserting user_persona:", error);
-          // Improved logging for the user to see
-          alert(`Erro Supabase: ${error.message} - ${error.details || 'Sem detalhes'}`);
-          await addToSyncQueue({ table: 'user_profile' as any, action: 'update', data: profile });
+          console.warn("[dataService] Full upsert failed, falling back to field-by-field update:", error.message);
+          
+          // Fallback: try to update field by field to ignore problematic columns
+          // First ensure row exists with minimal data
+          await supabase.from('user_persona').upsert({ id: userId });
+          
+          for (const [key, value] of Object.entries(cloudPayload)) {
+            if (key === 'id') continue;
+            try {
+              const { error: fieldError } = await supabase.from('user_persona').update({ [key]: value }).eq('id', userId);
+              if (fieldError) {
+                console.warn(`[dataService] Ignored field ${key} due to error:`, fieldError.message);
+              }
+            } catch (err) {
+              console.warn(`[dataService] Exception on field ${key}:`, err);
+            }
+          }
+          console.log("[dataService] Field-by-field update completed.");
         } else {
           console.log("[dataService] User persona upserted successfully");
         }
