@@ -92,12 +92,12 @@ export const dataService = {
       aniversario: profile.aniversario || null,
       idiomas: profile.idiomas || [],
       intercambio: profile.intercambio || null,
-      progresso_total: profile.progresso_total || 0,
-      progresso_obrigatorias: profile.progresso_obrigatorias || 0,
-      progresso_optativas: profile.progresso_optativas || 0,
+      progresso_total: Number(profile.progresso_total) || 0,
+      progresso_obrigatorias: Number(profile.progresso_obrigatorias) || 0,
+      progresso_optativas: Number(profile.progresso_optativas) || 0,
       mural_fotos: profile.mural_fotos || [],
       experiencias_lideranca: profile.experiencias_lideranca || [],
-      status_geral_integralizacao: profile.status_geral_integralizacao || 0,
+      status_geral_integralizacao: Number(profile.status_geral_integralizacao) || 0,
       cargos_academicos: profile.cargos_academicos || {},
       integralizacao_curriculo: profile.integralizacao_curriculo || {},
       curriculo_url: profile.curriculo_url || null,
@@ -113,6 +113,8 @@ export const dataService = {
       const { error } = await supabase.from('user_persona').upsert(cloudPayload);
       if (error) {
         console.error("[dataService] Error upserting user_persona:", error);
+        // Improved logging for the user to see
+        alert(`Erro Supabase: ${error.message} - ${error.details || 'Sem detalhes'}`);
         await addToSyncQueue({ table: 'user_profile' as any, action: 'update', data: profile });
       } else {
         console.log("[dataService] User persona upserted successfully");
