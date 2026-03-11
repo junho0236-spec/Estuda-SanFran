@@ -1744,6 +1744,8 @@ Forneça a explicação de forma concisa e didática.`;
         confidence_levels: currentConfidenceLevels,
         question_stats: newStats
       });
+      
+      setUserProgress(prev => prev ? { ...prev, question_stats: newStats } : null);
     } else {
       supabase.from('questions').update({ status: 'Errado' }).eq('id', targetQuestion.id).then();
       const newCount = wrongCount + 1;
@@ -1779,6 +1781,8 @@ Forneça a explicação de forma concisa e didática.`;
         confidence_levels: currentConfidenceLevels,
         question_stats: newStats
       });
+      
+      setUserProgress(prev => prev ? { ...prev, question_stats: newStats } : null);
     }
     setPendingAnswerIndex(null);
   };
