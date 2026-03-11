@@ -840,7 +840,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
         .from('user_progress')
         .select('*')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
       const payload = {
         user_id: userId,
@@ -1749,7 +1749,7 @@ Forneça a explicação de forma concisa e didática.`;
         question_stats: newStats
       });
       
-      setUserProgress(prev => prev ? { ...prev, question_stats: newStats } : null);
+      setUserProgress(prev => prev ? { ...prev, question_stats: newStats } : { question_stats: newStats });
     } else {
       supabase.from('questions').update({ status: 'Errado' }).eq('id', targetQuestion.id).then();
       const newCount = wrongCount + 1;
@@ -1786,7 +1786,7 @@ Forneça a explicação de forma concisa e didática.`;
         question_stats: newStats
       });
       
-      setUserProgress(prev => prev ? { ...prev, question_stats: newStats } : null);
+      setUserProgress(prev => prev ? { ...prev, question_stats: newStats } : { question_stats: newStats });
     }
     setPendingAnswerIndex(null);
   };
