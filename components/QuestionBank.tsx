@@ -367,7 +367,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
   const [generatingPrecedentId, setGeneratingPrecedentId] = useState<string | null>(null);
 
   const getXRayStats = (questionId: string) => {
-    const stats = userProgress?.question_stats?.[questionId];
+    const stats = questionStats[questionId];
     if (!stats) {
       return {
         totalAttempts: 0,
@@ -428,6 +428,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
   const [correctCount, setCorrectCount] = useState(0);
   const [wrongCount, setWrongCount] = useState(0);
   const [userProgress, setUserProgress] = useState<UserProgress | null>(null);
+  const [questionStats, setQuestionStats] = useState<Record<string, { totalAttempts: number, correctAttempts: number, lastAttemptCorrect: boolean }>>({});
   const [errorMastery, setErrorMastery] = useState<Record<string, number>>({});
   const [isErrorNotebookMode, setIsErrorNotebookMode] = useState(false);
   const [showAiLesson, setShowAiLesson] = useState(false);
@@ -770,6 +771,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
   useEffect(() => {
     fetchQuestions();
     fetchUserProgress();
+    fetchQuestionStats();
 
     if (userId) {
       const channel = supabase.channel(`user_progress_${userId}`)
@@ -802,6 +804,30 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
       };
     }
   }, [userId]);
+
+  const fetchQuestionStats = async () => {
+    if (!userId) return;
+    try {
+      const { data, error } = await supabase
+        .from('user_question_stats')
+        .select('*')
+        .eq('user_id', userId);
+      
+      if (!error && data) {
+        const statsMap: Record<string, any> = {};
+        data.forEach(row => {
+          statsMap[row.question_id] = {
+            totalAttempts: row.total_attempts,
+            correctAttempts: row.correct_attempts,
+            lastAttemptCorrect: row.last_attempt_correct
+          };
+        });
+        setQuestionStats(statsMap);
+      }
+    } catch (err) {
+      console.error('Error fetching question stats:', err);
+    }
+  };
 
   const fetchUserProgress = async () => {
     try {
@@ -858,7 +884,6 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
         wrong_count: updates.wrongCount !== undefined ? updates.wrongCount : (current?.wrong_count || wrongCount),
         error_mastery: updates.errorMastery !== undefined ? updates.errorMastery : (current?.error_mastery || errorMastery),
         confidence_levels: updates.confidence_levels !== undefined ? updates.confidence_levels : (current?.confidence_levels || userProgress?.confidence_levels || {}),
-        question_stats: updates.question_stats !== undefined ? updates.question_stats : (current?.question_stats || userProgress?.question_stats || {}),
         updated_at: new Date().toISOString()
       };
 
@@ -1738,26 +1763,35 @@ Forneça a explicação de forma concisa e didática.`;
       
       const currentConfidenceLevels = { ...(userProgress?.confidence_levels || {}), [targetQuestion.id]: level };
       
-      // Update question stats
-      const newStats = { ...(userProgress?.question_stats || {}) };
-      const qStats = newStats[targetQuestion.id] || { correctAttempts: 0, totalAttempts: 0, lastAttemptCorrect: false };
+      // Update question stats in new table
+      const currentStat = questionStats[targetQuestion.id] || { totalAttempts: 0, correctAttempts: 0, lastAttemptCorrect: false };
       const isCorrect = index === targetQuestion.correct_answer;
-      newStats[targetQuestion.id] = {
-        correctAttempts: isCorrect ? qStats.correctAttempts + 1 : qStats.correctAttempts,
-        totalAttempts: qStats.totalAttempts + 1,
+      const newStat = {
+        totalAttempts: currentStat.totalAttempts + 1,
+        correctAttempts: isCorrect ? currentStat.correctAttempts + 1 : currentStat.correctAttempts,
         lastAttemptCorrect: isCorrect
       };
+      
+      setQuestionStats(prev => ({ ...prev, [targetQuestion.id]: newStat }));
+      
+      supabase.from('user_question_stats').upsert({
+        user_id: userId,
+        question_id: targetQuestion.id,
+        total_attempts: newStat.totalAttempts,
+        correct_attempts: newStat.correctAttempts,
+        last_attempt_correct: newStat.lastAttemptCorrect,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id, question_id' }).then(({ error }) => {
+        if (error) console.error('Error saving question stat:', error);
+      });
 
       syncUserProgress({ 
         correctCount: newCount, 
         wrongQuestions: newWrong, 
         correctQuestions: newCorrect,
         errorMastery: newMastery,
-        confidence_levels: currentConfidenceLevels,
-        question_stats: newStats
+        confidence_levels: currentConfidenceLevels
       });
-      
-      setUserProgress(prev => prev ? { ...prev, question_stats: newStats } : { question_stats: newStats });
     } else {
       supabase.from('questions').update({ status: 'Errado' }).eq('id', targetQuestion.id).then();
       const newCount = wrongCount + 1;
@@ -1777,24 +1811,33 @@ Forneça a explicação de forma concisa e didática.`;
       
       const currentConfidenceLevels = { ...(userProgress?.confidence_levels || {}), [targetQuestion.id]: level };
 
-      // Update question stats
-      const newStats = { ...(userProgress?.question_stats || {}) };
-      const qStats = newStats[targetQuestion.id] || { correctAttempts: 0, totalAttempts: 0, lastAttemptCorrect: false };
-      newStats[targetQuestion.id] = {
-        correctAttempts: qStats.correctAttempts,
-        totalAttempts: qStats.totalAttempts + 1,
+      // Update question stats in new table
+      const currentStat = questionStats[targetQuestion.id] || { totalAttempts: 0, correctAttempts: 0, lastAttemptCorrect: false };
+      const newStat = {
+        totalAttempts: currentStat.totalAttempts + 1,
+        correctAttempts: currentStat.correctAttempts,
         lastAttemptCorrect: false
       };
+      
+      setQuestionStats(prev => ({ ...prev, [targetQuestion.id]: newStat }));
+      
+      supabase.from('user_question_stats').upsert({
+        user_id: userId,
+        question_id: targetQuestion.id,
+        total_attempts: newStat.totalAttempts,
+        correct_attempts: newStat.correctAttempts,
+        last_attempt_correct: newStat.lastAttemptCorrect,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id, question_id' }).then(({ error }) => {
+        if (error) console.error('Error saving question stat:', error);
+      });
 
       syncUserProgress({ 
         wrongCount: newCount, 
         wrongQuestions: newWrong,
         errorMastery: newMastery,
-        confidence_levels: currentConfidenceLevels,
-        question_stats: newStats
+        confidence_levels: currentConfidenceLevels
       });
-      
-      setUserProgress(prev => prev ? { ...prev, question_stats: newStats } : { question_stats: newStats });
     }
     setPendingAnswerIndex(null);
   };
