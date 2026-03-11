@@ -6,7 +6,7 @@ import {
   AlertTriangle, Github, Linkedin, Twitter, Globe, Save,
   GraduationCap, BookOpen, Trophy, Star, ShieldCheck,
   History, UserCheck, ToggleLeft, ToggleRight, Share2, X, Users,
-  MapPin, Calendar, Languages, Plane, FileText, Image as ImageIcon, Heart, Briefcase, GraduationCap as GradIcon, Search, RefreshCw
+  MapPin, Calendar, Languages, Plane, FileText, Image as ImageIcon, Heart, Briefcase, GraduationCap as GradIcon, Search, RefreshCw, Plus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dataService } from '../services/dataService';
@@ -26,6 +26,7 @@ const Profile: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [showAiModal, setShowAiModal] = useState(false);
+  const [selectedFoto, setSelectedFoto] = useState<{ url: string; caption?: string; date?: string } | null>(null);
   const [showConfirmClear, setShowConfirmClear] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -190,8 +191,8 @@ const Profile: React.FC = () => {
             turma: data.turma || profile.turma,
             progresso_obrigatorias: data.progresso_obrigatorias || profile.progresso_obrigatorias,
             progresso_optativas: data.progresso_optativas || profile.progresso_optativas,
+            progresso_total: data.progresso_total || profile.progresso_total,
             status_geral_integralizacao: data.status_geral_integralizacao || profile.status_geral_integralizacao,
-            progresso_curso: data.status_geral_integralizacao || profile.progresso_curso, // Sync main progress too
             aniversario: data.aniversario || profile.aniversario,
           };
           
@@ -382,20 +383,77 @@ const Profile: React.FC = () => {
               <div className="p-2 bg-blue-100 dark:bg-blue-900/20 text-blue-600 rounded-xl">
                 <GradIcon size={18} />
               </div>
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Avanço no Curso</h3>
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Progresso Total</h3>
             </div>
             <div className="space-y-2">
               <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500">
-                <span>Progresso</span>
-                <span>{profile?.progresso_curso || 0}%</span>
+                <span>Integralização</span>
+                <span>{profile?.progresso_total || 0}%</span>
               </div>
               <div className="h-2 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
                 <motion.div 
                   initial={{ width: 0 }}
-                  animate={{ width: `${profile?.progresso_curso || 0}%` }}
+                  animate={{ width: `${profile?.progresso_total || 0}%` }}
                   className="h-full bg-blue-500 rounded-full"
                 />
               </div>
+            </div>
+          </div>
+          
+          <div className="bg-white dark:bg-white/5 p-6 rounded-3xl border border-slate-200 dark:border-white/10 shadow-lg">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 rounded-xl">
+                <CheckCircle2 size={18} />
+              </div>
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Obrigatórias</h3>
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500">
+                <span>Concluído</span>
+                <span>{profile?.progresso_obrigatorias || 0}%</span>
+              </div>
+              <div className="h-2 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${profile?.progresso_obrigatorias || 0}%` }}
+                  className="h-full bg-emerald-500 rounded-full"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-white/5 p-6 rounded-3xl border border-slate-200 dark:border-white/10 shadow-lg">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-amber-100 dark:bg-amber-900/20 text-amber-600 rounded-xl">
+                <BookOpen size={18} />
+              </div>
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Optativas</h3>
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500">
+                <span>Concluído</span>
+                <span>{profile?.progresso_optativas || 0}%</span>
+              </div>
+              <div className="h-2 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${profile?.progresso_optativas || 0}%` }}
+                  className="h-full bg-amber-500 rounded-full"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-white/5 p-6 rounded-3xl border border-slate-200 dark:border-white/10 shadow-lg">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-sanfran-rubi/10 text-sanfran-rubi rounded-xl">
+                <ShieldCheck size={18} />
+              </div>
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Status Integralização</h3>
+            </div>
+            <div className="flex items-end gap-2">
+              <span className="text-2xl font-serif font-bold text-sanfran-rubi">{profile?.status_geral_integralizacao || 0}%</span>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Concluído</span>
             </div>
           </div>
 
@@ -573,8 +631,39 @@ const Profile: React.FC = () => {
                 <h2 className="text-2xl font-serif font-bold text-sanfran-rubi dark:text-white">Mural de Memórias</h2>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Momentos Vividos no Largo</p>
               </div>
-              <div className="p-3 bg-pink-50 text-pink-600 rounded-2xl">
-                <Heart size={24} />
+              <div className="flex items-center gap-2">
+                <label className="p-3 bg-sanfran-rubi text-white rounded-2xl cursor-pointer hover:bg-sanfran-rubi/90 transition-all shadow-lg shadow-red-900/20">
+                  <Plus size={24} />
+                  <input 
+                    type="file" 
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file && session?.user) {
+                        try {
+                          setLoading(true);
+                          const path = `${session.user.id}/mural_${Date.now()}_${file.name}`;
+                          const url = await dataService.uploadFile(file, path);
+                          const newFoto = { url, caption: '', date: new Date().toISOString() };
+                          const updatedProfile = {
+                            ...profile,
+                            mural_fotos: [...(profile?.mural_fotos || []), newFoto]
+                          };
+                          await dataService.saveUserProfile(updatedProfile, session.user.id, navigator.onLine);
+                          setProfile(updatedProfile);
+                        } catch (err) {
+                          console.error(err);
+                        } finally {
+                          setLoading(false);
+                        }
+                      }
+                    }}
+                  />
+                </label>
+                <div className="p-3 bg-pink-50 text-pink-600 rounded-2xl">
+                  <Heart size={24} />
+                </div>
               </div>
             </div>
 
@@ -584,7 +673,8 @@ const Profile: React.FC = () => {
                   key={idx}
                   whileHover={{ scale: 1.05, zIndex: 10, rotate: 0 }}
                   initial={{ rotate: (idx % 2 === 0 ? -3 : 3) }}
-                  className="bg-white p-3 pb-8 shadow-xl border border-slate-100 transform transition-all cursor-pointer"
+                  onClick={() => setSelectedFoto(foto)}
+                  className="bg-white p-3 pb-8 shadow-xl border border-slate-100 transform transition-all cursor-pointer rounded-sm"
                 >
                   <div className="aspect-square overflow-hidden mb-3">
                     <img src={foto.url} alt={foto.caption} className="w-full h-full object-cover" />
@@ -595,7 +685,6 @@ const Profile: React.FC = () => {
                 <div className="col-span-full py-20 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-white/10 rounded-[2rem]">
                   <ImageIcon size={48} className="text-slate-200 dark:text-white/10 mb-4" />
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nenhuma polaroide no mural</p>
-                  <button onClick={() => setIsEditing(true)} className="mt-4 text-xs font-bold text-sanfran-rubi hover:underline">Adicionar Fotos</button>
                 </div>
               )}
             </div>
@@ -754,6 +843,69 @@ const Profile: React.FC = () => {
               </div>
             </div>
           </div>
+
+        {/* 📝 MODAL DE FOTO */}
+        <AnimatePresence>
+          {selectedFoto && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setSelectedFoto(null)}
+                className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+              />
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="relative w-full max-w-lg bg-white dark:bg-sanfran-rubiBlack rounded-[2.5rem] border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden"
+              >
+                <div className="p-8 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Memória</h2>
+                    <button onClick={() => setSelectedFoto(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded-full transition-colors">
+                      <X size={20} className="text-slate-400" />
+                    </button>
+                  </div>
+                  <img src={selectedFoto.url} className="w-full h-64 object-cover rounded-2xl" />
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Legenda</label>
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        value={selectedFoto.caption || ''}
+                        onChange={(e) => setSelectedFoto({...selectedFoto, caption: e.target.value})}
+                        className="flex-1 px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
+                      />
+                      <button 
+                        onClick={async () => {
+                          const caption = await geminiService.suggestPhotoCaption(selectedFoto.url);
+                          setSelectedFoto({...selectedFoto, caption: caption || ''});
+                        }}
+                        className="p-3 bg-sanfran-rubi/10 text-sanfran-rubi rounded-2xl hover:bg-sanfran-rubi/20"
+                      >
+                        <Zap size={20} />
+                      </button>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={async () => {
+                      const newFotos = profile?.mural_fotos?.map(f => f.url === selectedFoto.url ? selectedFoto : f);
+                      const updatedProfile = { ...profile, mural_fotos: newFotos };
+                      await dataService.saveUserProfile(updatedProfile, session?.user?.id || '', navigator.onLine);
+                      setProfile(updatedProfile);
+                      setSelectedFoto(null);
+                    }}
+                    className="w-full py-4 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-red-900/20"
+                  >
+                    Salvar Legenda
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
         {/* 📝 MODAL DE EDIÇÃO */}
       <AnimatePresence>

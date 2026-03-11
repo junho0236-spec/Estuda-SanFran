@@ -9,6 +9,7 @@ import Scratchpad from './components/Scratchpad';
 import { supabase } from './services/supabaseClient';
 import { db } from './services/offlineService';
 import { dataService } from './services/dataService';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Lazy Load dos Componentes para Performance (Code Splitting)
 const Dashboard = React.lazy(() => import('./components/Dashboard'));
@@ -1069,6 +1070,7 @@ const App: React.FC = () => {
           )}
           <div className={`${isExtremeFocus ? 'max-w-none h-full flex items-center justify-center' : 'max-w-6xl mx-auto h-full'}`}>
              <Suspense fallback={<PageLoader />}>
+<ErrorBoundary>
 <Routes>
                 <Route path={getPathFromView(View.Dashboard)} element={
                   <Dashboard 
@@ -1283,6 +1285,7 @@ const App: React.FC = () => {
                 <Route path="/simulados" element={<QuestionBank userId={session.user.id} onCorrectAnswer={incrementCorrectQuestions} folders={folders} flashcards={flashcards} />} />
 
               </Routes>
+</ErrorBoundary>
              </Suspense>
           </div>
         </main>

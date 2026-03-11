@@ -326,6 +326,7 @@ export const geminiService = {
       - progresso_optativas: Porcentagem de Optativas concluídas (0-100)
       - progresso_total: Porcentagem de Progresso Total no curso (0-100)
       - status_geral_integralizacao: Status Geral de Integralização (0-100)
+      - aniversario: Data de nascimento (se disponível)
       - trajetoria: Objeto contendo booleanos para:
         - monitoria: se há registros de monitoria
         - pesquisa: se há registros de iniciação científica/pesquisa

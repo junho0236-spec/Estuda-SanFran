@@ -490,15 +490,15 @@ export interface UserProfile {
   turma?: number;
   sala?: string;
   aniversario?: string;
-  progresso_curso?: number;
+  idiomas?: string[];
+  intercambio?: string;
   progresso_total?: number;
   progresso_obrigatorias?: number;
   progresso_optativas?: number;
   status_geral_integralizacao?: number;
   mural_fotos?: { url: string; caption?: string; date?: string }[];
+  experiencias_lideranca?: { cargo: string; instituicao: string; periodo: string }[];
   memorias?: string;
-  idiomas?: string[];
-  intercambio?: string;
   cargos_academicos?: {
     monitoria?: string[];
     pesquisa?: string[];
