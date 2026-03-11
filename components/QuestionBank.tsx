@@ -1443,6 +1443,7 @@ Forneça a explicação de forma concisa e didática.`;
 
       if (allGeneratedQuestions.length > 0) {
         const sanitizedInitialQuestions = allGeneratedQuestions.map((q: any) => ({
+          user_id: userId,
           subject: q.subject,
           topic: q.topic,
           statement: q.statement,
