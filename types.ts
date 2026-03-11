@@ -483,6 +483,34 @@ export interface UserProfile {
   };
   tags: string[];
   arcadia_score: number;
+  full_name?: string;
+  bio?: string;
+  avatar_url?: string;
+  turma_ano?: number;
+  turma?: number;
+  sala?: string;
+  aniversario?: string;
+  progresso_curso?: number;
+  progresso_obrigatorias?: number;
+  progresso_optativas?: number;
+  status_geral_integralizacao?: number;
+  mural_fotos?: { url: string; caption?: string; date?: string }[];
+  memorias?: string;
+  idiomas?: string[];
+  intercambio?: string;
+  cargos_academicos?: {
+    monitoria?: string[];
+    pesquisa?: string[];
+    pites?: string[];
+    diretoria?: string[];
+    coordenacao?: string[];
+  };
+  integralizacao_curriculo?: Record<string, boolean>;
+  curriculo_url?: string;
+  badges?: string[];
+  social_links?: Record<string, string>;
+  persona_mode?: boolean;
+  visibility?: 'public' | 'friends' | 'private';
   last_updated?: string;
   lastInteractionDate?: string;
   productivityStats?: {

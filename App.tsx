@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
 import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map as MapIcon, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck, BookX, ScrollText, FileText, Repeat, UserX, ListTodo, Handshake, Eye, Key, CalendarCheck, Loader2, BarChart3, Search, Command } from 'lucide-react';
-import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel, StudyMode, Board } from './types';
+import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel, StudyMode, Board, Notification, Friendship } from './types';
 import Login from './components/Login';
 import Atmosphere from './components/Atmosphere';
 import Scratchpad from './components/Scratchpad';
@@ -765,8 +765,6 @@ const App: React.FC = () => {
     }
   };
 
-  if (!isAuthenticated) return <Login onLogin={() => setIsAuthenticated(true)} />;
-
   // ATUALIZAÇÃO DA NAV BAR - PROMOVENDO OS RAMOS ESSENCIAIS
   const navItems = [
     { id: View.Dashboard, icon: LayoutDashboard, label: 'Painel', color: 'text-slate-600', bg: 'bg-slate-100' },
@@ -811,7 +809,53 @@ const App: React.FC = () => {
   const isHelpChild = [View.PrescriptionCalculator, View.SucessaoSimulator, View.InvestigationBoard, View.Checklist, View.Honorarios, View.Dosimetria, View.Petitum, View.CitationGenerator, View.DeadlineCalculator, View.LegalSimplifier].includes(currentView);
 
   // Helper to check if current view is a child of SanFran OAB
-  const isOABChild = [View.OabCountdown].includes(currentView);
+  const isOABChild = [View.OabCountdown, View.Specialization].includes(currentView);
+
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [friends, setFriends] = useState<Friendship[]>([]);
+
+  // Fetch notifications and friends
+  useEffect(() => {
+    const fetchColabData = async () => {
+      if (session?.user?.id) {
+        const [notifs, frnds] = await Promise.all([
+          dataService.getNotifications(session.user.id),
+          dataService.getFriends(session.user.id)
+        ]);
+        setNotifications(notifs);
+        setFriends(frnds);
+      }
+    };
+    fetchColabData();
+
+    // Set up real-time subscription for notifications
+    if (session?.user?.id) {
+      const channel = supabase
+        .channel('public:notifications')
+        .on('postgres_changes', { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'notifications',
+          filter: `user_id=eq.${session.user.id}`
+        }, (payload) => {
+          setNotifications(prev => [payload.new as Notification, ...prev]);
+        })
+        .subscribe();
+      
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [session?.user?.id]);
+
+  const handleNotificationClick = (notification: Notification) => {
+    if (notification.link_task) {
+      // Navigate to tasks and select the task
+      setCurrentView(View.Checklist);
+      // We might need a way to tell TaskMasterDetail to select this task
+      // For now, let's just navigate.
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -832,6 +876,8 @@ const App: React.FC = () => {
       console.error("Erro ao encerrar sessão:", err);
     }
   };
+
+  if (!isAuthenticated) return <Login onLogin={() => setIsAuthenticated(true)} />;
 
   return (
     <div className={`flex h-screen overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#fcfcfc]'}`}>
@@ -1000,7 +1046,12 @@ const App: React.FC = () => {
         <main className={`flex-1 overflow-y-auto ${isExtremeFocus ? 'p-0' : 'p-4 md:p-10'} relative transition-all duration-700`}>
           {!isExtremeFocus && (
             <div className="flex justify-end mb-6">
-              <HeaderActions />
+              <HeaderActions 
+                notifications={notifications} 
+                userId={session?.user?.id || ''}
+                onNotificationClick={handleNotificationClick}
+                onMarkAllRead={() => setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))}
+              />
             </div>
           )}
           {/* Offline Indicator */}

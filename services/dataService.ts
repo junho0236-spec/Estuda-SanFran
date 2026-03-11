@@ -47,9 +47,31 @@ export const dataService = {
         scores: profile.scores,
         matrix: profile.matrix,
         tags: profile.tags,
-        answeredQuestionIds: profile.answeredQuestionIds
+        answeredQuestionIds: profile.answeredQuestionIds,
+        persona_mode: profile.persona_mode,
+        visibility: profile.visibility
       },
-      profile_completion: profile.arcadia_score || 0
+      profile_completion: profile.arcadia_score || 0,
+      full_name: profile.full_name || null,
+      bio: profile.bio || null,
+      avatar_url: profile.avatar_url || null,
+      turma_ano: profile.turma_ano || null,
+      turma: profile.turma || null,
+      sala: profile.sala || null,
+      aniversario: profile.aniversario || null,
+      progresso_curso: profile.progresso_curso || 0,
+      progresso_obrigatorias: profile.progresso_obrigatorias || 0,
+      progresso_optativas: profile.progresso_optativas || 0,
+      status_geral_integralizacao: profile.status_geral_integralizacao || 0,
+      mural_fotos: profile.mural_fotos || [],
+      memorias: profile.memorias || null,
+      idiomas: profile.idiomas || [],
+      intercambio: profile.intercambio || null,
+      cargos_academicos: profile.cargos_academicos || {},
+      integralizacao_curriculo: profile.integralizacao_curriculo || {},
+      curriculo_url: profile.curriculo_url || null,
+      badges: profile.badges || [],
+      social_links: profile.social_links || {}
     };
 
     await db.user_profile.put({ ...profile, id: userId });
@@ -73,6 +95,23 @@ export const dataService = {
           ...data.persona_data,
           id: data.id,
           arcadia_score: data.profile_completion,
+          full_name: data.full_name,
+          bio: data.bio,
+          avatar_url: data.avatar_url,
+          turma_ano: data.turma_ano,
+          turma: data.turma,
+          sala: data.sala,
+          aniversario: data.aniversario,
+          progresso_curso: data.progresso_curso,
+          mural_fotos: data.mural_fotos,
+          memorias: data.memorias,
+          idiomas: data.idiomas,
+          intercambio: data.intercambio,
+          cargos_academicos: data.cargos_academicos,
+          integralizacao_curriculo: data.integralizacao_curriculo,
+          curriculo_url: data.curriculo_url,
+          badges: data.badges,
+          social_links: data.social_links,
           last_updated: data.updated_at
         };
         await db.user_profile.put(profile);
@@ -80,6 +119,35 @@ export const dataService = {
       }
     }
     return local;
+  },
+
+  async saveDisciplinas(disciplinas: any[], userId: string) {
+    // First, delete existing disciplines for this user to avoid duplicates
+    await supabase.from('disciplinas').delete().eq('user_id', userId);
+    
+    // Then insert new ones
+    if (disciplinas.length > 0) {
+      const payload = disciplinas.map(d => ({
+        user_id: userId,
+        codigo: d.codigo,
+        nome: d.nome,
+        turma_sala: d.turma_sala,
+        horarios: d.horarios
+      }));
+
+      const { error } = await supabase.from('disciplinas').insert(payload);
+      if (error) throw error;
+    }
+  },
+
+  async clearCloudHistory(userId: string) {
+    // Delete tasks and tasks_history from Supabase
+    const { error: tasksError } = await supabase.from('tasks').delete().eq('user_id', userId);
+    const { error: historyError } = await supabase.from('tasks_history').delete().eq('user_id', userId);
+    
+    if (tasksError || historyError) {
+      throw new Error("Erro ao limpar histórico na nuvem");
+    }
   },
   // FOLDERS
   async saveFolder(folder: Folder, userId: string, isOnline: boolean) {

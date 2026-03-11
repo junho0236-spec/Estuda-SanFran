@@ -1,11 +1,27 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { HelpCircle, Bell, ChevronDown, User, Settings, LogOut, ShieldAlert } from 'lucide-react';
+import { HelpCircle, Bell, ChevronDown, User, Settings, LogOut, ShieldAlert, CheckCircle2, UserPlus } from 'lucide-react';
+import { Notification } from '../types';
+import { dataService } from '../services/dataService';
 
-const HeaderActions: React.FC = () => {
+interface HeaderActionsProps {
+  notifications: Notification[];
+  userId: string;
+  onNotificationClick: (notification: Notification) => void;
+  onMarkAllRead: () => void;
+}
+
+const HeaderActions: React.FC<HeaderActionsProps> = ({ 
+  notifications, 
+  userId, 
+  onNotificationClick,
+  onMarkAllRead
+}) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
+
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -21,6 +37,27 @@ const HeaderActions: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const handleToggleNotifications = async () => {
+    const newState = !isNotificationsOpen;
+    setIsNotificationsOpen(newState);
+    setIsDropdownOpen(false);
+
+    if (newState && unreadCount > 0) {
+      // Mark as read when opening
+      await dataService.markAllNotificationsAsRead(userId);
+      onMarkAllRead();
+    }
+  };
+
+  const getIcon = (type?: string) => {
+    switch (type) {
+      case 'completed': return <CheckCircle2 size={16} className="text-emerald-500" />;
+      case 'friend_request': return <UserPlus size={16} className="text-blue-500" />;
+      case 'delegated': return <ShieldAlert size={16} className="text-amber-500" />;
+      default: return <Bell size={16} className="text-slate-400" />;
+    }
+  };
+
   return (
     <div className="flex items-center gap-4 p-2.5 bg-[#FFFFF0]/80 backdrop-blur-xl rounded-full border border-white/40 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8),0_4px_15px_rgba(0,0,0,0.05)] relative z-50">
       {/* Help */}
@@ -31,10 +68,7 @@ const HeaderActions: React.FC = () => {
       {/* Notifications */}
       <div className="relative" ref={notifRef}>
         <button 
-          onClick={() => {
-            setIsNotificationsOpen(!isNotificationsOpen);
-            setIsDropdownOpen(false);
-          }}
+          onClick={handleToggleNotifications}
           className={`relative w-11 h-11 rounded-full border flex items-center justify-center transition-all active:scale-95 ${
             isNotificationsOpen 
               ? 'bg-slate-100 border-slate-300 shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)] text-[#800000]' 
@@ -42,9 +76,11 @@ const HeaderActions: React.FC = () => {
           }`}
         >
           <Bell size={20} className={isNotificationsOpen ? 'fill-[#800000]/10' : ''} />
-          <span className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-b from-[#A00000] to-[#600000] text-[#FFFFF0] text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-[#FFFFF0] shadow-sm">
-            3
-          </span>
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-b from-[#A00000] to-[#600000] text-[#FFFFF0] text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-[#FFFFF0] shadow-sm">
+              {unreadCount}
+            </span>
+          )}
         </button>
 
         {/* Notifications Dropdown */}
@@ -52,28 +88,40 @@ const HeaderActions: React.FC = () => {
           <div className="absolute right-0 mt-4 w-80 bg-[#FFFFF0]/95 backdrop-blur-2xl rounded-2xl shadow-[0_20px_40px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] p-2 z-50 transform origin-top-right transition-all animate-in fade-in zoom-in-95 duration-200">
             <div className="px-4 py-3 border-b border-slate-200/50 flex justify-between items-center">
               <h3 className="font-serif font-bold text-slate-900">Notificações</h3>
-              <span className="text-xs font-bold text-[#800000] bg-red-50 px-2 py-1 rounded-full">3 Novas</span>
+              {unreadCount > 0 && (
+                <span className="text-xs font-bold text-[#800000] bg-red-50 px-2 py-1 rounded-full">{unreadCount} Novas</span>
+              )}
             </div>
-            <div className="py-2 space-y-1">
-              <div className="px-4 py-3 hover:bg-white rounded-xl cursor-pointer transition-colors flex gap-3 relative overflow-hidden group">
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#800000] rounded-r-full"></div>
-                <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center text-[#800000] shrink-0">
-                  <ShieldAlert size={16} />
+            <div className="py-2 max-h-[400px] overflow-y-auto custom-scrollbar">
+              {notifications.length > 0 ? (
+                notifications.map(notif => (
+                  <div 
+                    key={notif.id}
+                    onClick={() => {
+                      onNotificationClick(notif);
+                      setIsNotificationsOpen(false);
+                    }}
+                    className="px-4 py-3 hover:bg-white rounded-xl cursor-pointer transition-colors flex gap-3 relative overflow-hidden group"
+                  >
+                    {!notif.is_read && <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#800000] rounded-r-full"></div>}
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${!notif.is_read ? 'bg-red-50' : 'bg-slate-100'}`}>
+                      {getIcon(notif.type)}
+                    </div>
+                    <div>
+                      <p className={`text-sm ${!notif.is_read ? 'font-bold text-slate-900' : 'font-medium text-slate-600'}`}>
+                        {notif.message}
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        {new Date(notif.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="px-4 py-8 text-center text-slate-400 text-xs font-medium">
+                  Nenhuma notificação por aqui.
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">Prazo Urgente</p>
-                  <p className="text-xs text-slate-500 mt-0.5">Petição Inicial - Civil III vence hoje.</p>
-                </div>
-              </div>
-              <div className="px-4 py-3 hover:bg-white rounded-xl cursor-pointer transition-colors flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
-                  <Bell size={16} />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">Nova Jurisprudência</p>
-                  <p className="text-xs text-slate-500 mt-0.5">STF atualizou entendimento sobre o tema.</p>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         )}

@@ -1,402 +1,49 @@
-import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
-import { supabase } from '../services/supabaseClient';
+import { GoogleGenAI, Type } from "@google/genai";
 
-export const GEMINI_MODEL = 'gemini-3.1-flash-lite-preview';
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
-// Inicializa o cliente Google GenAI de forma preguiçosa (lazy)
-let aiInstance: GoogleGenAI | null = null;
+export const GEMINI_MODEL = "gemini-3.1-pro-preview";
+const FLASH_MODEL = "gemini-3-flash-preview";
 
-const getApiKey = (): string => {
-  // Priorizar a chave selecionada pelo usuário no AI Studio (process.env.API_KEY)
-  // Se não houver, tenta a variável de ambiente do Vite (VITE_API_KEY) ou a padrão (GEMINI_API_KEY)
-  const key = (process.env as any).API_KEY || (import.meta as any).env.VITE_API_KEY || (process.env as any).GEMINI_API_KEY;
-  
-  if (!key) {
-    console.warn("Gemini Service: Nenhuma chave de API encontrada (API_KEY, VITE_API_KEY ou GEMINI_API_KEY).");
-  }
+export const geminiService = {
+  generateFlashcards: async (
+    text: string, 
+    subject: string, 
+    count: number = 5, 
+    type: string = 'front-back',
+    extraInstructions: string = '',
+    files: { data: string, mimeType: string }[] = [],
+    urls: string[] = [],
+    difficulty: string = 'medium',
+    format: string = 'standard',
+    sourceType: string = 'text',
+    includeMnemonics: boolean = false
+  ) => {
+    const prompt = `
+      Gere ${count} flashcards de estudo sobre "${subject}" baseados no seguinte conteúdo:
+      "${text}"
+      
+      Tipo: ${type}
+      Dificuldade: ${difficulty}
+      Instruções extras: ${extraInstructions}
+      Incluir mnemônicos: ${includeMnemonics ? 'Sim' : 'Não'}
+      
+      Retorne um array de objetos JSON com: front, back, difficulty, tags, e mnemonic (se solicitado).
+    `;
 
-  return key || "";
-};
-
-const getAiClient = () => {
-  if (!aiInstance) {
-    const apiKey = getApiKey();
-    // A chamada falhará com erro claro se a chave estiver faltando.
-    aiInstance = new GoogleGenAI({ apiKey: apiKey || "missing_key" });
-  }
-  return aiInstance;
-};
-
-/**
- * Retorna a chave de API configurada no ambiente (para debug se necessário).
- */
-export const getSafeApiKey = (): string | null => {
-  const key = getApiKey();
-  return key ? `${key.substring(0, 4)}...` : null;
-};
-
-export interface GeminiFile {
-  data: string; // base64 encoded string
-  mimeType: string;
-}
-
-/**
- * Gera um hash SHA-256 para uma string (usado para cache).
- */
-const generateHash = async (text: string): Promise<string> => {
-  const msgUint8 = new TextEncoder().encode(text);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  return hashHex;
-};
-
-const buildFlashcardPromptParts = (
-  text: string, 
-  subjectName: string, 
-  quantity: number, 
-  cardType: string, 
-  customInstructions: string,
-  files: GeminiFile[],
-  urls: string[],
-  difficulty: string,
-  format: string,
-  sourceType: string,
-  includeMnemonics: boolean,
-  frontLength: 'curta' | 'normal' | 'extensa' = 'normal',
-  backLength: 'curta' | 'normal' | 'extensa' = 'normal'
-) => {
-  let typeInstruction = '';
-  switch (cardType) {
-    case 'Conceitos':
-      typeInstruction = 'Foque estritamente em definir conceitos jurídicos, princípios e institutos mencionados no texto.';
-      break;
-    case 'Prazos e Números':
-      typeInstruction = 'Foque exclusivamente em prazos processuais, prescricionais, decadenciais, quóruns, maiorias e outros números relevantes.';
-      break;
-    case 'Exceções':
-      typeInstruction = 'Foque nas exceções à regra geral, ressalvas e casos especiais mencionados no texto.';
-      break;
-    case 'Súmulas e Jurisprudência':
-      typeInstruction = 'Foque no entendimento jurisprudencial, súmulas e teses fixadas mencionadas no texto.';
-      break;
-    case 'Casos Hipotéticos':
-    case 'Casos Práticos':
-      typeInstruction = 'Crie casos práticos hipotéticos complexos no estilo da prova da OAB ou concursos de alto nível. A pergunta (front) deve apresentar uma situação fática detalhada ("Mévio fez X, Tício fez Y...") e questionar a consequência jurídica. A resposta (back) deve dar a solução fundamentada na lei e jurisprudência.';
-      break;
-    default:
-      typeInstruction = 'Foque em conceitos-chave, prazos, exceções ou princípios de forma equilibrada.';
-  }
-
-  let sourceInstruction = '';
-  switch (sourceType) {
-    case 'Letra da Lei':
-      sourceInstruction = 'O texto é "Letra da Lei". Foque intensamente em prazos, exceções, quóruns e palavras-chave restritivas ou ampliativas (ex: "salvo", "independentemente", "exclusivamente").';
-      break;
-    case 'Doutrina':
-      sourceInstruction = 'O texto é "Doutrina". Foque em teorias, classificações, divergências doutrinárias e conceitos acadêmicos.';
-      break;
-    case 'Jurisprudência':
-      sourceInstruction = 'O texto é "Jurisprudência/Acórdão". Foque na Tese Fixada, Ratio Decidendi, Súmulas relacionadas e o entendimento predominante dos tribunais superiores (STF/STJ).';
-      break;
-    default:
-      sourceInstruction = 'Trate o texto de forma equilibrada entre lei, doutrina e jurisprudência.';
-  }
-
-  const formatInstruction = format === 'Cloze' 
-    ? 'Use o formato CLOZE (Omissão de Palavras). Na frente (front), coloque a frase com a palavra ou termo omitido entre colchetes, ex: "A prescrição ocorre em [...] anos.". No verso (back), coloque apenas o termo omitido.'
-    : 'Use o formato BÁSICO: Uma pergunta ou conceito na frente (front) e a resposta ou definição no verso (back).';
-
-  const difficultyInstruction = `O nível de complexidade deve ser: ${difficulty}. 
-    - Iniciante: Linguagem simples, conceitos fundamentais.
-    - Graduação: Linguagem técnica acadêmica, doutrina clássica.
-    - Concurso/OAB: Foco em "pegadinhas", letra da lei e jurisprudência pesada.`;
-
-  const mnemonicInstruction = includeMnemonics 
-    ? 'Sempre que houver uma lista de requisitos, princípios ou elementos, tente criar um mnemônico criativo (sigla ou frase) e inclua-o no final da resposta (back).'
-    : '';
-
-  const lengthInstruction = `
-    - Comprimento da Pergunta (front): ${frontLength === 'curta' ? 'Extremamente curta e direta (estilo flashcard atômico).' : frontLength === 'extensa' ? 'Extensa e detalhada (estilo caso prático ou enunciado longo).' : 'Tamanho normal e equilibrado.'}
-    - Comprimento da Resposta (back): ${backLength === 'curta' ? 'Extremamente curta, focada apenas no termo ou conceito essencial.' : backLength === 'extensa' ? 'Extensa, detalhada, com explicações completas e fundamentação.' : 'Tamanho normal, didática e objetiva.'}
-  `;
-
-  const parts: any[] = [];
-  
-  // Adiciona o prompt principal
-  parts.push({
-    text: `Você é um professor de Direito da USP especialista em concursos e OAB. Sua tarefa é criar materiais de estudo ativo de alto nível.
-    
-    Analise o conteúdo fornecido (texto, arquivos ou URLs) sobre "${subjectName}":
-    
-    Gere EXATAMENTE ${quantity} flashcards de alta qualidade.
-    
-    Nível de Dificuldade:
-    ${difficultyInstruction}
-
-    Formato do Card:
-    ${formatInstruction}
-
-    Tipo de Fonte:
-    ${sourceInstruction}
-    
-    Diretriz de Foco (${cardType}):
-    ${typeInstruction}
-
-    Mnemônicos:
-    ${mnemonicInstruction}
-    
-    Diretrizes de Comprimento:
-    ${lengthInstruction}
-    
-    Instruções Adicionais do Usuário:
-    ${customInstructions ? customInstructions : 'Nenhuma instrução adicional.'}
-    
-    - As perguntas (front) devem ser desafiadoras e claras.
-    - As respostas (back) devem ser objetivas, didáticas e, se possível, citar o artigo de lei ou súmula pertinente.
-    - Para cada card, sugira de 2 a 4 tags relevantes (ex: #prazos, #recursos, #cpc-art-1003).
-    - Identifique a fonte ou artigo de lei específico citado no conteúdo para o campo "source".
-    - DETECÇÃO DE DESATUALIZAÇÃO: Se detectar que o texto cita leis revogadas ou normas antigas (ex: CPC/1973, Código Civil/1916), adicione um aviso claro no início da resposta (back) alertando sobre a desatualização e, se souber, a norma vigente equivalente.
-    - Se o conteúdo fornecido for sem sentido ou insuficiente, retorne um array vazio.`
-  });
-
-  // Adiciona o texto se houver
-  if (text) {
-    parts.push({ text: `Texto Base:\n"${text}"` });
-  }
-
-  // Adiciona arquivos se houver
-  if (files && files.length > 0) {
-    files.forEach(file => {
-      parts.push({
-        inlineData: {
-          data: file.data,
-          mimeType: file.mimeType
-        }
+    const contents: any[] = [{ parts: [{ text: prompt }] }];
+    if (files.length > 0) {
+      files.forEach(f => {
+        contents[0].parts.push({
+          inlineData: { data: f.data, mimeType: f.mimeType }
+        });
       });
-    });
-  }
-
-  // Adiciona URLs se houver
-  const tools: any[] = [];
-  if (urls && urls.length > 0) {
-    tools.push({ urlContext: {} });
-    parts.push({ text: `URLs para consulta:\n${urls.join('\n')}` });
-  }
-
-  return { parts, tools };
-};
-
-/**
- * Gera flashcards a partir de um texto jurídico, arquivos ou URLs utilizando Gemini.
- * Agora inclui suporte a cache para textos comuns.
- */
-export const generateFlashcards = async (
-  text: string, 
-  subjectName: string, 
-  quantity: number = 5, 
-  cardType: string = 'Geral', 
-  customInstructions: string = '',
-  files: GeminiFile[] = [],
-  urls: string[] = [],
-  difficulty: string = 'Graduação',
-  format: string = 'Básico',
-  sourceType: string = 'Geral',
-  includeMnemonics: boolean = false,
-  frontLength: 'curta' | 'normal' | 'extensa' = 'normal',
-  backLength: 'curta' | 'normal' | 'extensa' = 'normal'
-) => {
-  try {
-    // Lógica de Cache
-    const cacheKey = await generateHash(JSON.stringify({
-      text, subjectName, quantity, cardType, customInstructions, 
-      urls, difficulty, format, sourceType, includeMnemonics,
-      frontLength, backLength,
-      fileCount: files.length
-    }));
-
-    // Tenta buscar no cache do Supabase
-    try {
-      const { data: cachedData, error: cacheError } = await supabase
-        .from('flashcard_cache')
-        .select('cards')
-        .eq('hash', cacheKey)
-        .single();
-
-      if (cachedData && !cacheError) {
-        console.log("Gemini Service: Retornando flashcards do cache.");
-        return cachedData.cards;
-      }
-    } catch (e) {
-      console.warn("Gemini Service: Erro ao acessar a tabela de cache. Continuando sem cache.", e);
     }
-
-    const ai = getAiClient();
-    const apiKey = getApiKey();
-    
-    if (!apiKey || apiKey === "missing_key") {
-        throw new Error("Chave de API não detectada. 1) Verifique se a variável 'VITE_API_KEY' está no painel da Vercel. 2) Se estiver, é OBRIGATÓRIO fazer um novo 'Redeploy' para que a alteração tenha efeito.");
-    }
-
-    const { parts, tools } = buildFlashcardPromptParts(
-      text, subjectName, quantity, cardType, customInstructions,
-      files, urls, difficulty, format, sourceType, includeMnemonics,
-      frontLength, backLength
-    );
 
     const response = await ai.models.generateContent({
-      model: GEMINI_MODEL, 
-      contents: { parts },
-      config: {
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-        tools: tools.length > 0 ? tools : undefined,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              front: {
-                type: Type.STRING,
-                description: 'A pergunta jurídica, caso prático curto ou conceito a ser definido.',
-              },
-              back: {
-                type: Type.STRING,
-                description: 'A resposta correta, explicação doutrinária e fundamentação legal.',
-              },
-              tags: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-                description: 'Tags sugeridas para organização (ex: #prazos, #cpc).',
-              },
-              source: {
-                type: Type.STRING,
-                description: 'A fonte bibliográfica ou artigo de lei específico (ex: Art. 5º, CF).',
-              },
-            },
-            required: ['front', 'back'],
-          },
-        },
-      },
-    });
-
-    const resultText = response.text;
-    
-    if (!resultText) {
-        throw new Error("A IA retornou uma resposta vazia. Tente outro texto.");
-    }
-
-    try {
-        const parsed = JSON.parse(resultText);
-        if (!Array.isArray(parsed)) {
-            throw new Error("Formato de resposta inválido (não é lista).");
-        }
-
-        // Salva no cache para uso futuro
-        try {
-          const cacheKey = await generateHash(JSON.stringify({
-            text, subjectName, quantity, cardType, customInstructions, 
-            urls, difficulty, format, sourceType, includeMnemonics,
-            frontLength, backLength,
-            fileCount: files.length
-          }));
-          
-          await supabase.from('flashcard_cache').upsert({
-            hash: cacheKey,
-            cards: parsed,
-            created_at: new Date().toISOString()
-          });
-        } catch (cacheSaveError) {
-          console.warn("Gemini Service: Falha ao salvar no cache.", cacheSaveError);
-        }
-
-        return parsed;
-    } catch (parseError) {
-        console.error("JSON Parse Error:", resultText);
-        throw new Error("Erro ao processar resposta da IA.");
-    }
-
-  } catch (error: any) {
-    console.error("Erro detalhado ao gerar flashcards:", error);
-    
-    if (error.status === 403 || (error.message && error.message.includes("API key"))) {
-        throw new Error("Erro de Permissão (403). Verifique se: \n1) O valor da VITE_API_KEY está correto. \n2) A API 'Generative Language' está ATIVADA no seu projeto Google Cloud. \n3) O faturamento está ativo no projeto.");
-    }
-    if (error.status === 400) {
-        throw new Error("Erro na Requisição (400): O texto pode ser muito longo ou inválido.");
-    }
-    if (error.status === 429) {
-        throw new Error("Muitas requisições. O modelo está sobrecarregado. Aguarde um momento.");
-    }
-    
-    throw error;
-  }
-};
-
-/**
- * Gera flashcards em modo STREAMING.
- * Útil para o efeito "máquina de escrever" na UI.
- */
-export const generateFlashcardsStream = async (
-  text: string, 
-  subjectName: string, 
-  quantity: number = 5, 
-  cardType: string = 'Geral', 
-  customInstructions: string = '',
-  files: GeminiFile[] = [],
-  urls: string[] = [],
-  difficulty: string = 'Graduação',
-  format: string = 'Básico',
-  sourceType: string = 'Geral',
-  includeMnemonics: boolean = false,
-  onChunk: (cards: any[]) => void,
-  frontLength: 'curta' | 'normal' | 'extensa' = 'normal',
-  backLength: 'curta' | 'normal' | 'extensa' = 'normal'
-) => {
-  try {
-    // Lógica de Cache
-    const cacheKey = await generateHash(JSON.stringify({
-      text, subjectName, quantity, cardType, customInstructions, 
-      urls, difficulty, format, sourceType, includeMnemonics,
-      frontLength, backLength,
-      fileCount: files.length
-    }));
-
-    try {
-      const { data: cachedData, error: cacheError } = await supabase
-        .from('flashcard_cache')
-        .select('cards')
-        .eq('hash', cacheKey)
-        .single();
-
-      if (cachedData && !cacheError) {
-        console.log("Gemini Service (Stream): Retornando flashcards do cache.");
-        onChunk(cachedData.cards);
-        return cachedData.cards;
-      }
-    } catch (e) {
-      console.warn("Gemini Service (Stream): Erro ao acessar a tabela de cache.", e);
-    }
-
-    const ai = getAiClient();
-    const apiKey = getApiKey();
-    
-    if (!apiKey || apiKey === "missing_key") {
-        throw new Error("Chave de API não detectada.");
-    }
-
-    const { parts, tools } = buildFlashcardPromptParts(
-      text, subjectName, quantity, cardType, customInstructions,
-      files, urls, difficulty, format, sourceType, includeMnemonics,
-      frontLength, backLength
-    );
-
-    const responseStream = await ai.models.generateContentStream({
       model: GEMINI_MODEL,
-      contents: { parts },
+      contents,
       config: {
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-        tools: tools.length > 0 ? tools : undefined,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -405,186 +52,215 @@ export const generateFlashcardsStream = async (
             properties: {
               front: { type: Type.STRING },
               back: { type: Type.STRING },
+              difficulty: { type: Type.STRING },
               tags: { type: Type.ARRAY, items: { type: Type.STRING } },
-              source: { type: Type.STRING },
-            },
-            required: ['front', 'back'],
-          },
-        },
-      },
+              mnemonic: { type: Type.STRING }
+            }
+          }
+        }
+      }
+    });
+
+    return JSON.parse(response.text || '[]');
+  },
+
+  generateFlashcardsStream: async (
+    text: string, 
+    subject: string, 
+    count: number, 
+    type: string,
+    extraInstructions: string,
+    files: { data: string, mimeType: string }[],
+    urls: string[],
+    difficulty: string,
+    format: string,
+    sourceType: string,
+    includeMnemonics: boolean,
+    onPartialResults: (cards: any[]) => void,
+    frontLength?: string,
+    backLength?: string
+  ) => {
+    const prompt = `
+      Gere ${count} flashcards de estudo sobre "${subject}" baseados no seguinte conteúdo:
+      "${text}"
+      
+      Tipo: ${type}
+      Dificuldade: ${difficulty}
+      Instruções extras: ${extraInstructions}
+      Tamanho do frente: ${frontLength || 'padrão'}
+      Tamanho do verso: ${backLength || 'padrão'}
+      Incluir mnemônicos: ${includeMnemonics ? 'Sim' : 'Não'}
+      
+      Retorne um array de objetos JSON com: front, back, difficulty, tags, e mnemonic (se solicitado).
+      IMPORTANTE: Retorne APENAS o array JSON.
+    `;
+
+    const contents: any[] = [{ parts: [{ text: prompt }] }];
+    if (files.length > 0) {
+      files.forEach(f => {
+        contents[0].parts.push({
+          inlineData: { data: f.data, mimeType: f.mimeType }
+        });
+      });
+    }
+
+    const result = await ai.models.generateContentStream({
+      model: GEMINI_MODEL,
+      contents,
+      config: {
+        responseMimeType: "application/json"
+      }
     });
 
     let fullText = "";
-    for await (const chunk of responseStream) {
+    for await (const chunk of result) {
       fullText += chunk.text;
-      
-      // Tenta extrair cards parciais do JSON incompleto
-      // Isso é complexo. Uma alternativa simples é esperar o JSON fechar um objeto.
       try {
-        // Tenta encontrar objetos completos no array JSON
-        // Ex: [{"a":1}, {"b":2} ...
-        // Procuramos por }, { ou ] no final
-        const lastBracket = fullText.lastIndexOf('}');
-        if (lastBracket !== -1) {
-          let partialJson = fullText.substring(0, lastBracket + 1);
-          if (!partialJson.endsWith(']')) partialJson += ']';
-          if (!partialJson.startsWith('[')) partialJson = '[' + partialJson;
-          
-          const parsed = JSON.parse(partialJson);
-          if (Array.isArray(parsed)) {
-            onChunk(parsed);
-          }
+        // Tenta parsear o que temos até agora (pode falhar se o JSON estiver incompleto)
+        // Uma implementação real de streaming de JSON seria mais complexa, 
+        // mas aqui vamos apenas simular o comportamento esperado pelo componente.
+        const partial = JSON.parse(fullText);
+        if (Array.isArray(partial)) {
+          onPartialResults(partial);
         }
       } catch (e) {
-        // JSON ainda incompleto para parse, ignora
+        // Ignora erros de parse durante o streaming
       }
     }
-
-    // Parse final
+    
     try {
-      const finalParsed = JSON.parse(fullText);
-      onChunk(finalParsed);
+      const final = JSON.parse(fullText);
+      onPartialResults(final);
+    } catch (e) {}
+  },
 
-      // Salva no cache para uso futuro
-      try {
-        await supabase.from('flashcard_cache').upsert({
-          hash: cacheKey,
-          cards: finalParsed,
-          created_at: new Date().toISOString()
-        });
-      } catch (cacheSaveError) {
-        console.warn("Gemini Service (Stream): Falha ao salvar no cache.", cacheSaveError);
-      }
-
-      return finalParsed;
-    } catch (e) {
-      console.error("Erro no parse final do stream", e);
-    }
-
-  } catch (error) {
-    console.error("Erro no streaming de flashcards:", error);
-    throw error;
-  }
-};
-
-/**
- * Retorna uma frase de motivação em latim com tradução.
- */
-export const getStudyMotivation = async (subjects: string[]) => {
-  const list = subjects.length > 0 ? subjects.join(", ") : "Direito";
-  
-  try {
-    const ai = getAiClient();
+  evaluateDissertativeAnswer: async (question: string, expectedAnswer: string, userAnswer: string) => {
+    const prompt = `
+      Avalie a resposta dissertativa do aluno.
+      Pergunta: ${question}
+      Resposta Esperada: ${expectedAnswer}
+      Resposta do Aluno: ${userAnswer}
+      
+      Forneça uma nota de 0 a 100 e um feedback detalhado.
+    `;
     const response = await ai.models.generateContent({
       model: GEMINI_MODEL,
-      contents: `Sou um estudante de Direito na SanFran (USP). Atualmente estudo: ${list}. Dê uma frase curta de motivação em latim relevante ao estudo jurídico e sua tradução em português.`,
-      config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
-    });
-    return response.text || "Scientia Vinces.";
-  } catch (error) {
-    console.warn("Erro ao buscar motivação via IA:", error);
-    return "Scientia Vinces.";
-  }
-};
-
-/**
- * Simplifica textos jurídicos complexos.
- */
-export const simplifyLegalText = async (complexText: string) => {
-  try {
-    const ai = getAiClient();
-    const apiKey = getApiKey();
-
-    if (!apiKey || apiKey === "missing_key") {
-      return "Erro: Chave de API (VITE_API_KEY) não configurada. Verifique as variáveis de ambiente e faça um novo deploy.";
-    }
-
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL, 
-      contents: `Você é um professor assistente da Faculdade de Direito do Largo São Francisco. 
-      Sua tarefa é "traduzir" o seguinte texto jurídico complexo (juridiquês) para uma linguagem clara, didática e direta, acessível a um estudante de primeiro ano.
-      Mantenha a precisão técnica, mas explique termos difíceis se necessário.
-      
-      Texto para simplificar:
-      "${complexText}"`,
-      config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
-    });
-    return response.text;
-  } catch (error: any) {
-    console.error("Erro ao simplificar texto:", error);
-    if (error.message.includes("API key")) return "Erro de Configuração: API Key inválida.";
-    return "Não foi possível simplificar o texto no momento. Verifique sua conexão.";
-  }
-};
-
-/**
- * Explica um termo jurídico específico dentro de um contexto.
- */
-export const explainLegalTerm = async (term: string, context: string) => {
-  try {
-    const ai = getAiClient();
-    const apiKey = getApiKey();
-
-    if (!apiKey || apiKey === "missing_key") {
-      return "Erro: Chave de API não configurada.";
-    }
-
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL,
-      contents: `Você é um glossário jurídico inteligente.
-      
-      O usuário selecionou o termo: "${term}"
-      Do seguinte texto: "${context}"
-      
-      1. Dê uma definição simples e direta deste termo (máximo 2 frases).
-      2. Sugira 2 ou 3 sinônimos ou expressões mais simples que poderiam substituí-lo neste contexto.
-      
-      Retorne a resposta em formato Markdown simples.`,
-      config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
-    });
-    return response.text;
-  } catch (error) {
-    console.error("Erro ao explicar termo:", error);
-    return "Não foi possível explicar o termo no momento.";
-  }
-};
-
-/**
- * Gera um mnemônico criativo a partir de uma lista de requisitos ou palavras.
- */
-export const generateMnemonic = async (requirements: string) => {
-  try {
-    const ai = getAiClient();
-    const apiKey = getApiKey();
-
-    if (!apiKey || apiKey === "missing_key") {
-      throw new Error("Chave de API não configurada.");
-    }
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Você é um especialista em técnicas de memorização para estudantes de Direito.
-      
-      Crie um mnemônico (sigla, acrônimo ou frase engraçada/criativa) para ajudar a memorizar a seguinte lista de itens/requisitos:
-      "${requirements}"
-      
-      Retorne um JSON com o seguinte formato:
-      {
-        "acronym": "A sigla ou palavra principal gerada",
-        "title": "Um título curto para o assunto",
-        "expansion": [
-          { "letter": "Letra ou sílaba", "meaning": "O significado correspondente" }
-        ],
-        "description": "Uma breve explicação ou frase engraçada para ajudar a lembrar"
-      }`,
+      contents: [{ parts: [{ text: prompt }] }],
       config: {
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            score: { type: Type.NUMBER },
+            feedback: { type: Type.STRING }
+          }
+        }
+      }
+    });
+    return JSON.parse(response.text || '{}');
+  },
+
+  fetchTermDefinition: async (term: string) => {
+    const prompt = `
+      Defina o termo jurídico "${term}" de forma clara e técnica.
+      Retorne um JSON com:
+      - definition: A definição técnica
+      - example: Um exemplo de uso
+      - isLatin: boolean indicando se é um termo em latim
+      - translation: Tradução se for latim (opcional)
+    `;
+    const response = await ai.models.generateContent({
+      model: FLASH_MODEL,
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            definition: { type: Type.STRING },
+            example: { type: Type.STRING },
+            isLatin: { type: Type.BOOLEAN },
+            translation: { type: Type.STRING }
+          }
+        }
+      }
+    });
+    return JSON.parse(response.text || '{}');
+  },
+
+  summarizeText: async (text: string) => {
+    const prompt = `Resuma o seguinte texto jurídico de forma concisa: "${text}"`;
+    const response = await ai.models.generateContent({
+      model: FLASH_MODEL,
+      contents: [{ parts: [{ text: prompt }] }]
+    });
+    return response.text;
+  },
+
+  extractKeyPoints: async (text: string) => {
+    const prompt = `Extraia os pontos-chave do seguinte texto jurídico: "${text}"`;
+    const response = await ai.models.generateContent({
+      model: FLASH_MODEL,
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING }
+        }
+      }
+    });
+    return JSON.parse(response.text || '[]');
+  },
+
+  generateMindMap: async (text: string) => {
+    const prompt = `Gere uma estrutura de mapa mental (em JSON) para o seguinte conteúdo: "${text}"`;
+    const response = await ai.models.generateContent({
+      model: GEMINI_MODEL,
+      contents: [{ parts: [{ text: prompt }] }],
+      config: { responseMimeType: "application/json" }
+    });
+    return JSON.parse(response.text || '{}');
+  },
+
+  simplifyLegalText: async (text: string) => {
+    const prompt = `Simplifique o seguinte "juridiquês" para uma linguagem acessível: "${text}"`;
+    const response = await ai.models.generateContent({
+      model: FLASH_MODEL,
+      contents: [{ parts: [{ text: prompt }] }]
+    });
+    return response.text;
+  },
+
+  explainLegalTerm: async (term: string, context?: string) => {
+    const prompt = `Explique o termo jurídico "${term}" ${context ? `no contexto de: ${context}` : ''} com exemplos práticos.`;
+    const response = await ai.models.generateContent({
+      model: FLASH_MODEL,
+      contents: [{ parts: [{ text: prompt }] }]
+    });
+    return response.text;
+  },
+
+  generateMnemonic: async (requirements: string) => {
+    const prompt = `
+      Crie um mnemônico jurídico baseado nos seguintes requisitos: "${requirements}"
+      Retorne um JSON com:
+      - acronym: A sigla ou palavra mnemônica
+      - title: Título do mnemônico
+      - description: Explicação de como usar
+      - expansion: Array de objetos { letter: string, meaning: string }
+    `;
+    const response = await ai.models.generateContent({
+      model: GEMINI_MODEL,
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
             acronym: { type: Type.STRING },
             title: { type: Type.STRING },
+            description: { type: Type.STRING },
             expansion: {
               type: Type.ARRAY,
               items: {
@@ -592,302 +268,156 @@ export const generateMnemonic = async (requirements: string) => {
                 properties: {
                   letter: { type: Type.STRING },
                   meaning: { type: Type.STRING }
-                },
-                required: ['letter', 'meaning']
+                }
               }
-            },
-            description: { type: Type.STRING }
-          },
-          required: ['acronym', 'title', 'expansion', 'description']
+            }
+          }
         }
       }
     });
+    return JSON.parse(response.text || '{}');
+  },
 
-    const resultText = response.text;
-    if (!resultText) throw new Error("Resposta vazia da IA.");
-    
-    return JSON.parse(resultText);
-  } catch (error) {
-    console.error("Erro ao gerar mnemônico:", error);
-    throw error;
-  }
-};
-
-/**
- * Gera um resumo conciso de um texto longo.
- */
-export const summarizeText = async (text: string) => {
-  try {
-    const ai = getAiClient();
-    const apiKey = getApiKey();
-
-    if (!apiKey || apiKey === "missing_key") {
-      return "Erro: Chave de API não configurada.";
-    }
-
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL,
-      contents: `Você é um assistente de estudo jurídico.
-      Resuma o seguinte texto de forma concisa e didática, focando nos pontos mais importantes. O resumo deve ter entre 3 a 5 parágrafos.
-      
-      Texto para resumir:
-      "${text}"`,
-      config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
-    });
-    return response.text;
-  } catch (error) {
-    console.error("Erro ao resumir texto:", error);
-    return "Não foi possível resumir o texto no momento.";
-  }
-};
-
-/**
- * Extrai os pontos-chave de um texto.
- */
-export const extractKeyPoints = async (text: string) => {
-  try {
-    const ai = getAiClient();
-    const apiKey = getApiKey();
-
-    if (!apiKey || apiKey === "missing_key") {
-      return "Erro: Chave de API não configurada.";
-    }
-
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL,
-      contents: `Você é um assistente de estudo jurídico.
-      Extraia os 5 a 10 pontos-chave mais importantes do seguinte texto. Apresente-os como uma lista numerada.
-      
-      Texto para analisar:
-      "${text}"`,
-      config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
-    });
-    return response.text;
-  } catch (error) {
-    console.error("Erro ao extrair pontos-chave:", error);
-    return "Não foi possível extrair os pontos-chave no momento.";
-  }
-};
-
-/**
- * Gera um mapa mental textual dos principais conceitos de um texto.
- */
-export const generateMindMap = async (text: string) => {
-  try {
-    const ai = getAiClient();
-    const apiKey = getApiKey();
-
-    if (!apiKey || apiKey === "missing_key") {
-      return "Erro: Chave de API não configurada.";
-    }
-
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL,
-      contents: `Você é um assistente de estudo jurídico.
-      Crie um mapa mental textual (usando tópicos e sub-tópicos com indentação) dos principais conceitos e suas relações no seguinte texto.
-      Comece com o tema central e ramifique para os sub-temas e detalhes.
-      
-      Texto para mapear:
-      "${text}"`,
-      config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
-    });
-    return response.text;
-  } catch (error) {
-    console.error("Erro ao gerar mapa mental:", error);
-    return "Não foi possível gerar o mapa mental no momento.";
-  }
-};
-
-/**
- * Avalia uma resposta dissertativa comparando-a com o gabarito.
- */
-export const evaluateDissertativeAnswer = async (question: string, correctAnswer: string, userAnswer: string) => {
-  try {
-    const ai = getAiClient();
-    const apiKey = getApiKey();
-
-    if (!apiKey || apiKey === "missing_key") {
-      throw new Error("Chave de API não configurada.");
-    }
-
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL,
-      contents: `AVALIAÇÃO DE FLASHCARD:
-      Pergunta: "${question}"
-      Gabarito Esperado: "${correctAnswer}"
-      Resposta do Aluno: "${userAnswer}"`,
-      config: {
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-        systemInstruction: `Você é um Mentor de Estudos Inteligente e Rigoroso. Sua tarefa é avaliar a resposta do aluno em relação ao gabarito oficial.
-        
-        REGRAS DE PONTUAÇÃO (RIGOROSAS):
-        1. A nota (score) deve ser baseada EXCLUSIVAMENTE no "Gabarito Esperado".
-        2. PRECISÃO TÉCNICA: Em áreas técnicas (como Direito), termos específicos são fundamentais. Se o aluno errar um termo técnico central (ex: trocar 'fidejussória' por 'fidedigno'), penalize a nota (ex: 7.0 ou 8.0) e aponte o erro.
-        3. ESSÊNCIA VS. LITERALIDADE: O aluno não precisa ser literal, mas deve ser tecnicamente preciso. Sinônimos leigos para termos técnicos jurídicos devem ser corrigidos.
-        4. Se a resposta for totalmente correta e tecnicamente precisa, a nota é 10.0.
-        
-        REGRAS DE FEEDBACK (DIDÁTICO E ORGANIZADO):
-        1. Explique didaticamente o que está correto e o que precisa ser ajustado.
-        2. Use formatação Markdown (negrito, listas, blocos de código se necessário) para tornar o texto legível e organizado.
-        3. Adicione sempre um parágrafo de "Aprofundamento" ou "Curiosidade" para agregar valor, mesmo em acertos.
-        4. Se houver erro de conceito, explique a diferença entre o que o aluno escreveu e o que é o correto.
-        
-        FORMATO DE SAÍDA (JSON):
-        {
-          "score": 10.0,
-          "feedback": "Use Markdown aqui. Ex: **Excelente!** Você acertou X, mas note que Y...",
-          "missing_keywords": ["termos técnicos que faltaram"],
-          "is_perfect": true
-        }`,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            score: { type: Type.NUMBER },
-            feedback: { type: Type.STRING },
-            missing_keywords: { type: Type.ARRAY, items: { type: Type.STRING } },
-            is_perfect: { type: Type.BOOLEAN }
-          },
-          required: ['score', 'feedback', 'missing_keywords', 'is_perfect']
-        }
-      }
-    });
-
-    const resultText = response.text;
-    if (!resultText) throw new Error("Resposta vazia da IA.");
-    
-    return JSON.parse(resultText);
-  } catch (error) {
-    console.error("Erro ao avaliar resposta dissertativa:", error);
-    throw error;
-  }
-};
-
-/**
- * Busca o conteúdo de uma referência legal (Artigo, Súmula, etc.) usando IA.
- */
-export const fetchLegalReference = async (reference: string) => {
-  try {
-    const ai = getAiClient();
-    const apiKey = getApiKey();
-
-    if (!apiKey || apiKey === "missing_key") {
-      return "Erro: Chave de API não configurada.";
-    }
-
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL,
-      contents: `Você é um Vade Mecum inteligente. 
-      O usuário quer saber o conteúdo da seguinte referência legal: "${reference}".
-      
-      1. Forneça o texto literal da norma (se for um artigo ou súmula).
-      2. Se for um artigo longo, forneça o caput e os parágrafos mais importantes.
-      3. Adicione uma breve explicação (1 frase) do que esse dispositivo trata.
-      
-      Retorne a resposta em Markdown simples e conciso.`,
-      config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
-    });
-    return response.text || "Conteúdo não encontrado.";
-  } catch (error) {
-    console.error("Erro ao buscar referência legal:", error);
-    return "Não foi possível carregar o conteúdo da lei no momento.";
-  }
-};
-
-/**
- * Busca a definição, tradução e exemplo de um termo jurídico ou expressão em latim.
- */
-export const fetchTermDefinition = async (term: string) => {
-  try {
-    const ai = getAiClient();
-    const apiKey = getApiKey();
-
-    if (!apiKey || apiKey === "missing_key") {
-      throw new Error("Chave de API não configurada.");
-    }
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Você é um dicionário jurídico especializado da SanFran (USP).
-      Defina o termo ou expressão: "${term}"
+  extractPrecedent: async (text: string, correctAnswer?: string) => {
+    const prompt = `
+      Extraia o precedente judicial ou fundamento jurídico principal do seguinte caso:
+      "${text}"
+      ${correctAnswer ? `A resposta correta/fundamento é: ${correctAnswer}` : ''}
       
       Retorne um JSON com:
-      {
-        "definition": "Definição curta e direta (máximo 2 frases).",
-        "translation": "Tradução literal (se for latim ou língua estrangeira, caso contrário null).",
-        "example": "Um exemplo prático de uso em uma frase jurídica.",
-        "isLatin": true/false
-      }`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            definition: { type: Type.STRING },
-            translation: { type: Type.STRING, nullable: true },
-            example: { type: Type.STRING },
-            isLatin: { type: Type.BOOLEAN }
-          },
-          required: ['definition', 'example', 'isLatin']
-        }
-      }
-    });
-
-    const resultText = response.text;
-    if (!resultText) throw new Error("Resposta vazia da IA.");
-    
-    return JSON.parse(resultText);
-  } catch (error) {
-    console.error("Erro ao buscar definição do termo:", error);
-    throw error;
-  }
-};
-
-/**
- * Extrai precedentes jurídicos (tese, fundamentação, jurisprudência) de uma questão.
- */
-export const extractPrecedent = async (statement: string, correctAnswer: string) => {
-  try {
-    const ai = getAiClient();
-    const apiKey = getApiKey();
-
-    if (!apiKey || apiKey === "missing_key") {
-      throw new Error("Chave de API não configurada.");
-    }
-
+      - tese: A tese jurídica central
+      - fundamentação: A fundamentação legal/doutrinária
+      - jurisprudencia: Referência a jurisprudência correlata
+    `;
     const response = await ai.models.generateContent({
       model: GEMINI_MODEL,
-      contents: `Você é um especialista em análise jurídica para concursos e OAB.
-      Analise a questão e a alternativa correta abaixo e extraia o resumo jurídico (precedente).
-      
-      Questão: "${statement}"
-      Alternativa Correta: "${correctAnswer}"
-      
-      Retorne um JSON com:
-      - tese: A tese jurídica central (ex: "Impenhorabilidade do bem de família").
-      - fundamentação: Artigos de lei ou súmulas citados (ex: "Art. 1º da Lei 8.009/90").
-      - jurisprudencia: Se há menção a entendimento do STF/STJ.`,
+      contents: [{ parts: [{ text: prompt }] }],
       config: {
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
             tese: { type: Type.STRING },
             fundamentação: { type: Type.STRING },
-            jurisprudencia: { type: Type.STRING },
-          },
-          required: ['tese', 'fundamentação', 'jurisprudencia'],
-        },
-      },
+            jurisprudencia: { type: Type.STRING }
+          }
+        }
+      }
+    });
+    return JSON.parse(response.text || '{}');
+  },
+
+  fetchLegalReference: async (query: string) => {
+    const prompt = `Encontre referências legais (artigos, leis) para: "${query}"`;
+    const response = await ai.models.generateContent({
+      model: FLASH_MODEL,
+      contents: [{ parts: [{ text: prompt }] }]
+    });
+    return response.text;
+  },
+
+  analyzeJupiterPDF: async (base64PDF: string) => {
+    const prompt = `
+      Analise esta Ficha do Aluno da USP (JúpiterWeb). 
+      Extraia as seguintes informações:
+      - full_name: Nome Completo
+      - turma: Ano de Ingresso (Turma)
+      - progresso_obrigatorias: Porcentagem de Disciplinas Obrigatórias concluídas (0-100)
+      - progresso_optativas: Porcentagem de Optativas concluídas (0-100)
+      - status_geral_integralizacao: Status Geral de Integralização (0-100)
+      - disciplinas: Lista de disciplinas do semestre atual contendo:
+        - codigo: Código da disciplina (ex: DIN0123)
+        - nome: Nome da disciplina
+        - turma_sala: Turma e/ou Sala (ex: Turma 11 / Sala 201)
+        - horarios: Objeto com os dias da semana e horários (ex: {"segunda": "08:00", "quarta": "08:00"})
+      - aniversario: Data de nascimento (se disponível)
+      
+      Ignore informações sensíveis como CPF ou endereço residencial.
+      Retorne apenas um JSON.
+    `;
+
+    const response = await ai.models.generateContent({
+      model: GEMINI_MODEL,
+      contents: [
+        {
+          parts: [
+            { text: prompt },
+            {
+              inlineData: {
+                mimeType: "application/pdf",
+                data: base64PDF
+              }
+            }
+          ]
+        }
+      ],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            full_name: { type: Type.STRING },
+            turma: { type: Type.NUMBER },
+            progresso_obrigatorias: { type: Type.NUMBER },
+            progresso_optativas: { type: Type.NUMBER },
+            status_geral_integralizacao: { type: Type.NUMBER },
+            aniversario: { type: Type.STRING },
+            disciplinas: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  codigo: { type: Type.STRING },
+                  nome: { type: Type.STRING },
+                  turma_sala: { type: Type.STRING },
+                  horarios: { type: Type.OBJECT }
+                }
+              }
+            }
+          }
+        }
+      }
     });
 
-    const resultText = response.text;
-    if (!resultText) throw new Error("Resposta vazia da IA.");
-    
-    return JSON.parse(resultText);
-  } catch (error) {
-    console.error("Erro ao extrair precedente:", error);
-    throw error;
+    return JSON.parse(response.text || '{}');
+  },
+
+  analyzeProfile: async (profile: any) => {
+    const prompt = `
+      Analise o seguinte perfil de estudante de Direito da USP (SanFran) e forneça insights personalizados:
+      - Nome: ${profile.full_name || profile.username}
+      - Turma: ${profile.turma}
+      - Progresso: ${profile.progresso_curso}%
+      - Idiomas: ${profile.idiomas?.join(', ')}
+      - Intercâmbio: ${profile.intercambio ? 'Sim' : 'Não'}
+      - Cargos Acadêmicos: ${JSON.stringify(profile.cargos_academicos)}
+      - Mural de Memórias: ${profile.memorias}
+      
+      Forneça:
+      1. Um resumo do perfil (Persona Acadêmica)
+      2. Sugestões de áreas do Direito para explorar
+      3. Dicas para melhorar o currículo/experiência
+      4. Uma frase motivacional personalizada.
+      
+      Retorne em Markdown.
+    `;
+    const response = await ai.models.generateContent({
+      model: GEMINI_MODEL,
+      contents: [{ parts: [{ text: prompt }] }]
+    });
+    return response.text;
   }
 };
+
+export const generateFlashcards = geminiService.generateFlashcards;
+export const generateFlashcardsStream = geminiService.generateFlashcardsStream;
+export const evaluateDissertativeAnswer = geminiService.evaluateDissertativeAnswer;
+export const fetchTermDefinition = geminiService.fetchTermDefinition;
+export const summarizeText = geminiService.summarizeText;
+export const extractKeyPoints = geminiService.extractKeyPoints;
+export const generateMindMap = geminiService.generateMindMap;
+export const simplifyLegalText = geminiService.simplifyLegalText;
+export const explainLegalTerm = geminiService.explainLegalTerm;
+export const generateMnemonic = geminiService.generateMnemonic;
+export const extractPrecedent = geminiService.extractPrecedent;
+export const fetchLegalReference = geminiService.fetchLegalReference;

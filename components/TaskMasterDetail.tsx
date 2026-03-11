@@ -126,6 +126,8 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
 
   const TABS = ['Geral', 'Leituras', 'Gestão/Entidades', ...boards.map(b => b.name)];
 
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+
   // --- Onboarding State ---
   const [showOnboarding, setShowOnboarding] = useState(boards.length === 0);
   const [messages, setMessages] = useState<Message[]>([
@@ -140,9 +142,106 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   const [questionCount, setQuestionCount] = useState(1);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+  const handleNLPAddTask = async (text: string) => {
+    if (!text.trim()) return;
 
-  // --- Profiling Phase 2 ---
+    let title = text;
+    let priority: TaskPriority = 'normal';
+    let category: TaskCategory = 'geral';
+    let dueDate = '';
+    let delegatedTo = '';
+    let delegatedToName = '';
+
+    // Parse Priority (!)
+    const priorityMatch = title.match(/!(\w+)/);
+    if (priorityMatch) {
+      const p = priorityMatch[1].toLowerCase();
+      if (['baixa', 'media', 'alta', 'urgente'].includes(p)) {
+        priority = p as TaskPriority;
+        title = title.replace(priorityMatch[0], '');
+      }
+    }
+
+    // Parse Category (#)
+    const categoryMatch = title.match(/#(\w+)/);
+    if (categoryMatch) {
+      const c = categoryMatch[1].toLowerCase();
+      if (c.includes('leitura')) category = 'estudo';
+      else if (c.includes('gest') || c.includes('entidade')) category = 'admin';
+      else category = 'geral';
+      title = title.replace(categoryMatch[0], '');
+    }
+
+    // Parse Delegation (@)
+    const mentionMatch = title.match(/@(\w+)/);
+    if (mentionMatch) {
+      const friendName = mentionMatch[1].toLowerCase();
+      const friend = friends.find(f => f.friend_name?.toLowerCase().includes(friendName));
+      if (friend) {
+        delegatedTo = friend.friend_id;
+        delegatedToName = friend.friend_name;
+        title = title.replace(mentionMatch[0], '');
+      }
+    }
+
+    // Parse Date (simple)
+    if (title.toLowerCase().includes('amanhã')) {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      dueDate = tomorrow.toISOString().split('T')[0];
+      title = title.replace(/amanhã/gi, '');
+    } else if (title.toLowerCase().includes('hoje')) {
+      dueDate = new Date().toISOString().split('T')[0];
+      title = title.replace(/hoje/gi, '');
+    }
+
+    const newTask: Task = {
+      id: crypto.randomUUID(),
+      title: title.trim(),
+      category,
+      priority,
+      completed: false,
+      subtasks: [],
+      notes: '',
+      links: [],
+      dueDate,
+      delegatedTo,
+      delegatedToName,
+      delegatedBy: userId,
+      delegatedByName: userProfile.answers?.['nome'] || 'Você',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    } as any;
+
+    setTasks(prev => [newTask, ...prev]);
+    setQuickEntryInput('');
+    await dataService.saveTask(newTask, userId, isOnline);
+
+    if (delegatedTo) {
+      // Create notification for friend
+      await dataService.createNotification(
+        delegatedTo,
+        `${userProfile.answers?.['nome'] || 'Você'} te atribuiu a tarefa: '${newTask.title}'`,
+        newTask.id,
+        'delegated'
+      );
+    }
+  };
+
+  const handleArchiveCompleted = async () => {
+    const completedTasks = tasks.filter(t => t.completed);
+    if (completedTasks.length === 0) return;
+
+    try {
+      await dataService.archiveTasks(userId, isOnline);
+      setTasks(prev => prev.filter(t => !t.completed));
+      setSelectedTaskId(null);
+    } catch (error) {
+      console.error("Failed to archive tasks:", error);
+    }
+  };
+
+  const selectedTask = tasks.find(t => t.id === selectedTaskId);
   const [userProfile, setUserProfile] = useState<UserProfile>({
     id: '',
     archetype: 'Calouro',
@@ -831,37 +930,6 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       });
     }
 
-    // Continuous Interaction Logic: Daily Check-in
-  useEffect(() => {
-    if (userProfile.id && !showOnboarding) {
-      const today = new Date().toISOString().split('T')[0];
-      if (userProfile.lastInteractionDate !== today) {
-        // Trigger Daily Check-in
-        const checkInMessage = userProfile.arcadia_score > 80 
-          ? "Bom dia! Vamos planejar as Arcadas hoje? Vi seu progresso recente..."
-          : "Bom dia! Que tal continuarmos seu perfilamento para eu te ajudar melhor hoje?";
-        
-        handleAssistantSend(checkInMessage);
-        
-        // Update last interaction date and productivity stats
-        const newStats = {
-          completedYesterday: userProfile.productivityStats?.completedToday || 0,
-          completedToday: 0,
-          streak: (userProfile.productivityStats?.completedToday || 0) > 0 
-            ? (userProfile.productivityStats?.streak || 0) + 1 
-            : 0
-        };
-        
-        const updatedProfile = { 
-          ...userProfile, 
-          lastInteractionDate: today,
-          productivityStats: newStats
-        };
-        setUserProfile(updatedProfile);
-        dataService.saveUserProfile(updatedProfile, userId, isOnline);
-      }
-    }
-  }, [userProfile.id, showOnboarding]);
     let newArchetype = userProfile.archetype;
     if (newAnsweredIds.length >= 3) {
       const { academico, corporativo, social, politico, resiliencia, tecnologico } = newScores;
@@ -906,8 +974,39 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     setTimeout(() => setShowReward(null), 5000);
   };
 
+  // Continuous Interaction Logic: Daily Check-in
+  useEffect(() => {
+    if (userProfile.id && !showOnboarding) {
+      const today = new Date().toISOString().split('T')[0];
+      if (userProfile.lastInteractionDate !== today) {
+        // Trigger Daily Check-in
+        const checkInMessage = userProfile.arcadia_score > 80 
+          ? "Bom dia! Vamos planejar as Arcadas hoje? Vi seu progresso recente..."
+          : "Bom dia! Que tal continuarmos seu perfilamento para eu te ajudar melhor hoje?";
+        
+        handleAssistantSend(checkInMessage);
+        
+        // Update last interaction date and productivity stats
+        const newStats = {
+          completedYesterday: userProfile.productivityStats?.completedToday || 0,
+          completedToday: 0,
+          streak: (userProfile.productivityStats?.completedToday || 0) > 0 
+            ? (userProfile.productivityStats?.streak || 0) + 1 
+            : 0
+        };
+        
+        const updatedProfile = { 
+          ...userProfile, 
+          lastInteractionDate: today,
+          productivityStats: newStats
+        };
+        setUserProfile(updatedProfile);
+        dataService.saveUserProfile(updatedProfile, userId, isOnline);
+      }
+    }
+  }, [userProfile.id, showOnboarding]);
+
   // --- Detail Panel State ---
-  const selectedTask = tasks.find(t => t.id === selectedTaskId);
   
   // Helper to check if a task should be visible in the main UI
   const isTaskVisible = (task: Task) => {
@@ -1198,88 +1297,6 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     setShowTemplatesMenu(false);
   };
 
-  const handleNLPAddTask = async (text: string) => {
-    if (!text.trim()) return;
-
-    let title = text;
-    let priority: TaskPriority = 'normal';
-    let category: TaskCategory = 'geral';
-    let dueDate = '';
-    let delegatedTo = '';
-    let delegatedToName = '';
-
-    // Parse Priority
-    if (text.includes('!Alta') || text.includes('!alta')) {
-      priority = 'alta';
-      title = title.replace(/!Alta|!alta/g, '');
-    } else if (text.includes('!Urgente') || text.includes('!urgente')) {
-      priority = 'urgente';
-      title = title.replace(/!Urgente|!urgente/g, '');
-    }
-
-    // Parse Category
-    const categoryMatch = text.match(/#(\w+)/);
-    if (categoryMatch) {
-      const cat = categoryMatch[1].toLowerCase();
-      const validCats: TaskCategory[] = ['peticao', 'estudo', 'audiencia', 'admin', 'geral'];
-      if (validCats.includes(cat as any)) {
-        category = cat as TaskCategory;
-      }
-      title = title.replace(categoryMatch[0], '');
-    }
-
-    // Parse Mentions (@)
-    const mentionMatch = text.match(/@(\w+)/);
-    if (mentionMatch) {
-      const name = mentionMatch[1].toLowerCase();
-      const friend = friends.find(f => f.friend_name.toLowerCase().includes(name));
-      if (friend) {
-        delegatedTo = friend.friend_id;
-        delegatedToName = friend.friend_name;
-      }
-      title = title.replace(mentionMatch[0], '');
-    }
-
-    // Parse Date (simple)
-    if (text.toLowerCase().includes('amanhã')) {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      dueDate = tomorrow.toISOString().split('T')[0];
-      title = title.replace(/amanhã/gi, '');
-    } else if (text.toLowerCase().includes('hoje')) {
-      dueDate = new Date().toISOString().split('T')[0];
-      title = title.replace(/hoje/gi, '');
-    }
-
-    const newTask: Task = {
-      id: Math.random().toString(36).substr(2, 9),
-      title: title.trim(),
-      completed: false,
-      priority,
-      category,
-      dueDate,
-      delegatedTo,
-      delegatedToName,
-      delegatedBy: userId,
-      delegatedByName: userProfile.answers?.['nome'] || 'Você',
-      createdAt: new Date().toISOString()
-    } as any;
-
-    await dataService.saveTask(newTask, userId, isOnline);
-    
-    if (delegatedTo) {
-      await dataService.createNotification(
-        delegatedTo,
-        `${userProfile.answers?.['nome'] || 'Você'} te atribuiu a tarefa: '${newTask.title}'`,
-        newTask.id,
-        'delegated'
-      );
-    }
-
-    setTasks(prev => [newTask, ...prev]);
-    setQuickEntryInput('');
-  };
-
   const handleUpdateTask = async (updates: Partial<Task>, taskIdOverride?: string) => {
     const taskId = taskIdOverride || selectedTaskId;
     if (!taskId) return;
@@ -1389,19 +1406,6 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       if (index !== -1) updatedTasks[index] = updated;
     }
     setTasks(updatedTasks);
-  };
-
-  const handleArchiveCompleted = async () => {
-    const completedTasks = tasks.filter(t => t.completed);
-    if (completedTasks.length === 0) return;
-
-    try {
-      await dataService.archiveTasks(userId, isOnline);
-      setTasks(prev => prev.filter(t => !t.completed));
-      setSelectedTaskId(null);
-    } catch (error) {
-      console.error("Failed to archive tasks:", error);
-    }
   };
 
   const handleAddLink = (url: string) => {
