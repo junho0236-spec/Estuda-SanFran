@@ -64,17 +64,18 @@ const Profile: React.FC = () => {
   }, []);
 
   const fetchProfile = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    setSession(session);
-    if (session?.user) {
-      const userProfile = await dataService.getUserProfile(session.user.id, navigator.onLine);
-      setProfile(userProfile);
-      
-      // Fetch disciplines
-      const { data: discData } = await supabase.from('disciplinas').select('*').eq('user_id', session.user.id);
-      if (discData) setDisciplinas(discData);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+      if (session?.user) {
+        const userProfile = await dataService.getUserProfile(session.user.id, navigator.onLine);
+        setProfile(userProfile);
+        
+        // Fetch disciplines
+        const { data: discData } = await supabase.from('disciplinas').select('*').eq('user_id', session.user.id);
+        if (discData) setDisciplinas(discData);
 
-      setEditForm({
+        setEditForm({
         full_name: userProfile?.full_name || session.user.user_metadata?.full_name || '',
         bio: userProfile?.bio || '',
         turma_ano: userProfile?.turma_ano || 0,
@@ -99,7 +100,11 @@ const Profile: React.FC = () => {
       });
     }
     setLoading(false);
-  };
+  } catch (err) {
+    console.warn("Failed to fetch profile/session:", err);
+    setLoading(false);
+  }
+};
 
   const handleSaveProfile = async () => {
     if (!session?.user || !profile) return;

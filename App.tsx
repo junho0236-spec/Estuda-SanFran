@@ -462,6 +462,8 @@ const App: React.FC = () => {
         syncProfile(session.user);
         clearOldLocalStorage(session.user.id);
       }
+    }).catch(err => {
+      console.warn("Failed to get session:", err);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {

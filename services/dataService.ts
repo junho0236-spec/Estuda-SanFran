@@ -117,9 +117,6 @@ export const dataService = {
     
     if (isOnline) {
       try {
-        // Força a atualização da sessão para garantir que o schema do banco esteja atualizado
-        await supabase.auth.refreshSession();
-        
         const { error } = await supabase.from('user_persona').upsert(cloudPayload);
         if (error) {
           console.warn("[dataService] Full upsert failed, falling back to field-by-field update:", error.message);

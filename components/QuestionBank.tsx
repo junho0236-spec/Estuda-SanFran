@@ -986,12 +986,7 @@ Forneça a explicação de forma concisa e didática.`;
     }
   };
 
-  const [aiCommentary, setAiCommentary] = useState<Record<string, {
-    legalBasis: string;
-    alternativesAnalysis: string;
-    mnemonic: string;
-    doctrineLink?: string;
-  }>>({});
+  const [aiCommentary, setAiCommentary] = useState<Record<string, any>>({});
   const [loadingAiCommentary, setLoadingAiCommentary] = useState<Record<string, boolean>>({});
 
   const generateIntelligentCorrection = async (question: Question) => {
@@ -1010,8 +1005,12 @@ Forneça a explicação de forma concisa e didática.`;
       
       Siga RIGOROSAMENTE este formato JSON:
       {
+        "doctrineAndContext": "Explicação didática do conceito central da questão (1 ou 2 parágrafos)",
         "legalBasis": "Artigo da lei, súmula ou informativo que fundamenta a resposta",
-        "alternativesAnalysis": "Explicação curta do erro jurídico de cada alternativa incorreta",
+        "alternativesAnalysis": [
+          { "alternative": "A", "status": "Correta" ou "Incorreta", "explanation": "Explicação breve" },
+          ...
+        ],
         "mnemonic": "Um 'Pulo do Gato' (dica ou mnemônico) para não errar mais",
         "doctrineLink": "Referência curta ao tópico doutrinário (ex: Direito Penal - Teoria do Erro)"
       }`;
@@ -1028,6 +1027,8 @@ Forneça a explicação de forma concisa e didática.`;
       if (response.text) {
         const data = JSON.parse(response.text);
         setAiCommentary(prev => ({ ...prev, [question.id]: data }));
+        // Persist to Supabase
+        supabase.from('questions').update({ explicacao_doutrinaria: data.doctrineAndContext }).eq('id', question.id).then();
       }
     } catch (error) {
       console.error('Error generating intelligent correction:', error);
@@ -3011,6 +3012,16 @@ Forneça a explicação de forma concisa e didática.`;
                                 </div>
                               ) : aiCommentary[q.id] ? (
                                 <div className="space-y-4">
+                                  {/* Doutrina e Contexto */}
+                                  <div className="p-4 bg-indigo-50 dark:bg-indigo-900/10 rounded-xl border border-indigo-100 dark:border-indigo-900/30">
+                                    <h4 className="font-black text-indigo-800 dark:text-indigo-400 text-[10px] uppercase tracking-widest mb-2 flex items-center gap-2">
+                                      <BookOpen size={14} /> Doutrina e Contexto
+                                    </h4>
+                                    <p className="text-indigo-900/80 dark:text-indigo-200/80 text-sm leading-relaxed">
+                                      {aiCommentary[q.id].doctrineAndContext}
+                                    </p>
+                                  </div>
+
                                   {/* Fundamentação Legal */}
                                   <div className="p-5 bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl border border-emerald-100 dark:border-emerald-900/30">
                                     <h4 className="font-black text-emerald-800 dark:text-emerald-400 text-[10px] uppercase tracking-widest mb-2 flex items-center gap-2">
@@ -3022,17 +3033,27 @@ Forneça a explicação de forma concisa e didática.`;
                                   </div>
 
                                   {/* Análise das Alternativas */}
-                                  <div className="p-5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
+                                  <div className="space-y-2">
                                     <h4 className="font-black text-slate-700 dark:text-slate-300 text-[10px] uppercase tracking-widest mb-2 flex items-center gap-2">
                                       <Gavel size={14} /> Análise das Alternativas
                                     </h4>
-                                    <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">
-                                      {aiCommentary[q.id].alternativesAnalysis}
-                                    </p>
+                                    {Array.isArray(aiCommentary[q.id].alternativesAnalysis) ? (
+                                      aiCommentary[q.id].alternativesAnalysis.map((alt: any, idx: number) => (
+                                        <div key={idx} className={`p-4 rounded-xl border ${alt.status === 'Correta' ? 'bg-green-50 dark:bg-green-900/10 border-green-100 dark:border-green-900/30' : 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30'}`}>
+                                          <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                                            <span className="font-black uppercase">[{alt.alternative}] {alt.status}:</span> {alt.explanation}
+                                          </p>
+                                        </div>
+                                      ))
+                                    ) : (
+                                      <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">
+                                        {aiCommentary[q.id].alternativesAnalysis}
+                                      </p>
+                                    )}
                                   </div>
 
                                   {/* Pulo do Gato */}
-                                  <div className="p-5 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-100 dark:border-amber-900/30 relative overflow-hidden">
+                                  <div className="p-4 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-100 dark:border-amber-900/30 relative overflow-hidden">
                                     <div className="absolute top-0 right-0 p-2 opacity-10">
                                       <Zap size={40} className="text-amber-500" />
                                     </div>
@@ -3268,6 +3289,16 @@ Forneça a explicação de forma concisa e didática.`;
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Doutrina e Contexto */}
+                          <div className="p-6 bg-indigo-50 dark:bg-indigo-900/10 rounded-[2rem] border-2 border-indigo-100 dark:border-indigo-900/30">
+                            <h4 className="font-black text-indigo-800 dark:text-indigo-400 text-[11px] uppercase tracking-widest mb-3 flex items-center gap-2">
+                              <BookOpen size={16} /> Doutrina e Contexto
+                            </h4>
+                            <p className="text-indigo-900/80 dark:text-indigo-200/80 text-sm leading-relaxed">
+                              {aiCommentary[currentQuestion.id].doctrineAndContext}
+                            </p>
+                          </div>
+
                           <div className="p-6 bg-emerald-50 dark:bg-emerald-900/10 rounded-[2rem] border-2 border-emerald-100 dark:border-emerald-900/30">
                             <h4 className="font-black text-emerald-800 dark:text-emerald-400 text-[11px] uppercase tracking-widest mb-3 flex items-center gap-2">
                               <Scale size={16} /> Fundamentação Legal
@@ -3290,13 +3321,23 @@ Forneça a explicação de forma concisa e didática.`;
                           </div>
                         </div>
 
-                        <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-[2rem] border-2 border-slate-200 dark:border-slate-700">
+                        <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-[2rem] border-2 border-slate-200 dark:border-slate-700 space-y-3">
                           <h4 className="font-black text-slate-700 dark:text-slate-300 text-[11px] uppercase tracking-widest mb-3 flex items-center gap-2">
                             <Gavel size={16} /> Análise Técnica das Alternativas
                           </h4>
-                          <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed whitespace-pre-wrap">
-                            {aiCommentary[currentQuestion.id].alternativesAnalysis}
-                          </p>
+                          {Array.isArray(aiCommentary[currentQuestion.id].alternativesAnalysis) ? (
+                            aiCommentary[currentQuestion.id].alternativesAnalysis.map((alt: any, idx: number) => (
+                              <div key={idx} className={`p-4 rounded-xl border ${alt.status === 'Correta' ? 'bg-green-50 dark:bg-green-900/10 border-green-100 dark:border-green-900/30' : 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30'}`}>
+                                <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                                  <span className="font-black uppercase">[{alt.alternative}] {alt.status}:</span> {alt.explanation}
+                                </p>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed whitespace-pre-wrap">
+                              {aiCommentary[currentQuestion.id].alternativesAnalysis}
+                            </p>
+                          )}
                         </div>
 
                         {aiCommentary[currentQuestion.id].doctrineLink && (
