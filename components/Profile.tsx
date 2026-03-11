@@ -201,7 +201,7 @@ const Profile: React.FC = () => {
       }
     } catch (error) {
       console.error("Erro na sincronização Júpiter:", error);
-      alert("Erro ao analisar PDF do Júpiter.");
+      alert(`Erro ao analisar PDF do Júpiter: ${error instanceof Error ? error.message : String(error)}`);
       setIsSyncing(false);
       setSyncStatus('');
       setShowManualInput(true);
@@ -220,7 +220,7 @@ const Profile: React.FC = () => {
       }
     } catch (error) {
       console.error("Erro na sincronização manual Júpiter:", error);
-      alert("Erro ao analisar texto do Júpiter.");
+      alert(`Erro ao analisar texto do Júpiter: ${error instanceof Error ? error.message : String(error)}`);
       setIsSyncing(false);
       setSyncStatus('');
     }
@@ -248,7 +248,11 @@ const Profile: React.FC = () => {
     await dataService.saveUserProfile(updatedProfile, session.user.id, navigator.onLine);
     
     if (data.disciplinas && data.disciplinas.length > 0) {
-      await dataService.saveDisciplinas(data.disciplinas, session.user.id);
+      try {
+        await dataService.saveDisciplinas(data.disciplinas, session.user.id);
+      } catch (err) {
+        console.warn("Erro ao salvar disciplinas (tabela pode não existir):", err);
+      }
     }
     
     await fetchProfile();

@@ -369,11 +369,26 @@ export const geminiService = {
             }
           ]
         }
-      ]
+      ],
+      config: { responseMimeType: "application/json" }
     });
 
-    const cleaned = cleanJsonResponse(response.text || '{}');
-    const data = JSON.parse(cleaned);
+    let textResponse = '{}';
+    try {
+      textResponse = response.text || '{}';
+    } catch (e) {
+      console.error("Error getting response.text in PDF (possibly safety block):", e);
+      throw new Error("A IA bloqueou a resposta ou falhou ao gerar o texto.");
+    }
+
+    const cleaned = cleanJsonResponse(textResponse);
+    let data;
+    try {
+      data = JSON.parse(cleaned);
+    } catch (e) {
+      console.error("Failed to parse Gemini response in PDF:", cleaned);
+      throw new Error("Falha ao interpretar a resposta da IA (JSON inválido).");
+    }
     
     // Ensure numeric types
     return {
@@ -420,11 +435,26 @@ export const geminiService = {
 
     const response = await ai.models.generateContent({
       model: GEMINI_MODEL,
-      contents: [{ parts: [{ text: prompt }] }]
+      contents: [{ parts: [{ text: prompt }] }],
+      config: { responseMimeType: "application/json" }
     });
 
-    const cleaned = cleanJsonResponse(response.text || '{}');
-    const data = JSON.parse(cleaned);
+    let textResponse = '{}';
+    try {
+      textResponse = response.text || '{}';
+    } catch (e) {
+      console.error("Error getting response.text (possibly safety block):", e);
+      throw new Error("A IA bloqueou a resposta ou falhou ao gerar o texto.");
+    }
+
+    const cleaned = cleanJsonResponse(textResponse);
+    let data;
+    try {
+      data = JSON.parse(cleaned);
+    } catch (e) {
+      console.error("Failed to parse Gemini response in Text:", cleaned);
+      throw new Error("Falha ao interpretar a resposta da IA (JSON inválido).");
+    }
     
     // Ensure numeric types
     return {

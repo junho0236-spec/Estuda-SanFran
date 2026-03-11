@@ -190,21 +190,27 @@ export const dataService = {
   },
 
   async saveDisciplinas(disciplinas: any[], userId: string) {
-    // First, delete existing disciplines for this user to avoid duplicates
-    await supabase.from('disciplinas').delete().eq('user_id', userId);
-    
-    // Then insert new ones
-    if (disciplinas.length > 0) {
-      const payload = disciplinas.map(d => ({
-        user_id: userId,
-        codigo: d.codigo,
-        nome: d.nome,
-        turma_sala: d.turma_sala,
-        horarios: d.horarios
-      }));
+    try {
+      // First, delete existing disciplines for this user to avoid duplicates
+      await supabase.from('disciplinas').delete().eq('user_id', userId);
+      
+      // Then insert new ones
+      if (disciplinas.length > 0) {
+        const payload = disciplinas.map(d => ({
+          user_id: userId,
+          codigo: d.codigo,
+          nome: d.nome,
+          turma_sala: d.turma_sala,
+          horarios: d.horarios
+        }));
 
-      const { error } = await supabase.from('disciplinas').insert(payload);
-      if (error) throw error;
+        const { error } = await supabase.from('disciplinas').insert(payload);
+        if (error) {
+          console.warn("[dataService] Error inserting disciplinas:", error);
+        }
+      }
+    } catch (err) {
+      console.warn("[dataService] Exception in saveDisciplinas:", err);
     }
   },
 
