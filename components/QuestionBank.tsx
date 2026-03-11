@@ -57,7 +57,8 @@ import {
   Book,
   Search,
   Settings,
-  Volume2
+  Volume2,
+  Send
 } from 'lucide-react';
 import { GlossaryText } from './GlossaryText.tsx';
 import { GlossaryPopover } from './GlossaryPopover.tsx';
@@ -987,7 +988,44 @@ Forneça a explicação de forma concisa e didática.`;
   };
 
   const [aiCommentary, setAiCommentary] = useState<Record<string, any>>({});
+  const [followUpChat, setFollowUpChat] = useState<Record<string, { role: 'user' | 'assistant', text: string }[]>>({});
+  const [isFollowUpLoading, setIsFollowUpLoading] = useState<Record<string, boolean>>({});
+  const [followUpInput, setFollowUpInput] = useState<Record<string, string>>({});
   const [loadingAiCommentary, setLoadingAiCommentary] = useState<Record<string, boolean>>({});
+
+  const handleFollowUp = async (questionId: string, questionStatement: string) => {
+    const input = followUpInput[questionId] || '';
+    if (!input.trim()) return;
+
+    const userMsg = { role: 'user' as const, text: input };
+    setFollowUpChat(prev => ({
+      ...prev,
+      [questionId]: [...(prev[questionId] || []), userMsg]
+    }));
+    setFollowUpInput(prev => ({ ...prev, [questionId]: '' }));
+    setIsFollowUpLoading(prev => ({ ...prev, [questionId]: true }));
+
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
+      const chat = ai.chats.create({ model: "gemini-3-flash-preview" });
+      
+      // Context for the chat
+      const context = `Você é um professor de Direito especialista em concursos. Estamos discutindo a seguinte questão: ${questionStatement}.`;
+      
+      const response = await chat.sendMessage({ message: `${context}\n\n${input}` });
+      
+      if (response.text) {
+        setFollowUpChat(prev => ({
+          ...prev,
+          [questionId]: [...(prev[questionId] || []), { role: 'assistant', text: response.text! }]
+        }));
+      }
+    } catch (error) {
+      console.error('Error in follow-up chat:', error);
+    } finally {
+      setIsFollowUpLoading(prev => ({ ...prev, [questionId]: false }));
+    }
+  };
 
   const generateIntelligentCorrection = async (question: Question) => {
     if (aiCommentary[question.id]) return;
@@ -3073,24 +3111,58 @@ Forneça a explicação de forma concisa e didática.`;
                                     </p>
                                   </div>
 
-                                  {/* Doctrine Link */}
-                                  {(aiCommentary[q.id].doctrineLink && aiCommentary[q.id].doctrineUrl) && (
-                                    <div className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-900/30">
-                                      <div className="flex items-center gap-2">
-                                        <FileText size={16} className="text-blue-500" />
-                                        <span className="text-[10px] font-black text-blue-700 dark:text-blue-300 uppercase tracking-widest">Doutrina Relacionada:</span>
-                                        <span className="text-xs font-bold text-slate-600 dark:text-slate-400">{aiCommentary[q.id].doctrineLink}</span>
-                                      </div>
-                                      <a 
-                                        href={aiCommentary[q.id].doctrineUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1 text-[10px] font-black uppercase tracking-widest"
-                                      >
-                                        Ver Material <ExternalLink size={12} />
-                                      </a>
+                                  {/* Follow-up Chat */}
+                                  <div className="mt-6 pt-6 border-t border-slate-100 dark:border-white/5 space-y-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <MessageSquareText size={16} className="text-purple-500" />
+                                      <span className="text-[10px] font-black text-purple-600 uppercase tracking-widest">Aprofundar com Mentor IA</span>
                                     </div>
-                                  )}
+                                    
+                                    <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                                      {(followUpChat[q.id] || []).map((msg, i) => (
+                                        <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                          <div className={`max-w-[90%] p-4 rounded-2xl text-xs font-bold shadow-sm ${
+                                            msg.role === 'user' 
+                                              ? 'bg-purple-600 text-white rounded-tr-none' 
+                                              : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-tl-none border border-slate-100 dark:border-white/5'
+                                          }`}>
+                                            <div className="prose prose-xs dark:prose-invert max-w-none">
+                                              <Markdown>{msg.text}</Markdown>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                      {isFollowUpLoading[q.id] && (
+                                        <div className="flex justify-start">
+                                          <div className="bg-slate-100 dark:bg-white/5 p-3 rounded-2xl rounded-tl-none">
+                                            <Loader2 size={14} className="animate-spin text-purple-500" />
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="flex gap-2">
+                                      <input 
+                                        type="text"
+                                        value={followUpInput[q.id] || ''}
+                                        onChange={(e) => setFollowUpInput(prev => ({ ...prev, [q.id]: e.target.value }))}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleFollowUp(q.id, q.statement)}
+                                        placeholder="Tire uma dúvida ou peça para aprofundar..."
+                                        className="flex-1 p-3 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold outline-none focus:border-purple-500"
+                                      />
+                                      <button 
+                                        onClick={() => handleFollowUp(q.id, q.statement)}
+                                        disabled={isFollowUpLoading[q.id] || !(followUpInput[q.id] || '').trim()}
+                                        className="p-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors disabled:opacity-50"
+                                      >
+                                        {isFollowUpLoading[q.id] ? (
+                                          <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                          <Send className="w-4 h-4" />
+                                        )}
+                                      </button>
+                                    </div>
+                                  </div>
 
                                   <div className="flex gap-3 pt-2">
                                     <button
@@ -3350,27 +3422,58 @@ Forneça a explicação de forma concisa e didática.`;
                           )}
                         </div>
 
-                        {(aiCommentary[currentQuestion.id].doctrineLink && aiCommentary[currentQuestion.id].doctrineUrl) && (
-                          <div className="flex items-center justify-between p-5 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border-2 border-blue-100 dark:border-blue-900/30">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                                <FileText size={20} className="text-blue-600 dark:text-blue-400" />
-                              </div>
-                              <div>
-                                <span className="block text-[10px] font-black text-blue-700 dark:text-blue-300 uppercase tracking-widest">Referência Doutrinária</span>
-                                <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{aiCommentary[currentQuestion.id].doctrineLink}</span>
-                              </div>
-                            </div>
-                            <a 
-                              href={aiCommentary[currentQuestion.id].doctrineUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-4 py-2 bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-50 transition-all flex items-center gap-2"
-                            >
-                              Ver Material <ExternalLink size={14} />
-                            </a>
+                        {/* Follow-up Chat */}
+                        <div className="mt-6 pt-6 border-t border-slate-100 dark:border-white/5 space-y-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <MessageSquareText size={16} className="text-purple-500" />
+                            <span className="text-[10px] font-black text-purple-600 uppercase tracking-widest">Aprofundar com Mentor IA</span>
                           </div>
-                        )}
+                          
+                          <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                            {(followUpChat[currentQuestion.id] || []).map((msg, i) => (
+                              <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[90%] p-4 rounded-2xl text-xs font-bold shadow-sm ${
+                                  msg.role === 'user' 
+                                    ? 'bg-purple-600 text-white rounded-tr-none' 
+                                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-tl-none border border-slate-100 dark:border-white/5'
+                                }`}>
+                                  <div className="prose prose-xs dark:prose-invert max-w-none">
+                                    <Markdown>{msg.text}</Markdown>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                            {isFollowUpLoading[currentQuestion.id] && (
+                              <div className="flex justify-start">
+                                <div className="bg-slate-100 dark:bg-white/5 p-3 rounded-2xl rounded-tl-none">
+                                  <Loader2 size={14} className="animate-spin text-purple-500" />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex gap-2">
+                            <input 
+                              type="text"
+                              value={followUpInput[currentQuestion.id] || ''}
+                              onChange={(e) => setFollowUpInput(prev => ({ ...prev, [currentQuestion.id]: e.target.value }))}
+                              onKeyDown={(e) => e.key === 'Enter' && handleFollowUp(currentQuestion.id, currentQuestion.statement)}
+                              placeholder="Tire uma dúvida ou peça para aprofundar..."
+                              className="flex-1 p-3 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold outline-none focus:border-purple-500"
+                            />
+                            <button 
+                              onClick={() => handleFollowUp(currentQuestion.id, currentQuestion.statement)}
+                              disabled={isFollowUpLoading[currentQuestion.id] || !(followUpInput[currentQuestion.id] || '').trim()}
+                              className="p-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors disabled:opacity-50"
+                            >
+                              {isFollowUpLoading[currentQuestion.id] ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Send className="w-4 h-4" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
 
                         <div className="flex gap-4 pt-2">
                           <button
