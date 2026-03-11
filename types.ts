@@ -217,6 +217,7 @@ export interface StudySession {
   subject_id: string;
   folder_id?: string;
   reading_id?: string;
+  task_id?: string;
   rating?: number;
 }
 
@@ -811,7 +812,7 @@ export interface Notification {
   is_read: boolean;
   link_task?: string;
   created_at: string;
-  type?: 'delegated' | 'completed' | 'friend_request';
+  type?: 'delegated' | 'completed' | 'friend_request' | string;
 }
 
 export interface Friendship {
@@ -819,7 +820,7 @@ export interface Friendship {
   user_id: string;
   friend_id: string;
   friend_name: string;
-  status: 'pending' | 'accepted';
+  status: 'pending' | 'accepted' | 'pendente' | 'aceito';
   created_at: string;
 }
 

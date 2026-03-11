@@ -236,6 +236,7 @@ const App: React.FC = () => {
   const [timerStudyMode, setTimerStudyMode] = useState<StudyMode>(StudyMode.CLASSIC);
   const [timerSelectedSubjectId, setTimerSelectedSubjectId] = useState<string | null>(null);
   const [timerSelectedReadingId, setTimerSelectedReadingId] = useState<string | null>(null);
+  const [timerSelectedTaskId, setTimerSelectedTaskId] = useState<string | null>(null);
   const [timerTotalInitial, setTimerTotalInitial] = useState(25 * 60);
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -429,6 +430,7 @@ const App: React.FC = () => {
       duration: duration,
       subject_id: timerSelectedSubjectId || '',
       reading_id: timerSelectedReadingId || undefined,
+      task_id: timerSelectedTaskId || undefined,
       start_time: brDate
     };
 
@@ -1166,6 +1168,7 @@ const App: React.FC = () => {
                   <Pomodoro 
                     subjects={subjects} 
                     readings={readings}
+                    tasks={tasks}
                     userId={session.user.id} 
                     studySessions={studySessions} 
                     setStudySessions={setStudySessions}
@@ -1179,6 +1182,8 @@ const App: React.FC = () => {
                     setSelectedSubjectId={setTimerSelectedSubjectId}
                     selectedReadingId={timerSelectedReadingId}
                     setSelectedReadingId={setTimerSelectedReadingId}
+                    selectedTaskId={timerSelectedTaskId}
+                    setSelectedTaskId={setTimerSelectedTaskId}
                     setTotalInitial={setTimerTotalInitial}
                     onManualFinalize={manualFinalize}
                     isExtremeFocus={isExtremeFocus}

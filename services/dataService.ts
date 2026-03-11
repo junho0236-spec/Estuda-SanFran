@@ -282,12 +282,12 @@ export const dataService = {
 
   // COLLABORATION
   async getFriends(userId: string) {
-    // Tenta buscar amizades aceitas
+    // Tenta buscar amizades aceitas (aceito ou accepted para compatibilidade)
     const { data, error } = await supabase
       .from('friendships')
       .select('*')
       .eq('user_id', userId)
-      .eq('status', 'accepted');
+      .in('status', ['aceito', 'accepted']);
     
     if (error || !data) return [];
 

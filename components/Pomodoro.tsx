@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Play, Pause, RotateCcw, Clock, Settings2, ShieldCheck, Coffee, History, Trash2, ArrowLeft, Calendar, Gavel, Trash, Check, Book, Quote, Zap, BrainCircuit } from 'lucide-react';
-import { Subject, StudySession, Reading } from '../types';
+import { Play, Pause, RotateCcw, Clock, Settings2, ShieldCheck, Coffee, History, Trash2, ArrowLeft, Calendar, Gavel, Trash, Check, Book, Quote, Zap, BrainCircuit, CheckSquare } from 'lucide-react';
+import { Subject, StudySession, Reading, Task } from '../types';
 import { supabase } from '../services/supabaseClient';
 import { updateQuestProgress } from '../services/questService';
 
@@ -20,6 +20,7 @@ const STUDY_MODE_TIMES = {
 interface PomodoroProps {
   subjects: Subject[];
   readings: Reading[];
+  tasks: Task[];
   userId: string;
   studySessions: StudySession[];
   setStudySessions: React.Dispatch<React.SetStateAction<StudySession[]>>;
@@ -33,6 +34,8 @@ interface PomodoroProps {
   setSelectedSubjectId: (id: string | null) => void;
   selectedReadingId: string | null;
   setSelectedReadingId: (id: string | null) => void;
+  selectedTaskId: string | null;
+  setSelectedTaskId: (id: string | null) => void;
   setTotalInitial: (seconds: number) => void;
   onManualFinalize?: () => void;
   isExtremeFocus?: boolean;
@@ -43,6 +46,7 @@ interface PomodoroProps {
 const Pomodoro: React.FC<PomodoroProps> = ({ 
   subjects, 
   readings,
+  tasks,
   userId, 
   studySessions, 
   setStudySessions,
@@ -56,6 +60,8 @@ const Pomodoro: React.FC<PomodoroProps> = ({
   setSelectedSubjectId,
   selectedReadingId,
   setSelectedReadingId,
+  selectedTaskId,
+  setSelectedTaskId,
   setTotalInitial,
   onManualFinalize,
   isExtremeFocus = false,
@@ -80,6 +86,16 @@ const Pomodoro: React.FC<PomodoroProps> = ({
   const activeQuote = useMemo(() => {
     return focusQuotes[Math.floor(Math.random() * focusQuotes.length)];
   }, [isActive, mode]);
+
+  const selectedTask = useMemo(() => {
+    return tasks.find(t => t.id === selectedTaskId);
+  }, [tasks, selectedTaskId]);
+
+  useEffect(() => {
+    if (selectedTask && selectedTask.subjectId) {
+      setSelectedSubjectId(selectedTask.subjectId);
+    }
+  }, [selectedTask, setSelectedSubjectId]);
 
   useEffect(() => {
     if (!isActive) {
@@ -187,6 +203,7 @@ const Pomodoro: React.FC<PomodoroProps> = ({
               studySessions.map((session) => {
                 const subject = subjects.find(sub => sub.id === session.subject_id);
                 const reading = readings.find(r => r.id === session.reading_id);
+                const task = tasks.find(t => t.id === session.task_id);
                 const date = new Date(session.start_time);
                 const durationMins = Math.floor(session.duration / 60);
                 const durationSecs = session.duration % 60;
@@ -197,6 +214,11 @@ const Pomodoro: React.FC<PomodoroProps> = ({
                       <div className="w-2 h-10 rounded-full" style={{ backgroundColor: subject?.color || '#9B111E' }} />
                       <div>
                         <p className="font-black text-slate-900 dark:text-white text-sm uppercase tracking-tight truncate max-w-[150px]">{subject?.name || 'Geral'}</p>
+                        {task && (
+                          <p className="text-[9px] font-bold text-emerald-600 uppercase flex items-center gap-1">
+                            <CheckSquare size={8} /> {task.title}
+                          </p>
+                        )}
                         {reading && (
                           <p className="text-[9px] font-bold text-sanfran-rubi uppercase flex items-center gap-1">
                             <Book size={8} /> {reading.title}
@@ -345,7 +367,20 @@ const Pomodoro: React.FC<PomodoroProps> = ({
         </div>
 
         {!isExtremeFocus && (
-          <div className="w-full mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
+          <div className="w-full mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl">
+            <div className="space-y-2">
+              <label className="text-[9px] md:text-[10px] text-center block font-black text-slate-400 uppercase tracking-widest">Pauta / Tarefa</label>
+              <select 
+                value={selectedTaskId || ''} 
+                onChange={(e) => setSelectedTaskId(e.target.value || null)} 
+                className="w-full p-4 bg-slate-50 dark:bg-black/60 border-2 border-slate-200 dark:border-sanfran-rubi/30 rounded-2xl font-black outline-none focus:border-sanfran-rubi text-xs text-slate-900 dark:text-white transition-all shadow-inner"
+              >
+                <option value="">Nenhuma Tarefa</option>
+                {tasks.filter(t => !t.completed).map(t => (
+                  <option key={t.id} value={t.id}>{t.title}</option>
+                ))}
+              </select>
+            </div>
             <div className="space-y-2">
               <label className="text-[9px] md:text-[10px] text-center block font-black text-slate-400 uppercase tracking-widest">Cadeira</label>
               <select 
