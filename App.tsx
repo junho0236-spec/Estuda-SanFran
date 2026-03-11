@@ -761,21 +761,31 @@ const App: React.FC = () => {
   const closeSidebar = () => setIsSidebarOpen(false);
 
   const incrementCorrectQuestions = async () => {
-    const newCount = correctQuestionsCount + 1;
-    setCorrectQuestionsCount(newCount);
+    if (!session?.user) return;
     
-    if (isAuthenticated && session?.user) {
-      try {
-        await supabase
-          .from('user_progress')
-          .upsert({ 
-            user_id: session.user.id, 
-            correct_count: newCount,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'user_id' });
-      } catch (e) {
-        console.error("Erro ao sincronizar acertos:", e);
-      }
+    try {
+      // Fetch current progress to avoid overwriting other fields
+      const { data: current, error: fetchError } = await supabase
+        .from('user_progress')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .maybeSingle();
+        
+      if (fetchError) throw fetchError;
+
+      const newCount = (current?.correct_count || 0) + 1;
+      setCorrectQuestionsCount(newCount);
+      
+      await supabase
+        .from('user_progress')
+        .upsert({ 
+          ...current,
+          user_id: session.user.id, 
+          correct_count: newCount,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+    } catch (e) {
+      console.error("Erro ao sincronizar acertos:", e);
     }
   };
 
