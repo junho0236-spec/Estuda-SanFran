@@ -367,20 +367,21 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
   const [generatingPrecedentId, setGeneratingPrecedentId] = useState<string | null>(null);
 
   const getXRayStats = (questionId: string) => {
-    const charSum = questionId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const totalAttempts = (charSum % 5) + 1; // 1 to 5
-    const correctAttempts = charSum % (totalAttempts + 1);
-    const lastAttemptCorrect = charSum % 2 === 0;
-    const avgTimeSeconds = 45 + (charSum % 120); // 45s to 165s
-    
-    const minutes = Math.floor(avgTimeSeconds / 60);
-    const seconds = avgTimeSeconds % 60;
+    const stats = userProgress?.question_stats?.[questionId];
+    if (!stats) {
+      return {
+        totalAttempts: 0,
+        correctAttempts: 0,
+        lastAttemptCorrect: false,
+        avgTime: '0s'
+      };
+    }
     
     return {
-      totalAttempts,
-      correctAttempts,
-      lastAttemptCorrect,
-      avgTime: `${minutes}m ${seconds}s`
+      totalAttempts: stats.totalAttempts,
+      correctAttempts: stats.correctAttempts,
+      lastAttemptCorrect: stats.lastAttemptCorrect,
+      avgTime: '0s'
     };
   };
 
@@ -849,6 +850,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
         wrong_count: updates.wrongCount !== undefined ? updates.wrongCount : (current?.wrong_count || wrongCount),
         error_mastery: updates.errorMastery !== undefined ? updates.errorMastery : (current?.error_mastery || errorMastery),
         confidence_levels: updates.confidence_levels !== undefined ? updates.confidence_levels : (current?.confidence_levels || userProgress?.confidence_levels || {}),
+        question_stats: updates.question_stats !== undefined ? updates.question_stats : (current?.question_stats || userProgress?.question_stats || {}),
         updated_at: new Date().toISOString()
       };
 
@@ -1723,13 +1725,24 @@ Forneça a explicação de forma concisa e didática.`;
       }
       
       const currentConfidenceLevels = { ...(userProgress?.confidence_levels || {}), [targetQuestion.id]: level };
+      
+      // Update question stats
+      const newStats = { ...(userProgress?.question_stats || {}) };
+      const qStats = newStats[targetQuestion.id] || { correctAttempts: 0, totalAttempts: 0, lastAttemptCorrect: false };
+      const isCorrect = index === targetQuestion.correct_answer;
+      newStats[targetQuestion.id] = {
+        correctAttempts: isCorrect ? qStats.correctAttempts + 1 : qStats.correctAttempts,
+        totalAttempts: qStats.totalAttempts + 1,
+        lastAttemptCorrect: isCorrect
+      };
 
       syncUserProgress({ 
         correctCount: newCount, 
         wrongQuestions: newWrong, 
         correctQuestions: newCorrect,
         errorMastery: newMastery,
-        confidence_levels: currentConfidenceLevels
+        confidence_levels: currentConfidenceLevels,
+        question_stats: newStats
       });
     } else {
       supabase.from('questions').update({ status: 'Errado' }).eq('id', targetQuestion.id).then();
@@ -1750,11 +1763,21 @@ Forneça a explicação de forma concisa e didática.`;
       
       const currentConfidenceLevels = { ...(userProgress?.confidence_levels || {}), [targetQuestion.id]: level };
 
+      // Update question stats
+      const newStats = { ...(userProgress?.question_stats || {}) };
+      const qStats = newStats[targetQuestion.id] || { correctAttempts: 0, totalAttempts: 0, lastAttemptCorrect: false };
+      newStats[targetQuestion.id] = {
+        correctAttempts: qStats.correctAttempts,
+        totalAttempts: qStats.totalAttempts + 1,
+        lastAttemptCorrect: false
+      };
+
       syncUserProgress({ 
         wrongCount: newCount, 
         wrongQuestions: newWrong,
         errorMastery: newMastery,
-        confidence_levels: currentConfidenceLevels
+        confidence_levels: currentConfidenceLevels,
+        question_stats: newStats
       });
     }
     setPendingAnswerIndex(null);

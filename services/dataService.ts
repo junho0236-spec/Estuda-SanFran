@@ -120,8 +120,36 @@ export const dataService = {
         const { error } = await supabase.from('user_persona').upsert(cloudPayload);
         if (error) {
           console.warn("[dataService] Full upsert failed, falling back to field-by-field update:", error.message);
-          
-          // Fallback: try to update field by field to ignore problematic columns
+          // ... (rest of the function)
+        }
+      } catch (e) {
+        console.error("[dataService] Error saving user profile:", e);
+      }
+    }
+  },
+
+  async updateQuestionProgress(userId: string, progress: UserProgress) {
+    const { error } = await supabase
+      .from('user_progress')
+      .upsert({
+        user_id: userId,
+        favorites: progress.favorites,
+        wrong_questions: progress.wrong_questions,
+        correct_questions: progress.correct_questions,
+        notes: progress.notes,
+        correct_count: progress.correct_count,
+        wrong_count: progress.wrong_count,
+        error_mastery: progress.error_mastery,
+        confidence_levels: progress.confidence_levels,
+        question_stats: progress.question_stats,
+        updated_at: new Date().toISOString()
+      });
+
+    if (error) {
+      console.error("[dataService] Error updating user progress:", error);
+      throw error;
+    }
+  },  // Fallback: try to update field by field to ignore problematic columns
           // First ensure row exists with minimal data
           await supabase.from('user_persona').upsert({ id: userId });
           
@@ -828,6 +856,29 @@ export const dataService = {
       } catch (err) {
         console.error(`Failed to sync item ${item.id}`, err);
       }
+    }
+  },
+
+  async updateQuestionProgress(userId: string, progress: UserProgress) {
+    const { error } = await supabase
+      .from('user_progress')
+      .upsert({
+        user_id: userId,
+        favorites: progress.favorites,
+        wrong_questions: progress.wrong_questions,
+        correct_questions: progress.correct_questions,
+        notes: progress.notes,
+        correct_count: progress.correct_count,
+        wrong_count: progress.wrong_count,
+        error_mastery: progress.error_mastery,
+        confidence_levels: progress.confidence_levels,
+        question_stats: progress.question_stats,
+        updated_at: new Date().toISOString()
+      });
+
+    if (error) {
+      console.error("[dataService] Error updating user progress:", error);
+      throw error;
     }
   }
 };

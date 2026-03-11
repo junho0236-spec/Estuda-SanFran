@@ -544,6 +544,7 @@ export interface UserProgress {
   wrong_count: number;
   error_mastery?: Record<string, number>; // question_id -> consecutive_correct_count
   confidence_levels?: Record<string, 'certeza' | 'duvida' | 'chute'>;
+  question_stats?: Record<string, { correctAttempts: number, totalAttempts: number, lastAttemptCorrect: boolean }>;
   updated_at: string;
 }
 
