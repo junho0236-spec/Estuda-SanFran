@@ -16,7 +16,7 @@ const Profile = React.lazy(() => import('./components/Profile'));
 const Anki = React.lazy(() => import('./components/Anki'));
 const Pomodoro = React.lazy(() => import('./components/Pomodoro'));
 const Subjects = React.lazy(() => import('./components/Subjects'));
-const Tasks = React.lazy(() => import('./components/Tasks'));
+const TaskMasterDetail = React.lazy(() => import('./components/TaskMasterDetail'));
 const CalendarView = React.lazy(() => import('./components/CalendarView'));
 const Ranking = React.lazy(() => import('./components/Ranking'));
 const Library = React.lazy(() => import('./components/Library'));
@@ -1193,7 +1193,7 @@ const App: React.FC = () => {
                     tasks={tasks}
                   />
                 } />
-                <Route path={getPathFromView(View.Tasks)} element={<Tasks subjects={subjects} tasks={tasks} setTasks={setTasks} userId={session.user.id} isOnline={isOnline} />} />
+                <Route path={getPathFromView(View.Tasks)} element={<TaskMasterDetail tasks={tasks} subjects={subjects} setTasks={setTasks} userId={session.user.id} isOnline={isOnline} />} />
 
                 <Route path="/simulados" element={<QuestionBank userId={session.user.id} onCorrectAnswer={incrementCorrectQuestions} folders={folders} flashcards={flashcards} />} />
 
