@@ -1012,7 +1012,8 @@ Forneça a explicação de forma concisa e didática.`;
           ...
         ],
         "mnemonic": "Um 'Pulo do Gato' (dica ou mnemônico) para não errar mais",
-        "doctrineLink": "Referência curta ao tópico doutrinário (ex: Direito Penal - Teoria do Erro)"
+        "doctrineLink": "Referência curta ao tópico doutrinário (ex: Direito Penal - Teoria do Erro)",
+        "doctrineUrl": "URL de uma fonte externa confiável sobre o assunto"
       }`;
 
       const response = await ai.models.generateContent({
@@ -3080,12 +3081,23 @@ Forneça a explicação de forma concisa e didática.`;
                                         <span className="text-[10px] font-black text-blue-700 dark:text-blue-300 uppercase tracking-widest">Doutrina Relacionada:</span>
                                         <span className="text-xs font-bold text-slate-600 dark:text-slate-400">{aiCommentary[q.id].doctrineLink}</span>
                                       </div>
-                                      <button 
-                                        onClick={() => navigate('/library')}
-                                        className="text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1 text-[10px] font-black uppercase tracking-widest"
-                                      >
-                                        Ver Material <ExternalLink size={12} />
-                                      </button>
+                                      {aiCommentary[q.id].doctrineUrl ? (
+                                        <a 
+                                          href={aiCommentary[q.id].doctrineUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1 text-[10px] font-black uppercase tracking-widest"
+                                        >
+                                          Ver Material <ExternalLink size={12} />
+                                        </a>
+                                      ) : (
+                                        <button 
+                                          onClick={() => navigate('/library')}
+                                          className="text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1 text-[10px] font-black uppercase tracking-widest"
+                                        >
+                                          Ver Material <ExternalLink size={12} />
+                                        </button>
+                                      )}
                                     </div>
                                   )}
 
@@ -3358,12 +3370,23 @@ Forneça a explicação de forma concisa e didática.`;
                                 <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{aiCommentary[currentQuestion.id].doctrineLink}</span>
                               </div>
                             </div>
-                            <button 
-                              onClick={() => navigate('/library')}
-                              className="px-4 py-2 bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-50 transition-all flex items-center gap-2"
-                            >
-                              Abrir Biblioteca <ExternalLink size={14} />
-                            </button>
+                            {aiCommentary[currentQuestion.id].doctrineUrl ? (
+                              <a 
+                                href={aiCommentary[currentQuestion.id].doctrineUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-4 py-2 bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-50 transition-all flex items-center gap-2"
+                              >
+                                Ver Material <ExternalLink size={14} />
+                              </a>
+                            ) : (
+                              <button 
+                                onClick={() => navigate('/library')}
+                                className="px-4 py-2 bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-50 transition-all flex items-center gap-2"
+                              >
+                                Abrir Biblioteca <ExternalLink size={14} />
+                              </button>
+                            )}
                           </div>
                         )}
 
