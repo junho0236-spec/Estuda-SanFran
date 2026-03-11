@@ -10,7 +10,6 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import imageCompression from 'browser-image-compression';
-import * as pdfjsLib from 'pdfjs-dist';
 import { dataService } from '../services/dataService';
 import { geminiService } from '../services/geminiService';
 import { supabase } from '../services/supabaseClient';
@@ -176,52 +175,51 @@ const Profile: React.FC = () => {
   const handleJupiterSync = async (file: File) => {
     if (!session?.user || !profile) return;
     setIsSyncing(true);
-    setSyncStatus('Analisando histórico...');
+    setSyncStatus('Enviando para análise...');
     try {
-      console.log("Testing handleJupiterSync");
-      const arrayBuffer = await file.arrayBuffer();
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      
-      let fullText = '';
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        fullText += textContent.items.map((item: any) => item.str).join(' ');
-      }
+      // 1. Upload to Supabase Storage
+      const path = `${session.user.id}/jupiter_${Date.now()}_${file.name}`;
+      await dataService.uploadFile(file, path, 'curriculos', file.type);
+
+      // 2. Convert to base64 for Gemini
+      const reader = new FileReader();
+      const base64PDF = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve((reader.result as string).split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
 
       setSyncStatus('Mapeando matérias das Arcadas...');
-      const data = await geminiService.analyzeJupiterText(fullText);
+      const data = await geminiService.analyzeJupiterPDF(base64PDF);
+      
+      if (data) {
+        setSyncStatus('Perfil atualizado!');
+        const updatedProfile = {
+          ...profile,
+          full_name: data.full_name || profile.full_name,
+          turma: data.turma || profile.turma,
+          progresso_obrigatorias: data.progresso_obrigatorias || profile.progresso_obrigatorias,
+          progresso_optativas: data.progresso_optativas || profile.progresso_optativas,
+          progresso_total: data.progresso_total || profile.progresso_total,
+          status_geral_integralizacao: data.status_geral_integralizacao || profile.status_geral_integralizacao,
+          aniversario: data.aniversario || profile.aniversario,
+        };
         
-        if (data) {
-          setSyncStatus('Perfil atualizado!');
-          const updatedProfile = {
-            ...profile,
-            full_name: data.full_name || profile.full_name,
-            turma: data.turma || profile.turma,
-            progresso_obrigatorias: data.progresso_obrigatorias || profile.progresso_obrigatorias,
-            progresso_optativas: data.progresso_optativas || profile.progresso_optativas,
-            progresso_total: data.progresso_total || profile.progresso_total,
-            status_geral_integralizacao: data.status_geral_integralizacao || profile.status_geral_integralizacao,
-            aniversario: data.aniversario || profile.aniversario,
-          };
-          
-          await dataService.saveUserProfile(updatedProfile, session.user.id, navigator.onLine);
-          
-          if (data.disciplinas && data.disciplinas.length > 0) {
-            await dataService.saveDisciplinas(data.disciplinas, session.user.id);
-            // Update local state
-            const { data: discData } = await supabase.from('disciplinas').select('*').eq('user_id', session.user.id);
-            if (discData) setDisciplinas(discData);
-          }
-          
-          setProfile(updatedProfile);
-          setTimeout(() => {
-            setSyncStatus('');
-            setIsSyncing(false);
-            alert("Perfil sincronizado com sucesso via Júpiter!");
-          }, 1500);
+        await dataService.saveUserProfile(updatedProfile, session.user.id, navigator.onLine);
+        
+        if (data.disciplinas && data.disciplinas.length > 0) {
+          await dataService.saveDisciplinas(data.disciplinas, session.user.id);
+          const { data: discData } = await supabase.from('disciplinas').select('*').eq('user_id', session.user.id);
+          if (discData) setDisciplinas(discData);
         }
+        
+        setProfile(updatedProfile);
+        setTimeout(() => {
+          setSyncStatus('');
+          setIsSyncing(false);
+          alert("Perfil sincronizado com sucesso via Júpiter!");
+        }, 1500);
+      }
     } catch (error) {
       console.error("Erro na sincronização Júpiter:", error);
       alert("Erro ao analisar PDF do Júpiter.");
