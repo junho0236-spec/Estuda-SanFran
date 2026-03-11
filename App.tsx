@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
 import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map as MapIcon, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck, BookX, ScrollText, FileText, Repeat, UserX, ListTodo, Handshake, Eye, Key, CalendarCheck, Loader2, BarChart3, Search, Command } from 'lucide-react';
-import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel, StudyMode, Board, Notification, Friendship } from './types';
+import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel, StudyMode, Board, Notification, Friendship, UserProfile } from './types';
 import Login from './components/Login';
 import Atmosphere from './components/Atmosphere';
 import Scratchpad from './components/Scratchpad';
@@ -10,6 +10,7 @@ import { supabase } from './services/supabaseClient';
 import { db } from './services/offlineService';
 import { dataService } from './services/dataService';
 import ErrorBoundary from './components/ErrorBoundary';
+import { getViewLabel } from './utils';
 
 // Lazy Load dos Componentes para Performance (Code Splitting)
 const Dashboard = React.lazy(() => import('./components/Dashboard'));
@@ -206,6 +207,7 @@ const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [presenceUsers, setPresenceUsers] = useState<PresenceUser[]>([]);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   // DUEL STATES
   const [activeDuel, setActiveDuel] = useState<Duel | null>(null);
@@ -270,7 +272,10 @@ const App: React.FC = () => {
               is_timer_active: userState.is_timer_active,
               last_seen: userState.last_seen,
               study_room_id: userState.study_room_id,
-              study_start_time: userState.study_start_time
+              study_start_time: userState.study_start_time,
+              localizacao_atual: userState.localizacao_atual,
+              turma: userState.turma,
+              cargo: userState.cargo
             });
           }
         });
@@ -287,7 +292,10 @@ const App: React.FC = () => {
             is_timer_active: timerIsActive,
             last_seen: new Date().toISOString(),
             study_room_id: currentView === View.StudyRoom ? currentRoomId : null,
-            study_start_time: currentView === View.StudyRoom ? roomStartTime : null
+            study_start_time: currentView === View.StudyRoom ? roomStartTime : null,
+            localizacao_atual: getViewLabel(currentView),
+            turma: userProfile?.turma,
+            cargo: userProfile?.experiencias_lideranca?.[0]?.cargo
           });
         }
       });
@@ -320,7 +328,7 @@ const App: React.FC = () => {
       channel.unsubscribe();
       supabase.removeChannel(duelsChannel);
     };
-  }, [isAuthenticated, session, currentView, timerIsActive, timerSelectedSubjectId, subjects, currentRoomId, roomStartTime]);
+  }, [isAuthenticated, session, currentView, timerIsActive, timerSelectedSubjectId, subjects, currentRoomId, roomStartTime, userProfile]);
 
   // --- Realtime Data Sync Listener ---
   useEffect(() => {
@@ -552,6 +560,9 @@ const App: React.FC = () => {
         // Fetch subjects first as they are often dependencies
         const { data: subs } = await supabase.from('subjects').select('*').eq('user_id', userId);
         if (subs) setSubjects(subs);
+        
+        const profile = await dataService.getUserProfile(userId, isOnline);
+        if (profile) setUserProfile(profile);
 
         // Fetch others in parallel but handle them individually to avoid one failure crashing everything
         const [resFlds, resCards, resTks, resBoards, resSessions, resReadings, resProgress] = await Promise.all([

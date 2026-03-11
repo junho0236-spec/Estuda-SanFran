@@ -261,13 +261,26 @@ export const dataService = {
     }
   },
 
-  async uploadFile(file: File, path: string): Promise<string> {
-    const { data, error } = await supabase.storage.from('subject-files').upload(path, file);
+  async uploadFile(file: File, path: string, bucket: string = 'subject-files', contentType?: string): Promise<string> {
+    const options = contentType ? { contentType } : {};
+    
+    // Ensure the path is unique by prepending Date.now() if not already handled
+    const uniquePath = path.includes(Date.now().toString()) ? path : `${Date.now()}-${path}`;
+    
+    const { data, error } = await supabase.storage.from(bucket).upload(uniquePath, file, options);
+    
     if (error) {
-      console.error("Upload error:", error);
+      console.error("[dataService] Upload error details:", {
+        message: error.message,
+        name: error.name,
+        stack: error.stack,
+        bucket,
+        path: uniquePath
+      });
       throw error;
     }
-    const { data: { publicUrl } } = supabase.storage.from('subject-files').getPublicUrl(data.path);
+    
+    const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(data.path);
     return publicUrl;
   },
   // TASKS

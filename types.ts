@@ -286,6 +286,9 @@ export interface PresenceUser {
   // New fields for Study Rooms
   study_room_id?: string;
   study_start_time?: number; // timestamp
+  localizacao_atual?: string;
+  turma?: number;
+  cargo?: string;
 }
 
 export interface MuralMessage {

@@ -3,6 +3,7 @@ import React from 'react';
 import { Users, User, Zap, BookOpen, BrainCircuit, Coffee, Clock, ShieldCheck, Map as MapIcon, Sparkles, Sword } from 'lucide-react';
 import { PresenceUser, View, DuelQuestion } from '../types';
 import { supabase } from '../services/supabaseClient';
+import { getViewLabel } from '../utils';
 
 interface LargoProps {
   presenceUsers: PresenceUser[];
@@ -22,22 +23,6 @@ const QUESTIONS_POOL: DuelQuestion[] = [
 const Largo: React.FC<LargoProps> = ({ presenceUsers, currentUserId }) => {
   const onlineCount = presenceUsers.length;
 
-  const getViewLabel = (view: string) => {
-    switch (view) {
-      case View.Dashboard: return 'Analisando o Painel';
-      case View.Anki: return 'Revisando Flashcards';
-      case View.Timer: return 'Em Sessão de Foco';
-      case View.Subjects: return 'Organizando Cadeiras';
-      case View.Tasks: return 'Consultando a Pauta';
-      case View.Calendar: return 'Revisando a Agenda';
-      case View.Ranking: return 'No Hall da Fama';
-      case View.Library: return 'Consultando a Doutrina';
-      case View.Largo: return 'No Largo São Francisco';
-      case View.Duel: return 'Em Combate Intelectual';
-      default: return 'Caminhando pelas Arcadas';
-    }
-  };
-
   const getStatusIcon = (user: PresenceUser) => {
     if (user.is_timer_active) return <Zap className="w-4 h-4 text-sanfran-rubi animate-pulse" />;
     switch (user.view) {
@@ -49,28 +34,27 @@ const Largo: React.FC<LargoProps> = ({ presenceUsers, currentUserId }) => {
     }
   };
 
-  const challengeUser = async (opponent: PresenceUser) => {
-    const challenger = presenceUsers.find(u => u.user_id === currentUserId);
-    if (!challenger) return;
+  const [searchTerm, setSearchTerm] = React.useState('');
 
-    // Sorteia 5 questões
-    const shuffled = [...QUESTIONS_POOL].sort(() => 0.5 - Math.random());
-    const selectedQuestions = shuffled.slice(0, 5);
+  const filteredUsers = presenceUsers.filter(u => 
+    u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (u.turma && u.turma.toString().includes(searchTerm)) ||
+    (u.cargo && u.cargo.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
 
+  const connectUser = async (friend: PresenceUser) => {
     try {
-      const { error } = await supabase.from('duels').insert({
-        challenger_id: currentUserId,
-        challenger_name: challenger.name,
-        opponent_id: opponent.user_id,
-        opponent_name: opponent.name,
-        status: 'pending',
-        questions: selectedQuestions
+      const { error } = await supabase.from('friendships').insert({
+        user_id: currentUserId,
+        friend_id: friend.user_id,
+        status: 'pendente'
       });
 
       if (error) throw error;
-      alert(`Desafio enviado para ${opponent.name}! Aguardando aceite...`);
+      alert(`Pedido de conexão enviado para ${friend.name}!`);
     } catch (e) {
-      alert("Falha ao protocolar desafio.");
+      console.error(e);
+      alert("Falha ao enviar pedido de conexão.");
     }
   };
 
@@ -86,29 +70,20 @@ const Largo: React.FC<LargoProps> = ({ presenceUsers, currentUserId }) => {
           <p className="text-slate-500 font-bold italic text-lg mt-2">"Nas Arcadas do Largo São Francisco, nunca se estuda sozinho."</p>
         </div>
         
-        <div className="bg-white dark:bg-sanfran-rubiDark/40 p-5 md:p-6 rounded-3xl border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl flex items-center justify-center gap-6 self-center md:self-auto">
-          <div className="flex -space-x-3">
-             {presenceUsers.slice(0, 5).map((u) => (
-               <div key={u.user_id} className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-slate-100 dark:bg-white/5 border-4 border-white dark:border-sanfran-rubiBlack flex items-center justify-center text-slate-400 font-black shadow-lg">
-                  <User size={18} />
-               </div>
-             ))}
-             {onlineCount > 5 && (
-               <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-sanfran-rubi border-4 border-white dark:border-sanfran-rubiBlack flex items-center justify-center text-white text-[10px] font-black shadow-lg">
-                  +{onlineCount - 5}
-               </div>
-             )}
-          </div>
-          <div>
-            <p className="text-[9px] md:text-[10px] font-black uppercase text-slate-500 tracking-widest">Atualmente Online</p>
-            <p className="text-xl md:text-2xl font-black text-slate-950 dark:text-white">{onlineCount} <span className="text-xs font-normal text-slate-400">Colegas</span></p>
-          </div>
+        <div className="w-full md:w-64">
+          <input 
+            type="text" 
+            placeholder="Buscar colegas..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full p-4 rounded-2xl border border-slate-200 dark:border-sanfran-rubi/30 bg-white dark:bg-sanfran-rubiDark/40 text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-sanfran-rubi outline-none"
+          />
         </div>
       </header>
 
       {/* Grid de Presença */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {presenceUsers.map((user) => (
+        {filteredUsers.map((user) => (
           <div 
             key={user.user_id} 
             className={`group p-6 md:p-8 rounded-[2.5rem] border-2 transition-all relative overflow-hidden flex flex-col justify-between ${user.user_id === currentUserId ? 'bg-sanfran-rubi/5 border-sanfran-rubi shadow-xl' : 'bg-white dark:bg-sanfran-rubiDark/30 border-slate-200 dark:border-sanfran-rubi/30 hover:border-usp-blue shadow-lg'}`}
@@ -133,6 +108,12 @@ const Largo: React.FC<LargoProps> = ({ presenceUsers, currentUserId }) => {
                      {user.is_timer_active ? 'Foco Extremo' : 'Online'}
                    </span>
                 </div>
+                {(user.turma || user.cargo) && (
+                  <div className="flex items-center gap-2 mt-1">
+                    {user.turma && <span className="text-[9px] font-bold text-usp-blue bg-usp-blue/10 px-2 py-0.5 rounded-full">{user.turma}ª Turma</span>}
+                    {user.cargo && <span className="text-[9px] font-bold text-sanfran-rubi bg-sanfran-rubi/10 px-2 py-0.5 rounded-full">{user.cargo}</span>}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -161,10 +142,10 @@ const Largo: React.FC<LargoProps> = ({ presenceUsers, currentUserId }) => {
             <div className="mt-6 pt-4 border-t border-slate-100 dark:border-white/5 flex items-center justify-between">
                {user.user_id !== currentUserId ? (
                  <button 
-                  onClick={() => challengeUser(user)}
+                  onClick={() => connectUser(user)}
                   className="flex items-center gap-2 px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg hover:scale-105 transition-transform"
                  >
-                   <Sword size={14} /> Desafiar
+                   <Users size={14} /> Conectar
                  </button>
                ) : (
                  <span className="text-[8px] font-bold text-slate-300 uppercase">SanFran Connect</span>

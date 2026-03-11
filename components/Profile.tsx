@@ -644,7 +644,7 @@ const Profile: React.FC = () => {
                         try {
                           setLoading(true);
                           const path = `${session.user.id}/mural_${Date.now()}_${file.name}`;
-                          const url = await dataService.uploadFile(file, path);
+                          const url = await dataService.uploadFile(file, path, 'mural_fotos', file.type);
                           const newFoto = { url, caption: '', date: new Date().toISOString() };
                           const updatedProfile = {
                             ...profile,
@@ -1101,13 +1101,14 @@ const Profile: React.FC = () => {
                               try {
                                 setLoading(true);
                                 const path = `${session.user.id}/mural_${Date.now()}_${file.name}`;
-                                const url = await dataService.uploadFile(file, path);
+                                const url = await dataService.uploadFile(file, path, 'mural_fotos', file.type);
                                 setEditForm({
                                   ...editForm, 
                                   mural_fotos: [...(editForm.mural_fotos || []), { url, date: new Date().toISOString() }]
                                 });
                               } catch (err) {
-                                console.error(err);
+                                console.error("[Profile] Mural photo upload error:", err);
+                                alert("Erro ao enviar foto. Verifique as permissões ou tente novamente.");
                               } finally {
                                 setLoading(false);
                               }
@@ -1130,12 +1131,12 @@ const Profile: React.FC = () => {
                             try {
                               setLoading(true);
                               const path = `${session.user.id}/cv_${Date.now()}.pdf`;
-                              const url = await dataService.uploadFile(file, path);
+                              const url = await dataService.uploadFile(file, path, 'curriculos', 'application/pdf');
                               setEditForm({...editForm, curriculo_url: url});
                               alert("Currículo enviado com sucesso!");
                             } catch (err) {
-                              console.error(err);
-                              alert("Erro ao enviar currículo.");
+                              console.error("[Profile] Curriculum upload error:", err);
+                              alert("Erro ao enviar currículo. Verifique se o arquivo é um PDF válido e tente novamente.");
                             } finally {
                               setLoading(false);
                             }
