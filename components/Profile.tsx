@@ -60,45 +60,46 @@ const Profile: React.FC = () => {
   const [disciplinas, setDisciplinas] = useState<any[]>([]);
 
   useEffect(() => {
-    const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      if (session?.user) {
-        const userProfile = await dataService.getUserProfile(session.user.id, navigator.onLine);
-        setProfile(userProfile);
-        
-        // Fetch disciplines
-        const { data: discData } = await supabase.from('disciplinas').select('*').eq('user_id', session.user.id);
-        if (discData) setDisciplinas(discData);
-
-        setEditForm({
-          full_name: userProfile?.full_name || session.user.user_metadata?.full_name || '',
-          bio: userProfile?.bio || '',
-          turma_ano: userProfile?.turma_ano || 0,
-          turma: userProfile?.turma || 0,
-          sala: userProfile?.sala || '',
-          aniversario: userProfile?.aniversario || '',
-          avatar_url: userProfile?.avatar_url || '',
-          social_links: userProfile?.social_links || {},
-          idiomas: userProfile?.idiomas || [],
-          intercambio: userProfile?.intercambio || '',
-          memorias: userProfile?.memorias || '',
-          progresso_curso: userProfile?.progresso_curso || 0,
-          curriculo_url: userProfile?.curriculo_url || '',
-          mural_fotos: userProfile?.mural_fotos || [],
-          cargos_academicos: userProfile?.cargos_academicos || {
-            monitoria: [],
-            pesquisa: [],
-            pites: [],
-            diretoria: [],
-            coordenacao: []
-          }
-        });
-      }
-      setLoading(false);
-    };
-    init();
+    fetchProfile();
   }, []);
+
+  const fetchProfile = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    setSession(session);
+    if (session?.user) {
+      const userProfile = await dataService.getUserProfile(session.user.id, navigator.onLine);
+      setProfile(userProfile);
+      
+      // Fetch disciplines
+      const { data: discData } = await supabase.from('disciplinas').select('*').eq('user_id', session.user.id);
+      if (discData) setDisciplinas(discData);
+
+      setEditForm({
+        full_name: userProfile?.full_name || session.user.user_metadata?.full_name || '',
+        bio: userProfile?.bio || '',
+        turma_ano: userProfile?.turma_ano || 0,
+        turma: userProfile?.turma || 0,
+        sala: userProfile?.sala || '',
+        aniversario: userProfile?.aniversario || '',
+        avatar_url: userProfile?.avatar_url || '',
+        social_links: userProfile?.social_links || {},
+        idiomas: userProfile?.idiomas || [],
+        intercambio: userProfile?.intercambio || '',
+        memorias: userProfile?.memorias || '',
+        progresso_curso: userProfile?.progresso_curso || 0,
+        curriculo_url: userProfile?.curriculo_url || '',
+        mural_fotos: userProfile?.mural_fotos || [],
+        cargos_academicos: userProfile?.cargos_academicos || {
+          monitoria: [],
+          pesquisa: [],
+          pites: [],
+          diretoria: [],
+          coordenacao: []
+        }
+      });
+    }
+    setLoading(false);
+  };
 
   const handleSaveProfile = async () => {
     if (!session?.user || !profile) return;
@@ -242,11 +243,10 @@ const Profile: React.FC = () => {
     
     if (data.disciplinas && data.disciplinas.length > 0) {
       await dataService.saveDisciplinas(data.disciplinas, session.user.id);
-      const { data: discData } = await supabase.from('disciplinas').select('*').eq('user_id', session.user.id);
-      if (discData) setDisciplinas(discData);
     }
     
-    setProfile(updatedProfile);
+    await fetchProfile();
+    
     setTimeout(() => {
       setSyncStatus('');
       setIsSyncing(false);
@@ -396,7 +396,10 @@ const Profile: React.FC = () => {
 
               <button 
                 onClick={async () => {
-                  if (!profile) return;
+                  if (!profile || !profile.turma || !profile.progresso_total) {
+                    alert('Aguarde um instante enquanto processamos sua trajetória...');
+                    return;
+                  }
                   setIsAnalyzing(true);
                   try {
                     const analysis = await geminiService.analyzeProfile(profile);
@@ -409,8 +412,8 @@ const Profile: React.FC = () => {
                     setIsAnalyzing(false);
                   }
                 }}
-                disabled={isAnalyzing}
-                className={`p-4 bg-indigo-600 text-white rounded-[2rem] shadow-xl shadow-indigo-900/20 hover:scale-[1.05] transition-all flex items-center gap-3 ${isAnalyzing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                disabled={isAnalyzing || isSyncing}
+                className={`p-4 bg-indigo-600 text-white rounded-[2rem] shadow-xl shadow-indigo-900/20 hover:scale-[1.05] transition-all flex items-center gap-3 ${(isAnalyzing || isSyncing) ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <div className="p-2 bg-white/20 rounded-xl">
                   {isAnalyzing ? <Loader2 size={20} className="animate-spin" /> : <Zap size={20} />}

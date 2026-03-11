@@ -470,13 +470,16 @@ export const geminiService = {
   analyzeProfile: async (profile: any) => {
     const prompt = `
       Analise o seguinte perfil de estudante de Direito da USP (SanFran) e forneça insights personalizados:
-      - Nome: ${profile.full_name || profile.username}
-      - Turma: ${profile.turma}
-      - Progresso: ${profile.progresso_curso}%
-      - Idiomas: ${profile.idiomas?.join(', ')}
+      - Nome: ${profile.full_name || profile.username || 'Não informado'}
+      - Turma: ${profile.turma || 'Não informada'}
+      - Progresso: ${profile.progresso_total || profile.progresso_curso || 0}%
+      - Idiomas: ${profile.idiomas?.join(', ') || 'Nenhum'}
       - Intercâmbio: ${profile.intercambio ? 'Sim' : 'Não'}
-      - Cargos Acadêmicos: ${JSON.stringify(profile.cargos_academicos)}
-      - Mural de Memórias: ${profile.memorias}
+      - Cargos Acadêmicos: ${JSON.stringify(profile.cargos_academicos) || 'Nenhum'}
+      - Mural de Memórias: ${profile.memorias || 'Nenhuma'}
+      
+      IMPORTANTE: Considere os dados recém-sincronizados do usuário (Nome, Turma, Matérias). 
+      Se os dados parecerem vazios ou incompletos, solicite que o usuário aguarde 5 segundos e tente novamente.
       
       Forneça:
       1. Um resumo do perfil (Persona Acadêmica)
