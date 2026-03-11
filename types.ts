@@ -491,6 +491,7 @@ export interface UserProfile {
   sala?: string;
   aniversario?: string;
   progresso_curso?: number;
+  progresso_total?: number;
   progresso_obrigatorias?: number;
   progresso_optativas?: number;
   status_geral_integralizacao?: number;

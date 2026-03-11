@@ -239,28 +239,32 @@ const Profile: React.FC = () => {
     <div className="h-full overflow-y-auto bg-slate-50 dark:bg-sanfran-rubiBlack/20">
       <div className="max-w-5xl mx-auto p-4 md:p-8 space-y-8">
         
-        {/* 👤 1. HEADER DE IDENTIDADE (O "CARTEIRINHA") */}
+        {/* 👤 1. HEADER DE IDENTIDADE (A "CARTEIRINHA") */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative bg-white dark:bg-white/5 rounded-[2.5rem] border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden"
+          className="relative bg-white dark:bg-white/5 rounded-[3rem] border border-slate-200 dark:border-white/10 shadow-sm overflow-hidden"
         >
           {/* Cover/Background Pattern */}
-          <div className="h-32 bg-gradient-to-r from-sanfran-rubi to-sanfran-rubiDark opacity-10 dark:opacity-20"></div>
+          <div className="h-40 bg-sanfran-rubi/5 dark:bg-sanfran-rubi/10 relative overflow-hidden">
+            <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#8B1A1A 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
+          </div>
           
-          <div className="px-8 pb-8 -mt-12 flex flex-col md:flex-row items-center md:items-end gap-6">
+          <div className="px-10 pb-10 -mt-16 flex flex-col md:flex-row items-center md:items-end gap-8 relative z-10">
             {/* Avatar with Status */}
             <div className="relative group">
-              <div className="w-32 h-32 rounded-full border-4 border-white dark:border-sanfran-rubiBlack bg-slate-200 dark:bg-white/10 overflow-hidden shadow-xl">
+              <div className="w-40 h-40 rounded-full border-8 border-white dark:border-sanfran-rubiBlack bg-sanfran-offwhite dark:bg-white/5 overflow-hidden shadow-2xl relative">
                 {profile?.avatar_url ? (
                   <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-slate-400">
-                    <User size={48} />
+                  <div className="w-full h-full flex items-center justify-center text-sanfran-rubi/20">
+                    <User size={64} />
                   </div>
                 )}
+                {/* Status Ring */}
+                <div className="absolute inset-0 border-4 border-emerald-500/30 rounded-full"></div>
               </div>
-              <div className={`absolute bottom-2 right-2 w-6 h-6 rounded-full border-4 border-white dark:border-sanfran-rubiBlack ${navigator.onLine ? 'bg-emerald-500' : 'bg-slate-400 shadow-inner'}`}></div>
+              <div className={`absolute bottom-4 right-4 w-6 h-6 rounded-full border-4 border-white dark:border-sanfran-rubiBlack ${navigator.onLine ? 'bg-emerald-500' : 'bg-slate-400'}`}></div>
               <button 
                 onClick={() => setIsEditing(true)}
                 className="absolute inset-0 flex items-center justify-center bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity rounded-full"
@@ -270,40 +274,50 @@ const Profile: React.FC = () => {
             </div>
 
             {/* Identity Info */}
-            <div className="flex-1 text-center md:text-left space-y-1">
-              <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
-                <h1 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+            <div className="flex-1 text-center md:text-left space-y-3">
+              <div className="space-y-1">
+                <h1 className="text-4xl font-serif font-bold text-sanfran-rubi dark:text-white tracking-tight">
                   {profile?.full_name || session?.user?.user_metadata?.full_name || 'Estudante SanFran'}
                 </h1>
-                <div className="flex items-center justify-center md:justify-start gap-2">
-                  <span className="px-3 py-1 bg-sanfran-rubi/10 text-sanfran-rubi rounded-full text-[10px] font-black uppercase tracking-widest border border-sanfran-rubi/20">
+                <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
+                  <span className="px-4 py-1.5 bg-sanfran-rubi text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-red-900/20">
                     Turma {profile?.turma || profile?.turma_ano || '---'}
                   </span>
                   {profile?.sala && (
-                    <span className="px-3 py-1 bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400 rounded-full text-[10px] font-black uppercase tracking-widest border border-slate-200 dark:border-white/5">
+                    <span className="px-4 py-1.5 bg-white dark:bg-white/10 text-slate-600 dark:text-slate-300 rounded-full text-[10px] font-black uppercase tracking-widest border border-slate-200 dark:border-white/10 shadow-sm">
                       Sala {profile.sala}
                     </span>
                   )}
-                  <span className="px-3 py-1 bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400 rounded-full text-[10px] font-black uppercase tracking-widest border border-slate-200 dark:border-white/5">
+                  <span className="px-4 py-1.5 bg-white dark:bg-white/10 text-slate-600 dark:text-slate-300 rounded-full text-[10px] font-black uppercase tracking-widest border border-slate-200 dark:border-white/10 shadow-sm">
                     {profile?.archetype || 'Novato'}
                   </span>
+                  {profile?.cargos_academicos?.diretoria?.[0] && (
+                    <span className="px-4 py-1.5 bg-amber-500 text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-amber-900/20">
+                      {profile.cargos_academicos.diretoria[0]}
+                    </span>
+                  )}
                 </div>
               </div>
-              <p className="text-slate-500 dark:text-slate-400 font-medium max-w-xl">
-                {profile?.bio || 'Nenhuma biografia definida. Clique em editar para adicionar.'}
-              </p>
+              <div className="relative group max-w-2xl">
+                <p className="text-slate-600 dark:text-slate-400 font-medium leading-relaxed italic">
+                  "{profile?.bio || 'Nenhuma biografia definida. Clique em editar para adicionar.'}"
+                </p>
+                <button 
+                  onClick={() => setIsEditing(true)}
+                  className="absolute -right-8 top-0 p-1 text-slate-300 hover:text-sanfran-rubi transition-colors opacity-0 group-hover:opacity-100"
+                >
+                  <Edit3 size={14} />
+                </button>
+              </div>
             </div>
 
             {/* Actions */}
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <button 
                 onClick={() => setIsEditing(true)}
-                className="p-3 bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-white rounded-2xl hover:bg-slate-200 dark:hover:bg-white/20 transition-all"
+                className="p-4 bg-white dark:bg-white/10 text-slate-600 dark:text-white rounded-3xl border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/20 transition-all shadow-sm"
               >
                 <Edit3 size={20} />
-              </button>
-              <button className="p-3 bg-sanfran-rubi text-white rounded-2xl shadow-lg shadow-red-900/20 hover:scale-105 transition-all">
-                <Share2 size={20} />
               </button>
               
               <div className="relative group">
@@ -319,26 +333,15 @@ const Profile: React.FC = () => {
                 />
                 <label 
                   htmlFor="jupiter-sync-upload"
-                  className={`p-4 bg-emerald-600 text-white rounded-3xl shadow-xl shadow-emerald-900/20 hover:scale-[1.02] transition-all flex flex-col gap-1 cursor-pointer min-w-[200px] border border-white/20 ${isSyncing ? 'opacity-80 pointer-events-none' : ''}`}
+                  className={`p-4 bg-sanfran-rubi text-white rounded-[2rem] shadow-xl shadow-red-900/20 hover:scale-[1.02] transition-all flex items-center gap-3 cursor-pointer border border-white/10 ${isSyncing ? 'opacity-80 pointer-events-none' : ''}`}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-white/20 rounded-xl">
-                      {isSyncing ? <Loader2 size={20} className="animate-spin" /> : <RefreshCw size={20} className="group-hover:rotate-180 transition-transform duration-500" />}
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-xs font-black uppercase tracking-widest">Sincronização Inteligente</span>
-                      <span className="text-[10px] text-emerald-100 font-medium opacity-80">Via PDF do JúpiterWeb</span>
-                    </div>
+                  <div className="p-2 bg-white/20 rounded-xl">
+                    {isSyncing ? <Loader2 size={20} className="animate-spin" /> : <RefreshCw size={20} />}
                   </div>
-                  {isSyncing && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="mt-2 pt-2 border-t border-white/10"
-                    >
-                      <p className="text-[9px] font-bold uppercase tracking-widest animate-pulse">{syncStatus}</p>
-                    </motion.div>
-                  )}
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black uppercase tracking-widest">Sincronização</span>
+                    <span className="text-[8px] text-white/70 font-bold uppercase tracking-tighter">{isSyncing ? syncStatus : 'Via JúpiterWeb'}</span>
+                  </div>
                 </label>
               </div>
 
@@ -358,12 +361,15 @@ const Profile: React.FC = () => {
                   }
                 }}
                 disabled={isAnalyzing}
-                className={`p-3 bg-indigo-600 text-white rounded-2xl shadow-lg shadow-indigo-900/20 hover:scale-105 transition-all flex items-center gap-2 ${isAnalyzing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`p-4 bg-indigo-600 text-white rounded-[2rem] shadow-xl shadow-indigo-900/20 hover:scale-[1.05] transition-all flex items-center gap-3 ${isAnalyzing ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                {isAnalyzing ? <Loader2 size={20} className="animate-spin" /> : <Zap size={20} />}
-                <span className="hidden md:inline text-[10px] font-black uppercase tracking-widest">
-                  {isAnalyzing ? 'Analisando...' : 'Análise IA'}
-                </span>
+                <div className="p-2 bg-white/20 rounded-xl">
+                  {isAnalyzing ? <Loader2 size={20} className="animate-spin" /> : <Zap size={20} />}
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-[10px] font-black uppercase tracking-widest">Análise IA</span>
+                  <span className="text-[8px] text-white/70 font-bold uppercase tracking-tighter">Insights Gemini</span>
+                </div>
               </button>
             </div>
           </div>
@@ -477,314 +483,279 @@ const Profile: React.FC = () => {
           </motion.div>
         )}
 
-        {/* 📊 INTEGRALIZAÇÃO DO CURRÍCULO */}
-        <div className="bg-white dark:bg-white/5 p-8 rounded-[2.5rem] border border-slate-200 dark:border-white/10 shadow-xl">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-sanfran-rubi/10 text-sanfran-rubi rounded-xl">
-                <BookOpen size={20} />
-              </div>
-              <h2 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Integralização do Currículo</h2>
+        {/* 📊 EVOLUÇÃO NAS ARCADAS */}
+        <div className="bg-white dark:bg-white/5 p-10 rounded-[3rem] border border-slate-200 dark:border-white/10 shadow-sm">
+          <div className="flex items-center justify-between mb-10">
+            <div className="space-y-1">
+              <h2 className="text-2xl font-serif font-bold text-sanfran-rubi dark:text-white">Evolução nas Arcadas</h2>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Integralização do Currículo • Graduação em Direito</p>
             </div>
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Graduação em Direito</span>
+            <div className="p-3 bg-sanfran-rubi/5 text-sanfran-rubi rounded-2xl">
+              <BookOpen size={24} />
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 items-center">
+            {/* Circular Progress */}
+            <div className="flex flex-col items-center justify-center space-y-4">
+              <div className="relative w-48 h-48">
+                <svg className="w-full h-full transform -rotate-90">
+                  <circle
+                    cx="96"
+                    cy="96"
+                    r="88"
+                    stroke="currentColor"
+                    strokeWidth="12"
+                    fill="transparent"
+                    className="text-slate-100 dark:text-white/5"
+                  />
+                  <motion.circle
+                    cx="96"
+                    cy="96"
+                    r="88"
+                    stroke="currentColor"
+                    strokeWidth="12"
+                    fill="transparent"
+                    strokeDasharray={552.92}
+                    initial={{ strokeDashoffset: 552.92 }}
+                    animate={{ strokeDashoffset: 552.92 - (552.92 * (profile?.status_geral_integralizacao || 0)) / 100 }}
+                    className="text-sanfran-rubi"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-5xl font-serif font-bold text-sanfran-rubi">{profile?.status_geral_integralizacao || 0}%</span>
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Concluído</span>
+                </div>
+              </div>
+              <p className="text-[10px] font-bold text-slate-500 uppercase text-center max-w-[150px]">Status Geral de Integralização</p>
+            </div>
+
+            {/* Linear Progress Bars */}
+            <div className="lg:col-span-2 space-y-8">
               {[
                 { label: 'Disciplinas Obrigatórias', progress: profile?.progresso_obrigatorias || 0, color: 'bg-sanfran-rubi' },
-                { label: 'Disciplinas Optativas', progress: profile?.progresso_optativas || 0, color: 'bg-amber-500' },
+                { label: 'Disciplinas Optativas', progress: profile?.progresso_optativas || 0, color: 'bg-sanfran-rubi/60' },
                 { label: 'Atividades Complementares', progress: 90, color: 'bg-emerald-500' },
               ].map((item) => (
-                <div key={item.label} className="space-y-2">
-                  <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500">
-                    <span>{item.label}</span>
-                    <span>{item.progress}%</span>
+                <div key={item.label} className="space-y-3">
+                  <div className="flex justify-between items-end">
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{item.label}</span>
+                    <span className="text-[10px] font-black text-sanfran-rubi">{item.progress}%</span>
                   </div>
-                  <div className="h-3 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden p-0.5 border border-slate-200 dark:border-white/10">
+                  <div className="h-4 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden p-1 border border-slate-200 dark:border-white/10">
                     <motion.div 
                       initial={{ width: 0 }}
                       animate={{ width: `${item.progress}%` }}
-                      className={`h-full ${item.color} rounded-full shadow-sm`}
-                    />
+                      className={`h-full ${item.color} rounded-full relative ${item.progress === 100 ? 'shadow-[0_0_15px_rgba(139,26,26,0.5)]' : ''}`}
+                    >
+                      {item.progress === 100 && (
+                        <motion.div 
+                          animate={{ opacity: [0.4, 0.8, 0.4] }}
+                          transition={{ repeat: Infinity, duration: 2 }}
+                          className="absolute inset-0 bg-white/20"
+                        />
+                      )}
+                    </motion.div>
                   </div>
                 </div>
               ))}
             </div>
-
-            <div className="p-6 bg-slate-50 dark:bg-white/5 rounded-3xl border border-slate-100 dark:border-white/5 flex flex-col justify-center">
-              <div className="text-center space-y-2">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Status Geral</p>
-                <p className="text-4xl font-black text-sanfran-rubi">{profile?.status_geral_integralizacao || 0}%</p>
-                <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tight">Você está no caminho certo para a formatura!</p>
-              </div>
-            </div>
           </div>
         </div>
 
+        {/* 🖼️ MURAL DE MEMÓRIAS E LIDERANÇA */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* 🏆 2. MURAL DE CONQUISTAS */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white dark:bg-white/5 p-8 rounded-[2.5rem] border border-slate-200 dark:border-white/10 shadow-xl">
-              <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-amber-100 dark:bg-amber-900/20 text-amber-600 rounded-xl">
-                    <Trophy size={20} />
-                  </div>
-                  <h2 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Mural de Conquistas</h2>
-                </div>
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nível {level}</span>
+          {/* Polaroid Photo Grid */}
+          <div className="lg:col-span-2 bg-white dark:bg-white/5 p-10 rounded-[3rem] border border-slate-200 dark:border-white/10 shadow-sm">
+            <div className="flex items-center justify-between mb-10">
+              <div className="space-y-1">
+                <h2 className="text-2xl font-serif font-bold text-sanfran-rubi dark:text-white">Mural de Memórias</h2>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Momentos Vividos no Largo</p>
               </div>
-
-              {/* XP Progress Bar */}
-              <div className="mb-10 space-y-3">
-                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500">
-                  <span>Progresso Acadêmico</span>
-                  <span>{experience} / {level * 10} XP</span>
-                </div>
-                <div className="h-4 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden p-1 border border-slate-200 dark:border-white/10">
-                  <motion.div 
-                    initial={{ width: 0 }}
-                    animate={{ width: `${progress}%` }}
-                    className="h-full bg-gradient-to-r from-sanfran-rubi to-sanfran-rubiDark rounded-full shadow-lg shadow-red-900/20"
-                  />
-                </div>
-              </div>
-
-              {/* Badges Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {[
-                  { id: 'sfjr', name: 'SanFran Jr', icon: <GraduationCap />, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-                  { id: 'xi', name: 'XI de Agosto', icon: <Star />, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-                  { id: 'casa', name: 'Casa do Estudante', icon: <ShieldCheck />, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-                  { id: 'oab', name: 'Foco OAB', icon: <Zap />, color: 'text-purple-500', bg: 'bg-purple-500/10' },
-                ].map((badge) => {
-                  const isEarned = profile?.badges?.includes(badge.id);
-                  return (
-                    <div 
-                      key={badge.id}
-                      className={`flex flex-col items-center p-4 rounded-3xl border transition-all ${isEarned ? 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 shadow-md' : 'bg-slate-50 dark:bg-white/5 border-dashed border-slate-200 dark:border-white/5 opacity-40 grayscale'}`}
-                    >
-                      <div className={`p-3 rounded-2xl mb-3 ${badge.bg} ${badge.color}`}>
-                        {badge.icon}
-                      </div>
-                      <span className="text-[9px] font-black uppercase tracking-widest text-center leading-tight">
-                        {badge.name}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Titles */}
-              <div className="mt-10 pt-8 border-t border-slate-100 dark:border-white/5">
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Títulos Conquistados</h3>
-                <div className="flex flex-wrap gap-2">
-                  {['Mestre do Fichamento', 'Assíduo da SanFran', 'Líder de Bancada'].map((title) => (
-                    <span key={title} className="px-4 py-2 bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest border border-slate-200 dark:border-white/5">
-                      {title}
-                    </span>
-                  ))}
-                </div>
+              <div className="p-3 bg-pink-50 text-pink-600 rounded-2xl">
+                <Heart size={24} />
               </div>
             </div>
 
-            {/* 💼 EXPERIÊNCIAS E LIDERANÇAS */}
-            <div className="bg-white dark:bg-white/5 p-8 rounded-[2.5rem] border border-slate-200 dark:border-white/10 shadow-xl">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="p-2 bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-white rounded-xl">
-                  <Briefcase size={20} />
-                </div>
-                <h2 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Experiências e Lideranças</h2>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {[
-                  { id: 'monitoria', label: 'Monitoria', icon: <BookOpen size={16} /> },
-                  { id: 'pesquisa', label: 'Pesquisa', icon: <Search size={16} /> },
-                  { id: 'diretoria', label: 'Diretoria de Entidades', icon: <Shield size={16} /> },
-                  { id: 'coordenacao', label: 'Coordenação de Grupos', icon: <Users size={16} /> },
-                ].map((exp) => (
-                  <div key={exp.id} className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <div className="text-sanfran-rubi">{exp.icon}</div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{exp.label}</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {profile?.cargos_academicos?.[exp.id as keyof typeof profile.cargos_academicos]?.length ? 
-                        (profile.cargos_academicos[exp.id as keyof typeof profile.cargos_academicos] as string[]).map(item => (
-                          <span key={item} className="px-3 py-1 bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 rounded-lg text-[9px] font-bold uppercase tracking-tight border border-slate-200 dark:border-white/5">
-                            {item}
-                          </span>
-                        )) : <span className="text-[9px] text-slate-400 italic">Nenhum registro</span>
-                      }
-                    </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-8">
+              {profile?.mural_fotos?.length ? profile.mural_fotos.map((foto, idx) => (
+                <motion.div 
+                  key={idx}
+                  whileHover={{ scale: 1.05, zIndex: 10, rotate: 0 }}
+                  initial={{ rotate: (idx % 2 === 0 ? -3 : 3) }}
+                  className="bg-white p-3 pb-8 shadow-xl border border-slate-100 transform transition-all cursor-pointer"
+                >
+                  <div className="aspect-square overflow-hidden mb-3">
+                    <img src={foto.url} alt={foto.caption} className="w-full h-full object-cover" />
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* 🖼️ MURAL DE FOTOS E MEMÓRIAS */}
-            <div className="bg-white dark:bg-white/5 p-8 rounded-[2.5rem] border border-slate-200 dark:border-white/10 shadow-xl">
-              <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-pink-100 dark:bg-pink-900/20 text-pink-600 rounded-xl">
-                    <Heart size={20} />
-                  </div>
-                  <h2 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Mural de Memórias</h2>
-                </div>
-                <button className="text-[10px] font-black uppercase tracking-widest text-sanfran-rubi hover:underline">Ver Todas</button>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                {profile?.mural_fotos?.length ? profile.mural_fotos.map((foto, idx) => (
-                  <div key={idx} className="aspect-square rounded-3xl overflow-hidden relative group">
-                    <img src={foto.url} alt={foto.caption} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
-                    {foto.caption && (
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
-                        <p className="text-[9px] text-white font-bold uppercase leading-tight">{foto.caption}</p>
-                      </div>
-                    )}
-                  </div>
-                )) : (
-                  <div className="col-span-full py-12 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-white/10 rounded-[2rem]">
-                    <ImageIcon size={48} className="text-slate-200 dark:text-white/10 mb-4" />
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nenhuma foto no mural</p>
-                  </div>
-                )}
-              </div>
-
-              {profile?.memorias && (
-                <div className="mt-8 p-6 bg-slate-50 dark:bg-white/5 rounded-3xl border border-slate-100 dark:border-white/5">
-                  <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Minhas Memórias</h3>
-                  <p className="text-sm text-slate-600 dark:text-slate-300 italic">"{profile.memorias}"</p>
+                  <p className="text-[10px] font-serif italic text-slate-500 text-center truncate px-2">{foto.caption || 'Sem legenda'}</p>
+                </motion.div>
+              )) : (
+                <div className="col-span-full py-20 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-white/10 rounded-[2rem]">
+                  <ImageIcon size={48} className="text-slate-200 dark:text-white/10 mb-4" />
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nenhuma polaroide no mural</p>
+                  <button onClick={() => setIsEditing(true)} className="mt-4 text-xs font-bold text-sanfran-rubi hover:underline">Adicionar Fotos</button>
                 </div>
               )}
             </div>
           </div>
 
-          {/* ⚙️ 3. CENTRAL DE DADOS E PREFERÊNCIAS */}
-          <div className="space-y-6">
-            <div className="bg-white dark:bg-white/5 p-8 rounded-[2.5rem] border border-slate-200 dark:border-white/10 shadow-xl">
+          {/* Leadership & Badges */}
+          <div className="space-y-8">
+            <div className="bg-white dark:bg-white/5 p-8 rounded-[3rem] border border-slate-200 dark:border-white/10 shadow-sm">
               <div className="flex items-center gap-3 mb-8">
-                <div className="p-2 bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-white rounded-xl">
-                  <Settings size={20} />
+                <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
+                  <Trophy size={20} />
                 </div>
-                <h2 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Preferências</h2>
+                <h2 className="text-lg font-serif font-bold text-slate-900 dark:text-white">Lideranças</h2>
               </div>
 
-              <div className="space-y-6">
-                {/* AI Persona Toggle */}
-                <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/5">
-                  <div className="flex items-center gap-3">
-                    <Zap className={profile?.persona_mode ? 'text-amber-500' : 'text-slate-400'} size={20} />
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-900 dark:text-white">Modo Persona</p>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">IA Inteligente Ativa</p>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={handleTogglePersona}
-                    className="text-slate-400 hover:text-sanfran-rubi transition-colors"
-                  >
-                    {profile?.persona_mode ? <ToggleRight size={32} className="text-sanfran-rubi" /> : <ToggleLeft size={32} />}
-                  </button>
-                </div>
-
-                {/* Visibility Settings */}
-                <div className="space-y-3">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Visibilidade do Perfil</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { id: 'public', label: 'Largo', icon: <Globe size={14} /> },
-                      { id: 'friends', label: 'Amigos', icon: <Users size={14} /> },
-                      { id: 'private', label: 'Privado', icon: <EyeOff size={14} /> },
-                    ].map((opt) => (
-                      <button
-                        key={opt.id}
-                        onClick={() => handleVisibilityChange(opt.id as any)}
-                        className={`flex flex-col items-center gap-2 p-3 rounded-2xl border transition-all ${profile?.visibility === opt.id ? 'bg-sanfran-rubi text-white border-sanfran-rubi shadow-lg shadow-red-900/20' : 'bg-slate-50 dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/5 hover:bg-slate-100 dark:hover:bg-white/10'}`}
-                      >
-                        {opt.icon}
-                        <span className="text-[9px] font-black uppercase tracking-widest">{opt.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Clear History */}
-                <div className="pt-6 border-t border-slate-100 dark:border-white/5">
-                  {!showConfirmClear ? (
-                    <button 
-                      onClick={() => setShowConfirmClear(true)}
-                      className="w-full flex items-center justify-center gap-3 py-4 bg-red-50 dark:bg-red-900/10 text-red-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-red-100 dark:hover:bg-red-900/20 transition-all border border-red-100 dark:border-red-900/30"
+              <div className="space-y-4">
+                {[
+                  { id: 'xi', name: 'XI de Agosto', icon: <Star size={14} />, color: 'text-amber-600', bg: 'bg-amber-50' },
+                  { id: 'sfjr', name: 'SanFran Jr.', icon: <Briefcase size={14} />, color: 'text-blue-600', bg: 'bg-blue-50' },
+                  { id: 'casa', name: 'Casa do Estudante', icon: <ShieldCheck size={14} />, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                  { id: 'monitoria', name: 'Monitoria', icon: <BookOpen size={14} />, color: 'text-purple-600', bg: 'bg-purple-50' },
+                  { id: 'pesquisa', name: 'Pesquisa Acadêmica', icon: <Search size={14} />, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                ].map((badge) => {
+                  const isEarned = profile?.badges?.includes(badge.id) || 
+                                  profile?.cargos_academicos?.[badge.id as keyof typeof profile.cargos_academicos]?.length;
+                  return (
+                    <div 
+                      key={badge.id}
+                      className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${isEarned ? 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 shadow-sm' : 'opacity-30 grayscale'}`}
                     >
-                      <History size={16} />
-                      Limpar Histórico e Nuvem
-                    </button>
-                  ) : (
-                    <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-300">
-                      <div className="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-xl">
-                        <AlertTriangle className="text-amber-500 shrink-0" size={18} />
-                        <p className="text-[9px] font-bold text-amber-700 dark:text-amber-400 leading-tight">
-                          Isso apagará permanentemente suas tarefas e histórico da nuvem e deste dispositivo.
-                        </p>
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg ${badge.bg} ${badge.color}`}>
+                          {badge.icon}
+                        </div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300">{badge.name}</span>
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <button 
-                          onClick={() => setShowConfirmClear(false)}
-                          className="py-3 bg-slate-100 dark:bg-white/10 text-slate-500 rounded-xl font-black uppercase text-[9px] tracking-widest"
-                        >
-                          Cancelar
-                        </button>
-                        <button 
-                          onClick={handleClearAllData}
-                          disabled={isClearing}
-                          className="py-3 bg-red-600 text-white rounded-xl font-black uppercase text-[9px] tracking-widest shadow-lg shadow-red-900/20 flex items-center justify-center gap-2"
-                        >
-                          {isClearing ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                          Confirmar
-                        </button>
-                      </div>
+                      {isEarned && <CheckCircle2 size={14} className="text-emerald-500" />}
                     </div>
-                  )}
-                </div>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Social Links */}
-            <div className="bg-white dark:bg-white/5 p-8 rounded-[2.5rem] border border-slate-200 dark:border-white/10 shadow-xl">
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-6">Conexões Sociais</h3>
+            <div className="bg-sanfran-rubi p-8 rounded-[3rem] shadow-xl shadow-red-900/20 text-white">
+              <h3 className="text-lg font-serif font-bold mb-4">Conexões SanFran</h3>
+              <p className="text-[10px] font-medium opacity-80 mb-6 leading-relaxed">Permita que a IA conheça sua trajetória corporativa e técnica para gerar insights personalizados.</p>
               <div className="space-y-3">
-                {[
-                  { id: 'linkedin', label: 'LinkedIn', icon: <Linkedin size={16} />, color: 'hover:text-blue-600' },
-                  { id: 'github', label: 'GitHub', icon: <Github size={16} />, color: 'hover:text-slate-900 dark:hover:text-white' },
-                  { id: 'twitter', label: 'Twitter', icon: <Twitter size={16} />, color: 'hover:text-sky-500' },
-                ].map((social) => (
-                  <div key={social.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/5">
-                    <div className="flex items-center gap-3">
-                      <div className={`text-slate-400 ${social.color} transition-colors`}>
-                        {social.icon}
-                      </div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400">{social.label}</span>
-                    </div>
-                    {profile?.social_links?.[social.id] ? (
-                      <a href={profile.social_links[social.id]} target="_blank" rel="noreferrer" className="text-sanfran-rubi">
-                        <ExternalLink size={14} />
-                      </a>
-                    ) : (
-                      <button onClick={() => setIsEditing(true)} className="text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-sanfran-rubi transition-colors">Vincular</button>
-                    )}
+                <button className="w-full flex items-center justify-between p-4 bg-white/10 hover:bg-white/20 rounded-2xl border border-white/10 transition-all">
+                  <div className="flex items-center gap-3">
+                    <Linkedin size={18} />
+                    <span className="text-[10px] font-black uppercase tracking-widest">LinkedIn</span>
                   </div>
-                ))}
+                  <ExternalLink size={14} className="opacity-50" />
+                </button>
+                <button className="w-full flex items-center justify-between p-4 bg-white/10 hover:bg-white/20 rounded-2xl border border-white/10 transition-all">
+                  <div className="flex items-center gap-3">
+                    <Github size={18} />
+                    <span className="text-[10px] font-black uppercase tracking-widest">GitHub</span>
+                  </div>
+                  <ExternalLink size={14} className="opacity-50" />
+                </button>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* 📝 MODAL DE EDIÇÃO */}
+            {/* ⚙️ 3. CENTRAL DE DADOS E PREFERÊNCIAS */}
+            <div className="space-y-8">
+              <div className="bg-white dark:bg-white/5 p-10 rounded-[3rem] border border-slate-200 dark:border-white/10 shadow-sm">
+                <div className="flex items-center gap-3 mb-10">
+                  <div className="p-2 bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-white rounded-xl">
+                    <Settings size={20} />
+                  </div>
+                  <h2 className="text-lg font-serif font-bold text-slate-900 dark:text-white">Privacidade</h2>
+                </div>
+
+                <div className="space-y-8">
+                  {/* AI Persona Toggle */}
+                  <div className="flex items-center justify-between p-5 bg-sanfran-offwhite dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/5">
+                    <div className="flex items-center gap-4">
+                      <div className={`p-2 rounded-xl ${profile?.persona_mode ? 'bg-sanfran-rubi text-white' : 'bg-slate-200 text-slate-400'}`}>
+                        <Zap size={18} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-900 dark:text-white">Modo Persona</p>
+                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">IA Inteligente Ativa</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={handleTogglePersona}
+                      className="transition-transform active:scale-95"
+                    >
+                      {profile?.persona_mode ? <ToggleRight size={40} className="text-sanfran-rubi" /> : <ToggleLeft size={40} className="text-slate-300" />}
+                    </button>
+                  </div>
+
+                  {/* Visibility Settings */}
+                  <div className="space-y-4">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Visibilidade</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { id: 'public', label: 'Largo', icon: <Globe size={14} /> },
+                        { id: 'friends', label: 'Amigos', icon: <Users size={14} /> },
+                        { id: 'private', label: 'Privado', icon: <EyeOff size={14} /> },
+                      ].map((opt) => (
+                        <button
+                          key={opt.id}
+                          onClick={() => handleVisibilityChange(opt.id as any)}
+                          className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${profile?.visibility === opt.id ? 'bg-sanfran-rubi text-white border-sanfran-rubi shadow-lg shadow-red-900/20' : 'bg-white dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/5 hover:bg-slate-50'}`}
+                        >
+                          {opt.icon}
+                          <span className="text-[9px] font-black uppercase tracking-widest">{opt.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Clear History */}
+                  <div className="pt-8 border-t border-slate-100 dark:border-white/5">
+                    {!showConfirmClear ? (
+                      <button 
+                        onClick={() => setShowConfirmClear(true)}
+                        className="w-full flex items-center justify-center gap-3 py-5 bg-amber-50 text-amber-700 rounded-3xl font-black uppercase text-[10px] tracking-widest hover:bg-amber-100 transition-all border border-amber-100"
+                      >
+                        <History size={16} />
+                        Limpar Histórico e Nuvem
+                      </button>
+                    ) : (
+                      <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-300">
+                        <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-100 rounded-2xl">
+                          <AlertTriangle className="text-red-500 shrink-0" size={18} />
+                          <p className="text-[9px] font-bold text-red-700 leading-tight">
+                            Atenção: Esta ação é irreversível e apagará todos os seus dados da SanFran Academy.
+                          </p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <button 
+                            onClick={() => setShowConfirmClear(false)}
+                            className="py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase text-[9px] tracking-widest"
+                          >
+                            Cancelar
+                          </button>
+                          <button 
+                            onClick={handleClearAllData}
+                            disabled={isClearing}
+                            className="py-4 bg-red-600 text-white rounded-2xl font-black uppercase text-[9px] tracking-widest shadow-lg shadow-red-900/20 flex items-center justify-center gap-2"
+                          >
+                            {isClearing ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                            Confirmar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        {/* 📝 MODAL DE EDIÇÃO */}
       <AnimatePresence>
         {isEditing && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">

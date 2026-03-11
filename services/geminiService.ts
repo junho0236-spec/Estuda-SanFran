@@ -324,7 +324,12 @@ export const geminiService = {
       - turma: Ano de Ingresso (Turma)
       - progresso_obrigatorias: Porcentagem de Disciplinas Obrigatórias concluídas (0-100)
       - progresso_optativas: Porcentagem de Optativas concluídas (0-100)
+      - progresso_total: Porcentagem de Progresso Total no curso (0-100)
       - status_geral_integralizacao: Status Geral de Integralização (0-100)
+      - trajetoria: Objeto contendo booleanos para:
+        - monitoria: se há registros de monitoria
+        - pesquisa: se há registros de iniciação científica/pesquisa
+        - intercambio: se há registros de intercâmbio
       - disciplinas: Lista de disciplinas do semestre atual contendo:
         - codigo: Código da disciplina (ex: DIN0123)
         - nome: Nome da disciplina
@@ -360,8 +365,17 @@ export const geminiService = {
             turma: { type: Type.NUMBER },
             progresso_obrigatorias: { type: Type.NUMBER },
             progresso_optativas: { type: Type.NUMBER },
+            progresso_total: { type: Type.NUMBER },
             status_geral_integralizacao: { type: Type.NUMBER },
             aniversario: { type: Type.STRING },
+            trajetoria: {
+              type: Type.OBJECT,
+              properties: {
+                monitoria: { type: Type.BOOLEAN },
+                pesquisa: { type: Type.BOOLEAN },
+                intercambio: { type: Type.BOOLEAN }
+              }
+            },
             disciplinas: {
               type: Type.ARRAY,
               items: {
@@ -406,6 +420,49 @@ export const geminiService = {
       contents: [{ parts: [{ text: prompt }] }]
     });
     return response.text;
+  },
+
+  suggestPhotoCaption: async (base64Image: string, locationHint: string = "Pátio das Arcadas") => {
+    const prompt = `
+      Analise esta foto de um estudante de Direito da USP (SanFran). 
+      O local provável é: ${locationHint}.
+      
+      Sugira 3 opções de legendas curtas e inspiradoras para o "Mural de Memórias".
+      As legendas devem refletir a tradição do Largo São Francisco, o sentimento de pertencer às Arcadas e a jornada acadêmica.
+      
+      Retorne um JSON com um array de strings chamado "suggestions".
+    `;
+
+    const response = await ai.models.generateContent({
+      model: FLASH_MODEL,
+      contents: [
+        {
+          parts: [
+            { text: prompt },
+            {
+              inlineData: {
+                mimeType: "image/jpeg",
+                data: base64Image
+              }
+            }
+          ]
+        }
+      ],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            suggestions: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING }
+            }
+          }
+        }
+      }
+    });
+
+    return JSON.parse(response.text || '{"suggestions": []}');
   }
 };
 

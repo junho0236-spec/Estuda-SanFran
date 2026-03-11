@@ -4,6 +4,13 @@
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Playfair Display", ui-serif, Georgia, serif;
+  
+  --color-sanfran-rubi: #8B1A1A;
+  --color-sanfran-rubi-dark: #6B1414;
+  --color-sanfran-rubi-black: #1A0505;
+  --color-sanfran-rubiBlack: #1A0505;
+  --color-sanfran-offwhite: #F5F2ED;
+  --color-sanfran-paper: #E4E3E0;
 }
 
 :root {
