@@ -1967,7 +1967,7 @@ Forneça a explicação de forma concisa e didática.`;
                     <AlertTriangle size={14} /> Alerta de Revisão
                   </div>
                   <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
-                    Você acertou <strong>{mockResults.luckyGuesses.length}</strong> questões marcadas como "Chute". Cuidado com o falso domínio! Transforme-as em flashcards para consolidar o conhecimento.
+                    { /* Removed: Você acertou stats */ }
                   </p>
                 </div>
               ) : (
@@ -2884,11 +2884,17 @@ Forneça a explicação de forma concisa e didática.`;
                         />
                       </div>
                       
-                      {q.status === 'Errado' && (
-                        <div className="absolute top-8 right-8 z-10 text-red-500">
-                          <Target size={24} />
-                        </div>
-                      )}
+                      {(() => {
+                        const stats = getXRayStats(q.id);
+                        if (stats.totalAttempts > 0) {
+                          return (
+                            <div className={`absolute top-8 right-8 z-10 ${stats.lastAttemptCorrect ? 'text-green-500' : 'text-red-500'}`}>
+                              <Target size={24} />
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
 
                       <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2 text-sm">
                         <span className="font-bold text-slate-900 dark:text-white">{idx + 1}</span>
@@ -2912,20 +2918,14 @@ Forneça a explicação de forma concisa e didática.`;
                             const stats = getXRayStats(q.id);
                             return (
                               <>
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold shadow-sm border border-slate-200/50 dark:border-slate-700/50">
-                                  <Target size={12} className="text-blue-500" />
-                                  Você acertou {stats.correctAttempts}/{stats.totalAttempts} vezes
-                                </span>
+                                { /* Removed: Você acertou stats */ }
                                 {!stats.lastAttemptCorrect && stats.totalAttempts > 0 && (
                                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-xs font-semibold shadow-sm border border-red-100 dark:border-red-900/30">
                                     <AlertCircle size={12} />
                                     Última tentativa: Erro
                                   </span>
                                 )}
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-semibold shadow-sm border border-slate-200/50 dark:border-slate-700/50">
-                                  <Clock size={12} />
-                                  Tempo médio: {stats.avgTime}
-                                </span>
+                                { /* Removed: Tempo médio stats */ }
                               </>
                             );
                           })()}
@@ -3230,7 +3230,19 @@ Forneça a explicação de forma concisa e didática.`;
                 >
                   <ArrowLeft size={18} /> Voltar para a Lista
                 </button>
-            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden relative">
+              {/* Target Icon */}
+              {(() => {
+                const stats = getXRayStats(currentQuestion.id);
+                if (stats.totalAttempts > 0) {
+                  return (
+                    <div className={`absolute top-6 right-6 z-10 ${stats.lastAttemptCorrect ? 'text-green-500' : 'text-red-500'}`}>
+                      <Target size={24} />
+                    </div>
+                  );
+                }
+                return null;
+              })()}
               {/* Question Header */}
               <div className="bg-slate-50 dark:bg-slate-800/50 p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
                 <div>
@@ -3258,7 +3270,7 @@ Forneça a explicação de forma concisa e didática.`;
                             <>
                               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold shadow-sm border border-slate-200/50 dark:border-slate-700/50">
                                 <Target size={12} className="text-blue-500" />
-                                Você acertou {stats.correctAttempts}/{stats.totalAttempts} vezes
+                                { /* Removed: Você acertou stats */ }
                               </span>
                               {!stats.lastAttemptCorrect && stats.totalAttempts > 0 && (
                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-xs font-semibold shadow-sm border border-red-100 dark:border-red-900/30">
