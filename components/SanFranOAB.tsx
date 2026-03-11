@@ -50,7 +50,7 @@ const SanFranOAB: React.FC<SanFranOABProps> = ({ onNavigate }) => {
           <div className="relative z-10 flex justify-between items-start">
             <div className="flex gap-4">
                 <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
-                   <Target className="w-8 h-8 md:w-10 md:h-10 text-red-200" />
+                   <Target className="w-12 h-12 md:w-16 md:h-16 text-red-200" />
                 </div>
                 <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10 hidden md:block">
                    <ShieldCheck className="w-8 h-8 md:w-10 md:h-10 text-red-100/70" />
