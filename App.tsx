@@ -48,6 +48,7 @@ const Trunfo = React.lazy(() => import('./components/Trunfo'));
 const Honorarios = React.lazy(() => import('./components/Honorarios'));
 const Checklist = React.lazy(() => import('./components/Checklist'));
 const InvestigationBoard = React.lazy(() => import('./components/InvestigationBoard'));
+const HeaderActions = React.lazy(() => import('./components/HeaderActions'));
 const LatinGame = React.lazy(() => import('./components/LatinGame'));
 const SucessaoSimulator = React.lazy(() => import('./components/SucessaoSimulator'));
 const JurisTinder = React.lazy(() => import('./components/JurisTinder'));
@@ -978,6 +979,11 @@ const App: React.FC = () => {
         </header>
 
         <main className={`flex-1 overflow-y-auto ${isExtremeFocus ? 'p-0' : 'p-4 md:p-10'} relative transition-all duration-700`}>
+          {!isExtremeFocus && (
+            <div className="flex justify-end mb-6">
+              <HeaderActions />
+            </div>
+          )}
           {/* Offline Indicator */}
           {!isOnline && (
             <div className="fixed top-4 right-4 z-50 bg-amber-500 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2 animate-bounce">
