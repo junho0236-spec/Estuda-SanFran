@@ -5,6 +5,19 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 export const GEMINI_MODEL = "gemini-3.1-pro-preview";
 const FLASH_MODEL = "gemini-3-flash-preview";
 
+const cleanJsonResponse = (text: string) => {
+  console.log("Raw Gemini Response:", text);
+  // Remove markdown code blocks
+  let cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+  // Find the first '{' and last '}'
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
+  if (start !== -1 && end !== -1) {
+    cleaned = cleaned.substring(start, end + 1);
+  }
+  return cleaned;
+};
+
 export const geminiService = {
   generateFlashcards: async (
     text: string, 
@@ -116,15 +129,11 @@ export const geminiService = {
     for await (const chunk of result) {
       fullText += chunk.text;
       try {
-        // Tenta parsear o que temos até agora (pode falhar se o JSON estiver incompleto)
-        // Uma implementação real de streaming de JSON seria mais complexa, 
-        // mas aqui vamos apenas simular o comportamento esperado pelo componente.
         const partial = JSON.parse(fullText);
         if (Array.isArray(partial)) {
           onPartialResults(partial);
         }
       } catch (e) {
-        // Ignora erros de parse durante o streaming
       }
     }
     
@@ -319,27 +328,31 @@ export const geminiService = {
   analyzeJupiterPDF: async (base64PDF: string) => {
     const prompt = `
       Analise esta Ficha do Aluno da USP (JúpiterWeb). 
-      Extraia as seguintes informações:
-      - full_name: Nome Completo
-      - turma: Ano de Ingresso (Turma)
-      - progresso_obrigatorias: Porcentagem de Disciplinas Obrigatórias concluídas (0-100)
-      - progresso_optativas: Porcentagem de Optativas concluídas (0-100)
-      - progresso_total: Porcentagem de Progresso Total no curso (0-100)
-      - status_geral_integralizacao: Status Geral de Integralização (0-100)
-      - aniversario: Data de nascimento (se disponível)
-      - trajetoria: Objeto contendo booleanos para:
-        - monitoria: se há registros de monitoria
-        - pesquisa: se há registros de iniciação científica/pesquisa
-        - intercambio: se há registros de intercâmbio
-      - disciplinas: Lista de disciplinas do semestre atual contendo:
-        - codigo: Código da disciplina (ex: DIN0123)
-        - nome: Nome da disciplina
-        - turma_sala: Turma e/ou Sala (ex: Turma 11 / Sala 201)
-        - horarios: Objeto com os dias da semana e horários (ex: {"segunda": "08:00", "quarta": "08:00"})
-      - aniversario: Data de nascimento (se disponível)
-      
-      Ignore informações sensíveis como CPF ou endereço residencial.
-      Retorne apenas um JSON.
+      Extraia as seguintes informações e retorne APENAS um JSON puro, sem textos adicionais ou marcações markdown.
+      Formato esperado:
+      {
+        "full_name": "Nome Completo",
+        "turma": 202X,
+        "progresso_obrigatorias": 0,
+        "progresso_optativas": 0,
+        "progresso_total": 0,
+        "status_geral_integralizacao": 0,
+        "aniversario": "DD/MM/AAAA",
+        "trajetoria": {
+          "monitoria": false,
+          "pesquisa": false,
+          "intercambio": false
+        },
+        "disciplinas": [
+          {
+            "codigo": "DIN0123",
+            "nome": "Nome da disciplina",
+            "turma_sala": "Turma X / Sala Y",
+            "horarios": {}
+          }
+        ]
+      }
+      Certifique-se de que os campos numéricos sejam números inteiros.
     `;
 
     const response = await ai.models.generateContent({
@@ -356,115 +369,72 @@ export const geminiService = {
             }
           ]
         }
-      ],
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            full_name: { type: Type.STRING },
-            turma: { type: Type.NUMBER },
-            progresso_obrigatorias: { type: Type.NUMBER },
-            progresso_optativas: { type: Type.NUMBER },
-            progresso_total: { type: Type.NUMBER },
-            status_geral_integralizacao: { type: Type.NUMBER },
-            aniversario: { type: Type.STRING },
-            trajetoria: {
-              type: Type.OBJECT,
-              properties: {
-                monitoria: { type: Type.BOOLEAN },
-                pesquisa: { type: Type.BOOLEAN },
-                intercambio: { type: Type.BOOLEAN }
-              }
-            },
-            disciplinas: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  codigo: { type: Type.STRING },
-                  nome: { type: Type.STRING },
-                  turma_sala: { type: Type.STRING },
-                  horarios: { type: Type.OBJECT }
-                }
-              }
-            }
-          }
-        }
-      }
+      ]
     });
 
-    return JSON.parse(response.text || '{}');
+    const cleaned = cleanJsonResponse(response.text || '{}');
+    const data = JSON.parse(cleaned);
+    
+    // Ensure numeric types
+    return {
+      ...data,
+      turma: parseInt(data.turma) || 0,
+      progresso_obrigatorias: parseInt(data.progresso_obrigatorias) || 0,
+      progresso_optativas: parseInt(data.progresso_optativas) || 0,
+      progresso_total: parseInt(data.progresso_total) || 0,
+      status_geral_integralizacao: parseInt(data.status_geral_integralizacao) || 0,
+    };
   },
 
   analyzeJupiterText: async (text: string) => {
     const prompt = `
       Analise o texto extraído de uma Ficha do Aluno da USP (JúpiterWeb). 
-      Extraia as seguintes informações:
-      - full_name: Nome Completo
-      - turma: Ano de Ingresso (Turma)
-      - progresso_obrigatorias: Porcentagem de Disciplinas Obrigatórias concluídas (0-100)
-      - progresso_optativas: Porcentagem de Optativas concluídas (0-100)
-      - progresso_total: Porcentagem de Progresso Total no curso (0-100)
-      - status_geral_integralizacao: Status Geral de Integralização (0-100)
-      - aniversario: Data de nascimento (se disponível)
-      - trajetoria: Objeto contendo booleanos para:
-        - monitoria: se há registros de monitoria
-        - pesquisa: se há registros de iniciação científica/pesquisa
-        - intercambio: se há registros de intercâmbio
-      - disciplinas: Lista de disciplinas do semestre atual contendo:
-        - codigo: Código da disciplina (ex: DIN0123)
-        - nome: Nome da disciplina
-        - turma_sala: Turma e/ou Sala (ex: Turma 11 / Sala 201)
-        - horarios: Objeto com os dias da semana e horários (ex: {"segunda": "08:00", "quarta": "08:00"})
-      
-      Ignore informações sensíveis como CPF ou endereço residencial.
-      Retorne apenas um JSON.
+      Extraia as informações e retorne APENAS um JSON puro, sem textos adicionais ou marcações markdown.
+      Formato esperado:
+      {
+        "full_name": "Nome Completo",
+        "turma": 202X,
+        "progresso_obrigatorias": 0,
+        "progresso_optativas": 0,
+        "progresso_total": 0,
+        "status_geral_integralizacao": 0,
+        "aniversario": "DD/MM/AAAA",
+        "trajetoria": {
+          "monitoria": false,
+          "pesquisa": false,
+          "intercambio": false
+        },
+        "disciplinas": [
+          {
+            "codigo": "DIN0123",
+            "nome": "Nome da disciplina",
+            "turma_sala": "Turma X / Sala Y",
+            "horarios": {}
+          }
+        ]
+      }
+      Certifique-se de que os campos numéricos sejam números inteiros.
       
       Texto: "${text}"
     `;
 
     const response = await ai.models.generateContent({
       model: GEMINI_MODEL,
-      contents: [{ parts: [{ text: prompt }] }],
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            full_name: { type: Type.STRING },
-            turma: { type: Type.NUMBER },
-            progresso_obrigatorias: { type: Type.NUMBER },
-            progresso_optativas: { type: Type.NUMBER },
-            progresso_total: { type: Type.NUMBER },
-            status_geral_integralizacao: { type: Type.NUMBER },
-            aniversario: { type: Type.STRING },
-            trajetoria: {
-              type: Type.OBJECT,
-              properties: {
-                monitoria: { type: Type.BOOLEAN },
-                pesquisa: { type: Type.BOOLEAN },
-                intercambio: { type: Type.BOOLEAN }
-              }
-            },
-            disciplinas: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  codigo: { type: Type.STRING },
-                  nome: { type: Type.STRING },
-                  turma_sala: { type: Type.STRING },
-                  horarios: { type: Type.OBJECT }
-                }
-              }
-            }
-          }
-        }
-      }
+      contents: [{ parts: [{ text: prompt }] }]
     });
 
-    return JSON.parse(response.text || '{}');
+    const cleaned = cleanJsonResponse(response.text || '{}');
+    const data = JSON.parse(cleaned);
+    
+    // Ensure numeric types
+    return {
+      ...data,
+      turma: parseInt(data.turma) || 0,
+      progresso_obrigatorias: parseInt(data.progresso_obrigatorias) || 0,
+      progresso_optativas: parseInt(data.progresso_optativas) || 0,
+      progresso_total: parseInt(data.progresso_total) || 0,
+      status_geral_integralizacao: parseInt(data.status_geral_integralizacao) || 0,
+    };
   },
 
   analyzeProfile: async (profile: any) => {
