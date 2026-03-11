@@ -663,11 +663,13 @@ const Profile: React.FC = () => {
                           const path = `${session.user.id}/mural_${Date.now()}_${compressedFile.name}`;
                           const url = await dataService.uploadFile(compressedFile, path, 'mural_fotos', compressedFile.type);
                           const newFoto = { url, caption: '', date: new Date().toISOString() };
+                          
+                          const updatedFotos = await dataService.addMuralFoto(session.user.id, newFoto);
+                          
                           const updatedProfile = {
                             ...profile,
-                            mural_fotos: [...(profile?.mural_fotos || []), newFoto]
+                            mural_fotos: updatedFotos
                           };
-                          await dataService.saveUserProfile(updatedProfile, session.user.id, navigator.onLine);
                           setProfile(updatedProfile);
                         } catch (err) {
                           console.error("[Profile] Mural photo upload error:", err);

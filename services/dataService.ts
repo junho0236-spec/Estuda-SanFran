@@ -37,6 +37,37 @@ export const dataService = {
     }
   },
 
+  async addMuralFoto(userId: string, newFoto: any) {
+    // 1. Get current mural_fotos
+    const { data, error } = await supabase.from('user_persona').select('mural_fotos').eq('id', userId).single();
+    if (error) {
+      console.error("[dataService] Error fetching current mural_fotos:", error);
+      throw error;
+    }
+    
+    const currentFotos = data?.mural_fotos || [];
+    const updatedFotos = [...currentFotos, newFoto];
+    
+    // 2. Update
+    const { error: updateError } = await supabase
+      .from('user_persona')
+      .update({ mural_fotos: updatedFotos })
+      .eq('id', userId);
+      
+    if (updateError) {
+      console.error("[dataService] Error updating mural_fotos:", updateError);
+      throw updateError;
+    }
+    
+    // 3. Update local DB
+    const localProfile = await db.user_profile.get(userId);
+    if (localProfile) {
+      await db.user_profile.put({ ...localProfile, mural_fotos: updatedFotos });
+    }
+    
+    return updatedFotos;
+  },
+
   // USER PROFILE
   async saveUserProfile(profile: any, userId: string, isOnline: boolean) {
     const cloudPayload = {
@@ -74,12 +105,17 @@ export const dataService = {
       social_links: profile.social_links || {}
     };
 
+    console.log("[dataService] Saving user profile, mural_fotos:", cloudPayload.mural_fotos);
+
     await db.user_profile.put({ ...profile, id: userId });
     
     if (isOnline) {
       const { error } = await supabase.from('user_persona').upsert(cloudPayload);
       if (error) {
+        console.error("[dataService] Error upserting user_persona:", error);
         await addToSyncQueue({ table: 'user_profile' as any, action: 'update', data: profile });
+      } else {
+        console.log("[dataService] User persona upserted successfully");
       }
     } else {
       await addToSyncQueue({ table: 'user_profile' as any, action: 'update', data: profile });
