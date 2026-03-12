@@ -23,11 +23,11 @@ export class SanFranOfflineDB extends Dexie {
 
   constructor() {
     super('SanFranOfflineDB');
-    this.version(5).stores({
+    this.version(6).stores({
       flashcards: 'id, subjectId, folderId',
       folders: 'id, parentId',
       subjects: 'id',
-      tasks: 'id, subjectId, dueDate, boardId',
+      tasks: 'id, subjectId, dueDate, boardId, completed',
       study_sessions: 'id, subject_id, start_time',
       notes: 'id, subject_id, user_id',
       subject_files: 'id, subject_id, user_id, type',

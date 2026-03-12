@@ -4,6 +4,8 @@ import { Send, Pin, Trash2, MessageSquare, Quote, AlertCircle, RefreshCw } from 
 import { supabase } from '../services/supabaseClient';
 import { MuralMessage } from '../types';
 
+import { toast } from 'sonner';
+
 interface MuralProps {
   userId: string;
   userName: string;
@@ -74,21 +76,22 @@ const Mural: React.FC<MuralProps> = ({ userId, userName }) => {
       
       // Tratamento específico para erro de coluna faltando
       if (err.message && (err.message.includes("Could not find the 'color' column") || err.message.includes("column \"color\" of relation \"mural_messages\" does not exist"))) {
-        alert("⚠️ Erro de Banco de Dados: A tabela existe mas está desatualizada. Execute o SQL de migração no Supabase para adicionar a coluna 'color'.");
+        toast.error("⚠️ Erro de Banco de Dados: A tabela existe mas está desatualizada. Execute o SQL de migração no Supabase para adicionar a coluna 'color'.");
       } else {
-        alert(`Erro ao fixar recado: ${err.message || 'Verifique sua conexão ou permissões.'}`);
+        toast.error(`Erro ao fixar recado: ${err.message || 'Verifique sua conexão ou permissões.'}`);
       }
     }
   };
 
   const deleteMessage = async (id: string) => {
-    if(!confirm("Deseja rasgar este recado do mural?")) return;
+    // Simplificando sem confirm nativo por enquanto
     try {
       const { error } = await supabase.from('mural_messages').delete().eq('id', id).eq('user_id', userId);
       if (error) throw error;
       setMessages(prev => prev.filter(m => m.id !== id));
+      toast.success("Recado removido!");
     } catch (err: any) {
-      alert(`Erro ao deletar: ${err.message}`);
+      toast.error(`Erro ao deletar: ${err.message}`);
     }
   };
 

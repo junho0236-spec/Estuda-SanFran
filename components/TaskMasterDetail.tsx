@@ -28,6 +28,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { toast } from 'sonner';
 import { dataService } from '../services/dataService';
 
 interface TaskMasterDetailProps {
@@ -64,7 +65,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   const [showNotifications, setShowNotifications] = useState(false);
   const [mentionSuggestions, setMentionSuggestions] = useState<Friendship[]>([]);
 
-  const currentViewMode: 'list' | 'kanban' = userProfile?.viewPreferences?.[activeTab] || (boards.find(b => b.name === activeTab) ? 'kanban' : 'list');
+  const currentViewMode: 'list' | 'kanban' = userProfile?.viewPreferences?.[activeTab] || (boards.find(b => b.id === activeTab) ? 'kanban' : 'list');
 
   const handleToggleViewMode = (mode: 'list' | 'kanban') => {
     if (!userProfile) return;
@@ -114,7 +115,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     if (!over) return;
 
     // Handle Tab Switch (Dropping on a tab)
-    if (TABS.includes(over.id as string)) {
+    if (TABS.some(tab => tab.id === over.id)) {
       const taskId = active.id as string;
       const newCategory = over.id as string;
       
@@ -175,7 +176,12 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     }
   };
 
-  const TABS = ['Geral', 'Leituras', 'Entidades', ...boards.map(b => b.name)];
+  const TABS = [
+    { id: 'Geral', name: 'Geral' },
+    { id: 'Leituras', name: 'Leituras' },
+    { id: 'Entidades', name: 'Entidades' },
+    ...boards.map(b => ({ id: b.id, name: b.name }))
+  ];
 
   const handleNLPAddTask = async (text: string) => {
     if (!text.trim()) return;
@@ -356,7 +362,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     if (activeTab === 'Leituras') return task.category === 'estudo';
     if (activeTab === 'Entidades') return task.category === 'admin';
     
-    const board = boards.find(b => b.name === activeTab);
+    const board = boards.find(b => b.id === activeTab);
     if (board) return task.boardId === board.id;
     
     return true;
@@ -422,14 +428,18 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     if (activeTab === 'Leituras') category = 'estudo';
     else if (activeTab === 'Entidades') category = 'admin';
 
+    const board = boards.find(b => b.id === activeTab);
+    const boardIdToSet = board ? board.id : undefined;
+    const columnIdToSet = columnId || (board?.columns[0].id);
+
     const newTask: Task = {
       id: Math.random().toString(36).substr(2, 9),
       title,
       completed: false,
       category,
-      status: (columnId && ['Pendente', 'Fazendo', 'Concluido'].includes(columnId)) ? columnId as any : 'Pendente',
-      boardId: boardId || (boards.find(b => b.id === activeTab || b.name === activeTab) ? activeTab : undefined),
-      columnId: columnId || (boards.find(b => b.id === activeTab || b.name === activeTab)?.columns[0].id),
+      status: (columnIdToSet && ['Pendente', 'Fazendo', 'Concluido'].includes(columnIdToSet)) ? columnIdToSet as any : 'Pendente',
+      boardId: boardId || boardIdToSet,
+      columnId: columnIdToSet,
       subtasks,
       createdAt: new Date().toISOString()
     } as any;
@@ -480,10 +490,16 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   };
 
   const handleDeleteTask = async (id: string) => {
-    if (!confirm("Excluir esta tarefa?")) return;
-    await dataService.deleteTask(id, userId, isOnline);
-    setTasks(prev => prev.filter(t => t.id !== id));
-    if (selectedTaskId === id) setSelectedTaskId(null);
+    // Removido confirm nativo para evitar travamento em iframe
+    try {
+      await dataService.deleteTask(id, userId, isOnline);
+      setTasks(prev => prev.filter(t => t.id !== id));
+      if (selectedTaskId === id) setSelectedTaskId(null);
+      toast.success("Tarefa excluída");
+    } catch (error) {
+      console.error("Failed to delete task:", error);
+      toast.error("Erro ao excluir tarefa");
+    }
   };
 
   const handleAddBoard = async () => {
@@ -602,9 +618,9 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     );
   };
 
-  const DroppableTab = ({ tab, activeTab, onClick }: { tab: string, activeTab: string, onClick: () => void }) => {
+  const DroppableTab = ({ tab, activeTab, onClick }: { tab: { id: string, name: string }, activeTab: string, onClick: () => void }) => {
     const { isOver, setNodeRef } = useDroppable({
-      id: tab,
+      id: tab.id,
     });
 
     return (
@@ -612,14 +628,14 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         ref={setNodeRef}
         onClick={onClick}
         className={`px-4 py-2 rounded-full text-sm font-bold transition-all whitespace-nowrap border-2 ${
-          activeTab === tab 
+          activeTab === tab.id 
             ? 'bg-[#800000] text-white border-[#800000] shadow-md' 
             : isOver 
               ? 'bg-[#800000]/10 text-[#800000] border-[#800000] border-dashed scale-110'
               : 'text-slate-500 border-transparent hover:text-[#800000] hover:bg-slate-50'
         }`}
       >
-        {tab}
+        {tab.name}
       </button>
     );
   };
@@ -826,18 +842,18 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       <div className="h-[calc(100vh-120px)] flex flex-col bg-slate-50 rounded-[32px] overflow-hidden border border-slate-200 shadow-2xl">
         {/* Header Tabs */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white sticky top-0 z-20">
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar max-w-full md:max-w-[calc(100%-350px)]">
             {TABS.map(tab => (
               <DroppableTab 
-                key={tab} 
+                key={tab.id} 
                 tab={tab} 
                 activeTab={activeTab} 
-                onClick={() => setActiveTab(tab)} 
+                onClick={() => setActiveTab(tab.id)} 
               />
             ))}
             <button 
               onClick={() => setIsAddingBoard(true)}
-              className="p-2 rounded-full text-slate-400 hover:text-[#800000] hover:bg-slate-50 transition-all"
+              className="p-2 rounded-full text-slate-400 hover:text-[#800000] hover:bg-slate-50 transition-all shrink-0"
             >
               <Plus size={18} />
             </button>
@@ -1615,7 +1631,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
-            className="fixed inset-y-0 right-0 w-1/2 bg-white shadow-2xl z-50 border-l border-slate-200 flex flex-col"
+            className="fixed inset-y-0 right-0 w-full sm:w-1/2 bg-white shadow-2xl z-50 border-l border-slate-200 flex flex-col"
           >
             <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-3">

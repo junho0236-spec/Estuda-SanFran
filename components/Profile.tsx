@@ -17,6 +17,8 @@ import Markdown from 'react-markdown';
 import { db } from '../services/offlineService';
 import { UserProfile } from '../types';
 
+import { toast } from 'sonner';
+
 const Profile: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -411,7 +413,7 @@ const Profile: React.FC = () => {
               <button 
                 onClick={async () => {
                   if (!profile || !profile.turma || !profile.progresso_total) {
-                    alert('Aguarde um instante enquanto processamos sua trajetória...');
+                    toast.info('Aguarde um instante enquanto processamos sua trajetória...');
                     return;
                   }
                   setIsAnalyzing(true);
@@ -421,7 +423,7 @@ const Profile: React.FC = () => {
                     setShowAiModal(true);
                   } catch (error) {
                     console.error("Erro na análise IA:", error);
-                    alert("Erro ao gerar análise do perfil.");
+                    toast.error("Erro ao gerar análise do perfil.");
                   } finally {
                     setIsAnalyzing(false);
                   }
@@ -759,10 +761,10 @@ const Profile: React.FC = () => {
         {/* 🖼️ MURAL DE MEMÓRIAS E LIDERANÇA */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Polaroid Photo Grid */}
-          <div className="lg:col-span-2 bg-white dark:bg-white/5 p-10 rounded-[3rem] border border-slate-200 dark:border-white/10 shadow-sm">
-            <div className="flex items-center justify-between mb-10">
+          <div className="lg:col-span-2 bg-white dark:bg-white/5 p-6 sm:p-10 rounded-3xl sm:rounded-[3rem] border border-slate-200 dark:border-white/10 shadow-sm">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 sm:mb-10 gap-4">
               <div className="space-y-1">
-                <h2 className="text-2xl font-serif font-bold text-sanfran-rubi dark:text-white">Mural de Memórias</h2>
+                <h2 className="text-xl sm:text-2xl font-serif font-bold text-sanfran-rubi dark:text-white">Mural de Memórias</h2>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Momentos Vividos no Largo</p>
               </div>
               <div className="flex items-center gap-2">
@@ -801,7 +803,7 @@ const Profile: React.FC = () => {
                           setProfile(updatedProfile);
                         } catch (err) {
                           console.error("[Profile] Mural photo upload error:", err);
-                          alert("Erro ao enviar foto. Verifique as permissões ou tente novamente.");
+                          toast.error("Erro ao enviar foto. Verifique as permissões ou tente novamente.");
                         } finally {
                           setLoading(false);
                           setSyncStatus('');
@@ -841,8 +843,8 @@ const Profile: React.FC = () => {
 
           {/* Leadership & Badges */}
           <div className="space-y-8">
-            <div className="bg-white dark:bg-white/5 p-8 rounded-[3rem] border border-slate-200 dark:border-white/10 shadow-sm">
-              <div className="flex items-center gap-3 mb-8">
+            <div className="bg-white dark:bg-white/5 p-6 sm:p-8 rounded-3xl sm:rounded-[3rem] border border-slate-200 dark:border-white/10 shadow-sm">
+              <div className="flex items-center gap-3 mb-6 sm:mb-8">
                 <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
                   <Trophy size={20} />
                 </div>

@@ -9,6 +9,7 @@ import Scratchpad from './components/Scratchpad';
 import { supabase } from './services/supabaseClient';
 import { db } from './services/offlineService';
 import { dataService } from './services/dataService';
+import { Toaster, toast } from 'sonner';
 import ErrorBoundary from './components/ErrorBoundary';
 import { getViewLabel } from './utils';
 
@@ -209,7 +210,8 @@ const App: React.FC = () => {
   const [presenceUsers, setPresenceUsers] = useState<PresenceUser[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfile | null>({
     id: '',
-    archetype: 'Calouro',
+    archetype: 'Carregando...',
+    avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=default',
     answers: {},
     answeredQuestionIds: [],
     scores: { social: 0, corporativo: 0, academico: 0, politico: 0, resiliencia: 0, tecnologico: 0 },
@@ -677,10 +679,32 @@ const App: React.FC = () => {
         }
 
         if (resTks.data) {
-          const formattedTasks = resTks.data.map(t => ({
-            id: t.id, title: t.title, completed: t.completed, subjectId: t.subject_id, dueDate: t.due_date, completedAt: t.completed_at,
-            priority: t.priority || 'normal', category: t.category || 'geral', archived_at: t.archived_at
-          }));
+          const formattedTasks = resTks.data.map(t => {
+            const desc = t.description ? JSON.parse(t.description) : {};
+            return {
+              id: t.id, 
+              title: t.title, 
+              completed: t.status === 'Concluido', 
+              status: t.status,
+              subjectId: desc.subjectId || t.subject_id, 
+              dueDate: t.due_date, 
+              completedAt: t.completed_at,
+              priority: desc.originalPriority || (t.priority === 'Alta' ? 'alta' : 'normal'), 
+              category: t.category || 'geral', 
+              archived_at: t.archived_at,
+              boardId: desc.boardId,
+              columnId: desc.columnId,
+              notes: t.notes,
+              subtasks: t.subtasks || [],
+              delegatedTo: t.delegated_to,
+              delegatedBy: t.delegated_by,
+              delegatedByName: desc.delegatedByName,
+              delegatedToName: desc.delegatedToName,
+              syllabusLink: desc.syllabusLink,
+              importantCitations: desc.importantCitations,
+              revisionStatus: desc.revisionStatus
+            };
+          });
 
           const syncCount = await db.syncQueue.count();
           if (syncCount === 0) {
@@ -688,9 +712,9 @@ const App: React.FC = () => {
             const remoteIds = new Set(formattedTasks.map(t => t.id));
             const idsToDelete = localTasks.filter(t => !remoteIds.has(t.id)).map(t => t.id);
             if (idsToDelete.length > 0) await db.tasks.bulkDelete(idsToDelete);
-            await db.tasks.bulkPut(formattedTasks);
+            await db.tasks.bulkPut(formattedTasks as Task[]);
           }
-          setTasks(formattedTasks);
+          setTasks(formattedTasks as Task[]);
         }
 
         if (resBoards.data) {
@@ -887,7 +911,7 @@ const App: React.FC = () => {
   const handleNotificationClick = (notification: Notification) => {
     if (notification.link_task) {
       // Navigate to tasks and select the task
-      setCurrentView(View.Checklist);
+      setCurrentView(View.Tasks);
       // We might need a way to tell TaskMasterDetail to select this task
       // For now, let's just navigate.
     }
@@ -905,6 +929,8 @@ const App: React.FC = () => {
         db.subject_files.clear(),
         db.folders.clear(),
         db.subjects.clear(),
+        db.boards.clear(),
+        db.user_profile.clear(),
         db.syncQueue.clear()
       ]);
       window.location.reload();
@@ -917,6 +943,7 @@ const App: React.FC = () => {
 
   return (
     <div className={`flex h-screen overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#fcfcfc]'}`}>
+      <Toaster position="top-right" richColors />
       <Atmosphere isExtremeFocus={isExtremeFocus} isSidebarOpen={isSidebarOpen} />
       
       <Suspense fallback={null}>

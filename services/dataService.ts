@@ -525,7 +525,7 @@ export const dataService = {
       }
     }
     // Locally, we filter them out in the component or delete them if we want to match the RPC behavior
-    const completedTasks = await db.tasks.where('completed').equals(1).toArray();
+    const completedTasks = await db.tasks.where('completed').equals(true as any).toArray();
     for (const task of completedTasks) {
       await db.tasks.delete(task.id);
     }
