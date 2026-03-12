@@ -119,7 +119,7 @@ const OabCountdown: React.FC<OabCountdownProps> = ({ userId }) => {
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 shrink-0">
         <div>
            <div className="inline-flex items-center gap-2 bg-red-100 dark:bg-red-900/20 px-4 py-2 rounded-full border border-red-200 dark:border-red-800 mb-4">
-              <Target className="w-4 h-4 text-sanfran-rubi" />
+              <Target className="w-8 h-8 text-sanfran-rubi" />
               <span className="text-[10px] font-black uppercase tracking-widest text-sanfran-rubi">Missão OAB-FGV</span>
            </div>
            <h2 className="text-4xl md:text-6xl font-black text-slate-950 dark:text-white uppercase tracking-tighter leading-none">Plano de Ataque</h2>

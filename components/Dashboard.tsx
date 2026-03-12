@@ -18,6 +18,7 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, studySessions, readings, onNavigate }) => {
   const [oabDate, setOabDate] = useState<string>('2024-12-01');
+  const [showAllSubjects, setShowAllSubjects] = useState(false);
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -348,7 +349,7 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
             <p className="text-center text-xs text-slate-400 font-bold uppercase italic py-8 md:py-10">Nenhuma cadeira matriculada.</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {subjects.slice(0, 6).map(s => (
+              {(showAllSubjects ? subjects : subjects.slice(0, 6)).map(s => (
                 <div key={s.id} onClick={() => onNavigate(View.Subjects)} className="flex items-center justify-between p-3 md:p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 hover:scale-[1.02] transition-transform cursor-pointer">
                   <div className="flex items-center gap-3 md:gap-4 overflow-hidden">
                     <div className="w-4 h-4 md:w-5 md:h-5 rounded-full shadow-lg shrink-0" style={{ backgroundColor: s.color }} />
@@ -362,7 +363,18 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
             </div>
           )}
           {subjects.length > 6 && (
-            <p className="text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">+ {subjects.length - 6} outras cadeiras</p>
+            <div className="flex justify-center pt-4">
+              <button 
+                onClick={() => setShowAllSubjects(!showAllSubjects)}
+                className="flex items-center gap-2 px-6 py-2 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-slate-200 dark:border-white/10"
+              >
+                {showAllSubjects ? (
+                  <>Ver menos</>
+                ) : (
+                  <>+ {subjects.length - 6} outras cadeiras • Ver todas</>
+                )}
+              </button>
+            </div>
           )}
         </div>
       </div>
