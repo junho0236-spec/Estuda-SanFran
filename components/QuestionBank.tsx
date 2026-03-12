@@ -374,14 +374,36 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, folders = [], flash
   }
 
   const handleFirestoreError = (error: unknown, operationType: OperationType, path: string | null) => {
+    let errorMessage = 'Erro desconhecido';
+    
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    } else if (typeof error === 'object' && error !== null) {
+      const err = error as any;
+      // Try to extract message from Supabase error structure
+      errorMessage = err.message || err.details || err.hint || (err.code ? `Erro código ${err.code}` : '');
+      
+      if (!errorMessage || errorMessage === '[object Object]') {
+        try {
+          errorMessage = JSON.stringify(error);
+        } catch (e) {
+          errorMessage = 'Erro de estrutura complexa no banco de dados';
+        }
+      }
+    } else {
+      errorMessage = String(error);
+    }
+
     const errInfo = {
-      error: error instanceof Error ? error.message : String(error),
+      error: errorMessage,
       userId: userId || undefined,
       operationType,
-      path
+      path,
+      rawError: error
     };
-    console.error('Firestore Error: ', JSON.stringify(errInfo));
-    showNotification(`Erro no banco de dados (${operationType}): ${errInfo.error}`, 'error');
+    
+    console.error('Firestore Error Detail:', errInfo);
+    showNotification(`Erro no banco de dados (${operationType}): ${errorMessage}`, 'error');
   };
   const [generatingPrecedentId, setGeneratingPrecedentId] = useState<string | null>(null);
 
@@ -916,14 +938,33 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, folders = [], flash
 
       console.log('DEBUG: Payload to upsert:', payload);
 
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('user_progress')
         .upsert(payload, { onConflict: 'user_id' })
         .select()
         .single();
       
       if (error) {
-        handleFirestoreError(error, OperationType.WRITE, 'user_progress');
+        console.warn("Upsert failed, attempting fallback update...", error.message);
+        // Fallback: try to update only the most critical columns
+        const fallbackPayload = {
+          user_id: userId,
+          correct_questions: payload.correct_questions,
+          wrong_question_ids: payload.wrong_question_ids,
+          updated_at: payload.updated_at
+        };
+        
+        const retry = await supabase
+          .from('user_progress')
+          .upsert(fallbackPayload, { onConflict: 'user_id' })
+          .select()
+          .single();
+          
+        if (retry.error) {
+          handleFirestoreError(retry.error, OperationType.WRITE, 'user_progress');
+        } else {
+          setUserProgress(retry.data);
+        }
       } else {
         console.log('DEBUG: Sync successful! Data:', data);
         setUserProgress(data);
@@ -1282,20 +1323,41 @@ Forneça a explicação de forma concisa e didática.`;
         .select()
         .single();
 
-      // Fallback for missing exam_board column
-      if (error && error.message?.includes("exam_board")) {
-        console.warn("Column 'exam_board' not found, retrying without it...");
-        const { exam_board, ...sanitizedQuestion } = sanitizedInitialQuestion;
-        const retry = await supabase
-          .from('questions')
-          .insert([sanitizedQuestion])
-          .select()
-          .single();
-        data = retry.data;
-        error = retry.error;
+      // Fallback for missing columns
+      if (error) {
+        console.warn("Initial insert failed, attempting fallback...", error.message);
+        
+        // Try removing columns one by one if they are suspected to be missing
+        const fallbackQuestion: any = { ...sanitizedInitialQuestion };
+        const problematicColumns = ['exam_board', 'year', 'difficulty', 'explanation', 'topic'];
+        
+        let lastError = error;
+        for (const col of problematicColumns) {
+          if (lastError.message?.includes(col) || lastError.message?.includes("column")) {
+            delete fallbackQuestion[col];
+            console.log(`Retrying without column: ${col}`);
+            const retry = await supabase
+              .from('questions')
+              .insert([fallbackQuestion])
+              .select()
+              .single();
+            
+            if (!retry.error) {
+              data = retry.data;
+              error = null;
+              break;
+            }
+            lastError = retry.error;
+          }
+        }
+        
+        if (error) error = lastError;
       }
 
-      if (error) throw error;
+      if (error) {
+        handleFirestoreError(error, OperationType.WRITE, 'questions');
+        return;
+      }
 
       if (data) {
         setQuestions([data, ...questions]);
