@@ -363,6 +363,26 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, folders = [], flash
   const [viewMode, setViewMode] = useState<'list' | 'single'>('list');
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  enum OperationType {
+    CREATE = 'create',
+    UPDATE = 'update',
+    DELETE = 'delete',
+    LIST = 'list',
+    GET = 'get',
+    WRITE = 'write',
+  }
+
+  const handleFirestoreError = (error: unknown, operationType: OperationType, path: string | null) => {
+    const errInfo = {
+      error: error instanceof Error ? error.message : String(error),
+      userId: userId || undefined,
+      operationType,
+      path
+    };
+    console.error('Firestore Error: ', JSON.stringify(errInfo));
+    showNotification(`Erro no banco de dados (${operationType}): ${errInfo.error}`, 'error');
+  };
   const [generatingPrecedentId, setGeneratingPrecedentId] = useState<string | null>(null);
 
   const getXRayStats = (questionId: string) => {
@@ -427,6 +447,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, folders = [], flash
   const [correctCount, setCorrectCount] = useState(0);
   const [wrongCount, setWrongCount] = useState(0);
   const [userProgress, setUserProgress] = useState<UserProgress | null>(null);
+  const [isProgressLoaded, setIsProgressLoaded] = useState(false);
   const [questionStats, setQuestionStats] = useState<Record<string, { totalAttempts: number, correctAttempts: number, lastAttemptCorrect: boolean }>>({});
   const [errorMastery, setErrorMastery] = useState<Record<string, number>>({});
   const [isErrorNotebookMode, setIsErrorNotebookMode] = useState(false);
@@ -838,7 +859,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, folders = [], flash
         .maybeSingle();
 
       if (error) {
-        console.error('Error fetching user progress:', error);
+        handleFirestoreError(error, OperationType.GET, 'user_progress');
         return;
       }
 
@@ -855,24 +876,41 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, folders = [], flash
       }
     } catch (err) {
       console.error('Failed to sync progress:', err);
+    } finally {
+      setIsProgressLoaded(true);
     }
   };
 
   const syncUserProgress = async (updates: any) => {
+    if (!userId || !isProgressLoaded) {
+      console.log('DEBUG: Skipping sync because userId is missing or progress not loaded yet.', { userId, isProgressLoaded });
+      return;
+    }
     console.log('DEBUG: syncUserProgress called with:', updates);
-    console.log('DEBUG: Current userId:', userId);
     try {
-      // Use the most up-to-date values, prioritizing updates, then local state
+      // 1. Fetch current state from DB to avoid overwriting with stale local state
+      const { data: current, error: fetchError } = await supabase
+        .from('user_progress')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (fetchError) {
+        handleFirestoreError(fetchError, OperationType.GET, 'user_progress');
+      }
+
+      // 2. Construct payload merging current DB state, local state, and updates
+      // We prioritize: updates > local state > current DB state
       const payload = {
         user_id: userId,
-        favorites: updates.favorites !== undefined ? updates.favorites : favorites,
-        wrong_question_ids: updates.wrongQuestions !== undefined ? updates.wrongQuestions : wrongQuestions,
-        correct_questions: updates.correctQuestions !== undefined ? updates.correctQuestions : correctQuestions,
-        notes: updates.notes !== undefined ? updates.notes : notes,
-        correct_count: updates.correctCount !== undefined ? updates.correctCount : correctCount,
-        wrong_count: updates.wrongCount !== undefined ? updates.wrongCount : wrongCount,
-        error_mastery: updates.errorMastery !== undefined ? updates.errorMastery : errorMastery,
-        confidence_levels: updates.confidence_levels !== undefined ? updates.confidence_levels : (userProgress?.confidence_levels || {}),
+        favorites: updates.favorites !== undefined ? updates.favorites : (favorites.length > 0 ? favorites : (current?.favorites || [])),
+        wrong_question_ids: updates.wrongQuestions !== undefined ? updates.wrongQuestions : (wrongQuestions.length > 0 ? wrongQuestions : (current?.wrong_question_ids || [])),
+        correct_questions: updates.correctQuestions !== undefined ? updates.correctQuestions : (correctQuestions.length > 0 ? correctQuestions : (current?.correct_questions || [])),
+        notes: updates.notes !== undefined ? updates.notes : (Object.keys(notes).length > 0 ? notes : (current?.notes || {})),
+        correct_count: updates.correctCount !== undefined ? updates.correctCount : (correctCount > 0 ? correctCount : (current?.correct_count || 0)),
+        wrong_count: updates.wrongCount !== undefined ? updates.wrongCount : (wrongCount > 0 ? wrongCount : (current?.wrong_count || 0)),
+        error_mastery: updates.errorMastery !== undefined ? updates.errorMastery : (Object.keys(errorMastery).length > 0 ? errorMastery : (current?.error_mastery || {})),
+        confidence_levels: updates.confidence_levels !== undefined ? updates.confidence_levels : (Object.keys(userProgress?.confidence_levels || {}).length > 0 ? userProgress?.confidence_levels : (current?.confidence_levels || {})),
         updated_at: new Date().toISOString()
       };
 
@@ -885,9 +923,10 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, folders = [], flash
         .single();
       
       if (error) {
-        console.error('DEBUG: Error syncing user progress:', error);
+        handleFirestoreError(error, OperationType.WRITE, 'user_progress');
       } else {
         console.log('DEBUG: Sync successful! Data:', data);
+        setUserProgress(data);
       }
     } catch (err) {
       console.error('DEBUG: Unexpected error in syncUserProgress:', err);
@@ -1146,7 +1185,7 @@ Forneça a explicação de forma concisa e didática.`;
       const { data, error } = await supabase
         .from('questions')
         .select('*')
-        .eq('user_id', userId)
+        .or(`user_id.eq.${userId},user_id.is.null`)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -1216,8 +1255,10 @@ Forneça a explicação de forma concisa e didática.`;
 
     try {
       setIsSubmitting(true);
+      console.log('DEBUG: handleAddQuestion starting...');
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
+      console.log('DEBUG: Authenticated user for add:', user.id);
 
       // Sanitize question to ensure only valid columns are sent
       const sanitizedInitialQuestion = {
@@ -1232,6 +1273,8 @@ Forneça a explicação de forma concisa e didática.`;
         exam_board: newQuestion.exam_board,
         year: newQuestion.year?.toString()
       };
+
+      console.log('DEBUG: Sanitized question to insert:', sanitizedInitialQuestion);
 
       let { data, error } = await supabase
         .from('questions')
