@@ -46,6 +46,7 @@ interface StatisticsProps {
   tasks: Task[];
   subjects: Subject[];
   correctQuestionsCount?: number;
+  wrongQuestionsCount?: number;
   confidenceLevels?: Record<string, 'certeza' | 'duvida' | 'chute'>;
 }
 
@@ -55,6 +56,7 @@ const Statistics: React.FC<StatisticsProps> = ({
   tasks, 
   subjects,
   correctQuestionsCount = 0,
+  wrongQuestionsCount = 0,
   confidenceLevels = {}
 }) => {
   const [dateFilter, setDateFilter] = React.useState<'7days' | '30days' | 'all' | 'custom'>('all');
@@ -334,8 +336,8 @@ const Statistics: React.FC<StatisticsProps> = ({
         <MetricCard 
           icon={<Target className="text-sanfran-rubi" />} 
           label="Questões" 
-          value={correctQuestionsCount} 
-          subValue="Acertos Totais"
+          value={correctQuestionsCount + wrongQuestionsCount} 
+          subValue={`${correctQuestionsCount} Acertos`}
           color="border-sanfran-rubi"
         />
       </div>

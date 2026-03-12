@@ -226,6 +226,8 @@ const App: React.FC = () => {
   const [readings, setReadings] = useState<Reading[]>([]);
   const [studySessions, setStudySessions] = useState<StudySession[]>([]);
   const [correctQuestionsCount, setCorrectQuestionsCount] = useState(0);
+  const [wrongQuestionsCount, setWrongQuestionsCount] = useState(0);
+  const [wrongQuestionIds, setWrongQuestionIds] = useState<string[]>([]);
   const [confidenceLevels, setConfidenceLevels] = useState<Record<string, 'certeza' | 'duvida' | 'chute'>>({});
   const [selectedSubjectIdForNotes, setSelectedSubjectIdForNotes] = useState<string | null>(null);
   const [selectedSubjectIdForRepository, setSelectedSubjectIdForRepository] = useState<string | null>(null);
@@ -574,7 +576,7 @@ const App: React.FC = () => {
           supabase.from('boards').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
           supabase.from('study_sessions').select('*').eq('user_id', userId).order('start_time', { ascending: false }),
           supabase.from('readings').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-          supabase.from('user_progress').select('correct_count, confidence_levels').eq('user_id', userId).maybeSingle()
+          supabase.from('user_progress').select('*').eq('user_id', userId).maybeSingle()
         ]);
 
         if (resFlds.data) {
@@ -612,6 +614,8 @@ const App: React.FC = () => {
 
         if (resProgress.data) {
           setCorrectQuestionsCount(resProgress.data.correct_count || 0);
+          setWrongQuestionsCount(resProgress.data.wrong_count || 0);
+          setWrongQuestionIds(resProgress.data.wrong_question_ids || []);
           setConfidenceLevels(resProgress.data.confidence_levels || {});
         }
         
@@ -764,26 +768,24 @@ const App: React.FC = () => {
     if (!session?.user) return;
     
     try {
-      // Fetch current progress to avoid overwriting other fields
-      const { data: current, error: fetchError } = await supabase
+      // Use RPC or a simple update to increment the count safely
+      const { data: current } = await supabase
         .from('user_progress')
-        .select('*')
+        .select('correct_count')
         .eq('user_id', session.user.id)
         .maybeSingle();
-        
-      if (fetchError) throw fetchError;
 
       const newCount = (current?.correct_count || 0) + 1;
-      setCorrectQuestionsCount(newCount);
       
       await supabase
         .from('user_progress')
-        .upsert({ 
-          ...current,
-          user_id: session.user.id, 
+        .update({ 
           correct_count: newCount,
           updated_at: new Date().toISOString()
-        }, { onConflict: 'user_id' });
+        })
+        .eq('user_id', session.user.id);
+        
+      setCorrectQuestionsCount(newCount);
     } catch (e) {
       console.error("Erro ao sincronizar acertos:", e);
     }
@@ -1186,7 +1188,7 @@ const App: React.FC = () => {
                 <Route path={getPathFromView(View.PronunciationLab)} element={<PronunciationLab userId={session.user.id} />} />
                 <Route path={getPathFromView(View.LyricalVibes)} element={<LyricalVibes userId={session.user.id} />} />
                 <Route path={getPathFromView(View.TheExchangeStudent)} element={<TheExchangeStudent userId={session.user.id} />} />
-                <Route path={getPathFromView(View.QuestionBank)} element={<QuestionBank userId={session.user.id} onCorrectAnswer={incrementCorrectQuestions} folders={folders} flashcards={flashcards} />} />
+                <Route path={getPathFromView(View.QuestionBank)} element={<QuestionBank userId={session.user.id} folders={folders} flashcards={flashcards} />} />
                 <Route path={getPathFromView(View.IntelligentSummarizer)} element={<IntelligentSummarizer userId={session.user.id} />} />
                 <Route path={getPathFromView(View.StudyBuddy)} element={<StudyBuddy userId={session.user.id} />} />
                 <Route path={getPathFromView(View.Certificates)} element={<Certificates userId={session.user.id} userName={session.user.user_metadata?.full_name} />} />
@@ -1219,7 +1221,7 @@ const App: React.FC = () => {
                 <Route path={getPathFromView(View.SpeedReader)} element={<SpeedReader />} />
                 <Route path={getPathFromView(View.Mnemonics)} element={<Mnemonics userId={session.user.id} />} />
                 <Route path={getPathFromView(View.ReverseSchedule)} element={<ReverseStudyPlanner userId={session.user.id} />} />
-                <Route path={getPathFromView(View.Statistics)} element={<Statistics studySessions={studySessions} flashcards={flashcards} tasks={tasks} subjects={subjects} correctQuestionsCount={correctQuestionsCount} confidenceLevels={confidenceLevels} />} />
+                <Route path={getPathFromView(View.Statistics)} element={<Statistics studySessions={studySessions} flashcards={flashcards} tasks={tasks} subjects={subjects} correctQuestionsCount={correctQuestionsCount} wrongQuestionsCount={wrongQuestionsCount} confidenceLevels={confidenceLevels} />} />
                 
                 <Route path={getPathFromView(View.Duel)} element={activeDuel ? 
                   <DuelArena 
@@ -1305,7 +1307,7 @@ const App: React.FC = () => {
                   />
                 } />
 
-                <Route path="/simulados" element={<QuestionBank userId={session.user.id} onCorrectAnswer={incrementCorrectQuestions} folders={folders} flashcards={flashcards} />} />
+                <Route path="/simulados" element={<QuestionBank userId={session.user.id} folders={folders} flashcards={flashcards} />} />
 
               </Routes>
 </ErrorBoundary>

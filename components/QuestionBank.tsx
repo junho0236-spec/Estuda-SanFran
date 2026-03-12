@@ -80,12 +80,11 @@ import {
 
 interface QuestionBankProps {
   userId: string;
-  onCorrectAnswer?: () => void;
   folders?: Folder[];
   flashcards?: Flashcard[];
 }
 
-const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, folders = [], flashcards = [] }) => {
+const QuestionBank: React.FC<QuestionBankProps> = ({ userId, folders = [], flashcards = [] }) => {
   const navigate = useNavigate();
   // ... (rest of the component)
 
@@ -863,27 +862,17 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
     console.log('DEBUG: syncUserProgress called with:', updates);
     console.log('DEBUG: Current userId:', userId);
     try {
-      // Get current state to ensure we don't overwrite with old data
-      const { data: current, error: fetchError } = await supabase
-        .from('user_progress')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (fetchError) {
-        console.error('DEBUG: Error fetching current progress:', fetchError);
-      }
-
+      // Use the most up-to-date values, prioritizing updates, then local state
       const payload = {
         user_id: userId,
-        favorites: updates.favorites !== undefined ? updates.favorites : (favorites.length > 0 ? favorites : (current?.favorites || [])),
-        wrong_question_ids: updates.wrongQuestions !== undefined ? updates.wrongQuestions : (wrongQuestions.length > 0 ? wrongQuestions : (current?.wrong_question_ids || [])),
-        correct_questions: updates.correctQuestions !== undefined ? updates.correctQuestions : (correctQuestions.length > 0 ? correctQuestions : (current?.correct_questions || [])),
-        notes: updates.notes !== undefined ? updates.notes : (Object.keys(notes).length > 0 ? notes : (current?.notes || {})),
-        correct_count: updates.correctCount !== undefined ? updates.correctCount : (correctCount > 0 ? correctCount : (current?.correct_count || 0)),
-        wrong_count: updates.wrongCount !== undefined ? updates.wrongCount : (wrongCount > 0 ? wrongCount : (current?.wrong_count || 0)),
-        error_mastery: updates.errorMastery !== undefined ? updates.errorMastery : (Object.keys(errorMastery).length > 0 ? errorMastery : (current?.error_mastery || {})),
-        confidence_levels: updates.confidence_levels !== undefined ? updates.confidence_levels : (Object.keys(userProgress?.confidence_levels || {}).length > 0 ? userProgress?.confidence_levels : (current?.confidence_levels || {})),
+        favorites: updates.favorites !== undefined ? updates.favorites : favorites,
+        wrong_question_ids: updates.wrongQuestions !== undefined ? updates.wrongQuestions : wrongQuestions,
+        correct_questions: updates.correctQuestions !== undefined ? updates.correctQuestions : correctQuestions,
+        notes: updates.notes !== undefined ? updates.notes : notes,
+        correct_count: updates.correctCount !== undefined ? updates.correctCount : correctCount,
+        wrong_count: updates.wrongCount !== undefined ? updates.wrongCount : wrongCount,
+        error_mastery: updates.errorMastery !== undefined ? updates.errorMastery : errorMastery,
+        confidence_levels: updates.confidence_levels !== undefined ? updates.confidence_levels : (userProgress?.confidence_levels || {}),
         updated_at: new Date().toISOString()
       };
 
@@ -1736,7 +1725,6 @@ Forneça a explicação de forma concisa e didática.`;
       supabase.from('questions').update({ status: 'Acertou' }).eq('id', targetQuestion.id).then();
       const newCount = correctCount + 1;
       setCorrectCount(newCount);
-      if (onCorrectAnswer) onCorrectAnswer();
       
       let newCorrect = [...correctQuestions];
       if (!correctQuestions.includes(targetQuestion.id)) {
