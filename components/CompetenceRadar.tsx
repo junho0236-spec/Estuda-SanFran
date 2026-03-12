@@ -38,8 +38,8 @@ const CompetenceRadar: React.FC<CompetenceRadarProps> = ({ subjects, studySessio
     // Ordenar por horas para pegar as disciplinas mais relevantes se houver muitas
     chartData.sort((a, b) => b.hours - a.hours);
     
-    // Limitar a 6 eixos para legibilidade
-    const topData = chartData.slice(0, 6);
+    // Limitar a 12 eixos para legibilidade (antes era 6)
+    const topData = chartData.slice(0, 12);
 
     // Encontrar o valor máximo para ajustar a escala
     const maxVal = Math.max(...topData.map(d => d.hours));
@@ -83,7 +83,9 @@ const CompetenceRadar: React.FC<CompetenceRadarProps> = ({ subjects, studySessio
           <h3 className="text-xl font-black text-slate-950 dark:text-white uppercase tracking-tight flex items-center gap-2">
             <BrainCircuit className="text-usp-blue w-6 h-6" /> Radar de Competências
           </h3>
-          <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest mt-1">Equilíbrio de Carga Horária</p>
+          <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest mt-1">
+            Equilíbrio de Carga Horária {subjects.length > 12 && `• Mostrando as 12 mais estudadas`}
+          </p>
         </div>
       </div>
 
@@ -94,7 +96,7 @@ const CompetenceRadar: React.FC<CompetenceRadarProps> = ({ subjects, studySessio
             {/* Removed complex tick object to prevent React Error #31 in some environments */}
             <PolarAngleAxis 
               dataKey="subject" 
-              tick={{ fontSize: 10, fill: '#64748b', fontWeight: 900 }}
+              tick={{ fontSize: data.length > 8 ? 8 : 10, fill: '#64748b', fontWeight: 900 }}
             />
             <PolarRadiusAxis 
               angle={30} 
