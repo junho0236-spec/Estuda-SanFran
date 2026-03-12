@@ -889,14 +889,16 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
 
       console.log('DEBUG: Payload to upsert:', payload);
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('user_progress')
-        .upsert(payload, { onConflict: 'user_id' });
+        .upsert(payload, { onConflict: 'user_id' })
+        .select()
+        .single();
       
       if (error) {
         console.error('DEBUG: Error syncing user progress:', error);
       } else {
-        console.log('DEBUG: Sync successful!');
+        console.log('DEBUG: Sync successful! Data:', data);
       }
     } catch (err) {
       console.error('DEBUG: Unexpected error in syncUserProgress:', err);
@@ -2430,7 +2432,7 @@ Forneça a explicação de forma concisa e didática.`;
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
               <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-2xl">
-                <Target className="text-blue-600 dark:text-blue-400" size={64} />
+                <Target className="text-blue-600 dark:text-blue-400" size={32} />
               </div>
               <div>
                 <h2 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Simulado em Curso</h2>
@@ -2940,7 +2942,7 @@ Forneça a explicação de forma concisa e didática.`;
                         if (stats.totalAttempts > 0) {
                           return (
                             <div className={`absolute top-8 right-8 z-10 ${stats.lastAttemptCorrect ? 'text-green-500' : 'text-red-500'}`}>
-                              <Target size={64} />
+                              <Target size={32} />
                             </div>
                           );
                         }
@@ -3288,7 +3290,7 @@ Forneça a explicação de forma concisa e didática.`;
                 if (stats.totalAttempts > 0) {
                   return (
                     <div className={`absolute top-6 right-6 z-10 ${stats.lastAttemptCorrect ? 'text-green-500' : 'text-red-500'}`}>
-                      <Target size={64} />
+                      <Target size={32} />
                     </div>
                   );
                 }
@@ -3320,7 +3322,7 @@ Forneça a explicação de forma concisa e didática.`;
                           return (
                             <>
                               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold shadow-sm border border-slate-200/50 dark:border-slate-700/50">
-                                <Target size={40} className="text-blue-500" />
+                                <Target size={20} className="text-blue-500" />
                                 { /* Removed: Você acertou stats */ }
                               </span>
                               {!stats.lastAttemptCorrect && stats.totalAttempts > 0 && (
