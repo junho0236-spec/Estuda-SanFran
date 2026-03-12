@@ -81,7 +81,8 @@ export const dataService = {
         answeredQuestionIds: profile.answeredQuestionIds,
         persona_mode: profile.persona_mode,
         onboarding_completed: profile.onboarding_completed,
-        visibility: profile.visibility
+        visibility: profile.visibility,
+        viewPreferences: profile.viewPreferences || {}
       },
       profile_completion: profile.arcadia_score || 0,
       full_name: profile.full_name || null,
@@ -194,6 +195,7 @@ export const dataService = {
           curriculo_url: data.curriculo_url,
           badges: data.badges,
           social_links: data.social_links,
+          viewPreferences: data.persona_data?.viewPreferences || {},
           creditos_aula: data.creditos_aula,
           creditos_trabalho: data.creditos_trabalho,
           media: data.media,
@@ -394,7 +396,7 @@ export const dataService = {
         completed_at: task.completedAt || null,
         category: task.category || 'Geral',
         priority: task.priority === 'urgente' || task.priority === 'alta' ? 'Alta' : 'Média',
-        status: task.completed ? 'Concluido' : 'Pendente',
+        status: task.status || (task.completed ? 'Concluido' : 'Pendente'),
         subtasks: task.subtasks || [],
         delegated_to: task.delegatedTo || null,
         delegated_by: task.delegatedBy || null,
@@ -406,7 +408,8 @@ export const dataService = {
           columnId: task.columnId,
           subjectId: task.subjectId,
           delegatedByName: task.delegatedByName,
-          delegatedToName: task.delegatedToName
+          delegatedToName: task.delegatedToName,
+          originalPriority: task.priority
         })
       };
 
@@ -434,11 +437,12 @@ export const dataService = {
             id: t.id,
             title: t.title,
             completed: t.status === 'Concluido',
+            status: t.status,
             notes: t.notes,
             dueDate: t.due_date,
             completedAt: t.completed_at,
             category: t.category,
-            priority: t.priority === 'Alta' ? 'alta' : 'normal',
+            priority: desc.originalPriority || (t.priority === 'Alta' ? 'alta' : 'normal'),
             subtasks: t.subtasks,
             delegatedTo: t.delegated_to,
             delegatedBy: t.delegated_by,

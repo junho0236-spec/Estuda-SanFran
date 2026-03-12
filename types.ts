@@ -188,6 +188,7 @@ export interface Task {
   completedAt?: string;
   priority?: TaskPriority;
   category?: TaskCategory;
+  status?: 'Pendente' | 'Fazendo' | 'Concluido';
   archived_at?: string | null;
   boardId?: string;
   columnId?: string;
@@ -519,6 +520,7 @@ export interface UserProfile {
   visibility?: 'public' | 'friends' | 'private';
   last_updated?: string;
   lastInteractionDate?: string;
+  viewPreferences?: Record<string, 'list' | 'kanban'>;
   productivityStats?: {
     completedToday: number;
     completedYesterday: number;

@@ -4,7 +4,7 @@ import {
   Plus, Layout, List, MoreVertical, Trash2, CheckSquare, 
   Clock, Paperclip, ChevronRight, X, Calendar, AlertCircle,
   Play, Pause, RotateCcw, Save, Quote, ThumbsUp, ExternalLink, Link as LinkIcon, Globe, Bell,
-  CheckCircle2, User, Zap
+  CheckCircle2, User, Zap, Trello
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -18,6 +18,7 @@ import {
   DragEndEvent,
   DragStartEvent,
   useDroppable,
+  useDraggable,
 } from '@dnd-kit/core';
 import {
   arrayMove,
@@ -63,6 +64,25 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   const [showNotifications, setShowNotifications] = useState(false);
   const [mentionSuggestions, setMentionSuggestions] = useState<Friendship[]>([]);
 
+  const currentViewMode: 'list' | 'kanban' = userProfile?.viewPreferences?.[activeTab] || (boards.find(b => b.name === activeTab) ? 'kanban' : 'list');
+
+  const handleToggleViewMode = (mode: 'list' | 'kanban') => {
+    if (!userProfile) return;
+    const newPreferences = {
+      ...(userProfile.viewPreferences || {}),
+      [activeTab]: mode
+    };
+    const updatedProfile = { ...userProfile, viewPreferences: newPreferences };
+    setUserProfile(updatedProfile);
+    dataService.saveUserProfile(updatedProfile, userId, isOnline);
+  };
+
+  const DEFAULT_KANBAN_COLUMNS = [
+    { id: 'Pendente', name: 'Pendente' },
+    { id: 'Fazendo', name: 'Fazendo' },
+    { id: 'Concluido', name: 'Concluído' }
+  ];
+
   // Mark all as read when closing notifications
   useEffect(() => {
     if (!showNotifications && notifications.some(n => !n.is_read)) {
@@ -105,6 +125,41 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         await dataService.saveTask(updatedTask, userId, isOnline);
       }
       return;
+    }
+
+    // Handle Kanban Column Drop
+    const taskId = active.id as string;
+    const overId = over.id as string;
+    const task = tasks.find(t => t.id === taskId);
+
+    if (task) {
+      // Check if dropping on a default status column
+      if (['Pendente', 'Fazendo', 'Concluido'].includes(overId)) {
+        const updatedTask = { 
+          ...task, 
+          status: overId as any,
+          completed: overId === 'Concluido'
+        };
+        setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t));
+        await dataService.saveTask(updatedTask, userId, isOnline);
+        return;
+      }
+
+      // Check if dropping on a board column
+      for (const board of boards) {
+        const column = board.columns.find(c => c.id === overId);
+        if (column) {
+          const updatedTask = { 
+            ...task, 
+            boardId: board.id, 
+            columnId: column.id,
+            status: undefined // Clear general status if moved to a board
+          };
+          setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t));
+          await dataService.saveTask(updatedTask, userId, isOnline);
+          return;
+        }
+      }
     }
 
     // Handle Reordering
@@ -188,7 +243,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       delegatedTo,
       delegatedToName,
       delegatedBy: userId,
-      delegatedByName: userProfile?.displayName || 'Você',
+      delegatedByName: userProfile?.full_name || 'Você',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     } as any;
@@ -201,7 +256,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       // Create notification for friend
       await dataService.createNotification(
         delegatedTo,
-        `${userProfile?.displayName || 'Você'} te atribuiu a tarefa: '${newTask.title}'`,
+        `${userProfile?.full_name || 'Você'} te atribuiu a tarefa: '${newTask.title}'`,
         newTask.id,
         'delegated'
       );
@@ -372,6 +427,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       title,
       completed: false,
       category,
+      status: (columnId && ['Pendente', 'Fazendo', 'Concluido'].includes(columnId)) ? columnId as any : 'Pendente',
       boardId: boardId || (boards.find(b => b.id === activeTab || b.name === activeTab) ? activeTab : undefined),
       columnId: columnId || (boards.find(b => b.id === activeTab || b.name === activeTab)?.columns[0].id),
       subtasks,
@@ -399,7 +455,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       if (taskToUpdate.delegatedBy && taskToUpdate.delegatedBy !== userId) {
         await dataService.createNotification(
           taskToUpdate.delegatedBy,
-          `${userProfile?.displayName || 'Alguém'} concluiu a tarefa: '${taskToUpdate.title}'`,
+          `${userProfile?.full_name || 'Alguém'} concluiu a tarefa: '${taskToUpdate.title}'`,
           taskToUpdate.id,
           'completed'
         );
@@ -507,6 +563,43 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     const newLink = { url, title: url.split('//')[1]?.split('/')[0] || url };
     const updatedLinks = [...(selectedTask.links || []), newLink];
     handleUpdateTask({ links: updatedLinks });
+  };
+
+  const DroppableColumn = ({ column, children }: { column: any, children: React.ReactNode }) => {
+    const { isOver, setNodeRef } = useDroppable({
+      id: column.id,
+    });
+
+    return (
+      <div 
+        ref={setNodeRef}
+        className={`w-80 shrink-0 flex flex-col gap-4 rounded-3xl transition-colors ${isOver ? 'bg-[#800000]/5 ring-2 ring-[#800000]/20 ring-inset' : ''}`}
+      >
+        {children}
+      </div>
+    );
+  };
+
+  const DraggableKanbanCard = ({ task, children }: { task: Task, children: React.ReactNode }) => {
+    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+      id: task.id,
+    });
+
+    const style = transform ? {
+      transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+    } : undefined;
+
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        {...listeners}
+        {...attributes}
+        className={isDragging ? 'opacity-0' : ''}
+      >
+        {children}
+      </div>
+    );
   };
 
   const DroppableTab = ({ tab, activeTab, onClick }: { tab: string, activeTab: string, onClick: () => void }) => {
@@ -751,6 +844,22 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
           </div>
 
         <div className="flex items-center gap-4">
+          <div className="flex items-center bg-slate-100 p-1 rounded-lg">
+            <button 
+              onClick={() => handleToggleViewMode('list')}
+              className={`p-1 rounded-md transition-all ${currentViewMode === 'list' ? 'bg-white text-[#800000] shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              title="Modo Lista"
+            >
+              <List size={14} />
+            </button>
+            <button 
+              onClick={() => handleToggleViewMode('kanban')}
+              className={`p-1 rounded-md transition-all ${currentViewMode === 'kanban' ? 'bg-white text-[#800000] shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              title="Modo Kanban"
+            >
+              <Trello size={14} />
+            </button>
+          </div>
           <div className="relative">
             <button 
               onClick={() => setShowNotifications(!showNotifications)}
@@ -829,14 +938,16 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
 
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden">
-        {(!boards.find(b => b.name === activeTab)) ? (
+        {(currentViewMode === 'list') ? (
           // --- MASTER-DETAIL VIEW (30/70) ---
           <div className="flex-1 flex overflow-hidden">
             {/* Master: List (30%) */}
             <div className={`transition-all duration-500 border-r border-slate-100 bg-white flex flex-col ${selectedTaskId ? 'w-[30%]' : 'w-full'}`}>
               <div className="p-4 border-b border-slate-50 flex flex-col gap-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-serif font-bold text-slate-900">{activeTab}</h3>
+                  <div className="flex items-center gap-3">
+                    <h3 className="font-serif font-bold text-slate-900">{activeTab}</h3>
+                  </div>
                   <div className="flex items-center gap-2 relative">
                     <button 
                       onClick={() => setShowTemplatesMenu(!showTemplatesMenu)} 
@@ -1338,80 +1449,102 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         ) : (
           // --- KANBAN VIEW ---
           <div className="flex-1 overflow-x-auto p-6 bg-slate-50 flex gap-6">
-            {boards.find(b => b.id === activeTab)?.columns.map(column => (
-              <div key={column.id} className="w-80 shrink-0 flex flex-col gap-4">
+            {(boards.find(b => b.name === activeTab)?.columns || DEFAULT_KANBAN_COLUMNS).map(column => (
+              <DroppableColumn key={column.id} column={column}>
                 <div className="flex items-center justify-between px-2">
                   <h4 className="font-bold text-slate-900 flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-[#800000]" />
                     {column.name}
                     <span className="text-xs text-slate-400 font-normal ml-1">
-                      {tasks.filter(t => t.boardId === activeTab && t.columnId === column.id).length}
+                      {tasks.filter(t => {
+                        const matchesTab = isTaskVisible(t);
+                        const matchesColumn = boards.find(b => b.name === activeTab) 
+                          ? t.columnId === column.id 
+                          : (t.status || (t.completed ? 'Concluido' : 'Pendente')) === column.id;
+                        return matchesTab && matchesColumn;
+                      }).length}
                     </span>
                   </h4>
                   <button onClick={() => handleAddTask(activeTab, column.id)} className="p-1 text-slate-400 hover:text-[#800000] transition-colors"><Plus size={18} /></button>
                 </div>
                 <div className="flex-1 space-y-3">
-                  {filteredTasks.filter(t => t.boardId === activeTab && t.columnId === column.id).map(task => {
+                  {tasks
+                    .filter(t => {
+                      const matchesTab = isTaskVisible(t);
+                      const matchesColumn = boards.find(b => b.name === activeTab) 
+                        ? t.columnId === column.id 
+                        : (t.status || (t.completed ? 'Concluido' : 'Pendente')) === column.id;
+                      return matchesTab && matchesColumn;
+                    })
+                    .map(task => {
                     const subtaskProgress = task.subtasks && task.subtasks.length > 0
                       ? (task.subtasks.filter(s => s.completed).length / task.subtasks.length) * 100
                       : 0;
 
                     return (
-                      <motion.div 
-                        key={task.id}
-                        layoutId={task.id}
-                        initial={false}
-                        animate={{ 
-                          opacity: task.completed ? 0.5 : 1,
-                          scale: 1
-                        }}
-                        whileHover={{ scale: 1.02 }}
-                        onClick={() => {
-                          setSelectedTaskId(task.id);
-                          setActiveTab('inbox'); // Switch to Master-Detail to show details
-                        }}
-                        className={`p-4 bg-white rounded-2xl shadow-sm border cursor-pointer hover:shadow-md hover:border-[#800000]/20 transition-all group relative overflow-hidden ${task.priority === 'urgente' ? 'border-l-4 border-l-red-500' : task.priority === 'alta' ? 'border-l-4 border-l-amber-500' : 'border-slate-100'}`}
-                      >
-                        {(task.priority === 'urgente' || task.priority === 'alta') && !task.completed && (
-                          <div className={`absolute inset-0 pointer-events-none animate-pulse ${task.priority === 'urgente' ? 'bg-red-500/5' : 'bg-amber-500/5'}`} />
-                        )}
-                        {task.completed && (
-                          <motion.div 
-                            initial={{ width: 0 }}
-                            animate={{ width: '100%' }}
-                            className="absolute top-0 left-0 h-1 bg-emerald-500/30"
-                          />
-                        )}
-                        <div className="flex items-start justify-between mb-2 relative z-10">
-                          <div className="flex flex-col gap-1">
-                            <h5 className={`text-sm font-bold text-slate-800 leading-tight transition-all ${task.completed ? 'line-through text-slate-400' : ''}`}>{task.title}</h5>
-                            {task.priority === 'urgente' && <span className="text-[8px] font-black text-red-500 uppercase tracking-widest">Urgente</span>}
+                      <DraggableKanbanCard key={task.id} task={task}>
+                        <motion.div 
+                          layoutId={task.id}
+                          initial={false}
+                          animate={{ 
+                            opacity: task.completed ? 0.5 : 1,
+                            scale: 1
+                          }}
+                          whileHover={{ scale: 1.02 }}
+                          onClick={() => {
+                            setSelectedTaskId(task.id);
+                          }}
+                          className={`p-4 bg-white rounded-2xl shadow-sm border cursor-pointer hover:shadow-md hover:border-[#800000]/20 transition-all group relative overflow-hidden ${task.priority === 'urgente' ? 'border-l-4 border-l-red-500' : task.priority === 'alta' ? 'border-l-4 border-l-amber-500' : 'border-slate-100'}`}
+                        >
+                          {(task.priority === 'urgente' || task.priority === 'alta') && !task.completed && (
+                            <div className={`absolute inset-0 pointer-events-none animate-pulse ${task.priority === 'urgente' ? 'bg-red-500/5' : 'bg-amber-500/5'}`} />
+                          )}
+                          {task.completed && (
+                            <motion.div 
+                              initial={{ width: 0 }}
+                              animate={{ width: '100%' }}
+                              className="absolute top-0 left-0 h-1 bg-emerald-500/30"
+                            />
+                          )}
+                          <div className="flex items-start justify-between mb-2 relative z-10">
+                            <div className="flex flex-col gap-1">
+                              <h5 className={`text-sm font-bold text-slate-800 leading-tight transition-all ${task.completed ? 'line-through text-slate-400' : ''}`}>{task.title}</h5>
+                              {task.priority === 'urgente' && <span className="text-[8px] font-black text-red-500 uppercase tracking-widest">Urgente</span>}
+                            </div>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleUpdateTask({ completed: !task.completed, status: !task.completed ? 'Concluido' : 'Pendente' }, task.id);
+                              }}
+                              className={`shrink-0 w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${task.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-200 hover:border-[#800000]'}`}
+                            >
+                              {task.completed && <CheckCircle2 size={12} />}
+                            </button>
                           </div>
-                          <ChevronRight size={14} className="text-slate-300 group-hover:text-[#800000] transition-colors" />
-                        </div>
-                        {task.notes && <p className="text-[10px] text-slate-400 line-clamp-2 mb-3 relative z-10">{task.notes}</p>}
-                        <div className="flex items-center justify-between relative z-10">
-                          <div className="flex items-center gap-2">
-                            {task.subtasks && task.subtasks.length > 0 && (
-                              <div className="flex items-center gap-1.5">
-                                <div className="w-12 h-1 bg-slate-100 rounded-full overflow-hidden">
-                                  <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${subtaskProgress}%` }} />
+                          {task.notes && <p className="text-[10px] text-slate-400 line-clamp-2 mb-3 relative z-10">{task.notes}</p>}
+                          <div className="flex items-center justify-between relative z-10">
+                            <div className="flex items-center gap-2">
+                              {task.subtasks && task.subtasks.length > 0 && (
+                                <div className="flex items-center gap-1.5">
+                                  <div className="w-12 h-1 bg-slate-100 rounded-full overflow-hidden">
+                                    <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${subtaskProgress}%` }} />
+                                  </div>
+                                  <span className="text-[9px] font-bold text-slate-400">{Math.round(subtaskProgress)}%</span>
                                 </div>
-                                <span className="text-[9px] font-bold text-slate-400">{Math.round(subtaskProgress)}%</span>
+                              )}
+                            </div>
+                            {task.dueDate && (
+                              <div className={`flex items-center gap-1 text-[10px] font-bold ${task.completed ? 'text-slate-300' : 'text-amber-600'}`}>
+                                <Calendar size={10} /> {new Date(task.dueDate).toLocaleDateString()}
                               </div>
                             )}
                           </div>
-                          {task.dueDate && (
-                            <div className={`flex items-center gap-1 text-[10px] font-bold ${task.completed ? 'text-slate-300' : 'text-amber-600'}`}>
-                              <Calendar size={10} /> {new Date(task.dueDate).toLocaleDateString()}
-                            </div>
-                          )}
-                        </div>
-                      </motion.div>
+                        </motion.div>
+                      </DraggableKanbanCard>
                     );
                   })}
                 </div>
-              </div>
+              </DroppableColumn>
             ))}
             <button 
               onClick={handleAddColumn}
