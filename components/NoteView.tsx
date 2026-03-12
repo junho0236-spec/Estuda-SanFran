@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css'; // Import Quill styles
-import { ArrowLeft, Save, Loader2, FileText, BrainCircuit, Sparkles, Tag, Split, Download, Gavel, Plus, Trash2, Edit3 } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, FileText, BrainCircuit, Sparkles, Tag, Split, Download, Gavel, Plus, Trash2, Edit3, Pencil } from 'lucide-react';
 import { Note, Subject, SubjectFile } from '../types';
 import { dataService } from '../services/dataService';
 import { summarizeText } from '../services/geminiService';
@@ -10,6 +10,7 @@ import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { SmartText } from './SmartVadeMecum';
 import * as pdfjsLib from 'pdfjs-dist';
 import { Folder, Upload, File, CheckCircle2, AlertCircle } from 'lucide-react';
+import HandwritingCanvas from './HandwritingCanvas';
 
 // Set up pdfjs worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
@@ -44,6 +45,8 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(initialSubjectId);
   const [isRenaming, setIsRenaming] = useState(false);
   const [newTitle, setNewTitle] = useState('');
+  const [isHandwritingOpen, setIsHandwritingOpen] = useState(false);
+  const [handwritingData, setHandwritingData] = useState<string | undefined>(undefined);
   
   // Sync selectedSubjectId when initialSubjectId changes from props
   useEffect(() => {
@@ -240,6 +243,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
         const firstNote = notes[0];
         setSelectedNote(firstNote);
         setNoteContent(firstNote.content);
+        setHandwritingData(firstNote.handwriting_data);
         if (quillRef.current) {
           const delta = quillRef.current.clipboard.convert({ html: firstNote.content });
           quillRef.current.setContents(delta, 'silent');
@@ -248,6 +252,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     } else {
       setSelectedNote(null);
       setNoteContent('');
+      setHandwritingData(undefined);
       if (quillRef.current) {
         quillRef.current.setContents([] as any, 'silent');
       }
@@ -316,6 +321,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   // Refs to keep track of latest state for auto-save without re-triggering effects
   const noteContentRef = useRef(noteContent);
   const selectedNoteRef = useRef(selectedNote);
+  const handwritingDataRef = useRef(handwritingData);
 
   useEffect(() => {
     noteContentRef.current = noteContent;
@@ -325,13 +331,18 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     selectedNoteRef.current = selectedNote;
   }, [selectedNote]);
 
+  useEffect(() => {
+    handwritingDataRef.current = handwritingData;
+  }, [handwritingData]);
+
   const saveNoteContent = useCallback(async (isAuto: boolean = false) => {
     const currentNote = selectedNoteRef.current;
     const currentContent = noteContentRef.current;
+    const currentHandwriting = handwritingDataRef.current;
 
     if (!currentNote) return;
     // Don't save if content is empty and it was already empty
-    if (!currentContent.trim() && !currentNote.content.trim()) return; 
+    if (!currentContent.trim() && !currentNote.content.trim() && !currentHandwriting) return; 
 
     if (isAuto) setIsAutoSaving(true);
     else setIsSaving(true);
@@ -342,6 +353,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
       const updatedNote: Note = {
         ...currentNote,
         content: currentContent,
+        handwriting_data: currentHandwriting,
         updated_at: new Date().toISOString(),
         tags: extractedTags,
       };
@@ -375,6 +387,20 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     saveNoteContent(false);
   };
 
+  const handleExportHandwritingImage = (base64: string) => {
+    const quill = quillRef.current;
+    if (quill) {
+      const range = quill.getSelection() || { index: quill.getLength(), length: 0 };
+      quill.insertEmbed(range.index, 'image', base64);
+      quill.setSelection((range.index + 1) as any);
+      setIsHandwritingOpen(false);
+    }
+  };
+
+  const handleSaveHandwriting = (data: string) => {
+    setHandwritingData(data);
+    alert("Traços de escrita salvos! Eles serão carregados quando você abrir a caneta novamente.");
+  };
   const applyTemplate = (template: keyof typeof templates) => {
     const newContent = noteContent + templates[template];
     setNoteContent(newContent);
@@ -672,6 +698,16 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
             )}
           </div>
 
+          {/* Handwriting Button */}
+          <button 
+            onClick={() => setIsHandwritingOpen(true)}
+            disabled={!selectedNote}
+            className="py-2 px-4 bg-pink-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-pink-700 transition-colors disabled:opacity-50"
+            title="Escrever à mão (Tablet/Touch)"
+          >
+            <Pencil size={18} /> Caneta
+          </button>
+
           {/* Save Button */}
           <button 
             onClick={handleSaveNote} 
@@ -883,6 +919,18 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
           )}
         </div>
       </div>
+      {isHandwritingOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-6xl h-[90vh]">
+            <HandwritingCanvas 
+              initialData={handwritingData}
+              onSave={handleSaveHandwriting}
+              onExportImage={handleExportHandwritingImage}
+              onClose={() => setIsHandwritingOpen(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

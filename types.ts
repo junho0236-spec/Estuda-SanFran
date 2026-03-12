@@ -252,6 +252,7 @@ export interface Note {
   user_id: string;
   title?: string;
   content: string;
+  handwriting_data?: string; // Base64 or JSON of paths
   updated_at: string;
   tags?: string[];
 }

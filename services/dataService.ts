@@ -646,7 +646,8 @@ export const dataService = {
         const { error } = await supabase.from('notes').upsert({
           ...note,
           user_id: userId,
-          subject_id: note.subject_id
+          subject_id: note.subject_id,
+          handwriting_data: note.handwriting_data || null
         });
         
         if (error) {
