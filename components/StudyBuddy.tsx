@@ -25,19 +25,44 @@ interface Message {
 
 interface StudyBuddyProps {
   userId: string;
+  userProfile?: any;
+  onSetupComplete?: (data: any) => void;
 }
 
-const StudyBuddy: React.FC<StudyBuddyProps> = ({ userId }) => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'ai',
-      content: "Olá! Sou seu Amigo de Estudo com IA da SanFran. Como posso ajudar você hoje? Posso explicar conceitos jurídicos, responder dúvidas ou gerar questões de prática para você.",
-      timestamp: new Date()
-    }
-  ]);
+const StudyBuddy: React.FC<StudyBuddyProps> = ({ userId, userProfile, onSetupComplete }) => {
+  const isInitialSetup = userProfile && !userProfile.setup_completed;
+
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isProcessingSetup, setIsProcessingSetup] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (messages.length === 0) {
+      if (isInitialSetup) {
+        setMessages([
+          {
+            role: 'ai',
+            content: `Olá, **${userProfile.full_name || 'Estudante'}**! Boas-vindas à SanFran Academy. 🏛️
+
+Sou seu Mentor de Boas-vindas. Para configurar seu workspace personalizado, preciso entender um pouco sobre sua rotina e objetivos. 
+
+Podemos começar? Me conte: em qual ano da faculdade você está e qual seu principal objetivo este semestre?`,
+            timestamp: new Date()
+          }
+        ]);
+      } else {
+        setMessages([
+          {
+            role: 'ai',
+            content: "Olá! Sou seu Amigo de Estudo com IA da SanFran. Como posso ajudar você hoje? Posso explicar conceitos jurídicos, responder dúvidas ou gerar questões de prática para você.",
+            timestamp: new Date()
+          }
+        ]);
+      }
+    }
+  }, [isInitialSetup, userProfile]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -63,7 +88,7 @@ const StudyBuddy: React.FC<StudyBuddyProps> = ({ userId }) => {
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
       
-      const systemInstruction = `Você é o "Amigo de Estudo da SanFran", um assistente de IA especializado em Direito Brasileiro e voltado para estudantes da Faculdade de Direito da USP (SanFran).
+      let systemInstruction = `Você é o "Amigo de Estudo da SanFran", um assistente de IA especializado em Direito Brasileiro e voltado para estudantes da Faculdade de Direito da USP (SanFran).
       Seu tom deve ser profissional, porém encorajador e acadêmico.
       Suas funções principais:
       1. Explicar conceitos jurídicos complexos de forma clara e didática.
@@ -72,6 +97,31 @@ const StudyBuddy: React.FC<StudyBuddyProps> = ({ userId }) => {
       4. Sempre que possível, cite autores clássicos ou contemporâneos relevantes.
       5. Se o usuário perguntar algo fora do escopo jurídico ou acadêmico, gentilmente redirecione-o para os estudos.
       Use Markdown para formatar suas respostas, especialmente para listas, negrito e blocos de código/citações.`;
+
+      if (isInitialSetup) {
+        systemInstruction = `Você é o "Mentor de Boas-vindas da SanFran Academy". Seu objetivo é realizar um breve questionário de onboarding com o novo estudante.
+        
+        Siga este fluxo:
+        1. Pergunte sobre o ano da faculdade e objetivos.
+        2. Pergunte sobre as matérias que está cursando.
+        3. Pergunte sobre o tempo disponível para estudo por dia.
+        4. Pergunte se prefere métodos visuais, leitura ou prática.
+        
+        Ao final (após coletar informações suficientes), você DEVE gerar um JSON final no seguinte formato exato, sem texto adicional antes ou depois:
+        {
+          "setup_complete": true,
+          "archetype": "O Estrategista" | "O Acadêmico" | "O Prático" | "O Maratonista",
+          "completeness_score": 100,
+          "initial_tasks": [
+            {"title": "Configurar matérias do semestre", "priority": "alta"},
+            {"title": "Criar primeiro deck de flashcards", "priority": "normal"},
+            {"title": "Definir meta de horas semanais", "priority": "normal"}
+          ],
+          "summary": "Uma breve mensagem de encerramento e boas-vindas ao workspace configurado."
+        }
+        
+        Mantenha a conversa amigável e focada em Direito USP.`;
+      }
 
       // Prepare history for context
       const history = messages.map(m => ({
@@ -91,9 +141,34 @@ const StudyBuddy: React.FC<StudyBuddyProps> = ({ userId }) => {
         }
       });
 
+      const responseText = response.text || "Desculpe, tive um problema ao processar sua resposta. Pode repetir?";
+
+      // Check for setup completion JSON
+      if (isInitialSetup && responseText.includes('"setup_complete": true')) {
+        try {
+          const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const setupData = JSON.parse(jsonMatch[0]);
+            setIsProcessingSetup(true);
+            
+            // Simular processamento elegante por 3 segundos
+            setTimeout(() => {
+              if (onSetupComplete) {
+                onSetupComplete(setupData);
+              }
+              setIsProcessingSetup(false);
+            }, 3500);
+            
+            return; // Don't add the JSON message to the chat
+          }
+        } catch (e) {
+          console.error("Failed to parse setup JSON:", e);
+        }
+      }
+
       const aiResponse: Message = {
         role: 'ai',
-        content: response.text || "Desculpe, tive um problema ao processar sua resposta. Pode repetir?",
+        content: responseText,
         timestamp: new Date()
       };
 
@@ -118,8 +193,28 @@ const StudyBuddy: React.FC<StudyBuddyProps> = ({ userId }) => {
   ];
 
   return (
-    <div className="flex flex-col h-[calc(100vh-120px)] max-w-5xl mx-auto bg-white dark:bg-sanfran-rubiDark/20 rounded-[2.5rem] border border-slate-200 dark:border-sanfran-rubi/20 shadow-2xl overflow-hidden animate-in fade-in duration-700">
+    <div className="flex flex-col h-[calc(100vh-120px)] max-w-5xl mx-auto bg-white dark:bg-sanfran-rubiDark/20 rounded-[2.5rem] border border-slate-200 dark:border-sanfran-rubi/20 shadow-2xl overflow-hidden animate-in fade-in duration-700 relative">
       
+      {/* Loading Overlay for Setup */}
+      {isProcessingSetup && (
+        <div className="absolute inset-0 z-50 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-10 text-center animate-in fade-in duration-500">
+          <div className="relative mb-8">
+            <div className="absolute inset-0 bg-sanfran-rubi blur-3xl opacity-20 rounded-full animate-pulse"></div>
+            <div className="relative bg-white dark:bg-sanfran-rubiDark p-6 rounded-3xl border border-slate-100 dark:border-sanfran-rubi/20 shadow-2xl">
+              <Sparkles className="w-16 h-16 text-sanfran-rubi animate-bounce" />
+            </div>
+          </div>
+          <h2 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter mb-4">Processando sua Jornada...</h2>
+          <p className="text-slate-500 dark:text-slate-400 max-w-md font-medium leading-relaxed">
+            Estamos configurando seu workspace personalizado, organizando suas tarefas iniciais e definindo seu arquétipo de estudante.
+          </p>
+          <div className="mt-10 w-64 h-1.5 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+            <div className="h-full bg-sanfran-rubi animate-[loading_3s_ease-in-out_infinite]"></div>
+          </div>
+          <p className="mt-4 text-[10px] font-black uppercase tracking-[0.3em] text-sanfran-rubi animate-pulse">Quase pronto...</p>
+        </div>
+      )}
+
       {/* Header */}
       <header className="p-6 border-b border-slate-100 dark:border-sanfran-rubi/20 bg-slate-50/50 dark:bg-white/5 flex items-center justify-between">
         <div className="flex items-center gap-4">

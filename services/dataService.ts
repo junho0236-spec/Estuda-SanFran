@@ -80,6 +80,7 @@ export const dataService = {
         tags: profile.tags,
         answeredQuestionIds: profile.answeredQuestionIds,
         persona_mode: profile.persona_mode,
+        onboarding_completed: profile.onboarding_completed,
         visibility: profile.visibility
       },
       profile_completion: profile.arcadia_score || 0,

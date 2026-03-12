@@ -207,7 +207,17 @@ const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [presenceUsers, setPresenceUsers] = useState<PresenceUser[]>([]);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>({
+    id: '',
+    archetype: 'Calouro',
+    answers: {},
+    answeredQuestionIds: [],
+    scores: { social: 0, corporativo: 0, academico: 0, politico: 0, resiliencia: 0, tecnologico: 0 },
+    matrix: { academicoVsPratico: 0, extensaoVsCarreira: 0, socialVsReservado: 0, urgenciaVsPlanejamento: 0 },
+    tags: [],
+    arcadia_score: 0,
+    productivityStats: { completedToday: 0, completedYesterday: 0, streak: 0 }
+  });
 
   // DUEL STATES
   const [activeDuel, setActiveDuel] = useState<Duel | null>(null);
@@ -1304,6 +1314,8 @@ const App: React.FC = () => {
                     setStudySessions={setStudySessions}
                     userId={session.user.id} 
                     isOnline={isOnline} 
+                    userProfile={userProfile}
+                    setUserProfile={setUserProfile}
                   />
                 } />
 

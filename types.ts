@@ -515,6 +515,7 @@ export interface UserProfile {
   badges?: string[];
   social_links?: Record<string, string>;
   persona_mode?: boolean;
+  onboarding_completed?: boolean;
   visibility?: 'public' | 'friends' | 'private';
   last_updated?: string;
   lastInteractionDate?: string;

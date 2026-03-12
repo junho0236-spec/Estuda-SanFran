@@ -46,11 +46,14 @@ interface TaskMasterDetailProps {
   setStudySessions: React.Dispatch<React.SetStateAction<StudySession[]>>;
   userId: string;
   isOnline: boolean;
+  userProfile: UserProfile | null;
+  setUserProfile: React.Dispatch<React.SetStateAction<UserProfile | null>>;
 }
 
 const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({ 
   tasks, subjects, setTasks, boards, setBoards, 
-  studySessions, setStudySessions, userId, isOnline 
+  studySessions, setStudySessions, userId, isOnline,
+  userProfile, setUserProfile
 }) => {
   // --- View State ---
   const [activeTab, setActiveTab] = useState<string>('Geral');
@@ -129,7 +132,17 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
   // --- Onboarding State ---
-  const [showOnboarding, setShowOnboarding] = useState(boards.length === 0);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [isProcessingOnboarding, setIsProcessingOnboarding] = useState(false);
+
+  useEffect(() => {
+    if (userProfile && boards.length === 0 && !userProfile.onboarding_completed) {
+      setShowOnboarding(true);
+    } else {
+      setShowOnboarding(false);
+    }
+  }, [userProfile?.onboarding_completed, boards.length]);
+
   const [messages, setMessages] = useState<Message[]>([
     { 
       role: 'assistant', 
@@ -242,34 +255,6 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   };
 
   const selectedTask = tasks.find(t => t.id === selectedTaskId);
-  const [userProfile, setUserProfile] = useState<UserProfile>({
-    id: '',
-    archetype: 'Calouro',
-    answers: {},
-    answeredQuestionIds: [],
-    scores: {
-      social: 0,
-      corporativo: 0,
-      academico: 0,
-      politico: 0,
-      resiliencia: 0,
-      tecnologico: 0
-    },
-    matrix: {
-      academicoVsPratico: 0,
-      extensaoVsCarreira: 0,
-      socialVsReservado: 0,
-      urgenciaVsPlanejamento: 0
-    },
-    tags: [],
-    arcadia_score: 0,
-    lastInteractionDate: '',
-    productivityStats: {
-      completedToday: 0,
-      completedYesterday: 0,
-      streak: 0
-    }
-  });
   const [activeQuestion, setActiveQuestion] = useState<any | null>(null);
   const [showReward, setShowReward] = useState<string | null>(null);
   const [aiTone, setAiTone] = useState<{ name: string; prefix: string; style: string }>({
@@ -1166,13 +1151,13 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
 
       const responseText = response.text || "";
       
-      if (questionCount < 5 || showOnboarding) {
+      if (questionCount < 5) {
         try {
           const json = JSON.parse(responseText.replace(/```json\n?|\n?```/g, '').trim());
           setMessages(prev => [...prev, { role: 'assistant', content: json.mensagem_ia, options: json.opcoes_botoes }]);
           
           // Handle db_update from AI
-          if (json.db_update) {
+          if (json.db_update && userProfile) {
             const updatedTags = [...userProfile.tags];
             Object.entries(json.db_update).forEach(([key, value]) => {
               const tag = `${key}:${value}`;
@@ -1182,7 +1167,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
             const updatedProfile = { 
               ...userProfile, 
               tags: updatedTags,
-              arcadia_score: Math.min(100, userProfile.arcadia_score + (json.db_update.score_bonus || 2))
+              arcadia_score: Math.min(100, userProfile.arcadia_score + (Number(json.db_update.score_bonus) || 2))
             };
             setUserProfile(updatedProfile);
             dataService.saveUserProfile(updatedProfile, userId, isOnline);
@@ -1192,19 +1177,46 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         }
       } else {
         // Final Diagnosis
+        setIsProcessingOnboarding(true);
         const parts = responseText.split('---BOARD_CONFIG---');
         const diagnosis = parts[0];
-        setMessages(prev => [...prev, { role: 'assistant', content: diagnosis }]);
         
-        if (parts[1]) {
-          try {
+        try {
+          if (parts[1]) {
             const boardConfig = JSON.parse(parts[1].trim());
             await createInitialBoard(boardConfig);
-          } catch (e) {
-            console.error("Erro ao criar quadro inicial:", e);
+          } else {
+            // Create a default board if AI failed to provide one
+            await createInitialBoard({
+              nome: 'Meu Workspace Jurídico',
+              colunas: ['A Fazer', 'Em Progresso', 'Concluído'],
+              tarefas: [
+                { titulo: 'Explorar o SanFran Academy', descricao: 'Conheça todas as ferramentas disponíveis.' },
+                { titulo: 'Configurar meu Perfil', descricao: 'Adicione suas informações e preferências.' }
+              ]
+            });
           }
+          
+          // Mark onboarding as completed
+          if (userProfile) {
+            const updatedProfile = {
+              ...userProfile,
+              onboarding_completed: true,
+              arcadia_score: 100
+            };
+            setUserProfile(updatedProfile);
+            await dataService.saveUserProfile(updatedProfile, userId, isOnline);
+          }
+        } catch (e) {
+          console.error("Erro no processamento final do onboarding:", e);
         }
-        setShowOnboarding(false);
+
+        // Wait for 3 seconds to show the loading transition
+        setTimeout(() => {
+          setMessages(prev => [...prev, { role: 'assistant', content: diagnosis }]);
+          setShowOnboarding(false);
+          setIsProcessingOnboarding(false);
+        }, 3000);
       }
       
       setQuestionCount(prev => prev + 1);
@@ -1653,7 +1665,25 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
             </div>
           </div>
         </div>
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6 bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')]">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6 bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] relative">
+          {isProcessingOnboarding && (
+            <div className="absolute inset-0 z-50 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">
+              <div className="relative mb-8">
+                <div className="absolute inset-0 bg-[#800000] blur-3xl opacity-20 rounded-full animate-pulse"></div>
+                <Loader2 className="w-16 h-16 text-[#800000] animate-spin relative z-10" />
+              </div>
+              <h3 className="text-2xl font-serif font-bold text-slate-900 mb-2">Processando sua Jornada...</h3>
+              <p className="text-slate-600 max-w-md mx-auto leading-relaxed">
+                Estamos analisando seu perfil e preparando seu workspace personalizado nas Arcadas. 
+                Quase lá, sanfrancano(a)!
+              </p>
+              <div className="mt-8 flex gap-1">
+                <div className="w-2 h-2 rounded-full bg-[#800000] animate-bounce [animation-delay:-0.3s]"></div>
+                <div className="w-2 h-2 rounded-full bg-[#800000] animate-bounce [animation-delay:-0.15s]"></div>
+                <div className="w-2 h-2 rounded-full bg-[#800000] animate-bounce"></div>
+              </div>
+            </div>
+          )}
           {messages.map((msg, idx) => (
             <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
               <div className={`flex gap-3 max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
