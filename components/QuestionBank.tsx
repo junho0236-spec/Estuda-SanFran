@@ -889,7 +889,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, folders = [], flash
       if (data) {
         setUserProgress(data);
         setFavorites(data.favorites || []);
-        setWrongQuestions(data.wrong_question_ids || []);
+        setWrongQuestions(data.wrong_questions || data.wrong_question_ids || []);
         setCorrectQuestions(data.correct_questions || []);
         setNotes(data.notes || {});
         setCorrectCount(data.correct_count || 0);
@@ -926,7 +926,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, folders = [], flash
       const payload = {
         user_id: userId,
         favorites: updates.favorites !== undefined ? updates.favorites : (favorites.length > 0 ? favorites : (current?.favorites || [])),
-        wrong_question_ids: updates.wrongQuestions !== undefined ? updates.wrongQuestions : (wrongQuestions.length > 0 ? wrongQuestions : (current?.wrong_question_ids || [])),
+        wrong_questions: updates.wrongQuestions !== undefined ? updates.wrongQuestions : (wrongQuestions.length > 0 ? wrongQuestions : (current?.wrong_questions || current?.wrong_question_ids || [])),
         correct_questions: updates.correctQuestions !== undefined ? updates.correctQuestions : (correctQuestions.length > 0 ? correctQuestions : (current?.correct_questions || [])),
         notes: updates.notes !== undefined ? updates.notes : (Object.keys(notes).length > 0 ? notes : (current?.notes || {})),
         correct_count: updates.correctCount !== undefined ? updates.correctCount : (correctCount > 0 ? correctCount : (current?.correct_count || 0)),
@@ -950,7 +950,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, folders = [], flash
         const fallbackPayload = {
           user_id: userId,
           correct_questions: payload.correct_questions,
-          wrong_question_ids: payload.wrong_question_ids,
+          wrong_questions: payload.wrong_questions,
           updated_at: payload.updated_at
         };
         

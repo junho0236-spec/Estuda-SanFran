@@ -615,7 +615,7 @@ const App: React.FC = () => {
         if (resProgress.data) {
           setCorrectQuestionsCount(resProgress.data.correct_count || 0);
           setWrongQuestionsCount(resProgress.data.wrong_count || 0);
-          setWrongQuestionIds(resProgress.data.wrong_question_ids || []);
+          setWrongQuestionIds(resProgress.data.wrong_questions || resProgress.data.wrong_question_ids || []);
           setConfidenceLevels(resProgress.data.confidence_levels || {});
         }
         
