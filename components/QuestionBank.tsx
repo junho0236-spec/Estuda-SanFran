@@ -847,7 +847,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
       if (data) {
         setUserProgress(data);
         setFavorites(data.favorites || []);
-        setWrongQuestions(data.wrong_questions || []);
+        setWrongQuestions(data.wrong_question_ids || []);
         setCorrectQuestions(data.correct_questions || []);
         setNotes(data.notes || {});
         setCorrectCount(data.correct_count || 0);
@@ -877,7 +877,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
       const payload = {
         user_id: userId,
         favorites: updates.favorites !== undefined ? updates.favorites : (current?.favorites || favorites),
-        wrong_questions: updates.wrongQuestions !== undefined ? updates.wrongQuestions : (current?.wrong_questions || wrongQuestions),
+        wrong_question_ids: updates.wrongQuestions !== undefined ? updates.wrongQuestions : (current?.wrong_question_ids || wrongQuestions),
         correct_questions: updates.correctQuestions !== undefined ? updates.correctQuestions : (current?.correct_questions || correctQuestions),
         notes: updates.notes !== undefined ? updates.notes : (current?.notes || notes),
         correct_count: updates.correctCount !== undefined ? updates.correctCount : (current?.correct_count || correctCount),
