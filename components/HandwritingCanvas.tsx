@@ -23,6 +23,7 @@ interface HandwritingCanvasProps {
 
 const HandwritingCanvas: React.FC<HandwritingCanvasProps> = ({ initialData, onSave, onExportImage, onClose }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const contextRef = useRef<CanvasRenderingContext2D | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [color, setColor] = useState('#000000');
   const [width, setWidth] = useState(2);
@@ -30,6 +31,19 @@ const HandwritingCanvas: React.FC<HandwritingCanvasProps> = ({ initialData, onSa
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [redoStack, setRedoStack] = useState<Stroke[]>([]);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Initialize canvas context
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      contextRef.current = ctx;
+    }
+  }, []);
 
   // Load initial data
   useEffect(() => {
@@ -46,10 +60,9 @@ const HandwritingCanvas: React.FC<HandwritingCanvasProps> = ({ initialData, onSa
   }, [initialData]);
 
   const drawStroke = useCallback((ctx: CanvasRenderingContext2D, stroke: Stroke) => {
-    if (stroke.points.length < 2) return;
+    if (stroke.points.length === 0) return;
 
     ctx.beginPath();
-    ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.strokeStyle = stroke.type === 'eraser' ? '#ffffff' : stroke.color;
@@ -61,24 +74,25 @@ const HandwritingCanvas: React.FC<HandwritingCanvasProps> = ({ initialData, onSa
       ctx.globalCompositeOperation = 'source-over';
     }
 
-    for (let i = 1; i < stroke.points.length; i++) {
-      ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+    if (stroke.points.length === 1) {
+      ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+      ctx.lineTo(stroke.points[0].x, stroke.points[0].y);
+    } else {
+      ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+      for (let i = 1; i < stroke.points.length; i++) {
+        ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+      }
     }
     ctx.stroke();
+    ctx.globalCompositeOperation = 'source-over'; // Reset
   }, []);
 
   const redraw = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    const ctx = contextRef.current;
+    if (!canvas || !ctx) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Draw background (optional, but good for visibility)
-    // ctx.fillStyle = '#ffffff';
-    // ctx.fillRect(0, 0, canvas.width, canvas.height);
-
     strokes.forEach(stroke => drawStroke(ctx, stroke));
   }, [strokes, drawStroke]);
 
@@ -86,16 +100,19 @@ const HandwritingCanvas: React.FC<HandwritingCanvasProps> = ({ initialData, onSa
     redraw();
   }, [redraw]);
 
-  const getCoordinates = (e: React.MouseEvent | React.TouchEvent | MouseEvent | TouchEvent): Point => {
+  const getCoordinates = (e: MouseEvent | TouchEvent): Point => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
 
     const rect = canvas.getBoundingClientRect();
     let clientX, clientY;
 
-    if ('touches' in e) {
+    if ('touches' in e && e.touches.length > 0) {
       clientX = e.touches[0].clientX;
       clientY = e.touches[0].clientY;
+    } else if ('changedTouches' in e && e.changedTouches.length > 0) {
+      clientX = e.changedTouches[0].clientX;
+      clientY = e.changedTouches[0].clientY;
     } else {
       clientX = (e as MouseEvent).clientX;
       clientY = (e as MouseEvent).clientY;
@@ -107,38 +124,91 @@ const HandwritingCanvas: React.FC<HandwritingCanvasProps> = ({ initialData, onSa
     };
   };
 
-  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault();
-    setIsDrawing(true);
-    const point = getCoordinates(e);
-    const newStroke: Stroke = {
-      points: [point],
-      color: color,
-      width: tool === 'eraser' ? width * 5 : width,
-      type: tool
-    };
-    setStrokes(prev => [...prev, newStroke]);
-    setRedoStack([]);
-  };
+  // Use direct event listeners for better touch support
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-  const draw = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isDrawing) return;
-    e.preventDefault();
-    const point = getCoordinates(e);
-    
-    setStrokes(prev => {
-      const lastStroke = prev[prev.length - 1];
-      const updatedStroke = {
-        ...lastStroke,
-        points: [...lastStroke.points, point]
+    const handleStart = (e: MouseEvent | TouchEvent) => {
+      e.preventDefault();
+      setIsDrawing(true);
+      const point = getCoordinates(e);
+      
+      const newStroke: Stroke = {
+        points: [point],
+        color: color,
+        width: tool === 'eraser' ? width * 5 : width,
+        type: tool
       };
-      return [...prev.slice(0, -1), updatedStroke];
-    });
-  };
+      
+      setStrokes(prev => [...prev, newStroke]);
+      setRedoStack([]);
 
-  const stopDrawing = () => {
-    setIsDrawing(false);
-  };
+      // Draw initial point
+      const ctx = contextRef.current;
+      if (ctx) {
+        drawStroke(ctx, newStroke);
+      }
+    };
+
+    const handleMove = (e: MouseEvent | TouchEvent) => {
+      if (!isDrawing) return;
+      e.preventDefault();
+      const point = getCoordinates(e);
+      
+      setStrokes(prev => {
+        if (prev.length === 0) return prev;
+        const lastStroke = prev[prev.length - 1];
+        const updatedStroke = {
+          ...lastStroke,
+          points: [...lastStroke.points, point]
+        };
+        
+        // Immediate draw for performance
+        const ctx = contextRef.current;
+        if (ctx) {
+          ctx.beginPath();
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.strokeStyle = updatedStroke.type === 'eraser' ? '#ffffff' : updatedStroke.color;
+          ctx.lineWidth = updatedStroke.width;
+          if (updatedStroke.type === 'eraser') ctx.globalCompositeOperation = 'destination-out';
+          
+          const prevPoint = lastStroke.points[lastStroke.points.length - 1];
+          ctx.moveTo(prevPoint.x, prevPoint.y);
+          ctx.lineTo(point.x, point.y);
+          ctx.stroke();
+          ctx.globalCompositeOperation = 'source-over';
+        }
+
+        return [...prev.slice(0, -1), updatedStroke];
+      });
+    };
+
+    const handleEnd = () => {
+      setIsDrawing(false);
+    };
+
+    canvas.addEventListener('mousedown', handleStart);
+    canvas.addEventListener('mousemove', handleMove);
+    canvas.addEventListener('mouseup', handleEnd);
+    canvas.addEventListener('mouseleave', handleEnd);
+    
+    canvas.addEventListener('touchstart', handleStart, { passive: false });
+    canvas.addEventListener('touchmove', handleMove, { passive: false });
+    canvas.addEventListener('touchend', handleEnd);
+
+    return () => {
+      canvas.removeEventListener('mousedown', handleStart);
+      canvas.removeEventListener('mousemove', handleMove);
+      canvas.removeEventListener('mouseup', handleEnd);
+      canvas.removeEventListener('mouseleave', handleEnd);
+      
+      canvas.removeEventListener('touchstart', handleStart);
+      canvas.removeEventListener('touchmove', handleMove);
+      canvas.removeEventListener('touchend', handleEnd);
+    };
+  }, [isDrawing, color, width, tool, drawStroke]);
 
   const undo = () => {
     if (strokes.length === 0) return;
@@ -169,7 +239,6 @@ const HandwritingCanvas: React.FC<HandwritingCanvasProps> = ({ initialData, onSa
     const canvas = canvasRef.current;
     if (!canvas) return;
     
-    // Create a temporary canvas with white background for export
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = canvas.width;
     tempCanvas.height = canvas.height;
@@ -178,37 +247,31 @@ const HandwritingCanvas: React.FC<HandwritingCanvasProps> = ({ initialData, onSa
 
     tempCtx.fillStyle = '#ffffff';
     tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-    
-    // Draw existing strokes
     strokes.forEach(stroke => drawStroke(tempCtx, stroke));
 
     const base64 = tempCanvas.toDataURL('image/png');
     onExportImage(base64);
   };
 
-  // Resize handler
+  // Resize handler with ResizeObserver
   useEffect(() => {
-    const handleResize = () => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      
-      const parent = canvas.parentElement;
-      if (!parent) return;
+    const canvas = canvasRef.current;
+    if (!canvas || !canvas.parentElement) return;
 
-      // Save current content
-      const tempStrokes = [...strokes];
-      
-      canvas.width = parent.clientWidth;
-      canvas.height = parent.clientHeight;
-      
-      // Redraw
-      setStrokes(tempStrokes);
-    };
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          canvas.width = width;
+          canvas.height = height;
+          redraw();
+        }
+      }
+    });
 
-    window.addEventListener('resize', handleResize);
-    handleResize();
-    return () => window.removeEventListener('resize', handleResize);
-  }, [strokes]);
+    observer.observe(canvas.parentElement);
+    return () => observer.disconnect();
+  }, [redraw]);
 
   return (
     <div className={`flex flex-col bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden transition-all duration-300 ${isFullscreen ? 'fixed inset-4 z-[100]' : 'relative h-[500px]'}`}>
@@ -301,13 +364,6 @@ const HandwritingCanvas: React.FC<HandwritingCanvasProps> = ({ initialData, onSa
       <div className="flex-1 relative bg-white cursor-crosshair overflow-hidden">
         <canvas 
           ref={canvasRef}
-          onMouseDown={startDrawing}
-          onMouseMove={draw}
-          onMouseUp={stopDrawing}
-          onMouseLeave={stopDrawing}
-          onTouchStart={startDrawing}
-          onTouchMove={draw}
-          onTouchEnd={stopDrawing}
           className="absolute inset-0 w-full h-full touch-none"
         />
         {strokes.length === 0 && (
