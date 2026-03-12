@@ -876,14 +876,14 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, onCorrectAnswer, fo
 
       const payload = {
         user_id: userId,
-        favorites: updates.favorites !== undefined ? updates.favorites : (current?.favorites || favorites),
-        wrong_question_ids: updates.wrongQuestions !== undefined ? updates.wrongQuestions : (current?.wrong_question_ids || wrongQuestions),
-        correct_questions: updates.correctQuestions !== undefined ? updates.correctQuestions : (current?.correct_questions || correctQuestions),
-        notes: updates.notes !== undefined ? updates.notes : (current?.notes || notes),
-        correct_count: updates.correctCount !== undefined ? updates.correctCount : (current?.correct_count || correctCount),
-        wrong_count: updates.wrongCount !== undefined ? updates.wrongCount : (current?.wrong_count || wrongCount),
-        error_mastery: updates.errorMastery !== undefined ? updates.errorMastery : (current?.error_mastery || errorMastery),
-        confidence_levels: updates.confidence_levels !== undefined ? updates.confidence_levels : (current?.confidence_levels || userProgress?.confidence_levels || {}),
+        favorites: updates.favorites !== undefined ? updates.favorites : (favorites.length > 0 ? favorites : (current?.favorites || [])),
+        wrong_question_ids: updates.wrongQuestions !== undefined ? updates.wrongQuestions : (wrongQuestions.length > 0 ? wrongQuestions : (current?.wrong_question_ids || [])),
+        correct_questions: updates.correctQuestions !== undefined ? updates.correctQuestions : (correctQuestions.length > 0 ? correctQuestions : (current?.correct_questions || [])),
+        notes: updates.notes !== undefined ? updates.notes : (Object.keys(notes).length > 0 ? notes : (current?.notes || {})),
+        correct_count: updates.correctCount !== undefined ? updates.correctCount : (correctCount > 0 ? correctCount : (current?.correct_count || 0)),
+        wrong_count: updates.wrongCount !== undefined ? updates.wrongCount : (wrongCount > 0 ? wrongCount : (current?.wrong_count || 0)),
+        error_mastery: updates.errorMastery !== undefined ? updates.errorMastery : (Object.keys(errorMastery).length > 0 ? errorMastery : (current?.error_mastery || {})),
+        confidence_levels: updates.confidence_levels !== undefined ? updates.confidence_levels : (Object.keys(userProgress?.confidence_levels || {}).length > 0 ? userProgress?.confidence_levels : (current?.confidence_levels || {})),
         updated_at: new Date().toISOString()
       };
 
