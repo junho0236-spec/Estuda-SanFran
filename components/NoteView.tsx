@@ -606,9 +606,10 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
             <div className="flex items-center gap-4">
               <button 
                 onClick={onBack} 
-                className="p-3 bg-white dark:bg-white/5 text-slate-500 hover:text-sanfran-rubi rounded-2xl shadow-sm border border-slate-200 dark:border-white/10 transition-all hover:scale-105 active:scale-95"
+                className="p-3 bg-white dark:bg-white/5 text-slate-500 hover:text-sanfran-rubi rounded-2xl shadow-sm border border-slate-200 dark:border-white/10 transition-all hover:scale-105 active:scale-95 flex flex-col items-center gap-1"
               >
                 <ArrowLeft size={20} />
+                <span className="text-[8px] font-black uppercase tracking-tighter">Voltar</span>
               </button>
               <div className="flex flex-col">
                 <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Disciplina</span>
@@ -632,9 +633,10 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                   </h1>
                   <button 
                     onClick={() => { setIsRenaming(true); setNewTitle(selectedNote.title); }} 
-                    className="p-2.5 bg-slate-100 dark:bg-white/5 text-slate-400 hover:text-blue-500 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                    className="p-2.5 bg-slate-100 dark:bg-white/5 text-slate-400 hover:text-blue-500 rounded-xl transition-all opacity-0 group-hover:opacity-100 flex flex-col items-center gap-1"
                   >
                     <Edit3 size={20} />
+                    <span className="text-[8px] font-black uppercase">Renomear</span>
                   </button>
                 </div>
               ) : isRenaming ? (
@@ -648,8 +650,14 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                     onKeyDown={(e) => e.key === 'Enter' && renameNote()}
                   />
                   <div className="flex gap-2">
-                    <button onClick={renameNote} className="p-3 bg-blue-500 text-white rounded-2xl shadow-xl shadow-blue-500/20 hover:scale-105 transition-all"><CheckCircle2 size={24} /></button>
-                    <button onClick={() => setIsRenaming(false)} className="p-3 bg-slate-200 dark:bg-white/10 text-slate-500 rounded-2xl hover:scale-105 transition-all"><ArrowLeft size={24} /></button>
+                    <button onClick={renameNote} className="p-3 bg-blue-500 text-white rounded-2xl shadow-xl shadow-blue-500/20 hover:scale-105 transition-all flex flex-col items-center gap-1">
+                      <CheckCircle2 size={24} />
+                      <span className="text-[8px] font-black uppercase">Salvar</span>
+                    </button>
+                    <button onClick={() => setIsRenaming(false)} className="p-3 bg-slate-200 dark:bg-white/10 text-slate-500 rounded-2xl hover:scale-105 transition-all flex flex-col items-center gap-1">
+                      <ArrowLeft size={24} />
+                      <span className="text-[8px] font-black uppercase">Cancelar</span>
+                    </button>
                   </div>
                 </div>
               ) : (
@@ -665,25 +673,28 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
               <button 
                 onClick={handleSummarize}
                 disabled={isSummarizing || !selectedNote}
-                className="p-3 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-2xl transition-all disabled:opacity-30"
+                className="p-3 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-2xl transition-all disabled:opacity-30 flex flex-col items-center gap-1"
                 title="Resumir com IA"
               >
                 {isSummarizing ? <Loader2 className="w-6 h-6 animate-spin" /> : <Sparkles size={24} />}
+                <span className="text-[8px] font-black uppercase">Resumir</span>
               </button>
               <button 
                 onClick={handleGenerateFlashcards}
                 disabled={!selectedNote}
-                className="p-3 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-2xl transition-all disabled:opacity-30"
+                className="p-3 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-2xl transition-all disabled:opacity-30 flex flex-col items-center gap-1"
                 title="Gerar Flashcards"
               >
                 <BrainCircuit size={24} />
+                <span className="text-[8px] font-black uppercase">Anki</span>
               </button>
               <button
                 onClick={() => setIsVadeMecumMode(!isVadeMecumMode)}
-                className={`p-3 rounded-2xl transition-all ${isVadeMecumMode ? 'bg-sanfran-rubi text-white shadow-lg shadow-red-500/20' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/10'}`}
+                className={`p-3 rounded-2xl transition-all flex flex-col items-center gap-1 ${isVadeMecumMode ? 'bg-sanfran-rubi text-white shadow-lg shadow-red-500/20' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/10'}`}
                 title="Modo Vade Mecum"
               >
                 <Gavel size={24} />
+                <span className="text-[8px] font-black uppercase">Leitura</span>
               </button>
             </div>
 
@@ -693,10 +704,11 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                 <button 
                   onClick={() => setIsTemplateMenuOpen(!isTemplateMenuOpen)}
                   disabled={!selectedNote}
-                  className="p-3 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-2xl transition-all disabled:opacity-30"
+                  className="p-3 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-2xl transition-all disabled:opacity-30 flex flex-col items-center gap-1"
                   title="Templates"
                 >
                   <FileText size={24} />
+                  <span className="text-[8px] font-black uppercase">Modelos</span>
                 </button>
                 {isTemplateMenuOpen && (
                   <div className="absolute right-0 mt-4 w-72 bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl border border-slate-200 dark:border-white/10 z-[60] p-3 animate-in fade-in zoom-in-95 duration-200">
@@ -710,10 +722,11 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
               <button 
                 onClick={() => setIsHandwritingOpen(true)}
                 disabled={!selectedNote}
-                className="p-3 text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-900/20 rounded-2xl transition-all disabled:opacity-30"
+                className="p-3 text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-900/20 rounded-2xl transition-all disabled:opacity-30 flex flex-col items-center gap-1"
                 title="Escrita à Mão"
               >
                 <Pencil size={24} />
+                <span className="text-[8px] font-black uppercase">Caneta</span>
               </button>
             </div>
 
@@ -723,10 +736,11 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                 <button 
                   onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
                   disabled={!selectedNote}
-                  className="p-3 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-2xl transition-all disabled:opacity-30"
+                  className="p-3 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-2xl transition-all disabled:opacity-30 flex flex-col items-center gap-1"
                   title="Exportar"
                 >
                   <Download size={24} />
+                  <span className="text-[8px] font-black uppercase">Exportar</span>
                 </button>
                 {isExportMenuOpen && (
                   <div className="absolute right-0 mt-4 w-64 bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl border border-slate-200 dark:border-white/10 z-[60] p-3 animate-in fade-in zoom-in-95 duration-200">
@@ -742,10 +756,11 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                   setIsSplitView(nextSplitState);
                   onToggleSidebar(!nextSplitState);
                 }}
-                className={`p-3 rounded-2xl transition-all ${isSplitView ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-lg' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/10'}`}
+                className={`p-3 rounded-2xl transition-all flex flex-col items-center gap-1 ${isSplitView ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-lg' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/10'}`}
                 title="Split View"
               >
                 <Split size={24} />
+                <span className="text-[8px] font-black uppercase">{isSplitView ? 'Foco ON' : 'Foco OFF'}</span>
               </button>
             </div>
 
@@ -756,7 +771,10 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
               className="ml-4 py-4 px-8 bg-sanfran-rubi text-white rounded-[2rem] font-black uppercase tracking-widest text-xs flex items-center gap-4 hover:bg-red-700 transition-all shadow-2xl shadow-red-500/30 disabled:opacity-50 active:scale-95"
             >
               {(isSaving || isAutoSaving) ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save size={20} />} 
-              {(isSaving || isAutoSaving) ? 'Salvando' : 'Salvar'}
+              <div className="flex flex-col items-start">
+                <span className="leading-none">{(isSaving || isAutoSaving) ? 'Salvando' : 'Salvar'}</span>
+                <span className="text-[7px] opacity-50 mt-1">Ctrl + S</span>
+              </div>
             </button>
           </div>
         </div>
@@ -764,134 +782,138 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
 
       <div className="flex-1 flex gap-8 overflow-hidden">
         {/* Sidebar for Notes and Files */}
-        <aside className="w-80 flex flex-col bg-slate-50 dark:bg-white/5 rounded-[3rem] border border-slate-200 dark:border-white/10 overflow-hidden shadow-inner">
-          {/* Tabs */}
-          <div className="flex p-3 bg-white dark:bg-black/20 border-b border-slate-100 dark:border-white/5">
-            <button 
-              onClick={() => setActiveTab('notes')}
-              className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'notes' ? 'bg-sanfran-rubi text-white shadow-lg shadow-red-500/20' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-              Notas
-            </button>
-            <button 
-              onClick={() => setActiveTab('repository')}
-              className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'repository' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-              Repositório
-            </button>
-            <button 
-              onClick={() => setActiveTab('assignments')}
-              className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'assignments' ? 'bg-green-600 text-white shadow-lg shadow-green-500/20' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-              Entregas
-            </button>
-          </div>
-
-          <div className="px-8 py-6 flex items-center justify-between">
-            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
-              {activeTab === 'notes' ? 'Documentos' : activeTab === 'repository' ? 'PDFs / Textos' : 'Trabalhos'}
-            </h3>
-            {activeTab === 'notes' ? (
-              <button onClick={createNewNote} className="p-2.5 bg-white dark:bg-white/10 text-sanfran-rubi hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl shadow-sm border border-slate-100 dark:border-white/5 transition-all hover:rotate-90">
-                <Plus size={20} />
-              </button>
-            ) : (
+        {!isSplitView && (
+          <aside className="w-80 flex flex-col bg-slate-50 dark:bg-white/5 rounded-[3rem] border border-slate-200 dark:border-white/10 overflow-hidden shadow-inner animate-in slide-in-from-left-4 duration-300">
+            {/* Tabs */}
+            <div className="flex p-3 bg-white dark:bg-black/20 border-b border-slate-100 dark:border-white/5">
               <button 
-                onClick={() => fileInputRef.current?.click()} 
-                disabled={isUploading}
-                className={`p-2.5 bg-white dark:bg-white/10 rounded-xl shadow-sm border border-slate-100 dark:border-white/5 transition-all ${activeTab === 'repository' ? 'text-blue-500 hover:bg-blue-50' : 'text-green-500 hover:bg-green-50'}`}
+                onClick={() => setActiveTab('notes')}
+                className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'notes' ? 'bg-sanfran-rubi text-white shadow-lg shadow-red-500/20' : 'text-slate-400 hover:text-slate-600'}`}
               >
-                {isUploading ? <Loader2 size={20} className="animate-spin" /> : <Upload size={20} />}
+                Notas
               </button>
-            )}
-          </div>
+              <button 
+                onClick={() => setActiveTab('repository')}
+                className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'repository' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                Repositório
+              </button>
+              <button 
+                onClick={() => setActiveTab('assignments')}
+                className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'assignments' ? 'bg-green-600 text-white shadow-lg shadow-green-500/20' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                Entregas
+              </button>
+            </div>
 
-          <div className="flex-1 overflow-y-auto px-4 pb-8 space-y-4 custom-scrollbar">
-            {activeTab === 'notes' ? (
-              notes.map(note => (
-                <div 
-                  key={note.id}
-                  onClick={() => {
-                    setSelectedNote(note);
-                    setSelectedFile(null);
-                    setNoteContent(note.content);
-                    if (quillRef.current) {
-                      const delta = quillRef.current.clipboard.convert({ html: note.content });
-                      quillRef.current.setContents(delta, 'silent');
-                    }
-                  }}
-                  className={`group p-5 rounded-[2rem] cursor-pointer transition-all flex items-center justify-between border-2 relative overflow-hidden ${selectedNote?.id === note.id ? 'bg-white dark:bg-slate-900 border-sanfran-rubi shadow-xl -translate-y-1' : 'bg-white/50 dark:bg-white/5 border-transparent hover:bg-white dark:hover:bg-white/10 hover:shadow-lg'}`}
+            <div className="px-8 py-6 flex items-center justify-between">
+              <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
+                {activeTab === 'notes' ? 'Documentos' : activeTab === 'repository' ? 'PDFs / Textos' : 'Trabalhos'}
+              </h3>
+              {activeTab === 'notes' ? (
+                <button onClick={createNewNote} className="p-2.5 bg-white dark:bg-white/10 text-sanfran-rubi hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl shadow-sm border border-slate-100 dark:border-white/5 transition-all hover:rotate-90 flex flex-col items-center gap-1">
+                  <Plus size={20} />
+                  <span className="text-[7px] font-black uppercase">Novo</span>
+                </button>
+              ) : (
+                <button 
+                  onClick={() => fileInputRef.current?.click()} 
+                  disabled={isUploading}
+                  className={`p-2.5 bg-white dark:bg-white/10 rounded-xl shadow-sm border border-slate-100 dark:border-white/5 transition-all flex flex-col items-center gap-1 ${activeTab === 'repository' ? 'text-blue-500 hover:bg-blue-50' : 'text-green-500 hover:bg-green-50'}`}
                 >
-                  {/* Color accent bar */}
-                  <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${getCardColor(note.id).split(' ')[2]}`}></div>
-                  
-                  <div className="flex items-center gap-4 overflow-hidden">
-                    <div className={`p-3 rounded-2xl ${getCardColor(note.id)}`}>
-                      <FileText size={20} />
-                    </div>
-                    <div className="flex flex-col overflow-hidden">
-                      <span className={`text-sm font-black truncate ${selectedNote?.id === note.id ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>
-                        {note.title || 'Documento sem título'}
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-                        {new Date(note.updated_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); deleteNote(note.id); }}
-                    className="opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </div>
-              ))
-            ) : (
-              files.filter(f => f.type === (activeTab === 'repository' ? 'repository' : 'assignment')).map(file => (
-                <div 
-                  key={file.id}
-                  onClick={() => {
-                    setSelectedFile(file);
-                    setSelectedNote(null);
-                  }}
-                  className={`group p-5 rounded-[2rem] cursor-pointer transition-all flex items-center justify-between border-2 relative overflow-hidden ${selectedFile?.id === file.id ? 'bg-white dark:bg-slate-900 border-' + (activeTab === 'repository' ? 'blue-500' : 'green-500') + ' shadow-xl -translate-y-1' : 'bg-white/50 dark:bg-white/5 border-transparent hover:bg-white dark:hover:bg-white/10 hover:shadow-lg'}`}
-                >
-                  <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${activeTab === 'repository' ? 'bg-blue-500' : 'bg-green-500'}`}></div>
+                  {isUploading ? <Loader2 size={20} className="animate-spin" /> : <Upload size={20} />}
+                  <span className="text-[7px] font-black uppercase">Subir</span>
+                </button>
+              )}
+            </div>
 
-                  <div className="flex items-center gap-4 overflow-hidden">
-                    <div className={`p-3 rounded-2xl ${selectedFile?.id === file.id ? (activeTab === 'repository' ? 'bg-blue-500 text-white' : 'bg-green-500 text-white') : 'bg-slate-100 dark:bg-white/10 text-slate-400'}`}>
-                      <File size={20} />
-                    </div>
-                    <div className="flex flex-col overflow-hidden">
-                      <span className={`text-sm font-black truncate ${selectedFile?.id === file.id ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>
-                        {file.name}
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-                        {new Date(file.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); deleteFile(file.id); }}
-                    className="opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
+            <div className="flex-1 overflow-y-auto px-4 pb-8 space-y-4 custom-scrollbar">
+              {activeTab === 'notes' ? (
+                notes.map(note => (
+                  <div 
+                    key={note.id}
+                    onClick={() => {
+                      setSelectedNote(note);
+                      setSelectedFile(null);
+                      setNoteContent(note.content);
+                      if (quillRef.current) {
+                        const delta = quillRef.current.clipboard.convert({ html: note.content });
+                        quillRef.current.setContents(delta, 'silent');
+                      }
+                    }}
+                    className={`group p-5 rounded-[2rem] cursor-pointer transition-all flex items-center justify-between border-2 relative overflow-hidden ${selectedNote?.id === note.id ? 'bg-white dark:bg-slate-900 border-sanfran-rubi shadow-xl -translate-y-1' : 'bg-white/50 dark:bg-white/5 border-transparent hover:bg-white dark:hover:bg-white/10 hover:shadow-lg'}`}
                   >
-                    <Trash2 size={18} />
-                  </button>
+                    {/* Color accent bar */}
+                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${getCardColor(note.id).split(' ')[2]}`}></div>
+                    
+                    <div className="flex items-center gap-4 overflow-hidden">
+                      <div className={`p-3 rounded-2xl ${getCardColor(note.id)}`}>
+                        <FileText size={20} />
+                      </div>
+                      <div className="flex flex-col overflow-hidden">
+                        <span className={`text-sm font-black truncate ${selectedNote?.id === note.id ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>
+                          {note.title || 'Documento sem título'}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                          {new Date(note.updated_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); deleteNote(note.id); }}
+                      className="opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                ))
+              ) : (
+                files.filter(f => f.type === (activeTab === 'repository' ? 'repository' : 'assignment')).map(file => (
+                  <div 
+                    key={file.id}
+                    onClick={() => {
+                      setSelectedFile(file);
+                      setSelectedNote(null);
+                    }}
+                    className={`group p-5 rounded-[2rem] cursor-pointer transition-all flex items-center justify-between border-2 relative overflow-hidden ${selectedFile?.id === file.id ? 'bg-white dark:bg-slate-900 border-' + (activeTab === 'repository' ? 'blue-500' : 'green-500') + ' shadow-xl -translate-y-1' : 'bg-white/50 dark:bg-white/5 border-transparent hover:bg-white dark:hover:bg-white/10 hover:shadow-lg'}`}
+                  >
+                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${activeTab === 'repository' ? 'bg-blue-500' : 'bg-green-500'}`}></div>
+
+                    <div className="flex items-center gap-4 overflow-hidden">
+                      <div className={`p-3 rounded-2xl ${selectedFile?.id === file.id ? (activeTab === 'repository' ? 'bg-blue-500 text-white' : 'bg-green-500 text-white') : 'bg-slate-100 dark:bg-white/10 text-slate-400'}`}>
+                        <File size={20} />
+                      </div>
+                      <div className="flex flex-col overflow-hidden">
+                        <span className={`text-sm font-black truncate ${selectedFile?.id === file.id ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>
+                          {file.name}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                          {new Date(file.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); deleteFile(file.id); }}
+                      className="opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                ))
+              )}
+              
+              {((activeTab === 'notes' && notes.length === 0) || (activeTab !== 'notes' && files.filter(f => f.type === (activeTab === 'repository' ? 'repository' : 'assignment')).length === 0)) && !isLoading && (
+                <div className="text-center py-20 px-8">
+                  <div className="w-20 h-20 bg-white dark:bg-white/5 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-sm border border-slate-100 dark:border-white/5">
+                    <Archive size={32} className="text-slate-200" />
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em]">Vazio</p>
+                  <p className="text-xs text-slate-400 mt-2 font-medium">Nenhum item encontrado nesta categoria.</p>
                 </div>
-              ))
-            )}
-            
-            {((activeTab === 'notes' && notes.length === 0) || (activeTab !== 'notes' && files.filter(f => f.type === (activeTab === 'repository' ? 'repository' : 'assignment')).length === 0)) && !isLoading && (
-              <div className="text-center py-20 px-8">
-                <div className="w-20 h-20 bg-white dark:bg-white/5 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-sm border border-slate-100 dark:border-white/5">
-                  <Archive size={32} className="text-slate-200" />
-                </div>
-                <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em]">Vazio</p>
-                <p className="text-xs text-slate-400 mt-2 font-medium">Nenhum item encontrado nesta categoria.</p>
-              </div>
-            )}
-          </div>
-        </aside>
+              )}
+            </div>
+          </aside>
+        )}
 
         {/* Editor Area or File Preview */}
         <main className="flex-1 flex flex-col overflow-hidden">
@@ -914,8 +936,14 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                   </button>
                 </div>
               ) : isVadeMecumMode ? (
-                <div className="p-16 max-w-5xl mx-auto w-full">
-                  <div className="prose dark:prose-invert max-w-none font-serif text-2xl leading-relaxed text-slate-800 dark:text-slate-200">
+                <div className="p-16 max-w-5xl mx-auto w-full relative">
+                  <button 
+                    onClick={() => setIsVadeMecumMode(false)}
+                    className="absolute top-8 right-8 px-6 py-3 bg-sanfran-rubi text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-red-700 transition-all shadow-xl"
+                  >
+                    Sair do Modo Leitura
+                  </button>
+                  <div className="prose dark:prose-invert max-w-none font-serif text-2xl leading-relaxed text-slate-800 dark:text-slate-200 mt-12">
                     <SmartText text={new DOMParser().parseFromString(noteContent, 'text/html').body.textContent || ''} />
                   </div>
                 </div>
