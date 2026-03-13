@@ -603,7 +603,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   };
 
   return (
-    <div className={`flex flex-col h-full animate-in slide-in-from-right-4 duration-500 transition-all duration-500 ${isMaximized ? 'is-maximized fixed inset-0 z-[100] bg-white dark:bg-[#0d0303]' : 'flex-1 w-full'}`}>
+    <div className={`flex flex-col animate-in slide-in-from-right-4 duration-500 transition-all duration-500 ${isMaximized ? 'is-maximized fixed inset-0 z-[100] bg-white dark:bg-[#0d0303] h-full' : 'w-full min-h-[calc(100vh-10rem)]'}`}>
       
       {/* Editorial Header */}
       <header className={`relative border-b border-slate-100 dark:border-white/5 transition-all ${isMaximized ? 'py-2 px-4 mb-0 bg-slate-50 dark:bg-white/5' : 'py-8 mb-10'}`}>
@@ -807,7 +807,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
         </div>
       </header>
 
-      <div className="flex-1 flex gap-8 overflow-hidden">
+      <div className={`flex gap-8 ${isMaximized ? 'flex-1 overflow-hidden' : 'flex-1 min-h-[700px]'}`}>
         {/* Sidebar for Notes and Files */}
         {!isSplitView && (
           <aside className="w-80 flex flex-col bg-slate-50 dark:bg-white/5 rounded-[3rem] border border-slate-200 dark:border-white/10 overflow-hidden shadow-inner animate-in slide-in-from-left-4 duration-300">
@@ -975,8 +975,8 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                   </div>
                 </div>
               ) : (
-                <div className={`flex-1 flex flex-col transition-all duration-500 ${isMaximized ? 'p-0' : 'p-6 md:p-10'}`}>
-                  <div ref={onEditorRef} className="flex-1 quill-editor-custom paper-effect" />
+                <div className={`flex-1 flex flex-col transition-all duration-500 ${isMaximized ? 'p-0' : 'p-6 md:p-10 min-h-[600px]'}`}>
+                  <div ref={onEditorRef} className="flex-1 quill-editor-custom paper-effect min-h-[500px]" />
                 </div>
               )
             ) : (
