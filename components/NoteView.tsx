@@ -603,12 +603,12 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   };
 
   return (
-    <div className={`flex flex-col h-full animate-in slide-in-from-right-4 duration-500 transition-all duration-500 ${isMaximized ? 'fixed inset-0 z-[100] p-4 md:p-10 bg-slate-50 dark:bg-[#0d0303]' : (isSplitView ? 'lg:w-full' : 'lg:w-auto')}`}>
+    <div className={`flex flex-col h-full animate-in slide-in-from-right-4 duration-500 transition-all duration-500 ${isMaximized ? 'is-maximized fixed inset-0 z-[100] bg-white dark:bg-[#0d0303]' : (isSplitView ? 'lg:w-full' : 'lg:w-auto p-4 md:p-10')}`}>
       
       {/* Editorial Header */}
-      <header className="relative py-8 mb-10 border-b border-slate-100 dark:border-white/5">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
-          <div className="space-y-6">
+      <header className={`relative border-b border-slate-100 dark:border-white/5 transition-all ${isMaximized ? 'py-2 px-4 mb-0 bg-slate-50 dark:bg-white/5' : 'py-8 mb-10'}`}>
+        <div className={`flex flex-col lg:flex-row lg:items-center justify-between ${isMaximized ? 'gap-2' : 'gap-8'}`}>
+          <div className={`flex items-center gap-4 ${isMaximized ? 'scale-75 origin-left' : ''}`}>
             <div className="flex items-center gap-4">
               <button 
                 onClick={handleBack} 
@@ -617,24 +617,26 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                 <ArrowLeft size={20} />
                 <span className="text-[8px] font-black uppercase tracking-tighter">Voltar</span>
               </button>
-              <div className="flex flex-col">
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Disciplina</span>
-                <select
-                  value={selectedSubjectId}
-                  onChange={(e) => setSelectedSubjectId(e.target.value)}
-                  className="bg-transparent border-none p-0 text-xs font-bold text-sanfran-rubi focus:ring-0 outline-none cursor-pointer hover:underline transition-all"
-                >
-                  {subjects.map(sub => (
-                    <option key={sub.id} value={sub.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">{sub.name}</option>
-                  ))}
-                </select>
-              </div>
+              {!isMaximized && (
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Disciplina</span>
+                  <select
+                    value={selectedSubjectId}
+                    onChange={(e) => setSelectedSubjectId(e.target.value)}
+                    className="bg-transparent border-none p-0 text-xs font-bold text-sanfran-rubi focus:ring-0 outline-none cursor-pointer hover:underline transition-all"
+                  >
+                    {subjects.map(sub => (
+                      <option key={sub.id} value={sub.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">{sub.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             <div className="relative">
               {selectedNote && !isRenaming ? (
                 <div className="flex items-center gap-4 group">
-                  <h1 className="text-5xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tighter leading-[0.9]">
+                  <h1 className={`font-black text-slate-900 dark:text-white tracking-tighter leading-[0.9] transition-all ${isMaximized ? 'text-xl' : 'text-5xl md:text-6xl'}`}>
                     {selectedNote.title || 'Documento sem título'}
                   </h1>
                   <button 
@@ -651,7 +653,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                     type="text" 
                     value={newTitle} 
                     onChange={(e) => setNewTitle(e.target.value)}
-                    className="px-6 py-3 bg-white dark:bg-slate-800 border-4 border-blue-500/30 rounded-[2rem] outline-none text-4xl font-black tracking-tighter w-full max-w-xl focus:border-blue-500 transition-all"
+                    className={`px-6 py-3 bg-white dark:bg-slate-800 border-4 border-blue-500/30 rounded-[2rem] outline-none font-black tracking-tighter w-full max-w-xl focus:border-blue-500 transition-all ${isMaximized ? 'text-lg' : 'text-4xl'}`}
                     autoFocus
                     onKeyDown={(e) => e.key === 'Enter' && renameNote()}
                   />
@@ -667,13 +669,13 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                   </div>
                 </div>
               ) : (
-                <h1 className="text-5xl md:text-6xl font-black text-slate-200 dark:text-slate-800 tracking-tighter">Selecione um documento</h1>
+                <h1 className={`font-black text-slate-200 dark:text-slate-800 tracking-tighter transition-all ${isMaximized ? 'text-xl' : 'text-5xl md:text-6xl'}`}>Selecione um documento</h1>
               )}
             </div>
           </div>
 
           {/* Action Groups */}
-          <div className="flex flex-wrap items-center gap-3">
+          <div className={`flex flex-wrap items-center gap-3 ${isMaximized ? 'scale-75 origin-right' : ''}`}>
             {/* Group 1: AI & Smart Tools */}
             <div className="flex bg-white dark:bg-white/5 p-1.5 rounded-[2rem] border border-slate-200 dark:border-white/10 shadow-sm">
               <button 
@@ -941,7 +943,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
 
         {/* Editor Area or File Preview */}
         <main className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto bg-white dark:bg-white/5 rounded-[4rem] border border-slate-200 dark:border-white/10 shadow-2xl relative flex flex-col">
+          <div className={`flex-1 overflow-y-auto bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 shadow-2xl relative flex flex-col transition-all duration-500 ${isMaximized ? 'rounded-none border-0' : 'rounded-[4rem] border'}`}>
             {activeTab === 'notes' ? (
               !selectedNote ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-slate-400 space-y-8 p-12 text-center">
@@ -972,7 +974,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                   </div>
                 </div>
               ) : (
-                <div className="flex-1 flex flex-col p-12 md:p-16">
+                <div className={`flex-1 flex flex-col transition-all duration-500 ${isMaximized ? 'p-0' : 'p-12 md:p-16'}`}>
                   <div ref={onEditorRef} className="flex-1 quill-editor-custom paper-effect" />
                 </div>
               )
@@ -1045,7 +1047,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
           </div>
           
           {/* Tags Footer */}
-          {selectedNote && (
+          {selectedNote && !isMaximized && (
             <div className="mt-8 flex flex-wrap gap-3 px-6">
               {(noteContent.match(/#(\w+)/g) || []).map((tag, index) => (
                 <span key={index} className="flex items-center gap-3 px-6 py-3 bg-white dark:bg-white/5 text-slate-700 dark:text-slate-200 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-slate-200 dark:border-white/10 shadow-sm hover:scale-105 transition-all cursor-default">

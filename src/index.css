@@ -191,6 +191,42 @@
   background-color: transparent;
 }
 
+/* Maximized Mode Overrides */
+.is-maximized .quill-editor-custom {
+  padding: 0 !important;
+}
+
+.is-maximized .quill-editor-custom .ql-toolbar {
+  padding: 4px 8px !important;
+  border-top: 0 !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+  background: #f8fafc !important;
+}
+
+.is-maximized .quill-editor-custom .ql-container {
+  padding: 0 !important;
+  border: 0 !important;
+}
+
+.is-maximized .quill-editor-custom .ql-editor {
+  padding: 2rem 4rem !important;
+  max-width: 900px !important;
+  margin: 0 auto !important;
+  background: white !important;
+  min-height: calc(100vh - 100px) !important;
+  box-shadow: 0 0 50px rgba(0,0,0,0.05) !important;
+}
+
+.dark .is-maximized .quill-editor-custom .ql-toolbar {
+  background: rgba(255,255,255,0.05) !important;
+}
+
+.dark .is-maximized .quill-editor-custom .ql-editor {
+  background: #1a1a1a !important;
+  box-shadow: 0 0 50px rgba(0,0,0,0.2) !important;
+}
+
 /* Custom Scrollbar */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
