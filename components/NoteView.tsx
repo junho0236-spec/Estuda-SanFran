@@ -603,7 +603,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   };
 
   return (
-    <div className={`flex flex-col h-full animate-in slide-in-from-right-4 duration-500 transition-all duration-500 ${isMaximized ? 'is-maximized fixed inset-0 z-[100] bg-white dark:bg-[#0d0303]' : (isSplitView ? 'lg:w-full' : 'w-full p-4 md:p-10')}`}>
+    <div className={`flex flex-col h-full animate-in slide-in-from-right-4 duration-500 transition-all duration-500 ${isMaximized ? 'is-maximized fixed inset-0 z-[100] bg-white dark:bg-[#0d0303]' : 'flex-1 w-full'}`}>
       
       {/* Editorial Header */}
       <header className={`relative border-b border-slate-100 dark:border-white/5 transition-all ${isMaximized ? 'py-2 px-4 mb-0 bg-slate-50 dark:bg-white/5' : 'py-8 mb-10'}`}>
@@ -943,8 +943,8 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
         )}
 
         {/* Editor Area or File Preview */}
-        <main className="flex-1 flex flex-col overflow-hidden">
-          <div className={`flex-1 overflow-y-auto bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 shadow-2xl relative flex flex-col transition-all duration-500 ${isMaximized ? 'rounded-none border-0' : 'rounded-[4rem] border'}`}>
+        <main className="flex-1 flex flex-col overflow-hidden min-w-0">
+          <div className={`flex-1 overflow-y-auto bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 shadow-2xl relative flex flex-col transition-all duration-500 ${isMaximized ? 'rounded-none border-0' : 'rounded-3xl border'}`}>
             {activeTab === 'notes' ? (
               !selectedNote ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-slate-400 space-y-8 p-12 text-center">
@@ -975,7 +975,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                   </div>
                 </div>
               ) : (
-                <div className={`flex-1 flex flex-col transition-all duration-500 ${isMaximized ? 'p-0' : 'p-12 md:p-16'}`}>
+                <div className={`flex-1 flex flex-col transition-all duration-500 ${isMaximized ? 'p-0' : 'p-6 md:p-10'}`}>
                   <div ref={onEditorRef} className="flex-1 quill-editor-custom paper-effect" />
                 </div>
               )
