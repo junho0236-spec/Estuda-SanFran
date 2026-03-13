@@ -603,7 +603,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   };
 
   return (
-    <div className={`flex flex-col h-full animate-in slide-in-from-right-4 duration-500 transition-all duration-500 ${isMaximized ? 'is-maximized fixed inset-0 z-[100] bg-white dark:bg-[#0d0303]' : (isSplitView ? 'lg:w-full' : 'lg:w-auto p-4 md:p-10')}`}>
+    <div className={`flex flex-col h-full animate-in slide-in-from-right-4 duration-500 transition-all duration-500 ${isMaximized ? 'is-maximized fixed inset-0 z-[100] bg-white dark:bg-[#0d0303]' : (isSplitView ? 'lg:w-full' : 'w-full p-4 md:p-10')}`}>
       
       {/* Editorial Header */}
       <header className={`relative border-b border-slate-100 dark:border-white/5 transition-all ${isMaximized ? 'py-2 px-4 mb-0 bg-slate-50 dark:bg-white/5' : 'py-8 mb-10'}`}>
@@ -779,7 +779,8 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                     setIsSplitView(true);
                     onToggleSidebar(false);
                   } else {
-                    // Restore previous state if needed, or just leave as is
+                    setIsSplitView(false);
+                    onToggleSidebar(true);
                   }
                 }}
                 className={`p-3 rounded-2xl transition-all flex flex-col items-center gap-1 ${isMaximized ? 'bg-sanfran-rubi text-white shadow-lg shadow-red-500/20' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/10'}`}
