@@ -13,13 +13,39 @@ import {
   ArrowUpRight,
   Wrench,
   AlertCircle,
-  Sparkles
+  Sparkles,
+  Lock
 } from 'lucide-react';
 import { View } from '../types';
 
 interface SanFranHelpProps {
   onNavigate: (view: View) => void;
 }
+
+const LockedOverlay: React.FC = () => (
+  <div className="absolute inset-0 z-20 flex flex-col items-center justify-center overflow-hidden rounded-[2.5rem]">
+    {/* Efeito de Vidro Jateado / Grayscale Suave */}
+    <div className="absolute inset-0 bg-white/5 dark:bg-black/10 backdrop-blur-[1px] pointer-events-none"></div>
+    
+    {/* Correntes Finas e Delicadas (Formato X) */}
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[0.5px] bg-slate-400/20 rotate-[35deg]"></div>
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[0.5px] bg-slate-400/20 -rotate-[35deg]"></div>
+    </div>
+
+    {/* Cadeado Centralizado e Discreto */}
+    <div className="relative z-30 bg-white/60 dark:bg-slate-800/60 p-1.5 rounded-full shadow-sm border border-white/40 dark:border-slate-700/40 backdrop-blur-md">
+      <Lock size={12} className="text-slate-500/70" />
+    </div>
+
+    {/* Texto de Status Ajustado */}
+    <div className="absolute bottom-6 left-0 right-0 text-center z-30">
+      <span className="text-[7px] font-black uppercase tracking-[0.3em] text-slate-500/60 bg-white/30 dark:bg-black/20 px-2.5 py-1 rounded-full backdrop-blur-sm border border-white/10">
+        Desenvolvendo
+      </span>
+    </div>
+  </div>
+);
 
 const SanFranHelp: React.FC<SanFranHelpProps> = ({ onNavigate }) => {
   return (
@@ -41,13 +67,12 @@ const SanFranHelp: React.FC<SanFranHelpProps> = ({ onNavigate }) => {
         <div className="absolute bottom-0 left-1/3 w-96 h-96 bg-slate-500/5 rounded-full blur-3xl -z-10"></div>
       </header>
 
-      {/* BENTO GRID LAYOUT */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 auto-rows-[minmax(180px,auto)]">
-        
-        {/* CARD 0: SIMPLIFICADOR JURÍDICO (New Hero - AI) */}
+      {/* BENTO GRID LAYOUT - HERO */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6">
+        {/* CARD 0: SIMPLIFICADOR JURÍDICO (Hero - AI) */}
         <button
           onClick={() => onNavigate(View.LegalSimplifier)}
-          className="group relative col-span-1 md:col-span-2 row-span-2 bg-[#4c1d95] text-white rounded-[2.5rem] p-8 md:p-10 flex flex-col justify-between overflow-hidden shadow-2xl hover:shadow-purple-500/20 hover:scale-[1.01] transition-all duration-500"
+          className="group relative col-span-1 md:col-span-4 lg:col-span-2 h-[380px] bg-[#4c1d95] text-white rounded-[2.5rem] p-8 md:p-10 flex flex-col justify-between overflow-hidden shadow-2xl hover:shadow-purple-500/20 hover:scale-[1.005] transition-all duration-500"
         >
           {/* Abstract Background Decoration */}
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')] opacity-20"></div>
@@ -62,7 +87,7 @@ const SanFranHelp: React.FC<SanFranHelpProps> = ({ onNavigate }) => {
             </div>
           </div>
 
-          <div className="relative z-10 space-y-2 text-left mt-12">
+          <div className="relative z-10 space-y-2 text-left">
              <h3 className="text-3xl md:text-5xl font-black tracking-tight leading-none text-white">Tradutor de Juridiquês</h3>
              <p className="text-sm md:text-base font-medium text-purple-100 max-w-sm leading-relaxed">
                Simplifique textos complexos instantaneamente usando Inteligência Artificial.
@@ -76,181 +101,259 @@ const SanFranHelp: React.FC<SanFranHelpProps> = ({ onNavigate }) => {
           </div>
         </button>
 
-        {/* CARD 1: DOSIMETRIA PENAL (Tall) */}
-        <button
-          onClick={() => onNavigate(View.Dosimetria)}
-          className="group relative col-span-1 md:col-span-1 row-span-2 bg-[#7f1d1d] text-white rounded-[2.5rem] p-8 border border-red-800 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col items-center justify-between text-center overflow-hidden"
-        >
-           <div className="absolute inset-0 bg-gradient-to-b from-transparent to-red-900/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-           
-           <div className="w-full flex justify-between items-start relative z-10">
-              <Calculator size={20} className="text-red-300" />
-              <div className="w-2 h-2 rounded-full bg-red-500"></div>
-           </div>
+        {/* Decorative Placeholder or Future Feature for Hero Row */}
+        <div className="hidden lg:flex col-span-2 bg-slate-50 dark:bg-white/5 rounded-[2.5rem] border border-dashed border-slate-200 dark:border-white/10 items-center justify-center p-10 text-center">
+          <div className="space-y-4 max-w-xs">
+            <div className="w-12 h-12 bg-slate-200 dark:bg-white/10 rounded-full mx-auto flex items-center justify-center">
+              <Sparkles className="text-slate-400" size={20} />
+            </div>
+            <p className="text-sm font-medium text-slate-400">Novas ferramentas de IA estão sendo preparadas para você.</p>
+          </div>
+        </div>
+      </div>
 
-           <div className="relative z-10 my-4">
-              <div className="w-20 h-20 rounded-2xl bg-white/10 flex items-center justify-center shadow-lg transform -rotate-3 group-hover:rotate-0 transition-transform duration-500">
-                 <AlertCircle size={32} className="text-red-200" />
-              </div>
-           </div>
-           
-           <div className="relative z-10 space-y-1">
-              <h3 className="text-xl font-black text-white uppercase tracking-tight">Dosimetria</h3>
-              <p className="text-[10px] font-bold text-red-200 uppercase tracking-widest">Cálculo Trifásico</p>
-           </div>
-           
-           <div className="w-full pt-4 border-t border-red-800/50 mt-4 relative z-10">
-              <span className="text-[9px] font-black uppercase text-red-300 group-hover:text-white transition-colors">Calcular Pena</span>
-           </div>
-        </button>
+      {/* SEÇÃO: CÁLCULOS JURÍDICOS */}
+      <div className="space-y-6 pt-6">
+        <div className="flex items-center gap-4">
+          <h2 className="text-xs font-black uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">Cálculos Jurídicos</h2>
+          <div className="h-px flex-1 bg-slate-200 dark:bg-white/10"></div>
+        </div>
 
-        {/* CARD 2: SIMULADOR DE HONORÁRIOS (Tall) */}
-        <button
-          onClick={() => onNavigate(View.Honorarios)}
-          className="group relative col-span-1 md:col-span-1 row-span-2 bg-emerald-50 dark:bg-emerald-900/10 rounded-[2.5rem] p-8 border border-emerald-100 dark:border-emerald-800 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col items-center justify-between text-center overflow-hidden"
-        >
-           <div className="absolute inset-0 bg-gradient-to-b from-transparent to-emerald-100/50 dark:to-emerald-900/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-           
-           <div className="w-full flex justify-between items-start relative z-10">
-              <Banknote size={20} className="text-emerald-500" />
-              <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-           </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 auto-rows-[180px]">
+          {/* CARD 1: DOSIMETRIA PENAL (Tall) */}
+          <div className="relative col-span-1 row-span-2">
+            <button
+              disabled
+              className="w-full h-full group relative bg-white dark:bg-white/5 rounded-[2.5rem] p-8 border border-slate-200 dark:border-white/10 shadow-sm flex flex-col items-center justify-between text-center overflow-hidden"
+            >
+               <div className="w-full flex justify-between items-start relative z-10">
+                  <div className="p-2 bg-red-50 dark:bg-red-900/20 rounded-xl">
+                    <Calculator size={20} className="text-red-600 dark:text-red-400" />
+                  </div>
+                  <div className="w-2 h-2 rounded-full bg-red-500/30"></div>
+               </div>
 
-           <div className="relative z-10 my-4">
-              <div className="w-20 h-20 rounded-2xl bg-white dark:bg-white/10 flex items-center justify-center shadow-lg transform rotate-3 group-hover:rotate-0 transition-transform duration-500">
-                 <Banknote size={32} className="text-emerald-600 dark:text-emerald-300" />
-              </div>
-           </div>
-           
-           <div className="relative z-10 space-y-1">
-              <h3 className="text-xl font-black text-emerald-900 dark:text-white uppercase tracking-tight">Honorários</h3>
-              <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-300 uppercase tracking-widest">Tabela OAB/SP</p>
-           </div>
-           
-           <div className="w-full pt-4 border-t border-emerald-200 dark:border-emerald-800/50 mt-4 relative z-10">
-              <span className="text-[9px] font-black uppercase text-slate-400 group-hover:text-emerald-500 transition-colors">Calcular Proposta</span>
-           </div>
-        </button>
+               <div className="relative z-10 my-4">
+                  <div className="w-20 h-20 rounded-3xl bg-red-50 dark:bg-red-900/10 flex items-center justify-center shadow-inner transform -rotate-3">
+                     <AlertCircle size={32} className="text-red-600/40 dark:text-red-400/40" />
+                  </div>
+               </div>
+               
+               <div className="relative z-10 space-y-1">
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Dosimetria</h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Cálculo Trifásico</p>
+               </div>
+               
+               <div className="w-full pt-4 border-t border-slate-100 dark:border-white/5 mt-4 relative z-10">
+                  <span className="text-[9px] font-black uppercase text-slate-300">Calcular Pena</span>
+               </div>
+            </button>
+            <LockedOverlay />
+          </div>
 
-        {/* CARD 3: CALC. PRAZOS (Standard) */}
-        <button
-          onClick={() => onNavigate(View.DeadlineCalculator)}
-          className="group col-span-1 bg-orange-50 dark:bg-orange-900/10 rounded-[2.5rem] p-6 border border-orange-100 dark:border-orange-800 shadow-xl hover:border-orange-400 transition-all flex flex-col justify-between h-full hover:shadow-orange-500/10"
-        >
-           <div className="flex justify-between items-start">
-              <div className="p-3 bg-orange-100 dark:bg-orange-900/20 text-orange-600 rounded-2xl">
-                 <CalendarClock size={20} />
-              </div>
-              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-orange-500 transition-colors" />
-           </div>
-           <div className="text-left mt-4">
-              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Prazos</h4>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Contagem Processual</p>
-           </div>
-        </button>
+          {/* CARD 2: SIMULADOR DE HONORÁRIOS (Tall) */}
+          <div className="relative col-span-1 row-span-2">
+            <button
+              disabled
+              className="w-full h-full group relative bg-white dark:bg-white/5 rounded-[2.5rem] p-8 border border-slate-200 dark:border-white/10 shadow-sm flex flex-col items-center justify-between text-center overflow-hidden"
+            >
+               <div className="w-full flex justify-between items-start relative z-10">
+                  <div className="p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl">
+                    <Banknote size={20} className="text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div className="w-2 h-2 rounded-full bg-emerald-500/30"></div>
+               </div>
 
-        {/* CARD 4: PRESCRIÇÃO (Standard) */}
-        <button
-          onClick={() => onNavigate(View.PrescriptionCalculator)}
-          className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-red-400 transition-all flex flex-col justify-between h-full hover:shadow-red-500/10"
-        >
-           <div className="flex justify-between items-start">
-              <div className="p-3 bg-red-100 dark:bg-red-900/20 text-red-600 rounded-2xl">
-                 <Hourglass size={20} />
-              </div>
-              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-red-500 transition-colors" />
-           </div>
-           <div className="text-left mt-4">
-              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Prescrição</h4>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Extinção da Punibilidade</p>
-           </div>
-        </button>
+               <div className="relative z-10 my-4">
+                  <div className="w-20 h-20 rounded-3xl bg-emerald-50 dark:bg-emerald-900/10 flex items-center justify-center shadow-inner transform rotate-3">
+                     <Banknote size={32} className="text-emerald-600/40 dark:text-emerald-400/40" />
+                  </div>
+               </div>
+               
+               <div className="relative z-10 space-y-1">
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Honorários</h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tabela OAB/SP</p>
+               </div>
+               
+               <div className="w-full pt-4 border-t border-slate-100 dark:border-white/5 mt-4 relative z-10">
+                  <span className="text-[9px] font-black uppercase text-slate-300">Calcular Proposta</span>
+               </div>
+            </button>
+            <LockedOverlay />
+          </div>
 
-        {/* CARD 5: PARTILHA DE BENS (Standard) */}
-        <button
-          onClick={() => onNavigate(View.SucessaoSimulator)}
-          className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-pink-400 transition-all flex flex-col justify-between h-full hover:shadow-pink-500/10"
-        >
-           <div className="flex justify-between items-start">
-              <div className="p-3 bg-pink-100 dark:bg-pink-900/20 text-pink-600 rounded-2xl">
-                 <Split size={20} />
-              </div>
-              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-pink-500 transition-colors" />
-           </div>
-           <div className="text-left mt-4">
-              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Partilha de Bens</h4>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Sucessão & Meação</p>
-           </div>
-        </button>
+          {/* CARD 3: CALC. PRAZOS (Tall) */}
+          <div className="relative col-span-1 row-span-2">
+            <button
+              disabled
+              className="w-full h-full group relative bg-white dark:bg-white/5 rounded-[2.5rem] p-8 border border-slate-200 dark:border-white/10 shadow-sm flex flex-col items-center justify-between text-center overflow-hidden"
+            >
+               <div className="w-full flex justify-between items-start relative z-10">
+                  <div className="p-2 bg-orange-50 dark:bg-orange-900/20 rounded-xl">
+                    <CalendarClock size={20} className="text-orange-600 dark:text-orange-400" />
+                  </div>
+                  <div className="w-2 h-2 rounded-full bg-orange-500/30"></div>
+               </div>
 
-        {/* CARD 6: CHECKLIST DE PEÇAS (Standard) */}
-        <button
-          onClick={() => onNavigate(View.Checklist)}
-          className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-blue-400 transition-all flex flex-col justify-between h-full hover:shadow-blue-500/10"
-        >
-           <div className="flex justify-between items-start">
-              <div className="p-3 bg-blue-100 dark:bg-blue-900/20 text-blue-600 rounded-2xl">
-                 <ClipboardCheck size={20} />
-              </div>
-              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
-           </div>
-           <div className="text-left mt-4">
-              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Checklist</h4>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Validador de Peças</p>
-           </div>
-        </button>
+               <div className="relative z-10 my-4">
+                  <div className="w-20 h-20 rounded-3xl bg-orange-50 dark:bg-orange-900/10 flex items-center justify-center shadow-inner transform rotate-6">
+                     <CalendarClock size={32} className="text-orange-600/40 dark:text-orange-400/40" />
+                  </div>
+               </div>
+               
+               <div className="relative z-10 space-y-1">
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Prazos</h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Contagem Processual</p>
+               </div>
+               
+               <div className="w-full pt-4 border-t border-slate-100 dark:border-white/5 mt-4 relative z-10">
+                  <span className="text-[9px] font-black uppercase text-slate-300">Calcular Prazo</span>
+               </div>
+            </button>
+            <LockedOverlay />
+          </div>
 
-        {/* CARD 7: LOUSA DE INVESTIGAÇÃO (Standard) */}
-        <button
-          onClick={() => onNavigate(View.InvestigationBoard)}
-          className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-amber-400 transition-all flex flex-col justify-between h-full hover:shadow-amber-500/10"
-        >
-           <div className="flex justify-between items-start">
-              <div className="p-3 bg-amber-100 dark:bg-amber-900/20 text-amber-600 rounded-2xl">
-                 <ScanSearch size={20} />
-              </div>
-              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-amber-500 transition-colors" />
-           </div>
-           <div className="text-left mt-4">
-              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Lousa</h4>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Mapa Mental de Caso</p>
-           </div>
-        </button>
+          {/* CARD 4: PRESCRIÇÃO (Tall) */}
+          <div className="relative col-span-1 row-span-2">
+            <button
+              disabled
+              className="w-full h-full group relative bg-white dark:bg-white/5 rounded-[2.5rem] p-8 border border-slate-200 dark:border-white/10 shadow-sm flex flex-col items-center justify-between text-center overflow-hidden"
+            >
+               <div className="w-full flex justify-between items-start relative z-10">
+                  <div className="p-2 bg-rose-50 dark:bg-rose-900/20 rounded-xl">
+                    <Hourglass size={20} className="text-rose-600 dark:text-rose-400" />
+                  </div>
+                  <div className="w-2 h-2 rounded-full bg-rose-500/30"></div>
+               </div>
 
-        {/* CARD 8: PETITUM (Standard) */}
-        <button
-          onClick={() => onNavigate(View.Petitum)}
-          className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-teal-400 transition-all flex flex-col justify-between h-full hover:shadow-teal-500/10"
-        >
-           <div className="flex justify-between items-start">
-              <div className="p-3 bg-teal-100 dark:bg-teal-900/20 text-teal-600 rounded-2xl">
-                 <FileSignature size={20} />
-              </div>
-              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-teal-500 transition-colors" />
-           </div>
-           <div className="text-left mt-4">
-              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Petitum</h4>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Modelos de Peças</p>
-           </div>
-        </button>
+               <div className="relative z-10 my-4">
+                  <div className="w-20 h-20 rounded-3xl bg-rose-50 dark:bg-rose-900/10 flex items-center justify-center shadow-inner transform -rotate-6">
+                     <Hourglass size={32} className="text-rose-600/40 dark:text-rose-400/40" />
+                  </div>
+               </div>
+               
+               <div className="relative z-10 space-y-1">
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Prescrição</h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Extinção da Punibilidade</p>
+               </div>
+               
+               <div className="w-full pt-4 border-t border-slate-100 dark:border-white/5 mt-4 relative z-10">
+                  <span className="text-[9px] font-black uppercase text-slate-300">Verificar Prazo</span>
+               </div>
+            </button>
+            <LockedOverlay />
+          </div>
+        </div>
+      </div>
 
-        {/* CARD 9: CITAÇÕES ABNT (Standard) */}
-        <button
-          onClick={() => onNavigate(View.CitationGenerator)}
-          className="group col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-slate-400 transition-all flex flex-col justify-between h-full hover:shadow-slate-500/10"
-        >
-           <div className="flex justify-between items-start">
-              <div className="p-3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl">
-                 <Quote size={20} />
-              </div>
-              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-slate-500 transition-colors" />
-           </div>
-           <div className="text-left mt-4">
-              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">ABNT</h4>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Gerador de Citações</p>
-           </div>
-        </button>
+      {/* SEÇÃO: GESTÃO E APOIO */}
+      <div className="space-y-6 pt-6">
+        <div className="flex items-center gap-4">
+          <h2 className="text-xs font-black uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">Gestão e Apoio</h2>
+          <div className="h-px flex-1 bg-slate-200 dark:bg-white/10"></div>
+        </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 auto-rows-[180px]">
+          {/* CARD 5: PARTILHA DE BENS (Standard) */}
+          <div className="relative col-span-1">
+            <button
+              disabled
+              className="w-full h-full group bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-sm flex flex-col justify-between"
+            >
+               <div className="flex justify-between items-start">
+                  <div className="p-3 bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 rounded-2xl">
+                     <Split size={20} />
+                  </div>
+                  <ArrowUpRight size={16} className="text-slate-200" />
+               </div>
+               <div className="text-left mt-4">
+                  <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Partilha de Bens</h4>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Sucessão & Meação</p>
+               </div>
+            </button>
+            <LockedOverlay />
+          </div>
+
+          {/* CARD 6: CHECKLIST DE PEÇAS (Standard) */}
+          <div className="relative col-span-1">
+            <button
+              disabled
+              className="w-full h-full group bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-sm flex flex-col justify-between"
+            >
+               <div className="flex justify-between items-start">
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-2xl">
+                     <ClipboardCheck size={20} />
+                  </div>
+                  <ArrowUpRight size={16} className="text-slate-200" />
+               </div>
+               <div className="text-left mt-4">
+                  <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Checklist</h4>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Validador de Peças</p>
+               </div>
+            </button>
+            <LockedOverlay />
+          </div>
+
+          {/* CARD 7: LOUSA DE INVESTIGAÇÃO (Standard) */}
+          <div className="relative col-span-1">
+            <button
+              disabled
+              className="w-full h-full group bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-sm flex flex-col justify-between"
+            >
+               <div className="flex justify-between items-start">
+                  <div className="p-3 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 rounded-2xl">
+                     <ScanSearch size={20} />
+                  </div>
+                  <ArrowUpRight size={16} className="text-slate-200" />
+               </div>
+               <div className="text-left mt-4">
+                  <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Lousa</h4>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Mapa Mental de Caso</p>
+               </div>
+            </button>
+            <LockedOverlay />
+          </div>
+
+          {/* CARD 8: PETITUM (Standard) */}
+          <div className="relative col-span-1">
+            <button
+              disabled
+              className="w-full h-full group bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-sm flex flex-col justify-between"
+            >
+               <div className="flex justify-between items-start">
+                  <div className="p-3 bg-teal-50 dark:bg-teal-900/20 text-teal-600 dark:text-teal-400 rounded-2xl">
+                     <FileSignature size={20} />
+                  </div>
+                  <ArrowUpRight size={16} className="text-slate-200" />
+               </div>
+               <div className="text-left mt-4">
+                  <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Petitum</h4>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Modelos de Peças</p>
+               </div>
+            </button>
+            <LockedOverlay />
+          </div>
+
+          {/* CARD 9: CITAÇÕES ABNT (Standard) */}
+          <div className="relative col-span-1">
+            <button
+              disabled
+              className="w-full h-full group bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-sm flex flex-col justify-between"
+            >
+               <div className="flex justify-between items-start">
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl">
+                     <Quote size={20} />
+                  </div>
+                  <ArrowUpRight size={16} className="text-slate-200" />
+               </div>
+               <div className="text-left mt-4">
+                  <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">ABNT</h4>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Gerador de Citações</p>
+               </div>
+            </button>
+            <LockedOverlay />
+          </div>
+        </div>
       </div>
 
     </div>

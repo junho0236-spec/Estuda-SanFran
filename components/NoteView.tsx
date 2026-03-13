@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css'; // Import Quill styles
-import { ArrowLeft, Save, Loader2, FileText, BrainCircuit, Sparkles, Tag, Split, Download, Gavel, Plus, Trash2, Edit3, Pencil } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, FileText, BrainCircuit, Sparkles, Tag, Split, Download, Gavel, Plus, Trash2, Edit3, Pencil, Archive } from 'lucide-react';
 import { Note, Subject, SubjectFile } from '../types';
 import { dataService } from '../services/dataService';
 import { summarizeText } from '../services/geminiService';
@@ -571,6 +571,22 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     }
   };
 
+  // Color palette for cards
+  const cardColors = [
+    'bg-rose-50 dark:bg-rose-900/10 border-rose-100 dark:border-rose-900/20 text-rose-600',
+    'bg-amber-50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-900/20 text-amber-600',
+    'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-900/20 text-emerald-600',
+    'bg-blue-50 dark:bg-blue-900/10 border-blue-100 dark:border-blue-900/20 text-blue-600',
+    'bg-indigo-50 dark:bg-indigo-900/10 border-indigo-100 dark:border-indigo-900/20 text-indigo-600',
+    'bg-purple-50 dark:bg-purple-900/10 border-purple-100 dark:border-purple-900/20 text-purple-600',
+    'bg-pink-50 dark:bg-pink-900/10 border-pink-100 dark:border-pink-900/20 text-pink-600',
+  ];
+
+  const getCardColor = (id: string) => {
+    const index = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return cardColors[index % cardColors.length];
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -581,197 +597,216 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   }
 
   return (
-    <div className={`flex flex-col h-full animate-in slide-in-from-right-4 duration-300 ${isSplitView ? 'lg:w-full' : 'lg:w-auto'}`}>
-      <header className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <button onClick={onBack} className="p-2 text-slate-400 hover:text-purple-500">
-            <ArrowLeft size={24} />
-          </button>
-          <div className="flex flex-col items-start">
-            <select
-              value={selectedSubjectId}
-              onChange={(e) => setSelectedSubjectId(e.target.value)}
-              className="mb-1 px-3 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-200"
-            >
-              {subjects.map(sub => (
-                <option key={sub.id} value={sub.id}>{sub.name}</option>
-              ))}
-            </select>
-            {selectedNote && !isRenaming ? (
-              <div className="flex items-center gap-2 group">
-                <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">{selectedNote.title || 'Documento sem título'}</h2>
-                <button 
-                  onClick={() => { setIsRenaming(true); setNewTitle(selectedNote.title); }} 
-                  className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-blue-500 transition-all"
+    <div className={`flex flex-col h-full animate-in slide-in-from-right-4 duration-500 ${isSplitView ? 'lg:w-full' : 'lg:w-auto'}`}>
+      
+      {/* Editorial Header */}
+      <header className="relative py-8 mb-10 border-b border-slate-100 dark:border-white/5">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+          <div className="space-y-6">
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={onBack} 
+                className="p-3 bg-white dark:bg-white/5 text-slate-500 hover:text-sanfran-rubi rounded-2xl shadow-sm border border-slate-200 dark:border-white/10 transition-all hover:scale-105 active:scale-95"
+              >
+                <ArrowLeft size={20} />
+              </button>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Disciplina</span>
+                <select
+                  value={selectedSubjectId}
+                  onChange={(e) => setSelectedSubjectId(e.target.value)}
+                  className="bg-transparent border-none p-0 text-xs font-bold text-sanfran-rubi focus:ring-0 outline-none cursor-pointer hover:underline transition-all"
                 >
-                  <Edit3 size={16} />
+                  {subjects.map(sub => (
+                    <option key={sub.id} value={sub.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">{sub.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="relative">
+              {selectedNote && !isRenaming ? (
+                <div className="flex items-center gap-4 group">
+                  <h1 className="text-5xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tighter leading-[0.9]">
+                    {selectedNote.title || 'Documento sem título'}
+                  </h1>
+                  <button 
+                    onClick={() => { setIsRenaming(true); setNewTitle(selectedNote.title); }} 
+                    className="p-2.5 bg-slate-100 dark:bg-white/5 text-slate-400 hover:text-blue-500 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                  >
+                    <Edit3 size={20} />
+                  </button>
+                </div>
+              ) : isRenaming ? (
+                <div className="flex items-center gap-4">
+                  <input 
+                    type="text" 
+                    value={newTitle} 
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    className="px-6 py-3 bg-white dark:bg-slate-800 border-4 border-blue-500/30 rounded-[2rem] outline-none text-4xl font-black tracking-tighter w-full max-w-xl focus:border-blue-500 transition-all"
+                    autoFocus
+                    onKeyDown={(e) => e.key === 'Enter' && renameNote()}
+                  />
+                  <div className="flex gap-2">
+                    <button onClick={renameNote} className="p-3 bg-blue-500 text-white rounded-2xl shadow-xl shadow-blue-500/20 hover:scale-105 transition-all"><CheckCircle2 size={24} /></button>
+                    <button onClick={() => setIsRenaming(false)} className="p-3 bg-slate-200 dark:bg-white/10 text-slate-500 rounded-2xl hover:scale-105 transition-all"><ArrowLeft size={24} /></button>
+                  </div>
+                </div>
+              ) : (
+                <h1 className="text-5xl md:text-6xl font-black text-slate-200 dark:text-slate-800 tracking-tighter">Selecione um documento</h1>
+              )}
+            </div>
+          </div>
+
+          {/* Action Groups */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Group 1: AI & Smart Tools */}
+            <div className="flex bg-white dark:bg-white/5 p-1.5 rounded-[2rem] border border-slate-200 dark:border-white/10 shadow-sm">
+              <button 
+                onClick={handleSummarize}
+                disabled={isSummarizing || !selectedNote}
+                className="p-3 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-2xl transition-all disabled:opacity-30"
+                title="Resumir com IA"
+              >
+                {isSummarizing ? <Loader2 className="w-6 h-6 animate-spin" /> : <Sparkles size={24} />}
+              </button>
+              <button 
+                onClick={handleGenerateFlashcards}
+                disabled={!selectedNote}
+                className="p-3 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-2xl transition-all disabled:opacity-30"
+                title="Gerar Flashcards"
+              >
+                <BrainCircuit size={24} />
+              </button>
+              <button
+                onClick={() => setIsVadeMecumMode(!isVadeMecumMode)}
+                className={`p-3 rounded-2xl transition-all ${isVadeMecumMode ? 'bg-sanfran-rubi text-white shadow-lg shadow-red-500/20' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/10'}`}
+                title="Modo Vade Mecum"
+              >
+                <Gavel size={24} />
+              </button>
+            </div>
+
+            {/* Group 2: Editor Tools */}
+            <div className="flex bg-white dark:bg-white/5 p-1.5 rounded-[2rem] border border-slate-200 dark:border-white/10 shadow-sm">
+              <div className="relative">
+                <button 
+                  onClick={() => setIsTemplateMenuOpen(!isTemplateMenuOpen)}
+                  disabled={!selectedNote}
+                  className="p-3 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-2xl transition-all disabled:opacity-30"
+                  title="Templates"
+                >
+                  <FileText size={24} />
                 </button>
+                {isTemplateMenuOpen && (
+                  <div className="absolute right-0 mt-4 w-72 bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl border border-slate-200 dark:border-white/10 z-[60] p-3 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Modelos Disponíveis</div>
+                    <button onClick={() => applyTemplate('doutrina')} className="w-full text-left px-5 py-4 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-2xl transition-colors">Fichamento de Doutrina</button>
+                    <button onClick={() => applyTemplate('jurisprudencia')} className="w-full text-left px-5 py-4 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-2xl transition-colors">Análise de Jurisprudência</button>
+                    <button onClick={() => applyTemplate('aula')} className="w-full text-left px-5 py-4 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-2xl transition-colors">Resumo de Aula</button>
+                  </div>
+                )}
               </div>
-            ) : isRenaming ? (
-              <div className="flex items-center gap-2">
-                <input 
-                  type="text" 
-                  value={newTitle} 
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  className="px-2 py-1 bg-white dark:bg-slate-800 border border-blue-500 rounded outline-none text-lg font-bold"
-                  autoFocus
-                  onKeyDown={(e) => e.key === 'Enter' && renameNote()}
-                />
-                <button onClick={renameNote} className="text-green-500 font-bold text-sm">OK</button>
-                <button onClick={() => setIsRenaming(false)} className="text-slate-400 text-sm">X</button>
+              <button 
+                onClick={() => setIsHandwritingOpen(true)}
+                disabled={!selectedNote}
+                className="p-3 text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-900/20 rounded-2xl transition-all disabled:opacity-30"
+                title="Escrita à Mão"
+              >
+                <Pencil size={24} />
+              </button>
+            </div>
+
+            {/* Group 3: Export & View */}
+            <div className="flex bg-white dark:bg-white/5 p-1.5 rounded-[2rem] border border-slate-200 dark:border-white/10 shadow-sm">
+              <div className="relative">
+                <button 
+                  onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+                  disabled={!selectedNote}
+                  className="p-3 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-2xl transition-all disabled:opacity-30"
+                  title="Exportar"
+                >
+                  <Download size={24} />
+                </button>
+                {isExportMenuOpen && (
+                  <div className="absolute right-0 mt-4 w-64 bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl border border-slate-200 dark:border-white/10 z-[60] p-3 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Exportar Documento</div>
+                    <button onClick={handleExportPdf} className="w-full text-left px-5 py-4 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-2xl transition-colors">PDF (.pdf)</button>
+                    <button onClick={handleExportDocx} className="w-full text-left px-5 py-4 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-2xl transition-colors">Word (.docx)</button>
+                  </div>
+                )}
               </div>
-            ) : (
-              <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Selecione um documento</h2>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Split View Button */}
-          <button
-            onClick={() => {
-              const nextSplitState = !isSplitView;
-              setIsSplitView(nextSplitState);
-              onToggleSidebar(!nextSplitState); // Hide sidebar if split view is active
-            }}
-            className="py-2 px-4 bg-slate-500 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-slate-600 transition-colors"
-          >
-            <Split size={18} /> {isSplitView ? 'Sair do Split' : 'Split View'}
-          </button>
-          {/* Vade Mecum Mode Button */}
-          <button
-            onClick={() => setIsVadeMecumMode(!isVadeMecumMode)}
-            className={`py-2 px-4 rounded-xl font-bold flex items-center gap-2 transition-colors ${isVadeMecumMode ? 'bg-sanfran-rubi text-white' : 'bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-300'}`}
-          >
-            <Gavel size={18} /> {isVadeMecumMode ? 'Sair do Vade Mecum' : 'Modo Vade Mecum'}
-          </button>
+              <button
+                onClick={() => {
+                  const nextSplitState = !isSplitView;
+                  setIsSplitView(nextSplitState);
+                  onToggleSidebar(!nextSplitState);
+                }}
+                className={`p-3 rounded-2xl transition-all ${isSplitView ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-lg' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/10'}`}
+                title="Split View"
+              >
+                <Split size={24} />
+              </button>
+            </div>
 
-          {/* AI Summarize Button */}
-          <button 
-            onClick={handleSummarize}
-            disabled={isSummarizing || !selectedNote}
-            className="py-2 px-4 bg-yellow-500 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-yellow-600 transition-colors disabled:opacity-50"
-          >
-            {isSummarizing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles size={18} />} Resumir
-          </button>
-
-          {/* Generate Flashcards Button */}
-          <button 
-            onClick={handleGenerateFlashcards}
-            disabled={!selectedNote}
-            className="py-2 px-4 bg-blue-500 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-blue-600 transition-colors disabled:opacity-50"
-          >
-            <BrainCircuit size={18} /> Gerar Flashcards
-          </button>
-
-          {/* Template Dropdown */}
-          <div className="relative">
+            {/* Save Button - Primary Action */}
             <button 
-              onClick={() => setIsTemplateMenuOpen(!isTemplateMenuOpen)}
-              disabled={!selectedNote}
-              className="py-2 px-4 bg-slate-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-slate-700 transition-colors disabled:opacity-50"
+              onClick={handleSaveNote} 
+              disabled={isSaving || isAutoSaving || !selectedNote}
+              className="ml-4 py-4 px-8 bg-sanfran-rubi text-white rounded-[2rem] font-black uppercase tracking-widest text-xs flex items-center gap-4 hover:bg-red-700 transition-all shadow-2xl shadow-red-500/30 disabled:opacity-50 active:scale-95"
             >
-              <FileText size={18} /> Usar Template
+              {(isSaving || isAutoSaving) ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save size={20} />} 
+              {(isSaving || isAutoSaving) ? 'Salvando' : 'Salvar'}
             </button>
-            {isTemplateMenuOpen && (
-              <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 z-10">
-                <a onClick={() => applyTemplate('doutrina')} className="block px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer">Fichamento de Doutrina</a>
-                <a onClick={() => applyTemplate('jurisprudencia')} className="block px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer">Análise de Jurisprudência</a>
-                <a onClick={() => applyTemplate('aula')} className="block px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer">Resumo de Aula</a>
-              </div>
-            )}
           </div>
-
-          {/* Export Dropdown */}
-          <div className="relative">
-            <button 
-              onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
-              disabled={!selectedNote}
-              className="py-2 px-4 bg-green-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-green-700 transition-colors disabled:opacity-50"
-            >
-              <Download size={18} /> Exportar
-            </button>
-            {isExportMenuOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 z-10">
-                <a onClick={handleExportPdf} className="block px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer">Exportar para PDF</a>
-                <a onClick={handleExportDocx} className="block px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer">Exportar para DOCX</a>
-              </div>
-            )}
-          </div>
-
-          {/* Handwriting Button */}
-          <button 
-            onClick={() => setIsHandwritingOpen(true)}
-            disabled={!selectedNote}
-            className="py-2 px-4 bg-pink-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-pink-700 transition-colors disabled:opacity-50"
-            title="Escrever à mão (Tablet/Touch)"
-          >
-            <Pencil size={18} /> Caneta
-          </button>
-
-          {/* Save Button */}
-          <button 
-            onClick={handleSaveNote} 
-            disabled={isSaving || isAutoSaving || !selectedNote}
-            className="py-2 px-4 bg-purple-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-purple-700 transition-colors disabled:opacity-50"
-          >
-            {(isSaving || isAutoSaving) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save size={18} />} 
-            {(isSaving || isAutoSaving) ? 'Salvando...' : 'Salvar'}
-          </button>
         </div>
       </header>
 
-      <div className="flex-1 flex gap-6 overflow-hidden">
+      <div className="flex-1 flex gap-8 overflow-hidden">
         {/* Sidebar for Notes and Files */}
-        <div className="w-72 flex flex-col bg-slate-50 dark:bg-black/20 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden">
+        <aside className="w-80 flex flex-col bg-slate-50 dark:bg-white/5 rounded-[3rem] border border-slate-200 dark:border-white/10 overflow-hidden shadow-inner">
           {/* Tabs */}
-          <div className="flex border-b border-slate-100 dark:border-slate-800">
+          <div className="flex p-3 bg-white dark:bg-black/20 border-b border-slate-100 dark:border-white/5">
             <button 
               onClick={() => setActiveTab('notes')}
-              className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-colors ${activeTab === 'notes' ? 'text-purple-600 bg-white dark:bg-slate-800 border-b-2 border-purple-600' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'notes' ? 'bg-sanfran-rubi text-white shadow-lg shadow-red-500/20' : 'text-slate-400 hover:text-slate-600'}`}
             >
               Notas
             </button>
             <button 
               onClick={() => setActiveTab('repository')}
-              className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-colors ${activeTab === 'repository' ? 'text-blue-600 bg-white dark:bg-slate-800 border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'repository' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-400 hover:text-slate-600'}`}
             >
               Repositório
             </button>
             <button 
               onClick={() => setActiveTab('assignments')}
-              className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-colors ${activeTab === 'assignments' ? 'text-green-600 bg-white dark:bg-slate-800 border-b-2 border-green-600' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'assignments' ? 'bg-green-600 text-white shadow-lg shadow-green-500/20' : 'text-slate-400 hover:text-slate-600'}`}
             >
               Entregas
             </button>
           </div>
 
-          <div className="p-4 border-bottom border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+          <div className="px-8 py-6 flex items-center justify-between">
+            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
               {activeTab === 'notes' ? 'Documentos' : activeTab === 'repository' ? 'PDFs / Textos' : 'Trabalhos'}
             </h3>
             {activeTab === 'notes' ? (
-              <button onClick={createNewNote} className="p-1 text-purple-500 hover:bg-purple-50 rounded-lg transition-colors">
+              <button onClick={createNewNote} className="p-2.5 bg-white dark:bg-white/10 text-sanfran-rubi hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl shadow-sm border border-slate-100 dark:border-white/5 transition-all hover:rotate-90">
                 <Plus size={20} />
               </button>
             ) : (
               <button 
                 onClick={() => fileInputRef.current?.click()} 
                 disabled={isUploading}
-                className={`p-1 rounded-lg transition-colors ${activeTab === 'repository' ? 'text-blue-500 hover:bg-blue-50' : 'text-green-500 hover:bg-green-50'}`}
+                className={`p-2.5 bg-white dark:bg-white/10 rounded-xl shadow-sm border border-slate-100 dark:border-white/5 transition-all ${activeTab === 'repository' ? 'text-blue-500 hover:bg-blue-50' : 'text-green-500 hover:bg-green-50'}`}
               >
                 {isUploading ? <Loader2 size={20} className="animate-spin" /> : <Upload size={20} />}
               </button>
             )}
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              onChange={handleFileUpload} 
-              className="hidden" 
-              accept=".pdf,.doc,.docx,.txt"
-            />
           </div>
 
-          <div className="flex-1 overflow-y-auto p-2 space-y-1">
+          <div className="flex-1 overflow-y-auto px-4 pb-8 space-y-4 custom-scrollbar">
             {activeTab === 'notes' ? (
               notes.map(note => (
                 <div 
@@ -785,19 +820,29 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                       quillRef.current.setContents(delta, 'silent');
                     }
                   }}
-                  className={`group p-3 rounded-xl cursor-pointer transition-all flex items-center justify-between ${selectedNote?.id === note.id ? 'bg-white dark:bg-slate-800 shadow-md border-l-4 border-purple-500' : 'hover:bg-white/50 dark:hover:bg-white/5'}`}
+                  className={`group p-5 rounded-[2rem] cursor-pointer transition-all flex items-center justify-between border-2 relative overflow-hidden ${selectedNote?.id === note.id ? 'bg-white dark:bg-slate-900 border-sanfran-rubi shadow-xl -translate-y-1' : 'bg-white/50 dark:bg-white/5 border-transparent hover:bg-white dark:hover:bg-white/10 hover:shadow-lg'}`}
                 >
-                  <div className="flex items-center gap-3 overflow-hidden">
-                    <FileText size={16} className={selectedNote?.id === note.id ? 'text-purple-500' : 'text-slate-400'} />
-                    <span className={`text-sm font-bold truncate ${selectedNote?.id === note.id ? 'text-slate-800 dark:text-slate-100' : 'text-slate-500'}`}>
-                      {note.title || 'Documento sem título'}
-                    </span>
+                  {/* Color accent bar */}
+                  <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${getCardColor(note.id).split(' ')[2]}`}></div>
+                  
+                  <div className="flex items-center gap-4 overflow-hidden">
+                    <div className={`p-3 rounded-2xl ${getCardColor(note.id)}`}>
+                      <FileText size={20} />
+                    </div>
+                    <div className="flex flex-col overflow-hidden">
+                      <span className={`text-sm font-black truncate ${selectedNote?.id === note.id ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>
+                        {note.title || 'Documento sem título'}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                        {new Date(note.updated_at).toLocaleDateString()}
+                      </span>
+                    </div>
                   </div>
                   <button 
                     onClick={(e) => { e.stopPropagation(); deleteNote(note.id); }}
-                    className="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-red-500 transition-all"
+                    className="opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={18} />
                   </button>
                 </div>
               ))
@@ -809,98 +854,136 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                     setSelectedFile(file);
                     setSelectedNote(null);
                   }}
-                  className={`group p-3 rounded-xl cursor-pointer transition-all flex items-center justify-between ${selectedFile?.id === file.id ? 'bg-white dark:bg-slate-800 shadow-md border-l-4 ' + (activeTab === 'repository' ? 'border-blue-500' : 'border-green-500') : 'hover:bg-white/50 dark:hover:bg-white/5'}`}
+                  className={`group p-5 rounded-[2rem] cursor-pointer transition-all flex items-center justify-between border-2 relative overflow-hidden ${selectedFile?.id === file.id ? 'bg-white dark:bg-slate-900 border-' + (activeTab === 'repository' ? 'blue-500' : 'green-500') + ' shadow-xl -translate-y-1' : 'bg-white/50 dark:bg-white/5 border-transparent hover:bg-white dark:hover:bg-white/10 hover:shadow-lg'}`}
                 >
-                  <div className="flex items-center gap-3 overflow-hidden">
-                    <File size={16} className={selectedFile?.id === file.id ? (activeTab === 'repository' ? 'text-blue-500' : 'text-green-500') : 'text-slate-400'} />
-                    <span className={`text-sm font-bold truncate ${selectedFile?.id === file.id ? 'text-slate-800 dark:text-slate-100' : 'text-slate-500'}`}>
-                      {file.name}
-                    </span>
+                  <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${activeTab === 'repository' ? 'bg-blue-500' : 'bg-green-500'}`}></div>
+
+                  <div className="flex items-center gap-4 overflow-hidden">
+                    <div className={`p-3 rounded-2xl ${selectedFile?.id === file.id ? (activeTab === 'repository' ? 'bg-blue-500 text-white' : 'bg-green-500 text-white') : 'bg-slate-100 dark:bg-white/10 text-slate-400'}`}>
+                      <File size={20} />
+                    </div>
+                    <div className="flex flex-col overflow-hidden">
+                      <span className={`text-sm font-black truncate ${selectedFile?.id === file.id ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>
+                        {file.name}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                        {new Date(file.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
                   </div>
                   <button 
                     onClick={(e) => { e.stopPropagation(); deleteFile(file.id); }}
-                    className="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-red-500 transition-all"
+                    className="opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={18} />
                   </button>
                 </div>
               ))
             )}
             
             {((activeTab === 'notes' && notes.length === 0) || (activeTab !== 'notes' && files.filter(f => f.type === (activeTab === 'repository' ? 'repository' : 'assignment')).length === 0)) && !isLoading && (
-              <div className="text-center py-8 px-4">
-                <p className="text-xs text-slate-400 font-medium italic">Nenhum item encontrado.</p>
+              <div className="text-center py-20 px-8">
+                <div className="w-20 h-20 bg-white dark:bg-white/5 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-sm border border-slate-100 dark:border-white/5">
+                  <Archive size={32} className="text-slate-200" />
+                </div>
+                <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em]">Vazio</p>
+                <p className="text-xs text-slate-400 mt-2 font-medium">Nenhum item encontrado nesta categoria.</p>
               </div>
             )}
           </div>
-        </div>
+        </aside>
 
         {/* Editor Area or File Preview */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto bg-white dark:bg-[#181818] rounded-2xl shadow-xl p-8 relative">
+        <main className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto bg-white dark:bg-white/5 rounded-[4rem] border border-slate-200 dark:border-white/10 shadow-2xl relative flex flex-col">
             {activeTab === 'notes' ? (
               !selectedNote ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 space-y-4">
-                  <FileText size={64} className="opacity-20" />
-                  <p className="font-medium">Selecione ou crie um novo documento para começar.</p>
-                  <button onClick={createNewNote} className="px-6 py-2 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-colors">Criar Documento</button>
+                <div className="flex-1 flex flex-col items-center justify-center text-slate-400 space-y-8 p-12 text-center">
+                  <div className="w-32 h-32 bg-slate-50 dark:bg-white/5 rounded-[3rem] flex items-center justify-center animate-float shadow-inner">
+                    <FileText size={64} className="opacity-10" />
+                  </div>
+                  <div className="space-y-3">
+                    <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter">Pronto para começar?</h3>
+                    <p className="text-sm font-medium max-w-sm mx-auto text-slate-500 leading-relaxed">Selecione um documento na barra lateral ou crie um novo para registrar seus estudos com o poder da IA.</p>
+                  </div>
+                  <button 
+                    onClick={createNewNote} 
+                    className="px-10 py-5 bg-sanfran-rubi text-white rounded-[2rem] font-black uppercase tracking-widest text-xs hover:bg-red-700 transition-all shadow-2xl shadow-red-500/30 active:scale-95"
+                  >
+                    Criar Primeiro Documento
+                  </button>
                 </div>
               ) : isVadeMecumMode ? (
-                <div className="prose dark:prose-invert max-w-none font-serif text-lg leading-relaxed">
-                  <SmartText text={new DOMParser().parseFromString(noteContent, 'text/html').body.textContent || ''} />
+                <div className="p-16 max-w-5xl mx-auto w-full">
+                  <div className="prose dark:prose-invert max-w-none font-serif text-2xl leading-relaxed text-slate-800 dark:text-slate-200">
+                    <SmartText text={new DOMParser().parseFromString(noteContent, 'text/html').body.textContent || ''} />
+                  </div>
                 </div>
               ) : (
-                <div ref={onEditorRef} className="h-full min-h-[400px] quill-editor-custom" />
+                <div className="flex-1 flex flex-col p-12 md:p-16">
+                  <div ref={onEditorRef} className="flex-1 quill-editor-custom paper-effect" />
+                </div>
               )
             ) : (
               !selectedFile ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 space-y-4">
-                  <Folder size={64} className="opacity-20" />
-                  <p className="font-medium">Selecione um arquivo para visualizar.</p>
-                  <button onClick={() => fileInputRef.current?.click()} className={`px-6 py-2 text-white rounded-xl font-bold transition-colors ${activeTab === 'repository' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'}`}>
+                <div className="flex-1 flex flex-col items-center justify-center text-slate-400 space-y-8 p-12 text-center">
+                  <div className="w-32 h-32 bg-slate-50 dark:bg-white/5 rounded-[3rem] flex items-center justify-center animate-float shadow-inner">
+                    <Folder size={64} className="opacity-10" />
+                  </div>
+                  <div className="space-y-3">
+                    <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter">Seu Repositório</h3>
+                    <p className="text-sm font-medium max-w-sm mx-auto text-slate-500 leading-relaxed">Suba PDFs, doutrinas ou enunciados para ter tudo organizado em um só lugar e gerar flashcards instantâneos.</p>
+                  </div>
+                  <button 
+                    onClick={() => fileInputRef.current?.click()} 
+                    className={`px-10 py-5 text-white rounded-[2rem] font-black uppercase tracking-widest text-xs transition-all shadow-2xl active:scale-95 ${activeTab === 'repository' ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/30' : 'bg-green-600 hover:bg-green-700 shadow-green-500/30'}`}
+                  >
                     Enviar Arquivo
                   </button>
                 </div>
               ) : (
-                <div className="h-full flex flex-col">
-                  <div className="flex items-center justify-between mb-8 p-6 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-slate-800">
-                    <div className="flex items-center gap-4">
-                      <div className={`p-3 rounded-xl ${activeTab === 'repository' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'}`}>
-                        <File size={32} />
+                <div className="flex-1 flex flex-col p-12 md:p-16 overflow-hidden">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 mb-16 p-10 bg-slate-50 dark:bg-white/5 rounded-[3rem] border border-slate-100 dark:border-white/10 shadow-sm">
+                    <div className="flex items-center gap-8">
+                      <div className={`w-20 h-20 rounded-[2rem] flex items-center justify-center shadow-2xl ${activeTab === 'repository' ? 'bg-blue-500 text-white shadow-blue-500/30' : 'bg-green-500 text-white shadow-green-500/30'}`}>
+                        <File size={40} />
                       </div>
                       <div>
-                        <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">{selectedFile.name}</h3>
-                        <p className="text-sm text-slate-500">Enviado em {new Date(selectedFile.created_at).toLocaleDateString()}</p>
+                        <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none mb-3">{selectedFile.name}</h3>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Enviado em {new Date(selectedFile.created_at).toLocaleDateString()}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-4">
                       <a 
                         href={selectedFile.file_url} 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="py-2 px-4 bg-slate-200 dark:bg-white/10 text-slate-700 dark:text-slate-200 rounded-xl font-bold hover:bg-slate-300 transition-colors"
+                        className="py-4 px-8 bg-white dark:bg-white/10 text-slate-700 dark:text-slate-200 rounded-[2rem] font-black uppercase tracking-widest text-[10px] hover:bg-slate-50 transition-all border border-slate-200 dark:border-white/10 shadow-sm"
                       >
                         Abrir Arquivo
                       </a>
                       <button 
                         onClick={() => handleGenerateFlashcardsFromFile(selectedFile)}
-                        className="py-2 px-4 bg-blue-500 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-blue-600 transition-colors"
+                        className="py-4 px-8 bg-blue-600 text-white rounded-[2rem] font-black uppercase tracking-widest text-[10px] flex items-center gap-4 hover:bg-blue-700 transition-all shadow-2xl shadow-blue-500/30"
                       >
-                        <BrainCircuit size={18} /> Gerar Flashcards
+                        <BrainCircuit size={20} /> Gerar Flashcards
                       </button>
                     </div>
                   </div>
                   
-                  <div className="flex-1 bg-slate-50 dark:bg-black/20 rounded-2xl p-6 overflow-y-auto">
-                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">Conteúdo Extraído (IA)</h4>
+                  <div className="flex-1 bg-slate-50 dark:bg-black/20 rounded-[3rem] p-10 overflow-y-auto border border-slate-100 dark:border-white/5 shadow-inner">
+                    <div className="flex items-center gap-4 mb-8">
+                      <Sparkles size={20} className="text-amber-500" />
+                      <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Conteúdo Extraído por IA</h4>
+                    </div>
                     {selectedFile.content ? (
-                      <div className="prose dark:prose-invert max-w-none text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap">
+                      <div className="prose dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 leading-loose text-lg font-medium">
                         {selectedFile.content}
                       </div>
                     ) : (
-                      <div className="flex flex-col items-center justify-center py-12 text-slate-400 italic">
-                        <AlertCircle size={32} className="mb-2 opacity-20" />
-                        <p>Nenhum texto extraído deste arquivo.</p>
+                      <div className="flex flex-col items-center justify-center py-32 text-slate-400 italic">
+                        <AlertCircle size={64} className="mb-6 opacity-5" />
+                        <p className="text-lg font-bold tracking-tight">Nenhum texto extraído deste arquivo.</p>
                       </div>
                     )}
                   </div>
@@ -908,16 +991,18 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
               )
             )}
           </div>
+          
+          {/* Tags Footer */}
           {selectedNote && (
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-8 flex flex-wrap gap-3 px-6">
               {(noteContent.match(/#(\w+)/g) || []).map((tag, index) => (
-                <span key={index} className="flex items-center gap-1 px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium">
-                  <Tag size={12} /> {tag}
+                <span key={index} className="flex items-center gap-3 px-6 py-3 bg-white dark:bg-white/5 text-slate-700 dark:text-slate-200 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-slate-200 dark:border-white/10 shadow-sm hover:scale-105 transition-all cursor-default">
+                  <Tag size={14} className="text-sanfran-rubi" /> {tag}
                 </span>
               ))}
             </div>
           )}
-        </div>
+        </main>
       </div>
       {isHandwritingOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
