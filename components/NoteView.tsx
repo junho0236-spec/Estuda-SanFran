@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css'; // Import Quill styles
-import { ArrowLeft, Save, Loader2, FileText, BrainCircuit, Sparkles, Tag, Split, Download, Gavel, Plus, Trash2, Edit3, Pencil, Archive } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, FileText, BrainCircuit, Sparkles, Tag, Split, Download, Gavel, Plus, Trash2, Edit3, Pencil, Archive, Maximize2, Minimize2 } from 'lucide-react';
 import { Note, Subject, SubjectFile } from '../types';
 import { dataService } from '../services/dataService';
 import { summarizeText } from '../services/geminiService';
@@ -42,6 +42,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   const [isSplitView, setIsSplitView] = useState(false);
   const [isVadeMecumMode, setIsVadeMecumMode] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(initialSubjectId);
   const [isRenaming, setIsRenaming] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -596,8 +597,13 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     );
   }
 
+  const handleBack = () => {
+    setIsMaximized(false);
+    onBack();
+  };
+
   return (
-    <div className={`flex flex-col h-full animate-in slide-in-from-right-4 duration-500 ${isSplitView ? 'lg:w-full' : 'lg:w-auto'}`}>
+    <div className={`flex flex-col h-full animate-in slide-in-from-right-4 duration-500 transition-all duration-500 ${isMaximized ? 'fixed inset-0 z-[100] p-4 md:p-10 bg-slate-50 dark:bg-[#0d0303]' : (isSplitView ? 'lg:w-full' : 'lg:w-auto')}`}>
       
       {/* Editorial Header */}
       <header className="relative py-8 mb-10 border-b border-slate-100 dark:border-white/5">
@@ -605,7 +611,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
           <div className="space-y-6">
             <div className="flex items-center gap-4">
               <button 
-                onClick={onBack} 
+                onClick={handleBack} 
                 className="p-3 bg-white dark:bg-white/5 text-slate-500 hover:text-sanfran-rubi rounded-2xl shadow-sm border border-slate-200 dark:border-white/10 transition-all hover:scale-105 active:scale-95 flex flex-col items-center gap-1"
               >
                 <ArrowLeft size={20} />
@@ -761,6 +767,24 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
               >
                 <Split size={24} />
                 <span className="text-[8px] font-black uppercase">{isSplitView ? 'Foco ON' : 'Foco OFF'}</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  const nextMaximizedState = !isMaximized;
+                  setIsMaximized(nextMaximizedState);
+                  if (nextMaximizedState) {
+                    setIsSplitView(true);
+                    onToggleSidebar(false);
+                  } else {
+                    // Restore previous state if needed, or just leave as is
+                  }
+                }}
+                className={`p-3 rounded-2xl transition-all flex flex-col items-center gap-1 ${isMaximized ? 'bg-sanfran-rubi text-white shadow-lg shadow-red-500/20' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/10'}`}
+                title={isMaximized ? "Sair da Tela Cheia" : "Tela Cheia"}
+              >
+                {isMaximized ? <Minimize2 size={24} /> : <Maximize2 size={24} />}
+                <span className="text-[8px] font-black uppercase">{isMaximized ? 'Recolher' : 'Expandir'}</span>
               </button>
             </div>
 
