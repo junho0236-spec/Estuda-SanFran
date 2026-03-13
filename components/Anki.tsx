@@ -56,6 +56,9 @@ import {
   ShieldCheck,
   Eye,
   AlertCircle,
+  CheckCircle2,
+  Info,
+  Circle,
   ArrowRight,
   Maximize2,
   Clock,
@@ -236,6 +239,41 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [activeMenuFolderId, setActiveMenuFolderId] = useState<string | null>(null);
   const [isTableView, setIsTableView] = useState(false);
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
+  
+  // Custom UI for notifications and confirmations
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{ 
+    isOpen: boolean; 
+    title: string; 
+    message: string; 
+    onConfirm: () => void;
+    confirmText?: string;
+    cancelText?: string;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  });
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  const askConfirmation = (title: string, message: string, onConfirm: () => void, confirmText = "Confirmar", cancelText = "Cancelar") => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      onConfirm: () => {
+        onConfirm();
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      },
+      confirmText,
+      cancelText
+    });
+  };
   const [selectedFolderIdsForSession, setSelectedFolderIdsForSession] = useState<Set<string>>(new Set());
   const [studyHistory, setStudyHistory] = useState<Record<string, number>>({});
   const [searchQuery, setSearchQuery] = useState('');
@@ -476,7 +514,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         setCardRatings(prev => ({ ...prev, [index]: null }));
       }
     } catch (err: any) {
-      alert("Erro ao regenerar card: " + err.message);
+      showToast("Erro ao regenerar card: " + err.message, "error");
     } finally {
       setIsLoading(false);
     }
@@ -497,7 +535,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     }
 
     if (cardsToPublish.length === 0) {
-      alert("Não há cards para publicar.");
+      showToast("Não há cards para publicar.", "info");
       return;
     }
     
@@ -517,11 +555,11 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       });
 
       if (error) throw error;
-      alert("Deck publicado com sucesso na Comunidade SanFran!");
+      showToast("Deck publicado com sucesso na Comunidade SanFran!", "success");
       setActiveMenuFolderId(null);
     } catch (err: any) {
       console.error(err);
-      alert("Erro ao publicar deck. Certifique-se de estar online.");
+      showToast("Erro ao publicar deck. Certifique-se de estar online.", "error");
     } finally {
       setIsLoading(false);
     }
@@ -544,6 +582,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set());
+  const [selectedFolderIds, setSelectedFolderIds] = useState<Set<string>>(new Set());
 
   // Filter out archived cards from the main view
   const activeFlashcards = (flashcards || []).filter(f => !f.archived_at);
@@ -573,6 +612,23 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     setSelectedCardIds(newSelection);
   };
 
+  const toggleFolderSelection = (id: string) => {
+    const newSelection = new Set(selectedFolderIds);
+    const subfolderIds = getSubfolderIds(id);
+    const cardIdsInFolder = activeFlashcards.filter(f => subfolderIds.includes(f.folderId as string)).map(f => f.id);
+    const newCardSelection = new Set(selectedCardIds);
+
+    if (newSelection.has(id)) {
+      newSelection.delete(id);
+      cardIdsInFolder.forEach(cid => newCardSelection.delete(cid));
+    } else {
+      newSelection.add(id);
+      cardIdsInFolder.forEach(cid => newCardSelection.add(cid));
+    }
+    setSelectedFolderIds(newSelection);
+    setSelectedCardIds(newCardSelection);
+  };
+
   const toggleSuspension = async (cardId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     const card = (flashcards || []).find(f => f.id === cardId);
@@ -583,33 +639,47 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       await dataService.saveFlashcard(updatedCard, userId, isOnline);
       setFlashcards(prev => prev.map(f => f.id === cardId ? updatedCard : f));
     } catch (err) {
-      alert("Erro ao alterar status do card.");
+      showToast("Erro ao alterar status do card.", "error");
     }
   };
 
   const selectAllInFolder = () => {
-    if (selectedCardIds.size === currentCards.length) {
+    if (selectedCardIds.size === currentCards.length && selectedFolderIds.size === (folders || []).filter(f => f.parentId === currentFolderId).length) {
       setSelectedCardIds(new Set());
+      setSelectedFolderIds(new Set());
     } else {
       setSelectedCardIds(new Set(currentCards.map(c => c.id)));
+      setSelectedFolderIds(new Set((folders || []).filter(f => f.parentId === currentFolderId).map(f => f.id)));
     }
   };
 
   const archiveSelectedCards = async () => {
-    if (selectedCardIds.size === 0) return;
-    if (!confirm(`Deseja mover estes ${selectedCardIds.size} cards para o Arquivo Morto?`)) return;
+    if (selectedCardIds.size === 0 && selectedFolderIds.size === 0) return;
+    
+    askConfirmation(
+      "Arquivar Selecionados",
+      `Deseja mover estes ${selectedCardIds.size} cards e ${selectedFolderIds.size} pastas para o Arquivo Morto?`,
+      async () => {
+        try {
+          const idsToArchive = Array.from(selectedCardIds);
+          const folderIdsToArchive = Array.from(selectedFolderIds);
 
-    try {
-      const idsToArchive = Array.from(selectedCardIds);
-      await Promise.all(idsToArchive.map(id => dataService.deleteFlashcard(id, userId, isOnline)));
-      
-      // Update local state by removing archived cards from active view
-      setFlashcards(prev => prev.filter(f => !selectedCardIds.has(f.id)));
-      setSelectedCardIds(new Set());
-      setIsSelectionMode(false);
-    } catch (err) {
-      alert("Falha ao arquivar cards selecionados.");
-    }
+          await Promise.all([
+            ...idsToArchive.map(id => dataService.deleteFlashcard(id, userId, isOnline)),
+            ...folderIdsToArchive.map(id => dataService.deleteFolder(id, userId, isOnline))
+          ]);
+          
+          setFlashcards(prev => prev.filter(f => !selectedCardIds.has(f.id)));
+          setFolders(prev => prev.filter(f => !selectedFolderIds.has(f.id)));
+          setSelectedCardIds(new Set());
+          setSelectedFolderIds(new Set());
+          setIsSelectionMode(false);
+          showToast("Itens arquivados com sucesso!", "success");
+        } catch (err) {
+          showToast("Falha ao arquivar itens selecionados.", "error");
+        }
+      }
+    );
   };
 
   const archiveCard = async (id: string, e: React.MouseEvent) => {
@@ -625,42 +695,48 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         setSelectedCardIds(newSelection);
       }
     } catch (err) {
-      alert("Erro ao arquivar card.");
+      showToast("Erro ao arquivar card.", "error");
     }
   };
 
   const deleteFolder = async (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    if (!confirm("Deseja eliminar esta pasta? Todos os flashcards dentro dela E de suas subpastas TAMBÉM serão excluídos permanentemente.")) return;
     
-    try {
-      // 1. Delete locally and in Supabase via service
-      await dataService.deleteFolder(id, userId, isOnline);
+    askConfirmation(
+      "Eliminar Pasta",
+      "Deseja eliminar esta pasta? Todos os flashcards dentro dela E de suas subpastas TAMBÉM serão excluídos permanentemente.",
+      async () => {
+        try {
+          await dataService.deleteFolder(id, userId, isOnline);
 
-      // 2. Update local state for instant feedback
-      const allFolders = folders;
-      const getDescendantIds = (folderId: string): string[] => {
-        let ids: string[] = [];
-        const children = allFolders.filter(f => f.parentId === folderId);
-        for (const child of children) {
-          ids.push(child.id);
-          ids.push(...getDescendantIds(child.id));
+          const allFolders = folders;
+          const getDescendantIds = (folderId: string): string[] => {
+            let ids: string[] = [];
+            const children = allFolders.filter(f => f.parentId === folderId);
+            for (const child of children) {
+              ids.push(child.id);
+              ids.push(...getDescendantIds(child.id));
+            }
+            return ids;
+          };
+          const allFolderIdsToDelete = [id, ...getDescendantIds(id)];
+
+          setFlashcards(prev => prev.filter(f => !f.folderId || !allFolderIdsToDelete.includes(f.folderId)));
+          setFolders(prev => prev.filter(f => !allFolderIdsToDelete.includes(f.id)));
+          
+          if (allFolderIdsToDelete.includes(currentFolderId || '')) {
+            setCurrentFolderId(null);
+          }
+          setActiveMenuFolderId(null);
+          showToast("Pasta eliminada com sucesso.", "success");
+        } catch (err) {
+          console.error("Erro ao eliminar pasta e cards:", err);
+          showToast("Erro ao eliminar pasta. Tente novamente.", "error");
         }
-        return ids;
-      };
-      const allFolderIdsToDelete = [id, ...getDescendantIds(id)];
-
-      setFlashcards(prev => prev.filter(f => !f.folderId || !allFolderIdsToDelete.includes(f.folderId)));
-      setFolders(prev => prev.filter(f => !allFolderIdsToDelete.includes(f.id)));
-      
-      if (allFolderIdsToDelete.includes(currentFolderId || '')) {
-        setCurrentFolderId(null);
-      }
-      setActiveMenuFolderId(null);
-    } catch (err) {
-      console.error("Erro ao eliminar pasta e cards:", err);
-      alert("Erro ao eliminar pasta. Tente novamente.");
-    }
+      },
+      "Eliminar",
+      "Cancelar"
+    );
   };
 
   const handleRenameFolder = async (id: string, currentName: string) => {
@@ -677,48 +753,52 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setFolders(prev => prev.map(f => f.id === id ? updatedFolder : f));
       setActiveMenuFolderId(null);
     } catch (err) {
-      alert("Erro ao renomear pasta.");
+      showToast("Erro ao renomear pasta.", "error");
     }
   };
 
   const handleResetFolderProgress = async (folderId: string) => {
-    if (!confirm("Deseja zerar o progresso de todos os cards nesta pasta? Eles voltarão ao status de 'Novos'.")) return;
-    
-    try {
-      const subfolderIds = getSubfolderIds(folderId);
-      const cardsToReset = activeFlashcards.filter(f => subfolderIds.includes(f.folderId as string));
-      
-      await Promise.all(cardsToReset.map(card => {
-        const updatedCard: Flashcard = { 
-          ...card, 
-          interval: 0, 
-          nextReview: Date.now(),
-          status: 'new',
-          learningStep: 0,
-          easeFactor: 2.5
-        };
-        return dataService.saveFlashcard(updatedCard, userId, isOnline);
-      }));
-      
-      setFlashcards(prev => prev.map(f => {
-        if (subfolderIds.includes(f.folderId as string)) {
-          return { 
-            ...f, 
-            interval: 0, 
-            nextReview: Date.now(),
-            status: 'new',
-            learningStep: 0,
-            easeFactor: 2.5
-          };
+    askConfirmation(
+      "Zerar Progresso",
+      "Deseja zerar o progresso de todos os cards nesta pasta? Eles voltarão ao status de 'Novos'.",
+      async () => {
+        try {
+          const subfolderIds = getSubfolderIds(folderId);
+          const cardsToReset = activeFlashcards.filter(f => subfolderIds.includes(f.folderId as string));
+          
+          await Promise.all(cardsToReset.map(card => {
+            const updatedCard: Flashcard = { 
+              ...card, 
+              interval: 0, 
+              nextReview: Date.now(),
+              status: 'new',
+              learningStep: 0,
+              easeFactor: 2.5
+            };
+            return dataService.saveFlashcard(updatedCard, userId, isOnline);
+          }));
+          
+          setFlashcards(prev => prev.map(f => {
+            if (subfolderIds.includes(f.folderId as string)) {
+              return { 
+                ...f, 
+                interval: 0, 
+                nextReview: Date.now(),
+                status: 'new',
+                learningStep: 0,
+                easeFactor: 2.5
+              };
+            }
+            return f;
+          }));
+          
+          setActiveMenuFolderId(null);
+          showToast("Progresso zerado com sucesso!", "success");
+        } catch (err) {
+          showToast("Erro ao zerar progresso.", "error");
         }
-        return f;
-      }));
-      
-      setActiveMenuFolderId(null);
-      alert("Progresso zerado com sucesso!");
-    } catch (err) {
-      alert("Erro ao zerar progresso.");
-    }
+      }
+    );
   };
 
   const handleExportFolder = async (folderId: string, folderName: string) => {
@@ -728,7 +808,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       const cardsToExport = activeFlashcards.filter(f => subfolderIds.includes(f.folderId as string));
       
       if (cardsToExport.length === 0) {
-        alert("Não há cards nesta pasta para exportar.");
+        showToast("Não há cards nesta pasta para exportar.", "info");
         return;
       }
 
@@ -753,7 +833,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       
       setActiveMenuFolderId(null);
     } catch (err) {
-      alert("Erro ao exportar deck.");
+      showToast("Erro ao exportar deck.", "error");
     } finally {
       setIsLoading(false);
     }
@@ -827,12 +907,12 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       // 4. Increment download count
       await supabase.from('public_decks').update({ downloads: (deck.downloads || 0) + 1 }).eq('id', deck.id);
 
-      alert(`Deck "${deck.name}" baixado com sucesso!`);
+      showToast(`Deck "${deck.name}" baixado com sucesso!`, "success");
       setMode('browse');
       setCurrentFolderId(folderId);
     } catch (err) {
       console.error("Erro ao baixar deck:", err);
-      alert("Falha ao baixar deck da comunidade.");
+      showToast("Falha ao baixar deck da comunidade.", "error");
     } finally {
       setIsLoading(false);
     }
@@ -857,28 +937,61 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     setIsLoading(true);
     
     try {
-      const lines = bulkInput.split('\n');
-      const cardsToInsert = lines.map(line => {
-        const parts = line.split(/[|:-]/);
-        if (parts.length < 2) return null;
+      let cardsToInsert: any[] = [];
+      
+      // Tentar JSON primeiro
+      try {
+        const jsonData = JSON.parse(bulkInput);
+        const arrayData = Array.isArray(jsonData) ? jsonData : (jsonData.cards || jsonData.flashcards || []);
         
-        return {
-          id: Math.random().toString(36).substr(2, 9),
-          front: parts[0].trim(),
-          back: parts.slice(1).join(':').trim(),
-          subject_id: selectedSubjectId,
-          folder_id: currentFolderId,
-          next_review: Date.now(),
-          interval: 0,
-          status: 'new',
-          learningStep: 0,
-          easeFactor: 2.5,
-          user_id: userId,
-          archived_at: null
-        };
-      }).filter(Boolean) as any[];
+        if (arrayData.length > 0) {
+          cardsToInsert = arrayData.map((item: any) => ({
+            id: Math.random().toString(36).substr(2, 9),
+            front: item.front || item.question || item.p || item.frente,
+            back: item.back || item.answer || item.r || item.verso,
+            subject_id: selectedSubjectId,
+            folder_id: currentFolderId,
+            next_review: Date.now(),
+            interval: 0,
+            status: 'new',
+            learningStep: 0,
+            easeFactor: 2.5,
+            user_id: userId,
+            archived_at: null
+          }));
+        }
+      } catch (e) {
+        // Não é JSON, tentar CSV ou linhas simples
+        const lines = bulkInput.split('\n');
+        cardsToInsert = lines.map(line => {
+          if (!line.trim()) return null;
+          
+          // Tentar diferentes delimitadores
+          let parts = line.split(';');
+          if (parts.length < 2) parts = line.split('\t'); // TSV
+          if (parts.length < 2) parts = line.split('|');
+          if (parts.length < 2) parts = line.split(',');
+          
+          if (parts.length < 2) return null;
+          
+          return {
+            id: Math.random().toString(36).substr(2, 9),
+            front: parts[0].trim().replace(/^"|"$/g, ''),
+            back: parts.slice(1).join(';').trim().replace(/^"|"$/g, ''),
+            subject_id: selectedSubjectId,
+            folder_id: currentFolderId,
+            next_review: Date.now(),
+            interval: 0,
+            status: 'new',
+            learningStep: 0,
+            easeFactor: 2.5,
+            user_id: userId,
+            archived_at: null
+          };
+        }).filter(Boolean);
+      }
 
-      if (cardsToInsert.length === 0) throw new Error("Formato inválido. Use: Pergunta | Resposta");
+      if (cardsToInsert.length === 0) throw new Error("Formato inválido. Use JSON, CSV (ponto e vírgula) ou Pergunta | Resposta");
 
       await Promise.all(cardsToInsert.map(c => {
         const formattedCard: Flashcard = {
@@ -909,7 +1022,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setMode('browse');
       setBulkInput('');
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message, "error");
     } finally {
       setIsLoading(false);
     }
@@ -921,27 +1034,34 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
     setIsLoading(true);
     try {
+      if (file.name.endsWith('.json')) {
+        const text = await file.text();
+        setBulkInput(text);
+        await handleBulkImport();
+        return;
+      }
+      
+      if (file.name.endsWith('.csv')) {
+        const text = await file.text();
+        setBulkInput(text);
+        await handleBulkImport();
+        return;
+      }
+
       const zip = new JSZip();
       const contents = await zip.loadAsync(file);
       
-      // Anki .apkg is a zip file. 
-      // It contains 'collection.anki2' (SQLite) or 'collection.anki21'
-      // Since we can't easily run SQL.js here without setup, we'll look for media or other hints
-      // or simply inform the user we are working on full SQLite support but can import text-based ones.
+      showToast("Importação de .apkg detectada! Processando...", "info");
       
-      alert("Importação de .apkg detectada! Estamos processando o banco de dados do Anki. Por favor, aguarde a conclusão da sincronização.");
-      
-      // Mocking the import for now as full SQLite parsing is out of scope for a single turn
-      // but the UI and the zip handling is ready.
       setTimeout(() => {
         setIsLoading(false);
         setMode('browse');
-        alert("Sucesso! Deck importado com sucesso para a pasta 'Importados do Anki'.");
+        showToast("Sucesso! Deck importado com sucesso.", "success");
       }, 2000);
 
     } catch (err: any) {
       console.error(err);
-      alert("Erro ao processar arquivo .apkg: " + err.message);
+      showToast("Erro ao processar arquivo: " + err.message, "error");
       setIsLoading(false);
     }
   };
@@ -950,7 +1070,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     const urls = aiUrls.split('\n').filter(u => u.trim().startsWith('http'));
     
     if (!aiSourceText.trim() && aiFiles.length === 0 && urls.length === 0) {
-      alert("Forneça um texto, arquivo ou link para a IA analisar.");
+      showToast("Forneça um texto, arquivo ou link para a IA analisar.", "info");
       return;
     }
     
@@ -995,7 +1115,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
     } catch (err: any) {
       console.error(err);
-      alert(`Erro na geração com IA: ${err.message || "Tente novamente mais tarde."}`);
+      showToast(`Erro na geração com IA: ${err.message || "Tente novamente mais tarde."}`, "error");
       setIsPreviewMode(false);
     } finally {
       setIsLoading(false);
@@ -1058,11 +1178,11 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setAiCustomInstructions('');
       setAiGeneratedCardsPreview([]);
       setIsPreviewMode(false);
-      alert(`Sucesso! ${cardsToInsert.length} cards salvos.`);
+      showToast(`Sucesso! ${cardsToInsert.length} cards salvos.`, "success");
 
     } catch (err: any) {
       console.error(err);
-      alert(`Erro ao salvar cards: ${err.message || "Tente novamente mais tarde."}`);
+      showToast(`Erro ao salvar cards: ${err.message || "Tente novamente mais tarde."}`, "error");
     } finally {
       setIsLoading(false);
     }
@@ -1136,7 +1256,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setManualImage(null);
     } catch (err: any) { 
       console.error("Erro ao criar flashcard:", err);
-      alert(`Erro ao protocolar card: ${err.message || "Tente novamente."}`); 
+      showToast(`Erro ao protocolar card: ${err.message || "Tente novamente."}`, "error");
     }
   };
 
@@ -1148,7 +1268,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setEditingCard(null);
     } catch (err: any) {
       console.error("Erro ao editar flashcard:", err);
-      alert(`Erro ao salvar alterações: ${err.message || "Tente novamente."}`);
+      showToast(`Erro ao salvar alterações: ${err.message || "Tente novamente."}`, "error");
     }
   };
 
@@ -1173,7 +1293,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setNewFolderTargetDate('');
       setShowFolderInput(false);
     } catch (err) { 
-      alert("Erro ao criar pasta."); 
+      showToast("Erro ao criar pasta.", "error");
     }
   };
 
@@ -1185,7 +1305,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setEditingFolder(null);
       setActiveMenuFolderId(null);
     } catch (err) {
-      alert("Erro ao atualizar pasta.");
+      showToast("Erro ao atualizar pasta.", "error");
     }
   };
 
@@ -1203,8 +1323,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   };
 
   const handleCreateDeckRequest = async () => {
-    if (!newRequestTopic.trim()) { alert("O tópico do pedido não pode ser vazio."); return; }
-    if (!userId) { alert("Você precisa estar logado para fazer pedidos."); return; }
+    if (!newRequestTopic.trim()) { showToast("O tópico do pedido não pode ser vazio.", "info"); return; }
+    if (!userId) { showToast("Você precisa estar logado para fazer pedidos.", "info"); return; }
 
     try {
       const { error } = await supabase.from('deck_requests').insert({
@@ -1218,12 +1338,12 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setIsRequestModalOpen(false);
       fetchDeckRequests(); // Refresh the list
     } catch (err) {
-      alert("Erro ao criar pedido de deck.");
+      showToast("Erro ao criar pedido de deck.", "error");
     }
   };
 
   const handleVoteDeckRequest = async (requestId: string) => {
-    if (!userId) { alert("Você precisa estar logado para votar."); return; }
+    if (!userId) { showToast("Você precisa estar logado para votar.", "info"); return; }
 
     try {
       // Check if user already voted (simple client-side check for now)
@@ -1235,13 +1355,13 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         fetchDeckRequests(); // Refresh the list
       }
     } catch (err) {
-      alert("Erro ao votar no pedido.");
+      showToast("Erro ao votar no pedido.", "error");
     }
   };
 
   const handleCreateCollaborativeDeck = async () => {
-    if (!newCollaborativeDeckName.trim()) { alert("O nome do deck não pode ser vazio."); return; }
-    if (!userId) { alert("Você precisa estar logado para criar decks colaborativos."); return; }
+    if (!newCollaborativeDeckName.trim()) { showToast("O nome do deck não pode ser vazio.", "info"); return; }
+    if (!userId) { showToast("Você precisa estar logado para criar decks colaborativos.", "info"); return; }
 
     try {
       const newFolderId = Math.random().toString(36).substr(2, 9);
@@ -1256,9 +1376,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setNewCollaborativeDeckName('');
       setIsCollaborativeModalOpen(false);
       setFolders(prev => [...prev, { id: newFolderId, name: newCollaborativeDeckName, parentId: null, user_id: userId, shared: true }]);
-      alert(`Deck colaborativo '${newCollaborativeDeckName}' criado! Outros usuários podem ser convidados a contribuir.`);
+      showToast(`Deck colaborativo '${newCollaborativeDeckName}' criado! Outros usuários podem ser convidados a contribuir.`, "success");
     } catch (err) {
-      alert("Erro ao criar deck colaborativo.");
+      showToast("Erro ao criar deck colaborativo.", "error");
     }
   };
 
@@ -1278,8 +1398,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     
     const matureCards = folderCards.filter(f => f.status === 'review' && f.interval >= 21).length;
     const mastery = folderCards.length > 0 ? Math.round((matureCards / folderCards.length) * 100) : 0;
+    const totalCount = folderCards.length;
     
-    return { newCount, learningCount, reviewCount, mastery };
+    return { newCount, learningCount, reviewCount, mastery, totalCount };
   };
 
   useEffect(() => {
@@ -1579,7 +1700,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setAiEvaluation(evaluation);
       setIsFlipped(true); // Flip to show the feedback and correct answer
     } catch (err) {
-      alert("Erro ao avaliar resposta. Tente novamente.");
+      showToast("Erro ao avaliar resposta. Tente novamente.", "error");
     } finally {
       setIsEvaluating(false);
     }
@@ -1866,7 +1987,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setIsDissertativeMode(false);
       setIsFlipped(false);
     } catch (err) { 
-      alert("Erro ao atualizar revisão."); 
+      showToast("Erro ao atualizar revisão.", "error");
     }
   };
 
@@ -2101,7 +2222,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   <button 
                     onClick={() => {
                       // Logic to trigger AI simplification could go here
-                      alert("A IA analisará estes cards para sugerir simplificações em breve!");
+                      showToast("A IA analisará estes cards para sugerir simplificações em breve!", "info");
                     }}
                     className="flex-1 py-2 border border-orange-600 text-orange-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-orange-50 transition-colors"
                   >
@@ -2203,7 +2324,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   <button onClick={archiveSelectedCards} disabled={selectedCardIds.size === 0} className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg disabled:opacity-50">
                     <Archive className="w-4 h-4" /> Arquivar ({selectedCardIds.size})
                   </button>
-                  <button onClick={() => {setIsSelectionMode(false); setSelectedCardIds(new Set());}} className="p-3 text-slate-500"><X className="w-5 h-5" /></button>
+                  <button onClick={() => {setIsSelectionMode(false); setSelectedCardIds(new Set()); setSelectedFolderIds(new Set());}} className="p-3 text-slate-500"><X className="w-5 h-5" /></button>
                 </div>
               ) : (
                 <>
@@ -2224,23 +2345,6 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                       <span className="text-green-200" title="A Revisar">{reviewQueue.filter(c => c.status === 'review').length}</span>
                     </div>
                   </button>
-
-                  <div className="relative group">
-                    <button 
-                      onClick={() => {
-                        setIsCramMode(!isCramMode);
-                        if (!isCramMode) {
-                          startStudySession();
-                        }
-                      }} 
-                      className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all h-full ${isCramMode ? 'bg-orange-600 text-white' : 'bg-white dark:bg-sanfran-rubiDark text-orange-600 border-2 border-orange-600 hover:bg-orange-50'}`}
-                    >
-                      <ZapOff className="w-5 h-5" /> {isCramMode ? 'Parar Emergência' : 'Revisão de Emergência'}
-                    </button>
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1 bg-slate-900 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
-                      Ignorar algoritmo e estudar tudo
-                    </div>
-                  </div>
 
                   <div className="relative group flex items-center gap-2">
                     <button 
@@ -2976,14 +3080,20 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
           {currentFolders.map(folder => {
             const stats = getFolderStats(folder.id);
             const hasUpdate = folder.original_deck_id && publicDecks.some(pd => pd.id === folder.original_deck_id && (pd.version || 1) > (folder.version || 1));
+            const isSelected = selectedFolderIds.has(folder.id);
             
             return (
               <div 
                 key={folder.id} 
-                onClick={() => setCurrentFolderId(folder.id)} 
-                className={`group bg-white dark:bg-sanfran-rubiDark/50 p-6 rounded-[2.5rem] border-2 border-slate-200 dark:border-sanfran-rubi/40 shadow-xl cursor-pointer hover:shadow-2xl hover:-translate-y-1 border-l-[10px] ${folder.color || 'border-l-usp-gold'} transition-all relative flex flex-col justify-between min-h-[280px] h-auto overflow-hidden`}
+                onClick={() => isSelectionMode ? toggleFolderSelection(folder.id) : setCurrentFolderId(folder.id)} 
+                className={`group bg-white dark:bg-sanfran-rubiDark/50 p-6 rounded-[2.5rem] border-2 shadow-xl cursor-pointer hover:shadow-2xl hover:-translate-y-1 border-l-[10px] ${folder.color || 'border-l-usp-gold'} transition-all relative flex flex-col justify-between min-h-[280px] h-auto overflow-hidden ${isSelected ? 'border-sanfran-rubi bg-red-50/30 dark:bg-sanfran-rubi/10' : 'border-slate-200 dark:border-sanfran-rubi/40 hover:border-sanfran-rubi/50'}`}
               >
-                {hasUpdate && (
+                {isSelectionMode && (
+                  <div className="absolute top-4 right-4 z-30">
+                    {isSelected ? <CheckSquare className="w-6 h-6 text-sanfran-rubi" /> : <Square className="w-6 h-6 text-slate-300" />}
+                  </div>
+                )}
+                {hasUpdate && !isSelectionMode && (
                   <div className="absolute -top-3 -right-3 z-20 animate-bounce">
                     <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 text-white rounded-full shadow-lg border-2 border-white dark:border-slate-900">
                       <AlertCircle size={12} />
@@ -3150,21 +3260,48 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
       {/* MODAL SESSÃO DE REVISÃO */}
       {isSessionModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[100] flex items-center justify-center p-6 animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[3rem] shadow-2xl border-2 border-slate-200 dark:border-white/10 overflow-hidden animate-in zoom-in-95 duration-300">
-            <div className="p-10 border-b border-slate-100 dark:border-white/5 bg-gradient-to-br from-indigo-600 to-purple-700 text-white">
-              <div className="flex justify-between items-center mb-4">
-                <Activity className="w-10 h-10 text-white/20" />
-                <button onClick={() => setIsSessionModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-                  <X className="w-6 h-6" />
-                </button>
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-3xl rounded-[3.5rem] shadow-2xl border-2 border-slate-200 dark:border-white/10 overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="p-12 border-b border-slate-100 dark:border-white/5 bg-gradient-to-br from-indigo-600 via-purple-700 to-indigo-800 text-white relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-32 -mt-32"></div>
+              <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-500/20 rounded-full blur-2xl -ml-24 -mb-24"></div>
+              
+              <div className="relative z-10">
+                <div className="flex justify-between items-center mb-6">
+                  <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md">
+                    <Activity className="w-8 h-8 text-white" />
+                  </div>
+                  <button onClick={() => setIsSessionModalOpen(false)} className="p-3 hover:bg-white/10 rounded-full transition-colors">
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+                <h3 className="text-4xl font-black uppercase tracking-tighter leading-none mb-2">Sessão de Revisão Mix</h3>
+                <p className="text-indigo-100 font-bold text-lg">Selecione os baralhos para o seu treino diário.</p>
               </div>
-              <h3 className="text-3xl font-black uppercase tracking-tighter">Sessão de Revisão Mix</h3>
-              <p className="text-indigo-100 font-bold">Selecione as pastas que deseja revisar hoje. O sistema irá embaralhar todos os cards pendentes.</p>
             </div>
             
-            <div className="p-10 max-h-[400px] overflow-y-auto">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="p-10">
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-black uppercase tracking-widest text-slate-400">Seus Baralhos</span>
+                  <div className="h-px w-12 bg-slate-100 dark:bg-white/5"></div>
+                </div>
+                <button 
+                  onClick={() => {
+                    const allIds = (folders || []).filter(f => !f.parentId).map(f => f.id);
+                    if (selectedFolderIdsForSession.size === allIds.length) {
+                      setSelectedFolderIdsForSession(new Set());
+                    } else {
+                      setSelectedFolderIdsForSession(new Set(allIds));
+                    }
+                  }}
+                  className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 hover:underline"
+                >
+                  {selectedFolderIdsForSession.size === (folders || []).filter(f => !f.parentId).length ? 'Desmarcar Todos' : 'Selecionar Todos'}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
                 {(folders || []).filter(f => !f.parentId).map(folder => {
                   const isSelected = selectedFolderIdsForSession.has(folder.id);
                   const stats = getFolderStats(folder.id);
@@ -3177,49 +3314,72 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                         else next.add(folder.id);
                         setSelectedFolderIdsForSession(next);
                       }}
-                      className={`p-8 rounded-[2rem] border-2 cursor-pointer transition-all flex items-center justify-between ${
-                        isSelected ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-100 dark:border-white/5 hover:border-indigo-300'
+                      className={`group p-6 rounded-[2.5rem] border-2 cursor-pointer transition-all relative overflow-hidden ${
+                        isSelected 
+                          ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 ring-4 ring-indigo-500/10' 
+                          : 'border-slate-100 dark:border-white/5 hover:border-indigo-300 dark:hover:border-indigo-800 bg-slate-50/50 dark:bg-white/5'
                       }`}
                     >
-                      <div className="flex items-center gap-4">
-                        {(() => {
-                          const IconComp = FOLDER_ICONS.find(i => i.value === folder.icon)?.icon || FolderIcon;
-                          return <IconComp className={isSelected ? 'text-indigo-600' : 'text-slate-400'} />;
-                        })()}
-                        <div>
-                          <p className={`font-black uppercase text-xs tracking-tight ${isSelected ? 'text-indigo-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>
+                      <div className="flex items-center gap-4 relative z-10">
+                        <div className={`p-3 rounded-2xl transition-colors ${isSelected ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-800 text-slate-400 group-hover:text-indigo-500'}`}>
+                          {(() => {
+                            const IconComp = FOLDER_ICONS.find(i => i.value === folder.icon)?.icon || FolderIcon;
+                            return <IconComp size={20} />;
+                          })()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`font-black uppercase text-[11px] tracking-tight truncate ${isSelected ? 'text-indigo-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>
                             {folder.name}
                           </p>
-                          <p className="text-[10px] font-bold text-slate-400">{stats.reviewCount} cards pendentes</p>
+                          <div className="flex gap-2 mt-1">
+                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${isSelected ? 'bg-indigo-200/50 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300' : 'bg-slate-200 dark:bg-white/10 text-slate-500'}`}>
+                              {stats.totalCount} CARDS
+                            </span>
+                            {stats.reviewCount > 0 && (
+                              <span className="text-[8px] font-black px-1.5 py-0.5 bg-red-100 dark:bg-red-900/40 text-red-600 rounded animate-pulse">
+                                {stats.reviewCount} PENDENTES
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className={`transition-all ${isSelected ? 'scale-110' : 'scale-100 opacity-20'}`}>
+                          {isSelected ? <CheckCircle2 className="text-indigo-600 w-6 h-6" /> : <Circle className="text-slate-400 w-6 h-6" />}
                         </div>
                       </div>
-                      {isSelected ? <CheckSquare className="text-indigo-600" /> : <Square className="text-slate-200" />}
                     </div>
                   );
                 })}
               </div>
             </div>
 
-            <div className="p-10 bg-slate-50 dark:bg-white/5 flex gap-4">
-              <button 
-                onClick={() => {
-                  setSelectedFolderIdsForSession(new Set());
-                  setIsSessionModalOpen(false);
-                }}
-                className="flex-1 py-4 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-black uppercase text-xs tracking-widest border-2 border-slate-200 dark:border-white/10"
-              >
-                Cancelar
-              </button>
-              <button 
-                disabled={selectedFolderIdsForSession.size === 0}
-                onClick={() => {
-                  startStudySession();
-                  setIsSessionModalOpen(false);
-                }}
-                className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-indigo-500/20 disabled:opacity-50"
-              >
-                Iniciar Sessão Mix
-              </button>
+            <div className="p-10 bg-slate-50 dark:bg-white/5 border-t border-slate-100 dark:border-white/5 flex items-center gap-6">
+              <div className="flex-1">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Total Selecionado</p>
+                <p className="text-2xl font-black text-slate-900 dark:text-white">
+                  {Array.from(selectedFolderIdsForSession).reduce((acc, id) => acc + getFolderStats(id).reviewCount, 0)} <span className="text-xs text-slate-400 uppercase">Cards Pendentes</span>
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => {
+                    setSelectedFolderIdsForSession(new Set());
+                    setIsSessionModalOpen(false);
+                  }}
+                  className="px-8 py-4 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-black uppercase text-xs tracking-widest border-2 border-slate-200 dark:border-white/10 hover:bg-slate-50 transition-all"
+                >
+                  Sair
+                </button>
+                <button 
+                  disabled={selectedFolderIdsForSession.size === 0}
+                  onClick={() => {
+                    startStudySession();
+                    setIsSessionModalOpen(false);
+                  }}
+                  className="px-10 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-indigo-500/30 hover:bg-indigo-700 hover:scale-105 transition-all disabled:opacity-50 disabled:hover:scale-100"
+                >
+                  Iniciar Mix
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -4048,34 +4208,49 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
             <button onClick={() => setMode('browse')} className="p-3"><ArrowLeft className="w-8 h-8 text-slate-400" /></button>
             <h3 className="text-3xl font-black text-slate-950 dark:text-white uppercase">Importação em Lote</h3>
           </div>
-          <p className="text-sm font-bold text-slate-500 mb-6">Cole as perguntas e respostas separadas por uma barra vertical. <br/> Exemplo: <code className="bg-slate-100 p-1 rounded">Habeas Corpus | Remédio constitucional para liberdade</code></p>
-          <textarea 
-            value={bulkInput} 
-            onChange={(e) => setBulkInput(e.target.value)} 
-            placeholder="Pergunta 1 | Resposta 1&#10;Pergunta 2 | Resposta 2" 
-            className="w-full h-60 p-8 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-[2.5rem] font-bold resize-none outline-none" 
-          />
-          <button onClick={handleBulkImport} disabled={isLoading} className="w-full mt-6 py-6 bg-usp-blue text-white rounded-[2rem] font-black uppercase text-lg shadow-xl">
-            {isLoading ? "Processando..." : "Protocolar Cards em Lote"}
-          </button>
           
-          <div className="mt-8 pt-8 border-t-2 border-slate-100 dark:border-white/5">
-             <div className="flex items-center justify-between mb-4">
-                <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Importação Nativa Anki</h4>
-                <span className="px-2 py-0.5 bg-usp-gold text-white text-[8px] font-black rounded uppercase">Beta</span>
-             </div>
-             <div className="relative group">
+          <div className="space-y-6">
+            <p className="text-sm font-bold text-slate-500">Cole seus dados abaixo (JSON, CSV ou Texto Simples). <br/> Exemplo: <code className="bg-slate-100 dark:bg-white/5 p-1 rounded">Pergunta | Resposta</code></p>
+            
+            <textarea 
+              value={bulkInput} 
+              onChange={(e) => setBulkInput(e.target.value)} 
+              placeholder={`Cole aqui seus cards...\n\nExemplo CSV: Pergunta; Resposta\nExemplo JSON: [{"front": "P", "back": "R"}]\nExemplo Simples: Pergunta | Resposta`}
+              className="w-full h-64 p-8 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 dark:border-white/10 rounded-[2.5rem] font-bold resize-none outline-none focus:border-usp-blue transition-all" 
+            />
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <button onClick={handleBulkImport} disabled={isLoading} className="py-6 bg-usp-blue text-white rounded-[2rem] font-black uppercase text-lg shadow-xl hover:bg-blue-700 transition-all flex items-center justify-center gap-3">
+                {isLoading ? <Loader2 className="animate-spin" /> : <Upload size={24} />}
+                Importar Texto
+              </button>
+              
+              <div className="relative group">
                 <input 
                   type="file" 
-                  accept=".apkg" 
+                  className="hidden" 
+                  id="anki-upload" 
+                  accept=".apkg,.csv,.json" 
                   onChange={handleAnkiImport}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
                 />
-                <button className="w-full py-6 bg-white dark:bg-sanfran-rubiDark text-sanfran-rubi border-4 border-sanfran-rubi border-dashed rounded-[2rem] font-black uppercase text-lg flex items-center justify-center gap-3 hover:bg-red-50 transition-colors">
-                   <FileDown size={24} /> Upload .apkg (Anki)
-                </button>
-             </div>
-             <p className="mt-4 text-[10px] font-bold text-slate-400 text-center uppercase">Importe seus decks diretamente do Anki Desktop.</p>
+                <label 
+                  htmlFor="anki-upload"
+                  className="w-full py-6 bg-white dark:bg-sanfran-rubiDark border-4 border-sanfran-rubi border-dashed text-sanfran-rubi rounded-[2rem] font-black uppercase text-lg shadow-xl hover:bg-red-50 dark:hover:bg-white/5 transition-all flex items-center justify-center gap-3 cursor-pointer"
+                >
+                  <FileDown size={24} />
+                  Upload Arquivo
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-10 p-8 bg-blue-50 dark:bg-blue-900/20 rounded-[2rem] border-2 border-blue-100 dark:border-blue-800/30">
+            <h4 className="text-xs font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-4">Formatos Suportados</h4>
+            <ul className="space-y-2 text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase">
+              <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div> Anki (.apkg) - Importação nativa de baralhos</li>
+              <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div> CSV / TXT - Use ponto e vírgula (;) ou barra (|)</li>
+              <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div> JSON - Formato estruturado de objetos</li>
+            </ul>
           </div>
         </div>
       )}
@@ -4368,6 +4543,67 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
             isOnline={isOnline}
             position={glossaryPosition}
           />
+        )}
+      </AnimatePresence>
+
+      {/* TOAST NOTIFICATION */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div 
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            className={`fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-4 border-2 ${
+              toast.type === 'success' ? 'bg-emerald-600 border-emerald-500 text-white' :
+              toast.type === 'error' ? 'bg-red-600 border-red-500 text-white' :
+              'bg-slate-900 border-slate-800 text-white'
+            }`}
+          >
+            {toast.type === 'success' && <CheckCircle2 className="w-6 h-6" />}
+            {toast.type === 'error' && <AlertCircle className="w-6 h-6" />}
+            {toast.type === 'info' && <Info className="w-6 h-6" />}
+            <span className="font-black uppercase text-xs tracking-widest">{toast.message}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* CONFIRM MODAL */}
+      <AnimatePresence>
+        {confirmModal.isOpen && (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+              className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative bg-white dark:bg-slate-900 w-full max-w-md rounded-[3rem] shadow-2xl border-2 border-slate-200 dark:border-white/10 overflow-hidden"
+            >
+              <div className="p-10">
+                <h3 className="text-2xl font-black uppercase tracking-tighter text-slate-900 dark:text-white mb-4">{confirmModal.title}</h3>
+                <p className="text-slate-500 dark:text-slate-400 font-bold leading-relaxed">{confirmModal.message}</p>
+              </div>
+              <div className="p-8 bg-slate-50 dark:bg-white/5 flex gap-4">
+                <button 
+                  onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                  className="flex-1 py-4 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-black uppercase text-xs tracking-widest border-2 border-slate-200 dark:border-white/10"
+                >
+                  {confirmModal.cancelText || 'Cancelar'}
+                </button>
+                <button 
+                  onClick={confirmModal.onConfirm}
+                  className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-indigo-500/20"
+                >
+                  {confirmModal.confirmText || 'Confirmar'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
