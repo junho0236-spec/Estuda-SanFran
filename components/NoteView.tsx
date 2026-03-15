@@ -597,70 +597,8 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     <div className={`flex flex-col animate-in slide-in-from-right-4 duration-500 transition-all duration-500 ${isMaximized ? 'is-maximized fixed inset-0 z-[100] bg-white dark:bg-[#0d0303] h-full' : 'w-full min-h-[calc(100vh-10rem)]'}`}>
       
       {/* Editorial Header */}
-      {selectedNote ? (
-        <DocsHeader
-          title={isRenaming ? newTitle : (selectedNote.title || 'Documento sem título')}
-          onTitleChange={(t) => { setIsRenaming(true); setNewTitle(t); }}
-          onTitleBlur={() => { if (isRenaming) renameNote(); }}
-          onBack={handleBack}
-          userId={userId}
-          quillRef={quillRef}
-          onSummarize={handleSummarize}
-          onGenerateFlashcards={handleGenerateFlashcards}
-          onToggleVadeMecum={() => setIsVadeMecumMode(!isVadeMecumMode)}
-          onApplyTemplate={applyTemplate}
-          onOpenHandwriting={() => setIsHandwritingOpen(true)}
-          onExportPdf={handleExportPdf}
-          onExportDocx={handleExportDocx}
-          onToggleSplitView={() => {
-            const nextSplitState = !isSplitView;
-            setIsSplitView(nextSplitState);
-            onToggleSidebar(!nextSplitState);
-          }}
-          onToggleMaximize={() => {
-            const nextMaximizedState = !isMaximized;
-            setIsMaximized(nextMaximizedState);
-            if (nextMaximizedState) {
-              setIsSplitView(true);
-              onToggleSidebar(false);
-            } else {
-              setIsSplitView(false);
-              onToggleSidebar(true);
-            }
-          }}
-          onSave={handleSaveNote}
-          isSaving={isSaving || isAutoSaving}
-          isSplitView={isSplitView}
-          isMaximized={isMaximized}
-          isVadeMecumMode={isVadeMecumMode}
-          isSummarizing={isSummarizing}
-        >
-          {/* Subject Dropdown */}
-          <div className="flex flex-col min-w-[120px] mr-2">
-            <span className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Disciplina</span>
-            <select
-              value={selectedSubjectId}
-              onChange={(e) => setSelectedSubjectId(e.target.value)}
-              className="bg-transparent border-none p-0 text-[11px] font-bold text-sanfran-rubi focus:ring-0 outline-none cursor-pointer hover:underline transition-all truncate max-w-[200px]"
-            >
-              {subjects.map(sub => (
-                <option key={sub.id} value={sub.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">{sub.name}</option>
-              ))}
-            </select>
-          </div>
-          
-          {/* Save Button */}
-          <button 
-            onClick={handleSaveNote} 
-            disabled={isSaving || isAutoSaving || !selectedNote}
-            className="py-1.5 px-4 bg-blue-600 text-white rounded-full font-medium text-sm flex items-center gap-2 hover:bg-blue-700 transition-colors disabled:opacity-50"
-          >
-            {(isSaving || isAutoSaving) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save size={16} />} 
-            <span>{(isSaving || isAutoSaving) ? 'Salvando...' : 'Salvar'}</span>
-          </button>
-        </DocsHeader>
-      ) : (
-        <header className={`relative border-b border-slate-100 dark:border-white/5 transition-all py-4 px-6 mb-6 bg-white dark:bg-white/2`}>
+      <header className={`relative border-b border-slate-100 dark:border-white/5 transition-all py-4 px-6 mb-6 bg-white dark:bg-white/2`}>
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button 
               onClick={handleBack} 
@@ -681,10 +619,91 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                 ))}
               </select>
             </div>
-            <h1 className="font-black text-slate-200 dark:text-slate-800 tracking-tighter text-5xl md:text-6xl ml-4">Selecione um documento</h1>
+            {!selectedNote && (
+              <h1 className="font-black text-slate-200 dark:text-slate-800 tracking-tighter text-5xl md:text-6xl ml-4">Selecione um documento</h1>
+            )}
           </div>
-        </header>
-      )}
+
+          {selectedNote && (
+            <div className="flex items-center gap-3">
+              {/* AI Actions */}
+              <div className="flex items-center gap-2 bg-purple-50 dark:bg-purple-900/10 p-1.5 rounded-2xl border border-purple-100 dark:border-purple-900/30">
+                <button 
+                  onClick={handleSummarize} 
+                  disabled={isSummarizing}
+                  className="px-4 py-2 bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-sm hover:shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isSummarizing ? <Loader2 size={14} className="animate-spin" /> : <BrainCircuit size={14} />}
+                  Resumir
+                </button>
+                <button 
+                  onClick={handleGenerateFlashcards} 
+                  className="px-4 py-2 bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-sm hover:shadow-md transition-all flex items-center gap-2"
+                >
+                  <Sparkles size={14} />
+                  Flashcards
+                </button>
+              </div>
+
+              <div className="w-px h-8 bg-slate-200 dark:bg-white/10 mx-1"></div>
+
+              {/* View Modes */}
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setIsVadeMecumMode(!isVadeMecumMode)}
+                  className={`p-2.5 rounded-xl transition-all flex flex-col items-center gap-0.5 border ${isVadeMecumMode ? 'bg-sanfran-rubi text-white border-sanfran-rubi shadow-lg shadow-red-500/20' : 'bg-white dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/10'}`}
+                  title="Modo Vade Mecum (Leitura)"
+                >
+                  <Gavel size={16} />
+                  <span className="text-[7px] font-black uppercase tracking-tighter">Leitura</span>
+                </button>
+                <button 
+                  onClick={() => {
+                    const nextSplitState = !isSplitView;
+                    setIsSplitView(nextSplitState);
+                    onToggleSidebar(!nextSplitState);
+                  }}
+                  className={`p-2.5 rounded-xl transition-all flex flex-col items-center gap-0.5 border ${isSplitView ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-500/20' : 'bg-white dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/10'}`}
+                  title="Split View"
+                >
+                  <Split size={16} />
+                  <span className="text-[7px] font-black uppercase tracking-tighter">Split</span>
+                </button>
+                <button 
+                  onClick={() => {
+                    const nextMaximizedState = !isMaximized;
+                    setIsMaximized(nextMaximizedState);
+                    if (nextMaximizedState) {
+                      setIsSplitView(true);
+                      onToggleSidebar(false);
+                    } else {
+                      setIsSplitView(false);
+                      onToggleSidebar(true);
+                    }
+                  }}
+                  className={`p-2.5 rounded-xl transition-all flex flex-col items-center gap-0.5 border ${isMaximized ? 'bg-slate-800 text-white border-slate-800 shadow-lg' : 'bg-white dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/10'}`}
+                  title="Tela Cheia"
+                >
+                  {isMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                  <span className="text-[7px] font-black uppercase tracking-tighter">Tela Cheia</span>
+                </button>
+              </div>
+
+              <div className="w-px h-8 bg-slate-200 dark:bg-white/10 mx-1"></div>
+
+              {/* Save Button */}
+              <button 
+                onClick={handleSaveNote} 
+                disabled={isSaving || isAutoSaving || !selectedNote}
+                className="py-3 px-6 bg-sanfran-rubi text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 disabled:opacity-50"
+              >
+                {(isSaving || isAutoSaving) ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} 
+                <span>{(isSaving || isAutoSaving) ? 'Salvando...' : 'Salvar'}</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </header>
 
       <div className={`flex gap-8 ${isMaximized ? 'flex-1 overflow-hidden' : 'flex-1 min-h-[700px]'}`}>
         {/* Sidebar for Notes and Files */}
@@ -855,7 +874,19 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                 </div>
               ) : (
                 <div className={`flex-1 flex flex-col transition-all duration-500 ${isMaximized ? 'p-0' : 'p-6 md:p-10 min-h-[600px]'}`}>
-                  <div ref={onEditorRef} className="flex-1 quill-editor-custom paper-effect min-h-[500px]" />
+                  <div className={`flex-1 flex flex-col bg-white dark:bg-slate-900 shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden ${isMaximized ? 'rounded-none border-0' : 'rounded-3xl'}`}>
+                    <DocsHeader
+                      title={isRenaming ? newTitle : (selectedNote.title || 'Documento sem título')}
+                      onTitleChange={(t) => { setIsRenaming(true); setNewTitle(t); }}
+                      onTitleBlur={() => { if (isRenaming) renameNote(); }}
+                      quillRef={quillRef}
+                      onApplyTemplate={applyTemplate}
+                      onOpenHandwriting={() => setIsHandwritingOpen(true)}
+                      onExportPdf={handleExportPdf}
+                      onExportDocx={handleExportDocx}
+                    />
+                    <div ref={onEditorRef} className="flex-1 quill-editor-custom paper-effect min-h-[500px]" />
+                  </div>
                 </div>
               )
             ) : (

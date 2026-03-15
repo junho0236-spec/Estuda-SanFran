@@ -12,25 +12,11 @@ interface DocsHeaderProps {
   title: string;
   onTitleChange: (title: string) => void;
   onTitleBlur: () => void;
-  onBack: () => void;
-  userId: string;
   quillRef: React.MutableRefObject<any>;
-  onSummarize?: () => void;
-  onGenerateFlashcards?: () => void;
-  onToggleVadeMecum?: () => void;
   onApplyTemplate?: (template: 'doutrina' | 'jurisprudencia' | 'aula') => void;
   onOpenHandwriting?: () => void;
   onExportPdf?: () => void;
   onExportDocx?: () => void;
-  onToggleSplitView?: () => void;
-  onToggleMaximize?: () => void;
-  onSave?: () => void;
-  isSaving?: boolean;
-  isSplitView?: boolean;
-  isMaximized?: boolean;
-  isVadeMecumMode?: boolean;
-  isSummarizing?: boolean;
-  children?: React.ReactNode;
 }
 
 const MenuButton = ({ label, items }: { label: string, items: { label?: string, onClick?: () => void, shortcut?: string, divider?: boolean, disabled?: boolean }[] }) => {
@@ -71,11 +57,8 @@ const MenuButton = ({ label, items }: { label: string, items: { label?: string, 
 };
 
 export const DocsHeader: React.FC<DocsHeaderProps> = ({ 
-  title, onTitleChange, onTitleBlur, onBack, userId, quillRef, 
-  onSummarize, onGenerateFlashcards, onToggleVadeMecum, onApplyTemplate, 
-  onOpenHandwriting, onExportPdf, onExportDocx, onToggleSplitView, 
-  onToggleMaximize, onSave, isSaving, isSplitView, isMaximized, 
-  isVadeMecumMode, isSummarizing, children 
+  title, onTitleChange, onTitleBlur, quillRef, 
+  onApplyTemplate, onOpenHandwriting, onExportPdf, onExportDocx
 }) => {
   const handleFormat = (format: string, value: any = true) => {
     if (quillRef.current) {
@@ -93,14 +76,13 @@ export const DocsHeader: React.FC<DocsHeaderProps> = ({
   const handlePrint = () => window.print();
 
   return (
-    <div className="flex flex-col border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 w-full shrink-0">
-      {/* Top Row: Icon, Title, Menus, Actions */}
+    <div className="flex flex-col border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 w-full shrink-0 overflow-hidden">
+      {/* Top Row: Icon, Title, Menus */}
       <div className="flex items-center justify-between px-4 py-2">
         <div className="flex items-center gap-3">
-          {/* Back Button / Icon */}
-          <button onClick={onBack} className="p-2 text-blue-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors" title="Voltar">
+          <div className="p-2 text-blue-500 rounded-full">
             <FileText size={28} fill="currentColor" className="text-blue-500" />
-          </button>
+          </div>
           
           <div className="flex flex-col">
             {/* Title and Status */}
@@ -158,14 +140,9 @@ export const DocsHeader: React.FC<DocsHeaderProps> = ({
                 { label: 'Localizar e substituir', shortcut: 'Ctrl+H', disabled: true }
               ]} />
               <MenuButton label="Ver" items={[
-                { label: 'Modo de Leitura (Vade Mecum)', onClick: onToggleVadeMecum },
-                { divider: true },
                 { label: 'Mostrar layout de impressão', disabled: true },
                 { label: 'Exibir régua', disabled: true },
-                { label: 'Mostrar caracteres não imprimíveis', disabled: true },
-                { divider: true },
-                { label: isSplitView ? 'Sair do Split View' : 'Split View', onClick: onToggleSplitView },
-                { label: isMaximized ? 'Sair da Tela inteira' : 'Tela inteira', onClick: onToggleMaximize }
+                { label: 'Mostrar caracteres não imprimíveis', disabled: true }
               ]} />
               <MenuButton label="Inserir" items={[
                 { label: 'Imagem', disabled: true },
@@ -199,9 +176,6 @@ export const DocsHeader: React.FC<DocsHeaderProps> = ({
                 { label: 'Ortografia e gramática', disabled: true },
                 { label: 'Contagem de palavras', shortcut: 'Ctrl+Shift+C', disabled: true },
                 { divider: true },
-                { label: 'Resumir com IA', onClick: onSummarize, disabled: isSummarizing },
-                { label: 'Gerar Flashcards (Anki)', onClick: onGenerateFlashcards },
-                { divider: true },
                 { label: 'Dicionário', shortcut: 'Ctrl+Shift+Y', disabled: true },
                 { label: 'Traduzir documento', disabled: true },
                 { label: 'Digitação por Voz', shortcut: 'Ctrl+Shift+S', disabled: true }
@@ -223,18 +197,6 @@ export const DocsHeader: React.FC<DocsHeaderProps> = ({
                 { label: 'Atalhos do teclado', shortcut: 'Ctrl+/', disabled: true }
               ]} />
             </div>
-          </div>
-        </div>
-        
-        {/* Right Actions: Comments, Share, Profile, and Custom Children */}
-        <div className="flex items-center gap-2">
-          {children}
-          <button className="p-2 text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors" title="Abrir histórico de comentários"><MessageSquare size={20} /></button>
-          <button className="px-5 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50 rounded-full font-medium flex items-center gap-2 transition-colors">
-            <Lock size={16} /> Compartilhar
-          </button>
-          <div className="w-9 h-9 rounded-full bg-purple-600 text-white flex items-center justify-center font-bold shadow-sm ml-2">
-            {userId.charAt(0).toUpperCase()}
           </div>
         </div>
       </div>
