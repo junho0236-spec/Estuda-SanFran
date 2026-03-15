@@ -13,6 +13,14 @@ import { Folder, Upload, File, CheckCircle2, AlertCircle } from 'lucide-react';
 import HandwritingCanvas from './HandwritingCanvas';
 import DocsToolbar from './DocsToolbar';
 
+// Register Line Height for Quill
+const Parchment = Quill.import('parchment');
+const LineHeightStyle = new Parchment.StyleAttributor('lineheight', 'line-height', {
+  scope: Parchment.Scope.INLINE,
+  whitelist: ['1', '1.15', '1.5', '2']
+});
+Quill.register(LineHeightStyle, true);
+
 // Set up pdfjs worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
@@ -49,6 +57,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   const [newTitle, setNewTitle] = useState('');
   const [isHandwritingOpen, setIsHandwritingOpen] = useState(false);
   const [handwritingData, setHandwritingData] = useState<string | undefined>(undefined);
+  const [isOfflineAvailable, setIsOfflineAvailable] = useState(true);
   
   // Sync selectedSubjectId when initialSubjectId changes from props
   useEffect(() => {
@@ -300,6 +309,41 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
       console.error("Error deleting note:", error);
       alert("Erro ao excluir documento.");
     }
+  };
+
+  const handleExportTxt = () => {
+    if (!selectedNote) return;
+    const text = quillRef.current?.getText() || '';
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${selectedNote.title || 'documento'}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const duplicateNote = async () => {
+    if (!selectedNote) return;
+    const newNote: Note = {
+      ...selectedNote,
+      id: Math.random().toString(36).substr(2, 9),
+      title: `${selectedNote.title} (Cópia)`,
+      updated_at: new Date().toISOString(),
+    };
+    try {
+      await dataService.saveNote(newNote, userId, isOnline);
+      setNotes(prev => [newNote, ...prev]);
+      setSelectedNote(newNote);
+    } catch (error) {
+      console.error("Error duplicating note:", error);
+      alert("Erro ao duplicar documento.");
+    }
+  };
+
+  const showDetails = () => {
+    if (!selectedNote) return;
+    alert(`Detalhes do Documento:\n\nTítulo: ${selectedNote.title}\nID: ${selectedNote.id}\nÚltima modificação: ${new Date(selectedNote.updated_at).toLocaleString()}\nProprietário: ${userId}`);
   };
 
   const renameNote = async () => {
@@ -1014,6 +1058,27 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                       dataService.saveNote(updatedNote, userId, isOnline);
                       setNotes(prev => prev.map(n => n.id === updatedNote.id ? updatedNote : n));
                     }}
+                    onNew={createNewNote}
+                    onOpen={() => onToggleSidebar(true)}
+                    onCopy={duplicateNote}
+                    onShare={() => alert('Funcionalidade de compartilhamento em breve!')}
+                    onEmail={() => {
+                      if (!selectedNote) return;
+                      window.location.href = `mailto:?subject=${encodeURIComponent(selectedNote.title)}&body=${encodeURIComponent(quillRef.current?.getText() || '')}`;
+                    }}
+                    onExportTxt={handleExportTxt}
+                    onDelete={() => selectedNote && deleteNote(selectedNote.id)}
+                    onVersionHistory={() => alert('Histórico de versões em breve!')}
+                    onOfflineToggle={() => setIsOfflineAvailable(!isOfflineAvailable)}
+                    isOfflineAvailable={isOfflineAvailable}
+                    onDetails={showDetails}
+                    onLanguageChange={(lang) => {
+                      if (quillRef.current) {
+                        quillRef.current.root.setAttribute('lang', lang);
+                        alert(`Idioma alterado para: ${lang}`);
+                      }
+                    }}
+                    onPageSetup={() => alert('Configuração da página em breve!')}
                   />
                   <div ref={onEditorRef} className="flex-1 quill-editor-custom paper-effect min-h-[500px] rounded-b-3xl border-t-0" />
                 </div>

@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Undo2, Redo2, Printer, SpellCheck, Paintbrush, Type, Bold, Italic, 
   Underline, Baseline, Highlighter, Link, MessageSquarePlus, AlignLeft, 
   AlignCenter, AlignRight, AlignJustify, List, ListOrdered, IndentDecrease, 
   IndentIncrease, Eraser, ChevronDown, Check, Image, Star, FileText, 
-  Share2, Clock, ListTodo, LineChart
+  Share2, Clock, ListTodo, LineChart, Plus, Folder, Download, Edit3, Trash2, AlertCircle,
+  MessageSquare, Link as LinkIcon
 } from 'lucide-react';
 
 interface DocsToolbarProps {
@@ -12,6 +13,7 @@ interface DocsToolbarProps {
   onImageUpload: () => void;
   onExportPdf: () => void;
   onExportDocx: () => void;
+  onExportTxt: () => void;
   onPrint: () => void;
   isMaximized: boolean;
   setIsMaximized: (val: boolean) => void;
@@ -19,14 +21,29 @@ interface DocsToolbarProps {
   onRename: () => void;
   isStarred: boolean;
   onToggleStar: () => void;
+  onNew: () => void;
+  onOpen: () => void;
+  onCopy: () => void;
+  onShare: () => void;
+  onEmail: () => void;
+  onDelete: () => void;
+  onVersionHistory: () => void;
+  onOfflineToggle: () => void;
+  isOfflineAvailable: boolean;
+  onDetails: () => void;
+  onLanguageChange: (lang: string) => void;
+  onPageSetup: () => void;
 }
 
 const DocsToolbar: React.FC<DocsToolbarProps> = ({ 
-  quillRef, onImageUpload, onExportPdf, onExportDocx, onPrint, 
-  isMaximized, setIsMaximized, title, onRename, isStarred, onToggleStar 
+  quillRef, onImageUpload, onExportPdf, onExportDocx, onExportTxt, onPrint, 
+  isMaximized, setIsMaximized, title, onRename, isStarred, onToggleStar,
+  onNew, onOpen, onCopy, onShare, onEmail, onDelete, onVersionHistory,
+  onOfflineToggle, isOfflineAvailable, onDetails, onLanguageChange, onPageSetup
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [zoom, setZoom] = useState('100%');
+  const [formatPainter, setFormatPainter] = useState<any>(null);
 
   const handleFormat = (format: string, value: any = true) => {
     if (quillRef.current) {
@@ -36,6 +53,34 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
   const handleUndo = () => quillRef.current?.history.undo();
   const handleRedo = () => quillRef.current?.history.redo();
+
+  const handlePaintbrushClick = () => {
+    if (quillRef.current) {
+      const range = quillRef.current.getSelection();
+      if (range) {
+        const formats = quillRef.current.getFormat(range);
+        setFormatPainter(formats);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (formatPainter && quillRef.current) {
+      const quill = quillRef.current;
+      const onSelectionChange = (range: any) => {
+        if (range && range.length > 0) {
+          Object.keys(formatPainter).forEach(key => {
+            quill.format(key, formatPainter[key]);
+          });
+          setFormatPainter(null);
+        }
+      };
+      quill.on('selection-change', onSelectionChange);
+      return () => {
+        quill.off('selection-change', onSelectionChange);
+      };
+    }
+  }, [formatPainter, quillRef]);
 
   return (
     <div className="flex flex-col border-b border-slate-200 dark:border-white/10 bg-[#f9fbfd] dark:bg-slate-900 rounded-t-xl overflow-hidden transition-all shadow-sm select-none">
@@ -64,15 +109,70 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
             <div className="flex items-center gap-0.5 text-[13px] text-slate-600 dark:text-slate-400">
               <div className="relative group">
                 <button className="px-2 py-0.5 hover:bg-slate-100 dark:hover:bg-white/5 rounded transition-colors">Arquivo</button>
-                <div className="absolute left-0 top-full mt-1 hidden group-hover:block w-64 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[100]">
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm">Novo</button>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm">Abrir</button>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm">Fazer uma cópia</button>
+                <div className="absolute left-0 top-full mt-1 hidden group-hover:block w-72 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[100]">
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={onNew}>
+                    <Plus size={16} className="text-slate-400" /> Novo
+                  </button>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={onOpen}>
+                    <Folder size={16} className="text-slate-400" /> Abrir
+                  </button>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={onCopy}>
+                    <FileText size={16} className="text-slate-400" /> Fazer uma cópia
+                  </button>
                   <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={onExportPdf}>Download PDF</button>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={onExportDocx}>Download Word</button>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={onShare}>
+                    <Share2 size={16} className="text-slate-400" /> Compartilhar
+                  </button>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={onEmail}>
+                    <Baseline size={16} className="text-slate-400" /> E-mail
+                  </button>
                   <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={onPrint}>Imprimir</button>
+                  <div className="relative group/sub">
+                    <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between">
+                      <div className="flex items-center gap-3"><Download size={16} className="text-slate-400" /> Baixar</div>
+                      <ChevronDown size={14} className="-rotate-90 text-slate-400" />
+                    </button>
+                    <div className="absolute left-full top-0 hidden group-hover/sub:block w-48 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
+                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={onExportDocx}>Microsoft Word (.docx)</button>
+                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={onExportPdf}>Documento PDF (.pdf)</button>
+                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={onExportTxt}>Texto sem formatação (.txt)</button>
+                    </div>
+                  </div>
+                  <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={onRename}>
+                    <Edit3 size={16} className="text-slate-400" /> Renomear
+                  </button>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3 text-red-600" onClick={onDelete}>
+                    <Trash2 size={16} /> Mover para a lixeira
+                  </button>
+                  <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={onVersionHistory}>
+                    <Clock size={16} className="text-slate-400" /> Histórico de versões
+                  </button>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between" onClick={onOfflineToggle}>
+                    <div className="flex items-center gap-3"><Check size={16} className={isOfflineAvailable ? "text-blue-600" : "text-transparent"} /> Disponível off-line</div>
+                  </button>
+                  <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={onDetails}>
+                    <AlertCircle size={16} className="text-slate-400" /> Detalhes
+                  </button>
+                  <div className="relative group/sub">
+                    <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between">
+                      <div className="flex items-center gap-3"><Baseline size={16} className="text-slate-400" /> Idioma</div>
+                      <ChevronDown size={14} className="-rotate-90 text-slate-400" />
+                    </button>
+                    <div className="absolute left-full top-0 hidden group-hover/sub:block w-48 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
+                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={() => onLanguageChange('pt-BR')}>Português (Brasil)</button>
+                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={() => onLanguageChange('en-US')}>English (US)</button>
+                    </div>
+                  </div>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={onPageSetup}>
+                    <FileText size={16} className="text-slate-400" /> Configuração da página
+                  </button>
+                  <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={onPrint}>
+                    <Printer size={16} className="text-slate-400" /> Imprimir
+                  </button>
                 </div>
               </div>
               <div className="relative group">
@@ -139,7 +239,13 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         <button className="ql-redo p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors" title="Refazer"><Redo2 size={18}/></button>
         <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors" onClick={onPrint} title="Imprimir"><Printer size={18}/></button>
         <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors" title="Verificação ortográfica" onClick={() => alert('Verificação ortográfica concluída.')}><SpellCheck size={18}/></button>
-        <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors" title="Pintar formatação" onClick={() => alert('Pintar formatação ativado.')}><Paintbrush size={18}/></button>
+        <button 
+          className={`p-1.5 rounded transition-colors ${formatPainter ? 'bg-blue-100 text-blue-600' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
+          title="Pintar formatação" 
+          onClick={handlePaintbrushClick}
+        >
+          <Paintbrush size={18}/>
+        </button>
         
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
@@ -214,13 +320,25 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
-        <select className="ql-align bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-1 py-1 outline-none cursor-pointer transition-colors" title="Alinhamento"></select>
+        <select className="ql-align bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-1 py-1 outline-none cursor-pointer transition-colors" title="Alinhamento">
+          <option value=""></option>
+          <option value="center"></option>
+          <option value="right"></option>
+          <option value="justify"></option>
+        </select>
         
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
 
-        <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors" title="Espaçamento entre linhas" onClick={() => alert('Espaçamento ajustado.')}>
-          <LineChart size={18} className="rotate-90" />
-        </button>
+        <select 
+          className="bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-2 py-1 text-sm font-medium outline-none cursor-pointer transition-colors" 
+          title="Espaçamento entre linhas"
+          onChange={(e) => handleFormat('lineheight', e.target.value)}
+        >
+          <option value="1">1.0</option>
+          <option value="1.15">1.15</option>
+          <option value="1.5">1.5</option>
+          <option value="2">2.0</option>
+        </select>
 
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
 
