@@ -552,6 +552,19 @@ export interface UserProgress {
   updated_at: string;
 }
 
+export interface LegalFrontier {
+  id: string;
+  user_id: string;
+  name: string;
+  icon: string;
+  color: string;
+  bg: string;
+  border: string;
+  accent: string;
+  subject_ids: string[];
+  created_at?: string;
+}
+
 export interface PetitumSection {
   title: string;
   skeleton: string;

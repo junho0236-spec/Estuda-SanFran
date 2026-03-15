@@ -1156,7 +1156,7 @@ const App: React.FC = () => {
                 <Route path={getPathFromView(View.SanFranOAB)} element={<SanFranOAB onNavigate={setCurrentView} />} />
 
                 <Route path={getPathFromView(View.Profile)} element={<Profile />} />
-                <Route path={getPathFromView(View.DominioJuridico)} element={<DominioJuridico subjects={subjects} studySessions={studySessions} />} />
+                <Route path={getPathFromView(View.DominioJuridico)} element={<DominioJuridico subjects={subjects} studySessions={studySessions} userId={session.user.id} />} />
                 <Route path={getPathFromView(View.DigitalID)} element={<DigitalID userId={session.user.id} userName={session.user.user_metadata?.full_name} studySessions={studySessions} tasks={tasks} />} />
                 <Route path={getPathFromView(View.Office)} element={<VirtualOffice studySessions={studySessions} userName={session.user.user_metadata?.full_name} />} />
                 <Route path={getPathFromView(View.Sebo)} element={<Sebo userId={session.user.id} userName={session.user.user_metadata?.full_name} />} />

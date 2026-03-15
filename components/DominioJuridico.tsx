@@ -1,24 +1,32 @@
-import React, { useMemo } from 'react';
-import { Landmark, Scale, Gavel, Briefcase, Star, CheckCircle2, BookOpen, AlertCircle, Trophy, Target, Zap, Shield, Award, Map as MapIcon, Compass, Loader2 } from 'lucide-react';
-import { Subject, StudySession } from '../types';
+import React, { useMemo, useState, useEffect } from 'react';
+import { Landmark, Scale, Gavel, Briefcase, Star, CheckCircle2, BookOpen, AlertCircle, Trophy, Target, Zap, Shield, Award, Map as MapIcon, Compass, Loader2, Plus, X, Edit2, Trash2, Check, ChevronRight, Search, Heart, Globe, Hammer, PenTool, Microscope, Music, Camera, Coffee, Car, Plane, Home } from 'lucide-react';
+import { Subject, StudySession, LegalFrontier } from '../types';
 import { 
   Radar, RadarChart, PolarGrid, 
   PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer,
   Tooltip
 } from 'recharts';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
+import { db } from '../services/offlineService';
+import { toast } from 'sonner';
 
 interface DominioJuridicoProps {
   subjects: Subject[];
   studySessions: StudySession[];
+  userId: string;
 }
 
-const GRANDES_AREAS = [
-  { id: 'civil', name: 'Direito Civil & Processual', icon: Scale, keywords: ['civil', 'cpc', 'processo civil', 'família', 'sucessões', 'consumidor', 'contratos'], color: '#005594', bg: 'bg-cyan-50 dark:bg-cyan-900/20', border: 'border-cyan-200 dark:border-cyan-800', accent: 'text-cyan-600' },
-  { id: 'penal', name: 'Ciências Penais', icon: Gavel, keywords: ['penal', 'cpp', 'processo penal', 'criminal', 'inquérito'], color: '#8B0000', bg: 'bg-red-50 dark:bg-red-900/20', border: 'border-red-200 dark:border-red-800', accent: 'text-red-600' },
-  { id: 'publico', name: 'Direito Público', icon: Landmark, keywords: ['const', 'adm', 'tribut', 'public', 'estado', 'eleitoral'], color: '#D4AF37', bg: 'bg-yellow-50 dark:bg-yellow-900/20', border: 'border-yellow-200 dark:border-yellow-800', accent: 'text-yellow-600' },
-  { id: 'corporativo', name: 'Direito Corporativo', icon: Briefcase, keywords: ['emp', 'trab', 'econ', 'comercial', 'societário', 'clt'], color: '#059669', bg: 'bg-emerald-50 dark:bg-emerald-900/20', border: 'border-emerald-200 dark:border-emerald-800', accent: 'text-emerald-600' },
+const DEFAULT_FRONTIERS = [
+  { id: 'civil', name: 'Direito Civil & Processual', icon: 'Scale', keywords: ['civil', 'cpc', 'processo civil', 'família', 'sucessões', 'consumidor', 'contratos'], color: '#005594', bg: 'bg-cyan-50 dark:bg-cyan-900/20', border: 'border-cyan-200 dark:border-cyan-800', accent: 'text-cyan-600' },
+  { id: 'penal', name: 'Ciências Penais', icon: 'Gavel', keywords: ['penal', 'cpp', 'processo penal', 'criminal', 'inquérito'], color: '#8B0000', bg: 'bg-red-50 dark:bg-red-900/20', border: 'border-red-200 dark:border-red-800', accent: 'text-red-600' },
+  { id: 'publico', name: 'Direito Público', icon: 'Landmark', keywords: ['const', 'adm', 'tribut', 'public', 'estado', 'eleitoral'], color: '#D4AF37', bg: 'bg-yellow-50 dark:bg-yellow-900/20', border: 'border-yellow-200 dark:border-yellow-800', accent: 'text-yellow-600' },
+  { id: 'corporativo', name: 'Direito Corporativo', icon: 'Briefcase', keywords: ['emp', 'trab', 'econ', 'comercial', 'societário', 'clt'], color: '#059669', bg: 'bg-emerald-50 dark:bg-emerald-900/20', border: 'border-emerald-200 dark:border-emerald-800', accent: 'text-emerald-600' },
 ];
+
+const ICON_MAP: Record<string, any> = {
+  Landmark, Scale, Gavel, Briefcase, Shield, Award, Compass, Zap, Target, Trophy, BookOpen, Star,
+  Heart, Globe, Hammer, PenTool, Microscope, Music, Camera, Coffee, Car, Plane, Home
+};
 
 const TIERS = {
   dominated: { label: 'Dominado', hours: 25, icon: Star, color: 'text-yellow-500', bg: 'bg-yellow-500/10' },
@@ -27,15 +35,56 @@ const TIERS = {
   locked: { label: 'Não Iniciado', hours: 0, icon: null, color: 'text-slate-400', bg: 'bg-slate-100' },
 };
 
-const ARCHETYPES = [
-  { name: 'O Civilista', description: 'Mestre das relações privadas e do patrimônio.', condition: (stats: any) => stats.civil > 50, icon: Shield, color: 'from-blue-600 to-cyan-500' },
-  { name: 'O Criminalista', description: 'Defensor ferrenho das garantias fundamentais.', condition: (stats: any) => stats.penal > 50, icon: Gavel, color: 'from-red-700 to-orange-600' },
-  { name: 'O Publicista', description: 'Guardião da Constituição e do interesse público.', condition: (stats: any) => stats.publico > 50, icon: Landmark, color: 'from-yellow-600 to-amber-500' },
-  { name: 'O Corporativista', description: 'Estrategista do mercado e das relações de trabalho.', condition: (stats: any) => stats.corporativo > 50, icon: Briefcase, color: 'from-emerald-600 to-teal-500' },
-  { name: 'O Jurista Polímata', description: 'Equilíbrio perfeito entre todas as artes jurídicas.', condition: (stats: any) => true, icon: Scale, color: 'from-slate-800 to-slate-600' },
+const MASTERY_LEVELS = [
+  { label: 'Iniciante', min: 0, color: 'text-slate-400' },
+  { label: 'Explorador', min: 5, color: 'text-blue-500' },
+  { label: 'Colonizador', min: 15, color: 'text-emerald-500' },
+  { label: 'Mestre', min: 30, color: 'text-amber-500' },
+  { label: 'Lenda', min: 50, color: 'text-sanfran-rubi' },
 ];
 
-const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessions }) => {
+const ARCHETYPES = [
+  { name: 'O Civilista', description: 'Mestre das relações privadas e do patrimônio.', icon: Shield, color: 'from-blue-600 to-cyan-500', keywords: ['civil', 'processo civil'] },
+  { name: 'O Criminalista', description: 'Defensor ferrenho das garantias fundamentais.', icon: Gavel, color: 'from-red-700 to-orange-600', keywords: ['penal', 'processo penal'] },
+  { name: 'O Publicista', description: 'Guardião da Constituição e do interesse público.', icon: Landmark, color: 'from-yellow-600 to-amber-500', keywords: ['público', 'administrativo', 'constitucional'] },
+  { name: 'O Corporativista', description: 'Estrategista do mercado e das relações de trabalho.', icon: Briefcase, color: 'from-emerald-600 to-teal-500', keywords: ['corporativo', 'empresarial', 'trabalho'] },
+  { name: 'O Humanista', description: 'Focado nos direitos humanos e justiça social.', icon: Heart, color: 'from-pink-600 to-rose-500', keywords: ['humanos', 'social'] },
+  { name: 'O Internacionalista', description: 'Navegador das ordens jurídicas globais.', icon: Globe, color: 'from-indigo-600 to-blue-500', keywords: ['internacional'] },
+  { name: 'O Jurista Polímata', description: 'Equilíbrio perfeito entre todas as artes jurídicas.', icon: Scale, color: 'from-slate-800 to-slate-600', keywords: [] },
+];
+
+const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessions, userId }) => {
+  const [customFrontiers, setCustomFrontiers] = useState<LegalFrontier[]>([]);
+  const [isFrontierModalOpen, setIsFrontierModalOpen] = useState(false);
+  const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
+  const [editingFrontier, setEditingFrontier] = useState<Partial<LegalFrontier> | null>(null);
+  const [selectedFrontierForSubjects, setSelectedFrontierForSubjects] = useState<string | null>(null);
+  const [subjectSearchTerm, setSubjectSearchTerm] = useState('');
+
+  useEffect(() => {
+    const loadFrontiers = async () => {
+      const saved = await db.legal_frontiers.where('user_id').equals(userId).toArray();
+      if (saved.length === 0) {
+        // Initialize with defaults if empty
+        const initial = DEFAULT_FRONTIERS.map(f => ({
+          id: f.id,
+          user_id: userId,
+          name: f.name,
+          icon: f.icon,
+          color: f.color,
+          bg: f.bg,
+          border: f.border,
+          accent: f.accent,
+          subject_ids: []
+        }));
+        await db.legal_frontiers.bulkAdd(initial);
+        setCustomFrontiers(initial);
+      } else {
+        setCustomFrontiers(saved);
+      }
+    };
+    if (userId) loadFrontiers();
+  }, [userId]);
 
   const processedData = useMemo(() => {
     const hoursBySubject: Record<string, number> = {};
@@ -53,19 +102,39 @@ const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessio
       return 'locked';
     };
 
-    let totalTerritories = 0;
+    let totalTerritories = subjects.length;
     let conqueredTerritories = 0;
-    const areaHours: Record<string, number> = { civil: 0, penal: 0, publico: 0, corporativo: 0 };
+    const areaHours: Record<string, number> = {};
+    
+    // Initialize area hours for all frontiers
+    customFrontiers.forEach(f => areaHours[f.id] = 0);
 
-    const groupedData = GRANDES_AREAS.map(area => {
+    const groupedData = customFrontiers.map(frontier => {
+      // Find subjects manually assigned or matching keywords (if default)
+      const defaultInfo = DEFAULT_FRONTIERS.find(d => d.id === frontier.id);
+      const keywords = defaultInfo?.keywords || [];
+
       const areaSubjects = subjects
-        .filter(sub => area.keywords.some(k => sub.name.toLowerCase().includes(k)))
+        .filter(sub => {
+          // Priority 1: Manual assignment
+          if (frontier.subject_ids.includes(sub.id)) return true;
+          
+          // Priority 2: Keyword match (only for default frontiers and if not assigned elsewhere)
+          if (keywords.length > 0) {
+            const matchesKeyword = keywords.some(k => sub.name.toLowerCase().includes(k));
+            if (matchesKeyword) {
+              // Check if this subject is manually assigned to ANOTHER frontier
+              const isAssignedElsewhere = customFrontiers.some(f => f.id !== frontier.id && f.subject_ids.includes(sub.id));
+              return !isAssignedElsewhere;
+            }
+          }
+          return false;
+        })
         .map(sub => {
           const hours = hoursBySubject[sub.id] || 0;
           const status = getStatus(hours);
-          totalTerritories++;
           if (status !== 'locked') conqueredTerritories++;
-          areaHours[area.id] += hours;
+          areaHours[frontier.id] += hours;
           return {
             ...sub,
             hours: hours,
@@ -75,9 +144,10 @@ const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessio
         .sort((a, b) => b.hours - a.hours);
 
       return {
-        ...area,
+        ...frontier,
         subjects: areaSubjects,
-        totalHours: areaHours[area.id],
+        totalHours: areaHours[frontier.id],
+        Icon: ICON_MAP[frontier.icon] || Scale
       };
     });
     
@@ -86,18 +156,122 @@ const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessio
     
     const areaPercentages = totalHoursAll > 0 
       ? Object.fromEntries(Object.entries(areaHours).map(([k, v]) => [k, (v / totalHoursAll) * 100]))
-      : { civil: 0, penal: 0, publico: 0, corporativo: 0 };
+      : {};
 
-    const archetype = ARCHETYPES.find(a => a.condition(areaPercentages)) || ARCHETYPES[ARCHETYPES.length - 1];
-
-    const radarData = GRANDES_AREAS.map(area => ({
-      subject: area.name.split(' ')[1] || area.name,
-      fullMark: 100,
-      A: Math.min(100, (areaHours[area.id] / 20) * 100), // Normalizado para 20h como "full"
+    // Identify unassigned subjects
+    const assignedSubjectIds = new Set<string>();
+    customFrontiers.forEach(f => f.subject_ids.forEach(id => assignedSubjectIds.add(id)));
+    
+    // Also consider default keyword matches as "assigned" for the purpose of this list
+    const unassignedSubjects = subjects.filter(sub => {
+      if (assignedSubjectIds.has(sub.id)) return false;
+      
+      // Check if it matches any default frontier keywords
+      const matchesAnyDefault = DEFAULT_FRONTIERS.some(df => 
+        df.keywords.some(k => sub.name.toLowerCase().includes(k))
+      );
+      
+      return !matchesAnyDefault;
+    }).map(sub => ({
+      ...sub,
+      hours: hoursBySubject[sub.id] || 0,
+      status: getStatus(hoursBySubject[sub.id] || 0)
     }));
 
-    return { groupedData, overallProgress, archetype, radarData, totalHoursAll, conqueredTerritories, totalTerritories };
-  }, [subjects, studySessions]);
+    // Find top frontier by hours
+    const topFrontierId = Object.entries(areaHours).sort((a, b) => b[1] - a[1])[0]?.[0];
+    const topFrontier = customFrontiers.find(f => f.id === topFrontierId);
+
+    const archetype = ARCHETYPES.find(a => {
+      if (!topFrontier || totalHoursAll === 0) return false;
+      
+      // If top frontier is a default one, match by keywords
+      const defaultInfo = DEFAULT_FRONTIERS.find(d => d.id === topFrontier.id);
+      if (defaultInfo) {
+        const areaId = a.name.toLowerCase().includes('civil') ? 'civil' : 
+                       a.name.toLowerCase().includes('criminal') ? 'penal' :
+                       a.name.toLowerCase().includes('public') ? 'publico' :
+                       a.name.toLowerCase().includes('corporat') ? 'corporativo' : null;
+        return areaId === topFrontier.id && areaPercentages[areaId] > 40;
+      }
+
+      // For custom frontiers, try to match by name keywords
+      return a.keywords.some(k => topFrontier.name.toLowerCase().includes(k)) && areaPercentages[topFrontier.id] > 40;
+    }) || ARCHETYPES[ARCHETYPES.length - 1];
+
+    const radarData = groupedData.slice(0, 6).map(area => ({
+      subject: area.name.length > 15 ? area.name.substring(0, 12) + '...' : area.name,
+      fullMark: 100,
+      A: Math.min(100, (areaHours[area.id] / 20) * 100),
+    }));
+
+    return { groupedData, overallProgress, archetype, radarData, totalHoursAll, conqueredTerritories, totalTerritories, unassignedSubjects };
+  }, [subjects, studySessions, customFrontiers]);
+
+  const handleSaveFrontier = async () => {
+    if (!editingFrontier?.name) return;
+    
+    const newFrontier: LegalFrontier = {
+      id: editingFrontier.id || Math.random().toString(36).substr(2, 9),
+      user_id: userId,
+      name: editingFrontier.name,
+      icon: editingFrontier.icon || 'Scale',
+      color: editingFrontier.color || '#6366f1',
+      bg: editingFrontier.bg || 'bg-indigo-50 dark:bg-indigo-900/20',
+      border: editingFrontier.border || 'border-indigo-200 dark:border-indigo-800',
+      accent: editingFrontier.accent || 'text-indigo-600',
+      subject_ids: editingFrontier.subject_ids || []
+    };
+
+    if (editingFrontier.id) {
+      await db.legal_frontiers.put(newFrontier);
+      setCustomFrontiers(prev => prev.map(f => f.id === newFrontier.id ? newFrontier : f));
+    } else {
+      await db.legal_frontiers.add(newFrontier);
+      setCustomFrontiers(prev => [...prev, newFrontier]);
+    }
+
+    setIsFrontierModalOpen(false);
+    setEditingFrontier(null);
+    toast.success('Fronteira salva com sucesso!');
+  };
+
+  const handleDeleteFrontier = async (id: string) => {
+    if (DEFAULT_FRONTIERS.some(d => d.id === id)) {
+      toast.error('Fronteiras padrão não podem ser excluídas.');
+      return;
+    }
+    if (!confirm('Deseja realmente excluir esta fronteira?')) return;
+    
+    await db.legal_frontiers.delete(id);
+    setCustomFrontiers(prev => prev.filter(f => f.id !== id));
+    toast.success('Fronteira removida.');
+  };
+
+  const toggleSubjectInFrontier = async (subjectId: string, frontierId: string) => {
+    const frontier = customFrontiers.find(f => f.id === frontierId);
+    if (!frontier) return;
+
+    let newSubjectIds = [...frontier.subject_ids];
+    if (newSubjectIds.includes(subjectId)) {
+      newSubjectIds = newSubjectIds.filter(id => id !== subjectId);
+    } else {
+      // Remove from other frontiers first to ensure unique assignment
+      const updatedFrontiers = await Promise.all(customFrontiers.map(async f => {
+        if (f.id !== frontierId && f.subject_ids.includes(subjectId)) {
+          const filtered = f.subject_ids.filter(id => id !== subjectId);
+          await db.legal_frontiers.update(f.id, { subject_ids: filtered } as any);
+          return { ...f, subject_ids: filtered };
+        }
+        return f;
+      }));
+      setCustomFrontiers(updatedFrontiers);
+      newSubjectIds.push(subjectId);
+    }
+
+    await db.legal_frontiers.update(frontierId, { subject_ids: newSubjectIds } as any);
+    setCustomFrontiers(prev => prev.map(f => f.id === frontierId ? { ...f, subject_ids: newSubjectIds } : f));
+  };
 
   return (
     <div className="space-y-12 animate-in fade-in duration-700 pb-20 px-2 md:px-0">
@@ -115,7 +289,20 @@ const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessio
            <p className="text-slate-500 font-bold italic text-xl max-w-2xl">Sua jornada intelectual mapeada em tempo real. Cada hora de estudo expande suas fronteiras.</p>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
+          <button
+            onClick={() => {
+              setEditingFrontier({ name: '', icon: 'Scale', color: '#6366f1', bg: 'bg-indigo-50 dark:bg-indigo-900/20', border: 'border-indigo-200 dark:border-indigo-800', accent: 'text-indigo-600', subject_ids: [] });
+              setIsFrontierModalOpen(true);
+            }}
+            className="p-6 rounded-[2.5rem] bg-white dark:bg-slate-800 border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-sanfran-rubi hover:text-sanfran-rubi transition-all flex items-center gap-3 group"
+          >
+            <div className="p-3 bg-slate-100 dark:bg-slate-700 rounded-2xl group-hover:bg-sanfran-rubi/10 transition-colors">
+              <Plus size={24} />
+            </div>
+            <span className="text-sm font-black uppercase tracking-tight">Nova Fronteira</span>
+          </button>
+
           <motion.div 
             whileHover={{ scale: 1.05 }}
             className={`p-6 rounded-[2.5rem] bg-gradient-to-br ${processedData.archetype.color} text-white shadow-2xl shadow-slate-500/20 flex items-center gap-4 border border-white/20`}
@@ -227,6 +414,7 @@ const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessio
          {processedData.groupedData.map(area => (
            <motion.div 
              key={area.id} 
+             layout
              whileHover={{ y: -5 }}
              className={`p-10 rounded-[3.5rem] border-2 shadow-2xl transition-all duration-500 ${area.bg} ${area.border} relative overflow-hidden group`}
            >
@@ -235,15 +423,48 @@ const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessio
               <div className="flex items-center justify-between mb-10 relative z-10">
                 <div className="flex items-center gap-6">
                    <div className={`p-5 rounded-3xl bg-white dark:bg-black/20 shadow-xl ${area.accent}`}>
-                      <area.icon size={32} />
+                      <area.Icon size={32} />
                    </div>
                    <div>
                       <h3 className={`text-3xl font-black uppercase tracking-tighter ${area.accent}`}>{area.name}</h3>
-                      <p className="text-[10px] font-black uppercase tracking-widest opacity-50">{Math.round(area.totalHours)} horas totais</p>
+                      <div className="flex items-center gap-3">
+                        <p className="text-[10px] font-black uppercase tracking-widest opacity-50">{Math.round(area.totalHours)} horas totais</p>
+                        <span className="w-1 h-1 bg-current opacity-20 rounded-full" />
+                        <p className="text-[10px] font-black uppercase tracking-widest opacity-50">{area.subjects.length} disciplinas</p>
+                        <span className="w-1 h-1 bg-current opacity-20 rounded-full" />
+                        <p className={`text-[10px] font-black uppercase tracking-widest ${MASTERY_LEVELS.slice().reverse().find(m => area.totalHours >= m.min)?.color || 'text-slate-400'}`}>
+                          Nível: {MASTERY_LEVELS.slice().reverse().find(m => area.totalHours >= m.min)?.label}
+                        </p>
+                      </div>
                    </div>
                 </div>
-                <div className="p-3 bg-white/50 dark:bg-black/20 rounded-2xl border border-white/50 dark:border-white/5">
-                  <Zap size={20} className={area.accent} />
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => {
+                      setSelectedFrontierForSubjects(area.id);
+                      setIsSubjectModalOpen(true);
+                    }}
+                    className="p-3 bg-white/50 dark:bg-black/20 rounded-2xl border border-white/50 dark:border-white/5 hover:bg-white transition-colors"
+                  >
+                    <Plus size={20} className={area.accent} />
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setEditingFrontier(area);
+                      setIsFrontierModalOpen(true);
+                    }}
+                    className="p-3 bg-white/50 dark:bg-black/20 rounded-2xl border border-white/50 dark:border-white/5 hover:bg-white transition-colors"
+                  >
+                    <Edit2 size={20} className={area.accent} />
+                  </button>
+                  {!DEFAULT_FRONTIERS.some(d => d.id === area.id) && (
+                    <button 
+                      onClick={() => handleDeleteFrontier(area.id)}
+                      className="p-3 bg-white/50 dark:bg-black/20 rounded-2xl border border-white/50 dark:border-white/5 hover:bg-red-500 hover:text-white transition-colors"
+                    >
+                      <Trash2 size={20} />
+                    </button>
+                  )}
                 </div>
               </div>
               
@@ -264,6 +485,7 @@ const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessio
                     return (
                        <motion.div 
                          key={sub.id} 
+                         layout
                          whileHover={{ scale: 1.02 }}
                          className={`group relative ${bgClass} p-5 rounded-3xl border-2 ${borderColor} shadow-lg transition-all ${opacity} cursor-default`}
                        >
@@ -304,6 +526,212 @@ const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessio
            </motion.div>
          ))}
       </div>
+
+      {/* Unassigned Subjects Section */}
+      {processedData.unassignedSubjects.length > 0 && (
+        <div className="mt-20 space-y-8">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-slate-100 dark:bg-white/5 rounded-2xl">
+              <Compass className="w-6 h-6 text-slate-400" />
+            </div>
+            <div>
+              <h3 className="text-2xl font-black uppercase tracking-tight text-slate-900 dark:text-white">Terra Incognita</h3>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Disciplinas aguardando colonização em uma fronteira</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {processedData.unassignedSubjects.map(sub => (
+              <div 
+                key={sub.id}
+                className="p-4 bg-white dark:bg-slate-900/50 border-2 border-dashed border-slate-200 dark:border-white/5 rounded-3xl flex items-center justify-between group hover:border-slate-400 transition-all"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: sub.color }} />
+                  <p className="text-xs font-black uppercase text-slate-600 dark:text-slate-400 truncate max-w-[120px]">{sub.name}</p>
+                </div>
+                <button 
+                  onClick={() => {
+                    // Open modal for first frontier if none selected
+                    setSelectedFrontierForSubjects(customFrontiers[0]?.id || null);
+                    setIsSubjectModalOpen(true);
+                  }}
+                  className="p-2 bg-slate-100 dark:bg-white/5 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-sanfran-rubi hover:text-white"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: FRONTIER EDITOR */}
+      <AnimatePresence>
+        {isFrontierModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsFrontierModalOpen(false)}
+              className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10"
+            >
+              <div className="p-8 space-y-8">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-2xl font-black uppercase tracking-tight text-slate-900 dark:text-white">Configurar Fronteira</h3>
+                  <button onClick={() => setIsFrontierModalOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded-full transition-colors">
+                    <X size={24} />
+                  </button>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nome da Fronteira</label>
+                    <input 
+                      type="text" 
+                      value={editingFrontier?.name || ''}
+                      onChange={(e) => setEditingFrontier(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Ex: Direito Digital"
+                      className="w-full bg-slate-50 dark:bg-white/5 border-2 border-slate-100 dark:border-white/5 rounded-2xl px-6 py-4 font-bold text-slate-900 dark:text-white focus:border-sanfran-rubi outline-none transition-all"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Ícone Representativo</label>
+                    <div className="grid grid-cols-6 gap-2">
+                      {Object.keys(ICON_MAP).map(iconName => {
+                        const Icon = ICON_MAP[iconName];
+                        return (
+                          <button
+                            key={iconName}
+                            onClick={() => setEditingFrontier(prev => ({ ...prev, icon: iconName }))}
+                            className={`p-3 rounded-xl border-2 transition-all ${editingFrontier?.icon === iconName ? 'border-sanfran-rubi bg-sanfran-rubi/10 text-sanfran-rubi' : 'border-slate-100 dark:border-white/5 hover:border-slate-300'}`}
+                          >
+                            <Icon size={20} />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Cor de Destaque</label>
+                    <div className="flex flex-wrap gap-3">
+                      {['#005594', '#8B0000', '#D4AF37', '#059669', '#6366f1', '#ec4899', '#f97316', '#14b8a6', '#8b5cf6', '#f43f5e', '#10b981'].map(color => (
+                        <button
+                          key={color}
+                          onClick={() => setEditingFrontier(prev => ({ ...prev, color }))}
+                          className={`w-10 h-10 rounded-full border-4 transition-all ${editingFrontier?.color === color ? 'border-white ring-2 ring-sanfran-rubi' : 'border-transparent'}`}
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={handleSaveFrontier}
+                  className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-5 rounded-2xl font-black uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-xl"
+                >
+                  Salvar Fronteira
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL: SUBJECT ASSIGNMENT */}
+      <AnimatePresence>
+        {isSubjectModalOpen && selectedFrontierForSubjects && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsSubjectModalOpen(false)}
+              className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10 flex flex-col max-h-[80vh]"
+            >
+              <div className="p-8 border-b border-slate-100 dark:border-white/5">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h3 className="text-2xl font-black uppercase tracking-tight text-slate-900 dark:text-white">Colonizar Disciplinas</h3>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Selecione as matérias desta fronteira</p>
+                  </div>
+                  <button onClick={() => setIsSubjectModalOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded-full transition-colors">
+                    <X size={24} />
+                  </button>
+                </div>
+                
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input 
+                    type="text" 
+                    placeholder="Buscar disciplina..."
+                    value={subjectSearchTerm}
+                    onChange={(e) => setSubjectSearchTerm(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-white/5 border-2 border-slate-100 dark:border-white/5 rounded-2xl pl-12 pr-6 py-4 font-bold text-slate-900 dark:text-white outline-none focus:border-sanfran-rubi transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-8 space-y-3">
+                {subjects
+                  .filter(s => s.name.toLowerCase().includes(subjectSearchTerm.toLowerCase()))
+                  .map(sub => {
+                  const currentFrontier = customFrontiers.find(f => f.id === selectedFrontierForSubjects);
+                  const isSelected = currentFrontier?.subject_ids.includes(sub.id);
+                  const assignedTo = customFrontiers.find(f => f.id !== selectedFrontierForSubjects && f.subject_ids.includes(sub.id));
+
+                  return (
+                    <button
+                      key={sub.id}
+                      onClick={() => toggleSubjectInFrontier(sub.id, selectedFrontierForSubjects)}
+                      className={`w-full flex items-center justify-between p-5 rounded-2xl border-2 transition-all ${isSelected ? 'border-sanfran-rubi bg-sanfran-rubi/5' : 'border-slate-100 dark:border-white/5 hover:border-slate-200'}`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-4 h-4 rounded-full" style={{ backgroundColor: sub.color }} />
+                        <div className="text-left">
+                          <p className="font-black text-slate-900 dark:text-white uppercase text-sm">{sub.name}</p>
+                          {assignedTo && (
+                            <p className="text-[9px] font-bold text-amber-600 uppercase">Atribuída a: {assignedTo.name}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${isSelected ? 'bg-sanfran-rubi text-white' : 'bg-slate-100 dark:bg-white/5 text-slate-300'}`}>
+                        {isSelected ? <Check size={16} /> : <Plus size={16} />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="p-8 bg-slate-50 dark:bg-white/5 border-t border-slate-100 dark:border-white/5">
+                <button 
+                  onClick={() => setIsSubjectModalOpen(false)}
+                  className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-5 rounded-2xl font-black uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-xl"
+                >
+                  Concluir Atribuição
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 };

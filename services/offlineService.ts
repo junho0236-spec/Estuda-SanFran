@@ -1,9 +1,9 @@
 import Dexie, { Table } from 'dexie';
-import { Flashcard, Task, StudySession, Note, SubjectFile, Folder, Subject, Board, UserProfile } from '../types';
+import { Flashcard, Task, StudySession, Note, SubjectFile, Folder, Subject, Board, UserProfile, LegalFrontier } from '../types';
 
 export interface OfflineSyncQueue {
   id?: number;
-  table: 'flashcards' | 'tasks' | 'study_sessions' | 'notes' | 'subject_files' | 'folders' | 'subjects' | 'boards' | 'user_profile';
+  table: 'flashcards' | 'tasks' | 'study_sessions' | 'notes' | 'subject_files' | 'folders' | 'subjects' | 'boards' | 'user_profile' | 'legal_frontiers';
   action: 'insert' | 'update' | 'delete';
   data: any;
   timestamp: string;
@@ -19,11 +19,12 @@ export class SanFranOfflineDB extends Dexie {
   subject_files!: Table<SubjectFile>;
   boards!: Table<Board>;
   user_profile!: Table<UserProfile & { id: string }>;
+  legal_frontiers!: Table<LegalFrontier>;
   syncQueue!: Table<OfflineSyncQueue>;
 
   constructor() {
     super('SanFranOfflineDB');
-    this.version(6).stores({
+    this.version(7).stores({
       flashcards: 'id, subjectId, folderId',
       folders: 'id, parentId',
       subjects: 'id',
@@ -33,6 +34,7 @@ export class SanFranOfflineDB extends Dexie {
       subject_files: 'id, subject_id, user_id, type',
       boards: 'id, userId',
       user_profile: 'id',
+      legal_frontiers: 'id, user_id',
       syncQueue: '++id, table, action, timestamp'
     });
   }
