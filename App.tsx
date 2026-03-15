@@ -989,12 +989,12 @@ const App: React.FC = () => {
 
       {isSidebarOpen && !isExtremeFocus && (
         <div 
-          className="fixed inset-0 bg-black/50 z-30 lg:hidden backdrop-blur-sm"
+          className="fixed inset-0 bg-black/50 z-30 md:hidden backdrop-blur-sm"
           onClick={closeSidebar}
         />
       )}
 
-      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${isExtremeFocus ? '-translate-x-full lg:-translate-x-full lg:w-0' : `lg:relative lg:translate-x-0 ${isSidebarMinimized ? 'lg:w-20' : 'lg:w-72'}`} fixed inset-y-0 left-0 z-40 bg-white dark:bg-[#0d0303] border-r border-slate-200 dark:border-sanfran-rubi/30 transition-all duration-500 flex flex-col shadow-2xl lg:shadow-none overflow-hidden`}>
+      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${isExtremeFocus ? '-translate-x-full md:-translate-x-full md:w-0' : `md:relative md:translate-x-0 ${isSidebarMinimized ? 'md:w-20' : 'md:w-72'}`} fixed inset-y-0 left-0 z-40 bg-white dark:bg-[#0d0303] border-r border-slate-200 dark:border-sanfran-rubi/30 transition-all duration-500 flex flex-col shadow-2xl md:shadow-none overflow-hidden`}>
         <div className={`p-6 border-b border-slate-100 dark:border-sanfran-rubi/20 flex flex-col ${isSidebarMinimized ? 'items-center px-2' : ''}`}>
           <div className="flex items-center justify-between mb-4 w-full">
             <Link
@@ -1025,7 +1025,7 @@ const App: React.FC = () => {
               </div>
             </Link>
             {!isSidebarMinimized && (
-              <button onClick={closeSidebar} className="lg:hidden p-2 text-slate-400 hover:text-sanfran-rubi transition-colors self-start">
+              <button onClick={closeSidebar} className="md:hidden p-2 text-slate-400 hover:text-sanfran-rubi transition-colors self-start">
                 <X className="w-6 h-6" />
               </button>
             )}
@@ -1109,7 +1109,7 @@ const App: React.FC = () => {
         <div className={`p-4 space-y-3 bg-slate-50 dark:bg-black/20 border-t border-slate-100 dark:border-sanfran-rubi/10 ${isSidebarMinimized ? 'px-2 items-center flex flex-col' : ''}`}>
           <button 
             onClick={() => setIsSidebarMinimized(!isSidebarMinimized)} 
-            className={`hidden lg:flex items-center justify-center bg-white dark:bg-sanfran-rubiDark border border-slate-200 dark:border-sanfran-rubi/30 text-slate-900 dark:text-white shadow-sm hover:shadow-md transition-all rounded-xl ${isSidebarMinimized ? 'w-10 h-10' : 'w-full py-2 gap-2 text-[9px] font-black uppercase tracking-widest'}`}
+            className={`hidden md:flex items-center justify-center bg-white dark:bg-sanfran-rubiDark border border-slate-200 dark:border-sanfran-rubi/30 text-slate-900 dark:text-white shadow-sm hover:shadow-md transition-all rounded-xl ${isSidebarMinimized ? 'w-10 h-10' : 'w-full py-2 gap-2 text-[9px] font-black uppercase tracking-widest'}`}
             title={isSidebarMinimized ? "Expandir Barra Lateral" : "Minimizar Barra Lateral"}
           >
             {isSidebarMinimized ? <ChevronRight className="w-4 h-4" /> : <><ChevronLeft className="w-4 h-4" /> Minimizar</>}
@@ -1136,7 +1136,7 @@ const App: React.FC = () => {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0 relative">
-        <header className={`${isExtremeFocus ? 'hidden' : 'lg:hidden'} bg-white dark:bg-[#0d0303] border-b border-slate-200 dark:border-sanfran-rubi/30 p-4 flex items-center justify-between sticky top-0 z-20`}>
+        <header className={`${isExtremeFocus ? 'hidden' : 'md:hidden'} bg-white dark:bg-[#0d0303] border-b border-slate-200 dark:border-sanfran-rubi/30 p-4 flex items-center justify-between sticky top-0 z-20`}>
           <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-slate-100 dark:bg-sanfran-rubi/10 rounded-xl text-slate-600 dark:text-white">
             <Menu className="w-6 h-6" />
           </button>
