@@ -5,8 +5,9 @@ import {
   AlignCenter, AlignRight, AlignJustify, List, ListOrdered, IndentDecrease, 
   IndentIncrease, Eraser, ChevronDown, Check, Image, Star, FileText, 
   Share2, Clock, ListTodo, LineChart, Plus, Folder, Download, Edit3, Trash2, AlertCircle,
-  MessageSquare, Link as LinkIcon
+  MessageSquare, Link as LinkIcon, Search, Replace
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface DocsToolbarProps {
   quillRef: React.MutableRefObject<any>;
@@ -44,6 +45,9 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
   const [isExpanded, setIsExpanded] = useState(true);
   const [zoom, setZoom] = useState('100%');
   const [formatPainter, setFormatPainter] = useState<any>(null);
+  const [showFindReplace, setShowFindReplace] = useState(false);
+  const [findText, setFindText] = useState('');
+  const [replaceText, setReplaceText] = useState('');
 
   const handleFormat = (format: string, value: any = true) => {
     if (quillRef.current) {
@@ -53,6 +57,102 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
   const handleUndo = () => quillRef.current?.history.undo();
   const handleRedo = () => quillRef.current?.history.redo();
+
+  const handleSelectAll = () => {
+    if (quillRef.current) {
+      quillRef.current.setSelection(0, quillRef.current.getLength());
+    }
+  };
+
+  const handleCut = () => {
+    document.execCommand('cut');
+  };
+
+  const handleCopy = () => {
+    document.execCommand('copy');
+  };
+
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (quillRef.current) {
+        const range = quillRef.current.getSelection();
+        if (range) {
+          quillRef.current.insertText(range.index, text);
+        } else {
+          quillRef.current.insertText(quillRef.current.getLength(), text);
+        }
+      }
+    } catch (err) {
+      toast.error('Por favor, use Ctrl+V para colar.');
+    }
+  };
+
+  const handlePastePlain = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (quillRef.current) {
+        const range = quillRef.current.getSelection();
+        if (range) {
+          quillRef.current.insertText(range.index, text, 'api');
+        } else {
+          quillRef.current.insertText(quillRef.current.getLength(), text, 'api');
+        }
+      }
+    } catch (err) {
+      toast.error('Por favor, use Ctrl+Shift+V para colar sem formatação.');
+    }
+  };
+
+  const handleFind = () => {
+    if (!findText || !quillRef.current) return;
+    const quill = quillRef.current;
+    const text = quill.getText();
+    const currentSelection = quill.getSelection();
+    const startIndex = currentSelection ? currentSelection.index + currentSelection.length : 0;
+    
+    let index = text.indexOf(findText, startIndex);
+    if (index === -1) {
+      // Wrap around
+      index = text.indexOf(findText);
+    }
+    
+    if (index !== -1) {
+      quill.setSelection(index, findText.length);
+      quill.root.focus();
+    } else {
+      toast.info('Texto não encontrado.');
+    }
+  };
+
+  const handleReplace = () => {
+    if (!findText || !quillRef.current) return;
+    const quill = quillRef.current;
+    const range = quill.getSelection();
+    if (range && quill.getText(range.index, range.length) === findText) {
+      quill.deleteText(range.index, range.length);
+      quill.insertText(range.index, replaceText);
+      handleFind();
+    } else {
+      handleFind();
+    }
+  };
+
+  const handleReplaceAll = () => {
+    if (!findText || !quillRef.current) return;
+    const quill = quillRef.current;
+    let text = quill.getText();
+    let index = text.indexOf(findText);
+    let count = 0;
+    while (index !== -1) {
+      quill.deleteText(index, findText.length);
+      quill.insertText(index, replaceText);
+      text = quill.getText();
+      index = text.indexOf(findText, index + replaceText.length);
+      count++;
+    }
+    toast.success(`${count} ocorrências substituídas.`);
+  };
 
   const handlePaintbrushClick = () => {
     if (quillRef.current) {
@@ -177,13 +277,17 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
               </div>
               <div className="relative group">
                 <button className="px-2 py-0.5 hover:bg-slate-100 dark:hover:bg-white/5 rounded transition-colors">Editar</button>
-                <div className="absolute left-0 top-full mt-1 hidden group-hover:block w-64 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[100]">
+                <div className="absolute left-0 top-full mt-1 hidden group-hover:block w-72 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[100]">
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex justify-between" onClick={handleUndo}><span>Desfazer</span><span className="text-slate-400">Ctrl+Z</span></button>
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex justify-between" onClick={handleRedo}><span>Refazer</span><span className="text-slate-400">Ctrl+Y</span></button>
                   <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex justify-between"><span>Recortar</span><span className="text-slate-400">Ctrl+X</span></button>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex justify-between"><span>Copiar</span><span className="text-slate-400">Ctrl+C</span></button>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex justify-between"><span>Colar</span><span className="text-slate-400">Ctrl+V</span></button>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex justify-between" onClick={handleCut}><span>Recortar</span><span className="text-slate-400">Ctrl+X</span></button>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex justify-between" onClick={handleCopy}><span>Copiar</span><span className="text-slate-400">Ctrl+C</span></button>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex justify-between" onClick={handlePaste}><span>Colar</span><span className="text-slate-400">Ctrl+V</span></button>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex justify-between" onClick={handlePastePlain}><span>Colar sem formatação</span><span className="text-slate-400">Ctrl+Shift+V</span></button>
+                  <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex justify-between" onClick={handleSelectAll}><span>Selecionar tudo</span><span className="text-slate-400">Ctrl+A</span></button>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex justify-between" onClick={() => setShowFindReplace(true)}><span>Localizar e substituir</span><span className="text-slate-400">Ctrl+H</span></button>
                 </div>
               </div>
               <div className="relative group">
@@ -197,7 +301,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                 <div className="absolute left-0 top-full mt-1 hidden group-hover:block w-64 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[100]">
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={onImageUpload}>Imagem</button>
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={() => {
-                    const url = prompt('Digite a URL do link:');
+                    const url = window.prompt('Digite a URL do link:');
                     if (url) handleFormat('link', url);
                   }}>Link</button>
                 </div>
@@ -238,7 +342,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         <button className="ql-undo p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors" title="Desfazer"><Undo2 size={18}/></button>
         <button className="ql-redo p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors" title="Refazer"><Redo2 size={18}/></button>
         <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors" onClick={onPrint} title="Imprimir"><Printer size={18}/></button>
-        <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors" title="Verificação ortográfica" onClick={() => alert('Verificação ortográfica concluída.')}><SpellCheck size={18}/></button>
+        <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors" title="Verificação ortográfica" onClick={() => toast.info('Verificação ortográfica concluída.')}><SpellCheck size={18}/></button>
         <button 
           className={`p-1.5 rounded transition-colors ${formatPainter ? 'bg-blue-100 text-blue-600' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
           title="Pintar formatação" 
@@ -360,6 +464,63 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
           <ChevronDown size={18} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
         </button>
       </div>
+
+      {/* Find and Replace Modal */}
+      {showFindReplace && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-[200] animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-white/10 p-6 w-[400px]">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Localizar e substituir</h3>
+              <button onClick={() => setShowFindReplace(false)} className="p-1 hover:bg-slate-100 dark:hover:bg-white/5 rounded transition-colors">
+                <Plus size={20} className="rotate-45 text-slate-500" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Localizar</label>
+                <input 
+                  type="text" 
+                  value={findText}
+                  onChange={(e) => setFindText(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  placeholder="Procurar por..."
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Substituir por</label>
+                <input 
+                  type="text" 
+                  value={replaceText}
+                  onChange={(e) => setReplaceText(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  placeholder="Novo texto..."
+                />
+              </div>
+              <div className="flex flex-wrap gap-2 pt-2">
+                <button 
+                  onClick={handleFind}
+                  className="flex-1 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  <Search size={16} /> Localizar
+                </button>
+                <button 
+                  onClick={handleReplace}
+                  className="flex-1 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  <Replace size={16} /> Substituir
+                </button>
+                <button 
+                  onClick={handleReplaceAll}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-medium transition-colors"
+                >
+                  Substituir tudo
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

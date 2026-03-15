@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { BookX, AlertTriangle, PenTool, TrendingUp, Plus, Trash2, Save, X, Filter } from 'lucide-react';
+import { BookX, AlertTriangle, PenTool, TrendingUp, Plus, Trash2, Save, X } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { ErrorLogEntry, ErrorReason } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as ReTooltip, BarChart, Bar, XAxis, YAxis } from 'recharts';
+import { toast } from 'sonner';
 
 interface ErrorLogProps {
   userId: string;
@@ -44,19 +45,26 @@ const ErrorLog: React.FC<ErrorLogProps> = ({ userId }) => {
 
   const fetchLogs = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('error_logs')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-    
-    if (data) setLogs(data);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase
+        .from('error_logs')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      if (data) setLogs(data);
+    } catch (err) {
+      console.error("Error fetching logs:", err);
+      toast.error("Erro ao carregar o caderno.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAddLog = async () => {
     if (!newTopic.trim() || !newJustification.trim()) {
-      alert("Preencha o tema e a justificativa.");
+      toast.error("Preencha o tema e a justificativa.");
       return;
     }
 
@@ -75,18 +83,23 @@ const ErrorLog: React.FC<ErrorLogProps> = ({ userId }) => {
       setShowForm(false);
       setNewTopic('');
       setNewJustification('');
+      toast.success("Erro registrado com sucesso!");
     } catch (e) {
       console.error(e);
-      alert("Erro ao salvar no caderno.");
+      toast.error("Erro ao salvar no caderno.");
     }
   };
 
   const handleDeleteLog = async (id: string) => {
-    if (!confirm("Arrancar esta folha do caderno?")) return;
+    if (!window.confirm("Arrancar esta folha do caderno?")) return;
     try {
       await supabase.from('error_logs').delete().eq('id', id);
       setLogs(logs.filter(l => l.id !== id));
-    } catch (e) { console.error(e); }
+      toast.success("Registro removido.");
+    } catch (e) { 
+      console.error(e);
+      toast.error("Erro ao remover registro.");
+    }
   };
 
   // Analytics Data
@@ -219,9 +232,6 @@ const ErrorLog: React.FC<ErrorLogProps> = ({ userId }) => {
                ) : (
                   logs.map(log => (
                      <div key={log.id} className="group bg-[#1a1a1a] border-l-4 border-slate-700 rounded-r-xl p-6 shadow-lg relative overflow-hidden transition-all hover:translate-x-1 hover:shadow-xl">
-                        {/* Paper Texture Overlay */}
-                        <div className="absolute inset-0 opacity-[0.03] bg-[url('https://www.transparenttextures.com/patterns/lined-paper.png')] pointer-events-none"></div>
-                        
                         <div className="flex justify-between items-start mb-4 relative z-10">
                            <div>
                               <div className="flex items-center gap-3 mb-1">
@@ -247,7 +257,7 @@ const ErrorLog: React.FC<ErrorLogProps> = ({ userId }) => {
 
                         <div className="mt-4 pt-4 border-t border-slate-800 flex justify-end">
                            <span className="text-[9px] font-black uppercase text-slate-600">
-                              {new Date(log.created_at).toLocaleDateString()}
+                              {log.created_at ? new Date(log.created_at).toLocaleDateString('pt-BR') : 'Sem data'}
                            </span>
                         </div>
                      </div>
