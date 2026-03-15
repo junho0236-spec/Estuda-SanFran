@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css'; // Import Quill styles
-import { ArrowLeft, Save, Loader2, FileText, BrainCircuit, Sparkles, Tag, Split, Download, Gavel, Plus, Trash2, Edit3, Pencil, Archive, Maximize2, Minimize2 } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, FileText, BrainCircuit, Sparkles, Tag, Split, Download, Gavel, Plus, Trash2, Edit3, Pencil, Archive, Maximize2, Minimize2, Star } from 'lucide-react';
 import { Note, Subject, SubjectFile } from '../types';
 import { dataService } from '../services/dataService';
 import { summarizeText } from '../services/geminiService';
@@ -11,7 +11,7 @@ import { SmartText } from './SmartVadeMecum';
 import * as pdfjsLib from 'pdfjs-dist';
 import { Folder, Upload, File, CheckCircle2, AlertCircle } from 'lucide-react';
 import HandwritingCanvas from './HandwritingCanvas';
-import { DocsHeader } from './DocsHeader';
+import DocsToolbar from './DocsToolbar';
 
 // Set up pdfjs worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
@@ -114,11 +114,18 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   }, []);
 
   const modules = useMemo(() => ({
+    history: { delay: 1000, maxStack: 500 },
     toolbar: {
       container: '#docs-toolbar',
       handlers: {
         'image': imageHandler,
-        'legal-citation': legalCitationHandler
+        'legal-citation': legalCitationHandler,
+        'undo': function() {
+          if (quillRef.current) quillRef.current.history.undo();
+        },
+        'redo': function() {
+          if (quillRef.current) quillRef.current.history.redo();
+        }
       }
     },
   }), [imageHandler, legalCitationHandler]);
@@ -597,111 +604,210 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     <div className={`flex flex-col animate-in slide-in-from-right-4 duration-500 transition-all duration-500 ${isMaximized ? 'is-maximized fixed inset-0 z-[100] bg-white dark:bg-[#0d0303] h-full' : 'w-full min-h-[calc(100vh-10rem)]'}`}>
       
       {/* Editorial Header */}
-      <header className={`relative border-b border-slate-100 dark:border-white/5 transition-all py-4 px-6 mb-6 bg-white dark:bg-white/2`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={handleBack} 
-              className="p-2.5 bg-white dark:bg-white/5 text-slate-500 hover:text-sanfran-rubi rounded-xl shadow-sm border border-slate-200 dark:border-white/10 transition-all hover:scale-105 active:scale-95 flex flex-col items-center gap-0.5"
-            >
-              <ArrowLeft size={18} />
-              <span className="text-[7px] font-black uppercase tracking-tighter">Voltar</span>
-            </button>
-            <div className="flex flex-col min-w-[120px]">
-              <span className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Disciplina</span>
-              <select
-                value={selectedSubjectId}
-                onChange={(e) => setSelectedSubjectId(e.target.value)}
-                className="bg-transparent border-none p-0 text-[11px] font-bold text-sanfran-rubi focus:ring-0 outline-none cursor-pointer hover:underline transition-all truncate max-w-[200px]"
+      <header className={`relative border-b border-slate-100 dark:border-white/5 transition-all ${isMaximized ? 'py-2 px-4 mb-0 bg-slate-50 dark:bg-white/5' : 'py-4 px-6 mb-6 bg-white dark:bg-white/2'}`}>
+        <div className={`flex flex-col lg:flex-row lg:items-center justify-between ${isMaximized ? 'gap-2' : 'gap-4'}`}>
+          <div className={`flex items-center gap-4 ${isMaximized ? 'scale-75 origin-left' : ''}`}>
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={handleBack} 
+                className="p-2.5 bg-white dark:bg-white/5 text-slate-500 hover:text-sanfran-rubi rounded-xl shadow-sm border border-slate-200 dark:border-white/10 transition-all hover:scale-105 active:scale-95 flex flex-col items-center gap-0.5"
               >
-                {subjects.map(sub => (
-                  <option key={sub.id} value={sub.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">{sub.name}</option>
-                ))}
-              </select>
+                <ArrowLeft size={18} />
+                <span className="text-[7px] font-black uppercase tracking-tighter">Voltar</span>
+              </button>
+              {!isMaximized && (
+                <div className="flex flex-col min-w-[120px]">
+                  <span className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Disciplina</span>
+                  <select
+                    value={selectedSubjectId}
+                    onChange={(e) => setSelectedSubjectId(e.target.value)}
+                    className="bg-transparent border-none p-0 text-[11px] font-bold text-sanfran-rubi focus:ring-0 outline-none cursor-pointer hover:underline transition-all truncate max-w-[200px]"
+                  >
+                    {subjects.map(sub => (
+                      <option key={sub.id} value={sub.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">{sub.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
-            {!selectedNote && (
-              <h1 className="font-black text-slate-200 dark:text-slate-800 tracking-tighter text-5xl md:text-6xl ml-4">Selecione um documento</h1>
-            )}
+
+            <div className="relative">
+              {selectedNote && !isRenaming ? (
+                <div className="flex items-center gap-3 group">
+                  <h1 className={`font-black text-slate-900 dark:text-white tracking-tighter leading-[1.1] transition-all ${isMaximized ? 'text-xl' : 'text-xl md:text-2xl'}`}>
+                    {selectedNote.title || 'Documento sem título'}
+                  </h1>
+                  <button 
+                    onClick={() => { setIsRenaming(true); setNewTitle(selectedNote.title); }} 
+                    className="p-2 bg-slate-100 dark:bg-white/5 text-slate-400 hover:text-blue-500 rounded-lg transition-all opacity-0 group-hover:opacity-100 flex flex-col items-center gap-0.5"
+                  >
+                    <Edit3 size={16} />
+                    <span className="text-[7px] font-black uppercase">Renomear</span>
+                  </button>
+                  <button 
+                    className="p-2 text-slate-300 hover:text-yellow-500 transition-colors"
+                    title="Marcar com estrela"
+                    onClick={() => alert('Documento marcado com estrela!')}
+                  >
+                    <Star size={20} />
+                  </button>
+                </div>
+              ) : isRenaming ? (
+                <div className="flex items-center gap-4">
+                  <input 
+                    type="text" 
+                    value={newTitle} 
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    className={`px-6 py-3 bg-white dark:bg-slate-800 border-4 border-blue-500/30 rounded-[2rem] outline-none font-black tracking-tighter w-full max-w-xl focus:border-blue-500 transition-all ${isMaximized ? 'text-lg' : 'text-4xl'}`}
+                    autoFocus
+                    onKeyDown={(e) => e.key === 'Enter' && renameNote()}
+                  />
+                  <div className="flex gap-2">
+                    <button onClick={renameNote} className="p-3 bg-blue-500 text-white rounded-2xl shadow-xl shadow-blue-500/20 hover:scale-105 transition-all flex flex-col items-center gap-1">
+                      <CheckCircle2 size={24} />
+                      <span className="text-[8px] font-black uppercase">Salvar</span>
+                    </button>
+                    <button onClick={() => setIsRenaming(false)} className="p-3 bg-slate-200 dark:bg-white/10 text-slate-500 rounded-2xl hover:scale-105 transition-all flex flex-col items-center gap-1">
+                      <ArrowLeft size={24} />
+                      <span className="text-[8px] font-black uppercase">Cancelar</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <h1 className={`font-black text-slate-200 dark:text-slate-800 tracking-tighter transition-all ${isMaximized ? 'text-xl' : 'text-5xl md:text-6xl'}`}>Selecione um documento</h1>
+              )}
+            </div>
           </div>
 
-          {selectedNote && (
-            <div className="flex items-center gap-3">
-              {/* AI Actions */}
-              <div className="flex items-center gap-2 bg-purple-50 dark:bg-purple-900/10 p-1.5 rounded-2xl border border-purple-100 dark:border-purple-900/30">
-                <button 
-                  onClick={handleSummarize} 
-                  disabled={isSummarizing}
-                  className="px-4 py-2 bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-sm hover:shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
-                >
-                  {isSummarizing ? <Loader2 size={14} className="animate-spin" /> : <BrainCircuit size={14} />}
-                  Resumir
-                </button>
-                <button 
-                  onClick={handleGenerateFlashcards} 
-                  className="px-4 py-2 bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-sm hover:shadow-md transition-all flex items-center gap-2"
-                >
-                  <Sparkles size={14} />
-                  Flashcards
-                </button>
-              </div>
-
-              <div className="w-px h-8 bg-slate-200 dark:bg-white/10 mx-1"></div>
-
-              {/* View Modes */}
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={() => setIsVadeMecumMode(!isVadeMecumMode)}
-                  className={`p-2.5 rounded-xl transition-all flex flex-col items-center gap-0.5 border ${isVadeMecumMode ? 'bg-sanfran-rubi text-white border-sanfran-rubi shadow-lg shadow-red-500/20' : 'bg-white dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/10'}`}
-                  title="Modo Vade Mecum (Leitura)"
-                >
-                  <Gavel size={16} />
-                  <span className="text-[7px] font-black uppercase tracking-tighter">Leitura</span>
-                </button>
-                <button 
-                  onClick={() => {
-                    const nextSplitState = !isSplitView;
-                    setIsSplitView(nextSplitState);
-                    onToggleSidebar(!nextSplitState);
-                  }}
-                  className={`p-2.5 rounded-xl transition-all flex flex-col items-center gap-0.5 border ${isSplitView ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-500/20' : 'bg-white dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/10'}`}
-                  title="Split View"
-                >
-                  <Split size={16} />
-                  <span className="text-[7px] font-black uppercase tracking-tighter">Split</span>
-                </button>
-                <button 
-                  onClick={() => {
-                    const nextMaximizedState = !isMaximized;
-                    setIsMaximized(nextMaximizedState);
-                    if (nextMaximizedState) {
-                      setIsSplitView(true);
-                      onToggleSidebar(false);
-                    } else {
-                      setIsSplitView(false);
-                      onToggleSidebar(true);
-                    }
-                  }}
-                  className={`p-2.5 rounded-xl transition-all flex flex-col items-center gap-0.5 border ${isMaximized ? 'bg-slate-800 text-white border-slate-800 shadow-lg' : 'bg-white dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/10'}`}
-                  title="Tela Cheia"
-                >
-                  {isMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-                  <span className="text-[7px] font-black uppercase tracking-tighter">Tela Cheia</span>
-                </button>
-              </div>
-
-              <div className="w-px h-8 bg-slate-200 dark:bg-white/10 mx-1"></div>
-
-              {/* Save Button */}
+          {/* Action Groups */}
+          <div className={`flex flex-wrap items-center gap-2 ${isMaximized ? 'scale-75 origin-right' : ''}`}>
+            {/* Group 1: AI & Smart Tools */}
+            <div className="flex bg-white dark:bg-white/5 p-1 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm">
               <button 
-                onClick={handleSaveNote} 
-                disabled={isSaving || isAutoSaving || !selectedNote}
-                className="py-3 px-6 bg-sanfran-rubi text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 disabled:opacity-50"
+                onClick={handleSummarize}
+                disabled={isSummarizing || !selectedNote}
+                className="p-2 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-xl transition-all disabled:opacity-30 flex flex-col items-center gap-0.5"
+                title="Resumir com IA"
               >
-                {(isSaving || isAutoSaving) ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} 
-                <span>{(isSaving || isAutoSaving) ? 'Salvando...' : 'Salvar'}</span>
+                {isSummarizing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles size={20} />}
+                <span className="text-[7px] font-black uppercase">Resumir</span>
+              </button>
+              <button 
+                onClick={handleGenerateFlashcards}
+                disabled={!selectedNote}
+                className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-all disabled:opacity-30 flex flex-col items-center gap-0.5"
+                title="Gerar Flashcards"
+              >
+                <BrainCircuit size={20} />
+                <span className="text-[7px] font-black uppercase">Anki</span>
+              </button>
+              <button
+                onClick={() => setIsVadeMecumMode(!isVadeMecumMode)}
+                className={`p-2 rounded-xl transition-all flex flex-col items-center gap-0.5 ${isVadeMecumMode ? 'bg-sanfran-rubi text-white shadow-lg shadow-red-500/20' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/10'}`}
+                title="Modo Vade Mecum"
+              >
+                <Gavel size={20} />
+                <span className="text-[7px] font-black uppercase">Leitura</span>
               </button>
             </div>
-          )}
+
+            {/* Group 2: Editor Tools */}
+            <div className="flex bg-white dark:bg-white/5 p-1 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm">
+              <div className="relative">
+                <button 
+                  onClick={() => setIsTemplateMenuOpen(!isTemplateMenuOpen)}
+                  disabled={!selectedNote}
+                  className="p-2 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-xl transition-all disabled:opacity-30 flex flex-col items-center gap-0.5"
+                  title="Templates"
+                >
+                  <FileText size={20} />
+                  <span className="text-[7px] font-black uppercase">Modelos</span>
+                </button>
+                {isTemplateMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-white/10 z-[60] p-2 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Modelos</div>
+                    <button onClick={() => applyTemplate('doutrina')} className="w-full text-left px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-colors">Fichamento de Doutrina</button>
+                    <button onClick={() => applyTemplate('jurisprudencia')} className="w-full text-left px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-colors">Análise de Jurisprudência</button>
+                    <button onClick={() => applyTemplate('aula')} className="w-full text-left px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-colors">Resumo de Aula</button>
+                  </div>
+                )}
+              </div>
+              <button 
+                onClick={() => setIsHandwritingOpen(true)}
+                disabled={!selectedNote}
+                className="p-2 text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-900/20 rounded-xl transition-all disabled:opacity-30 flex flex-col items-center gap-0.5"
+                title="Escrita à Mão"
+              >
+                <Pencil size={20} />
+                <span className="text-[7px] font-black uppercase">Caneta</span>
+              </button>
+            </div>
+
+            {/* Group 3: Export & View */}
+            <div className="flex bg-white dark:bg-white/5 p-1 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm">
+              <div className="relative">
+                <button 
+                  onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+                  disabled={!selectedNote}
+                  className="p-2 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-xl transition-all disabled:opacity-30 flex flex-col items-center gap-0.5"
+                  title="Exportar"
+                >
+                  <Download size={20} />
+                  <span className="text-[7px] font-black uppercase">Exportar</span>
+                </button>
+                {isExportMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-white/10 z-[60] p-2 animate-in fade-in zoom-in-95 duration-200">
+                    <button onClick={() => { handleExportPdf(); setIsExportMenuOpen(false); }} className="w-full text-left px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-colors">Exportar PDF</button>
+                    <button onClick={() => { handleExportDocx(); setIsExportMenuOpen(false); }} className="w-full text-left px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-colors">Exportar Word</button>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  const nextSplitState = !isSplitView;
+                  setIsSplitView(nextSplitState);
+                  onToggleSidebar(!nextSplitState);
+                }}
+                className={`p-2 rounded-xl transition-all flex flex-col items-center gap-0.5 ${isSplitView ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-lg' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/10'}`}
+                title="Split View"
+              >
+                <Split size={20} />
+                <span className="text-[7px] font-black uppercase">{isSplitView ? 'Foco ON' : 'Foco OFF'}</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  const nextMaximizedState = !isMaximized;
+                  setIsMaximized(nextMaximizedState);
+                  if (nextMaximizedState) {
+                    setIsSplitView(true);
+                    onToggleSidebar(false);
+                  } else {
+                    setIsSplitView(false);
+                    onToggleSidebar(true);
+                  }
+                }}
+                className={`p-2 rounded-xl transition-all flex flex-col items-center gap-0.5 ${isMaximized ? 'bg-sanfran-rubi text-white shadow-lg shadow-red-500/20' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/10'}`}
+                title={isMaximized ? "Sair da Tela Cheia" : "Tela Cheia"}
+              >
+                {isMaximized ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+                <span className="text-[7px] font-black uppercase">{isMaximized ? 'Recolher' : 'Expandir'}</span>
+              </button>
+            </div>
+
+            {/* Save Button - Primary Action */}
+            <button 
+              onClick={handleSaveNote} 
+              disabled={isSaving || isAutoSaving || !selectedNote}
+              className="ml-2 py-2.5 px-5 bg-sanfran-rubi text-white rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center gap-3 hover:bg-red-700 transition-all shadow-xl shadow-red-500/20 disabled:opacity-50 active:scale-95"
+            >
+              {(isSaving || isAutoSaving) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save size={18} />} 
+              <div className="flex flex-col items-start">
+                <span className="leading-none">{(isSaving || isAutoSaving) ? 'Salvando' : 'Salvar'}</span>
+                <span className="text-[6px] opacity-50 mt-0.5">Ctrl + S</span>
+              </div>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -874,19 +980,25 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                 </div>
               ) : (
                 <div className={`flex-1 flex flex-col transition-all duration-500 ${isMaximized ? 'p-0' : 'p-6 md:p-10 min-h-[600px]'}`}>
-                  <div className={`flex-1 flex flex-col bg-white dark:bg-slate-900 shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden ${isMaximized ? 'rounded-none border-0' : 'rounded-3xl'}`}>
-                    <DocsHeader
-                      title={isRenaming ? newTitle : (selectedNote.title || 'Documento sem título')}
-                      onTitleChange={(t) => { setIsRenaming(true); setNewTitle(t); }}
-                      onTitleBlur={() => { if (isRenaming) renameNote(); }}
-                      quillRef={quillRef}
-                      onApplyTemplate={applyTemplate}
-                      onOpenHandwriting={() => setIsHandwritingOpen(true)}
-                      onExportPdf={handleExportPdf}
-                      onExportDocx={handleExportDocx}
-                    />
-                    <div ref={onEditorRef} className="flex-1 quill-editor-custom paper-effect min-h-[500px]" />
-                  </div>
+                  <DocsToolbar 
+                    quillRef={quillRef} 
+                    onImageUpload={imageHandler} 
+                    onExportPdf={handleExportPdf} 
+                    onExportDocx={handleExportDocx} 
+                    onPrint={() => window.print()} 
+                    isMaximized={isMaximized} 
+                    setIsMaximized={(val) => {
+                      setIsMaximized(val);
+                      if (val) {
+                        setIsSplitView(true);
+                        onToggleSidebar(false);
+                      } else {
+                        setIsSplitView(false);
+                        onToggleSidebar(true);
+                      }
+                    }} 
+                  />
+                  <div ref={onEditorRef} className="flex-1 quill-editor-custom paper-effect min-h-[500px] rounded-b-3xl border-t-0" />
                 </div>
               )
             ) : (
