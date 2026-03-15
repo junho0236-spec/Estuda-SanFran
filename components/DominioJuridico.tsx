@@ -199,8 +199,8 @@ const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessio
       return a.keywords.some(k => topFrontier.name.toLowerCase().includes(k)) && areaPercentages[topFrontier.id] > 40;
     }) || ARCHETYPES[ARCHETYPES.length - 1];
 
-    const radarData = groupedData.slice(0, 8).map(area => ({
-      subject: area.name,
+    const radarData = groupedData.slice(0, 6).map(area => ({
+      subject: area.name.length > 15 ? area.name.substring(0, 12) + '...' : area.name,
       fullMark: 100,
       A: Math.min(100, (areaHours[area.id] / 20) * 100),
     }));
@@ -322,14 +322,11 @@ const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessio
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Radar Chart Card */}
         <div className="lg:col-span-2 bg-white dark:bg-slate-900/50 p-8 rounded-[3rem] border border-slate-200 dark:border-white/10 shadow-2xl flex flex-col md:flex-row items-center gap-8">
-          <div className="w-full h-[350px] md:w-1/2">
+          <div className="w-full h-[300px] md:w-1/2">
             <ResponsiveContainer width="100%" height="100%">
-              <RadarChart cx="50%" cy="50%" outerRadius="70%" data={processedData.radarData} margin={{ top: 20, right: 30, bottom: 20, left: 30 }}>
+              <RadarChart cx="50%" cy="50%" outerRadius="80%" data={processedData.radarData}>
                 <PolarGrid stroke="#e2e8f0" />
-                <PolarAngleAxis 
-                  dataKey="subject" 
-                  tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 900 }}
-                />
+                <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 900 }} />
                 <Radar
                   name="Domínio"
                   dataKey="A"
@@ -586,67 +583,69 @@ const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessio
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
               className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10 flex flex-col max-h-[90vh]"
             >
-              <div className="p-8 overflow-y-auto space-y-8 flex-1 custom-scrollbar">
-                <div className="flex justify-between items-center sticky top-0 bg-white dark:bg-slate-900 z-10 pb-4 border-b border-slate-100 dark:border-white/5">
-                  <h3 className="text-2xl font-black uppercase tracking-tight text-slate-900 dark:text-white">Configurar Fronteira</h3>
-                  <button onClick={() => setIsFrontierModalOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded-full transition-colors">
-                    <X size={24} />
-                  </button>
-                </div>
+              <div className="p-8 border-b border-slate-100 dark:border-white/5 flex justify-between items-center bg-white dark:bg-slate-900 z-10">
+                <h3 className="text-2xl font-black uppercase tracking-tight text-slate-900 dark:text-white">Configurar Fronteira</h3>
+                <button onClick={() => setIsFrontierModalOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded-full transition-colors">
+                  <X size={24} />
+                </button>
+              </div>
 
+              <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
                 <div className="space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nome da Fronteira</label>
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Nome da Fronteira</label>
                     <input 
                       type="text" 
                       value={editingFrontier?.name || ''}
                       onChange={(e) => setEditingFrontier(prev => ({ ...prev, name: e.target.value }))}
                       placeholder="Ex: Direito Digital"
-                      className="w-full bg-slate-50 dark:bg-white/5 border-2 border-slate-100 dark:border-white/5 rounded-2xl px-6 py-4 font-bold text-slate-900 dark:text-white focus:border-sanfran-rubi outline-none transition-all"
+                      className="w-full bg-slate-50 dark:bg-white/5 border-2 border-slate-100 dark:border-white/5 rounded-2xl px-6 py-4 font-bold text-slate-900 dark:text-white focus:border-sanfran-rubi outline-none transition-all placeholder:text-slate-300 dark:placeholder:text-slate-700"
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Ícone Representativo</label>
-                    <div className="grid grid-cols-6 gap-2">
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Ícone Representativo</label>
+                    <div className="grid grid-cols-5 gap-3">
                       {Object.keys(ICON_MAP).map(iconName => {
                         const Icon = ICON_MAP[iconName];
                         return (
                           <button
                             key={iconName}
                             onClick={() => setEditingFrontier(prev => ({ ...prev, icon: iconName }))}
-                            className={`p-3 rounded-xl border-2 transition-all ${editingFrontier?.icon === iconName ? 'border-sanfran-rubi bg-sanfran-rubi/10 text-sanfran-rubi' : 'border-slate-100 dark:border-white/5 hover:border-slate-300'}`}
+                            className={`p-4 rounded-2xl border-2 transition-all flex items-center justify-center ${editingFrontier?.icon === iconName ? 'border-sanfran-rubi bg-sanfran-rubi/10 text-sanfran-rubi shadow-lg shadow-sanfran-rubi/10' : 'border-slate-100 dark:border-white/5 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50/50 dark:bg-white/2'}`}
                           >
-                            <Icon size={20} />
+                            <Icon size={24} />
                           </button>
                         );
                       })}
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Cor de Destaque</label>
-                    <div className="flex flex-wrap gap-3">
-                      {['#005594', '#8B0000', '#D4AF37', '#059669', '#6366f1', '#ec4899', '#f97316', '#14b8a6', '#8b5cf6', '#f43f5e', '#10b981'].map(color => (
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Cor de Destaque</label>
+                    <div className="grid grid-cols-6 gap-3">
+                      {['#005594', '#8B0000', '#D4AF37', '#059669', '#6366f1', '#ec4899', '#f97316', '#14b8a6', '#8b5cf6', '#f43f5e', '#10b981', '#71717a'].map(color => (
                         <button
                           key={color}
                           onClick={() => setEditingFrontier(prev => ({ ...prev, color }))}
-                          className={`w-10 h-10 rounded-full border-4 transition-all ${editingFrontier?.color === color ? 'border-white ring-2 ring-sanfran-rubi' : 'border-transparent'}`}
+                          className={`w-full aspect-square rounded-xl border-4 transition-all ${editingFrontier?.color === color ? 'border-white dark:border-slate-800 ring-2 ring-sanfran-rubi scale-110 shadow-lg' : 'border-transparent hover:scale-105'}`}
                           style={{ backgroundColor: color }}
                         />
                       ))}
                     </div>
                   </div>
                 </div>
+              </div>
 
-                <div className="pt-4 sticky bottom-0 bg-white dark:bg-slate-900 z-10 border-t border-slate-100 dark:border-white/5">
-                  <button 
-                    onClick={handleSaveFrontier}
-                    className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-5 rounded-2xl font-black uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-xl"
-                  >
-                    Salvar Fronteira
-                  </button>
-                </div>
+              <div className="p-8 border-t border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/2">
+                <button 
+                  onClick={handleSaveFrontier}
+                  disabled={!editingFrontier?.name}
+                  className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-5 rounded-2xl font-black uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                >
+                  <Check size={20} />
+                  Salvar Fronteira
+                </button>
               </div>
             </motion.div>
           </div>
