@@ -199,8 +199,8 @@ const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessio
       return a.keywords.some(k => topFrontier.name.toLowerCase().includes(k)) && areaPercentages[topFrontier.id] > 40;
     }) || ARCHETYPES[ARCHETYPES.length - 1];
 
-    const radarData = groupedData.slice(0, 6).map(area => ({
-      subject: area.name.length > 15 ? area.name.substring(0, 12) + '...' : area.name,
+    const radarData = groupedData.slice(0, 8).map(area => ({
+      subject: area.name,
       fullMark: 100,
       A: Math.min(100, (areaHours[area.id] / 20) * 100),
     }));
@@ -322,11 +322,14 @@ const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessio
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Radar Chart Card */}
         <div className="lg:col-span-2 bg-white dark:bg-slate-900/50 p-8 rounded-[3rem] border border-slate-200 dark:border-white/10 shadow-2xl flex flex-col md:flex-row items-center gap-8">
-          <div className="w-full h-[300px] md:w-1/2">
+          <div className="w-full h-[350px] md:w-1/2">
             <ResponsiveContainer width="100%" height="100%">
-              <RadarChart cx="50%" cy="50%" outerRadius="80%" data={processedData.radarData}>
+              <RadarChart cx="50%" cy="50%" outerRadius="70%" data={processedData.radarData} margin={{ top: 20, right: 30, bottom: 20, left: 30 }}>
                 <PolarGrid stroke="#e2e8f0" />
-                <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 900 }} />
+                <PolarAngleAxis 
+                  dataKey="subject" 
+                  tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 900 }}
+                />
                 <Radar
                   name="Domínio"
                   dataKey="A"
@@ -581,10 +584,10 @@ const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessio
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10"
+              className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10 flex flex-col max-h-[90vh]"
             >
-              <div className="p-8 space-y-8">
-                <div className="flex justify-between items-center">
+              <div className="p-8 overflow-y-auto space-y-8 flex-1 custom-scrollbar">
+                <div className="flex justify-between items-center sticky top-0 bg-white dark:bg-slate-900 z-10 pb-4 border-b border-slate-100 dark:border-white/5">
                   <h3 className="text-2xl font-black uppercase tracking-tight text-slate-900 dark:text-white">Configurar Fronteira</h3>
                   <button onClick={() => setIsFrontierModalOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded-full transition-colors">
                     <X size={24} />
@@ -636,12 +639,14 @@ const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessio
                   </div>
                 </div>
 
-                <button 
-                  onClick={handleSaveFrontier}
-                  className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-5 rounded-2xl font-black uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-xl"
-                >
-                  Salvar Fronteira
-                </button>
+                <div className="pt-4 sticky bottom-0 bg-white dark:bg-slate-900 z-10 border-t border-slate-100 dark:border-white/5">
+                  <button 
+                    onClick={handleSaveFrontier}
+                    className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-5 rounded-2xl font-black uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-xl"
+                  >
+                    Salvar Fronteira
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>
