@@ -227,6 +227,18 @@
   box-shadow: 0 0 50px rgba(0,0,0,0.2) !important;
 }
 
+/* Show Non-Printing Characters */
+.show-non-printing .ql-editor p::after {
+  content: " ¶";
+  color: #cbd5e1;
+  font-weight: normal;
+  opacity: 0.5;
+}
+
+.dark .show-non-printing .ql-editor p::after {
+  color: #475569;
+}
+
 /* Custom Scrollbar */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;

@@ -39,6 +39,8 @@ const ErrorLog: React.FC<ErrorLogProps> = ({ userId }) => {
   // Stats
   const [activeTab, setActiveTab] = useState<'list' | 'stats'>('list');
 
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
   useEffect(() => {
     fetchLogs();
   }, [userId]);
@@ -91,10 +93,10 @@ const ErrorLog: React.FC<ErrorLogProps> = ({ userId }) => {
   };
 
   const handleDeleteLog = async (id: string) => {
-    if (!window.confirm("Arrancar esta folha do caderno?")) return;
     try {
       await supabase.from('error_logs').delete().eq('id', id);
       setLogs(logs.filter(l => l.id !== id));
+      setDeleteConfirmId(null);
       toast.success("Registro removido.");
     } catch (e) { 
       console.error(e);
@@ -244,9 +246,28 @@ const ErrorLog: React.FC<ErrorLogProps> = ({ userId }) => {
                               </div>
                               <h3 className="text-xl font-black text-white uppercase tracking-tight">{log.topic}</h3>
                            </div>
-                           <button onClick={() => handleDeleteLog(log.id)} className="text-slate-600 hover:text-red-500 transition-colors">
-                              <Trash2 size={18} />
-                           </button>
+                           <div className="flex items-center gap-2">
+                              {deleteConfirmId === log.id ? (
+                                 <div className="flex items-center gap-2 animate-in slide-in-from-right-2">
+                                    <button 
+                                       onClick={() => handleDeleteLog(log.id)}
+                                       className="bg-red-600 text-white text-[10px] font-black uppercase px-3 py-1 rounded hover:bg-red-700 transition-colors"
+                                    >
+                                       Confirmar
+                                    </button>
+                                    <button 
+                                       onClick={() => setDeleteConfirmId(null)}
+                                       className="text-slate-500 hover:text-white transition-colors"
+                                    >
+                                       <X size={18} />
+                                    </button>
+                                 </div>
+                              ) : (
+                                 <button onClick={() => setDeleteConfirmId(log.id)} className="text-slate-600 hover:text-red-500 transition-colors">
+                                    <Trash2 size={18} />
+                                 </button>
+                              )}
+                           </div>
                         </div>
 
                         <div className="relative z-10 pl-4 border-l-2 border-slate-800">

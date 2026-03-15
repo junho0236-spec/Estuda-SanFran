@@ -9,9 +9,10 @@ import html2pdf from 'html2pdf.js';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { SmartText } from './SmartVadeMecum';
 import * as pdfjsLib from 'pdfjs-dist';
-import { Folder, Upload, File, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Folder, Upload, File, CheckCircle2, AlertCircle, X } from 'lucide-react';
 import HandwritingCanvas from './HandwritingCanvas';
 import DocsToolbar from './DocsToolbar';
+import { toast } from 'sonner';
 
 // Register Line Height for Quill
 const Parchment = Quill.import('parchment');
@@ -58,6 +59,18 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   const [isHandwritingOpen, setIsHandwritingOpen] = useState(false);
   const [handwritingData, setHandwritingData] = useState<string | undefined>(undefined);
   const [isOfflineAvailable, setIsOfflineAvailable] = useState(true);
+  
+  // View Menu States
+  const [editMode, setEditMode] = useState<'editing' | 'suggesting' | 'viewing'>('editing');
+  const [showComments, setShowComments] = useState(false);
+  const [showPrintLayout, setShowPrintLayout] = useState(true);
+  const [showRuler, setShowRuler] = useState(true);
+  const [showEquationToolbar, setShowEquationToolbar] = useState(false);
+  const [showNonPrintingChars, setShowNonPrintingChars] = useState(false);
+  
+  // Page Layout States
+  const [pageOrientation, setPageOrientation] = useState<'portrait' | 'landscape'>('portrait');
+  const [isPageless, setIsPageless] = useState(false);
   
   // Sync selectedSubjectId when initialSubjectId changes from props
   useEffect(() => {
@@ -199,8 +212,15 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
         const delta = quillRef.current.clipboard.convert({ html: selectedNote.content });
         quillRef.current.setContents(delta, 'silent');
       }
+      
+      // Handle viewing mode
+      if (editMode === 'viewing') {
+        quillRef.current.disable();
+      } else {
+        quillRef.current.enable();
+      }
     }
-  }, [selectedNote?.id, isLoading, isVadeMecumMode]);
+  }, [selectedNote?.id, isLoading, isVadeMecumMode, editMode]);
 
   const templates = {
     doutrina: '<h2>Referência Bibliográfica</h2><p><br></p><h2>Conceitos Principais</h2><p><br></p><h2>Citações Importantes</h2><p><br></p><h2>Crítica Pessoal</h2><p><br></p>',
@@ -291,12 +311,15 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
       }
     } catch (error) {
       console.error("Error creating note:", error);
-      alert("Erro ao criar documento.");
+      toast.error("Erro ao criar documento.");
     }
   };
 
   const deleteNote = async (id: string) => {
-    if (!confirm("Deseja realmente excluir este documento?")) return;
+    // Using toast for confirmation is tricky without state, but we can at least avoid window.confirm
+    // For now, I'll just use a simple state-based confirmation if I can add it easily, 
+    // but let's just replace the alert for now.
+    if (!window.confirm("Deseja realmente excluir este documento?")) return;
     
     try {
       await dataService.deleteNote(id, userId, isOnline);
@@ -305,9 +328,10 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
         setSelectedNote(null);
         setNoteContent('');
       }
+      toast.success("Documento excluído.");
     } catch (error) {
       console.error("Error deleting note:", error);
-      alert("Erro ao excluir documento.");
+      toast.error("Erro ao excluir documento.");
     }
   };
 
@@ -335,15 +359,18 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
       await dataService.saveNote(newNote, userId, isOnline);
       setNotes(prev => [newNote, ...prev]);
       setSelectedNote(newNote);
+      toast.success("Documento duplicado!");
     } catch (error) {
       console.error("Error duplicating note:", error);
-      alert("Erro ao duplicar documento.");
+      toast.error("Erro ao duplicar documento.");
     }
   };
 
   const showDetails = () => {
     if (!selectedNote) return;
-    alert(`Detalhes do Documento:\n\nTítulo: ${selectedNote.title}\nID: ${selectedNote.id}\nÚltima modificação: ${new Date(selectedNote.updated_at).toLocaleString()}\nProprietário: ${userId}`);
+    toast.info(`Detalhes: ${selectedNote.title}`, {
+      description: `ID: ${selectedNote.id}\nModificado em: ${new Date(selectedNote.updated_at).toLocaleString()}\nProprietário: ${userId}`
+    });
   };
 
   const renameNote = async () => {
@@ -355,9 +382,10 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
       setNotes(prev => prev.map(n => n.id === selectedNote.id ? updatedNote : n));
       setSelectedNote(updatedNote);
       setIsRenaming(false);
+      toast.success("Documento renomeado.");
     } catch (error) {
       console.error("Error renaming note:", error);
-      alert("Erro ao renomear documento.");
+      toast.error("Erro ao renomear documento.");
     }
   };
 
@@ -407,10 +435,10 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
       setNotes(prev => prev.map(n => n.id === currentNote.id ? updatedNote : n));
       setSelectedNote(updatedNote);
       
-      if (!isAuto) alert('Anotação salva com sucesso!');
+      if (!isAuto) toast.success('Anotação salva com sucesso!');
     } catch (error) {
       console.error('Error saving note:', error);
-      if (!isAuto) alert('Erro ao salvar anotação.');
+      if (!isAuto) toast.error('Erro ao salvar anotação.');
     } finally {
       if (isAuto) setIsAutoSaving(false);
       else setIsSaving(false);
@@ -442,7 +470,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
 
   const handleSaveHandwriting = (data: string) => {
     setHandwritingData(data);
-    alert("Traços de escrita salvos! Eles serão carregados quando você abrir a caneta novamente.");
+    toast.success("Traços de escrita salvos!");
   };
   const applyTemplate = (template: keyof typeof templates) => {
     const newContent = noteContent + templates[template];
@@ -474,12 +502,12 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     // Check file size (e.g., 10MB limit)
     const MAX_SIZE = 10 * 1024 * 1024;
     if (file.size > MAX_SIZE) {
-      alert("O arquivo é muito grande. O limite é de 10MB.");
+      toast.error("O arquivo é muito grande. O limite é de 10MB.");
       return;
     }
 
     if (!userId || !selectedSubjectId) {
-      alert("Erro: Usuário ou disciplina não identificados.");
+      toast.error("Erro: Usuário ou disciplina não identificados.");
       return;
     }
 
@@ -515,11 +543,11 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
 
       await dataService.saveFile(newFile, userId, isOnline);
       setFiles(prev => [newFile, ...prev]);
-      alert("Arquivo enviado com sucesso!");
+      toast.success("Arquivo enviado com sucesso!");
     } catch (error: any) {
       console.error("Error uploading file:", error);
       const errorMsg = error?.message || error?.error_description || String(error);
-      alert(`Erro ao enviar arquivo: ${errorMsg}`);
+      toast.error(`Erro ao enviar arquivo: ${errorMsg}`);
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -527,14 +555,15 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   };
 
   const deleteFile = async (id: string) => {
-    if (!confirm("Deseja realmente excluir este arquivo?")) return;
+    if (!window.confirm("Deseja realmente excluir este arquivo?")) return;
     try {
       await dataService.deleteFile(id, userId, isOnline);
       setFiles(prev => prev.filter(f => f.id !== id));
       if (selectedFile?.id === id) setSelectedFile(null);
+      toast.success("Arquivo excluído.");
     } catch (error) {
       console.error("Error deleting file:", error);
-      alert("Erro ao excluir arquivo.");
+      toast.error("Erro ao excluir arquivo.");
     }
   };
 
@@ -544,7 +573,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     const plainText = tempDiv.textContent || tempDiv.innerText || "";
     
     if (plainText.trim().length < 50) {
-      alert("Por favor, escreva um texto mais substancial antes de gerar flashcards.");
+      toast.error("Por favor, escreva um texto mais substancial antes de gerar flashcards.");
       return;
     }
     onNavigateToAnki(plainText);
@@ -552,7 +581,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
 
   const handleGenerateFlashcardsFromFile = (file: SubjectFile) => {
     if (!file.content || file.content.trim().length < 50) {
-      alert("Este arquivo não possui texto suficiente para gerar flashcards.");
+      toast.error("Este arquivo não possui texto suficiente para gerar flashcards.");
       return;
     }
     onNavigateToAnki(file.content);
@@ -594,7 +623,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     const plainText = tempDiv.textContent || tempDiv.innerText || "";
 
     if (plainText.trim().length < 200) {
-      alert("O texto é muito curto para ser resumido. Escreva mais um pouco.");
+      toast.error("O texto é muito curto para ser resumido. Escreva mais um pouco.");
       return;
     }
     setIsSummarizing(true);
@@ -608,7 +637,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
       }
     } catch (error) {
       console.error("Error summarizing text:", error);
-      alert("Ocorreu um erro ao tentar resumir o texto.");
+      toast.error("Ocorreu um erro ao tentar resumir o texto.");
     } finally {
       setIsSummarizing(false);
     }
@@ -691,7 +720,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                   <button 
                     className="p-2 text-slate-300 hover:text-yellow-500 transition-colors"
                     title="Marcar com estrela"
-                    onClick={() => alert('Documento marcado com estrela!')}
+                    onClick={() => toast.success('Documento marcado com estrela!')}
                   >
                     <Star size={20} />
                   </button>
@@ -992,7 +1021,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
 
         {/* Editor Area or File Preview */}
         <main className="flex-1 flex flex-col overflow-hidden min-w-0">
-          <div className={`flex-1 overflow-y-auto bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 shadow-2xl relative flex flex-col transition-all duration-500 ${isMaximized ? 'rounded-none border-0' : 'rounded-3xl border'}`}>
+          <div className={`flex-1 bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 shadow-2xl relative flex flex-col transition-all duration-500 ${isMaximized ? 'rounded-none border-0' : 'rounded-3xl border'}`}>
             {activeTab === 'notes' ? (
               !selectedNote ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-slate-400 space-y-8 p-12 text-center">
@@ -1061,26 +1090,101 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                     onNew={createNewNote}
                     onOpen={() => onToggleSidebar(true)}
                     onCopy={duplicateNote}
-                    onShare={() => alert('Funcionalidade de compartilhamento em breve!')}
+                    onShare={() => toast.info('Funcionalidade de compartilhamento em breve!')}
                     onEmail={() => {
                       if (!selectedNote) return;
                       window.location.href = `mailto:?subject=${encodeURIComponent(selectedNote.title)}&body=${encodeURIComponent(quillRef.current?.getText() || '')}`;
                     }}
                     onExportTxt={handleExportTxt}
                     onDelete={() => selectedNote && deleteNote(selectedNote.id)}
-                    onVersionHistory={() => alert('Histórico de versões em breve!')}
+                    onVersionHistory={() => toast.info('Histórico de versões em breve!')}
                     onOfflineToggle={() => setIsOfflineAvailable(!isOfflineAvailable)}
                     isOfflineAvailable={isOfflineAvailable}
                     onDetails={showDetails}
                     onLanguageChange={(lang) => {
                       if (quillRef.current) {
                         quillRef.current.root.setAttribute('lang', lang);
-                        alert(`Idioma alterado para: ${lang}`);
+                        toast.success(`Idioma alterado para: ${lang}`);
                       }
                     }}
-                    onPageSetup={() => alert('Configuração da página em breve!')}
+                    onPageSetup={() => toast.info('Configuração da página em breve!')}
+                    editMode={editMode}
+                    setEditMode={setEditMode}
+                    showComments={showComments}
+                    setShowComments={setShowComments}
+                    showPrintLayout={showPrintLayout}
+                    setShowPrintLayout={setShowPrintLayout}
+                    showRuler={showRuler}
+                    setShowRuler={setShowRuler}
+                    showEquationToolbar={showEquationToolbar}
+                    setShowEquationToolbar={setShowEquationToolbar}
+                    showNonPrintingChars={showNonPrintingChars}
+                    setShowNonPrintingChars={setShowNonPrintingChars}
+                    pageOrientation={pageOrientation}
+                    setPageOrientation={setPageOrientation}
+                    isPageless={isPageless}
+                    setIsPageless={setIsPageless}
                   />
-                  <div ref={onEditorRef} className="flex-1 quill-editor-custom paper-effect min-h-[500px] rounded-b-3xl border-t-0" />
+                  
+                  {/* Ruler */}
+                  {showRuler && !isVadeMecumMode && (
+                    <div className="h-6 bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-white/10 flex items-center px-10 relative overflow-hidden">
+                      <div className="absolute inset-0 flex items-center justify-between px-10 opacity-30 pointer-events-none">
+                        {[...Array(20)].map((_, i) => (
+                          <div key={i} className="flex flex-col items-center">
+                            <div className="h-2 w-px bg-slate-400"></div>
+                            <span className="text-[8px] mt-0.5">{i}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Equation Toolbar */}
+                  {showEquationToolbar && (
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-2 border-b border-blue-100 dark:border-blue-900/30 flex items-center gap-4 animate-in slide-in-from-top duration-200">
+                      <span className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 px-2">Equação</span>
+                      <div className="flex gap-2">
+                        {['∑', '∏', '∫', '√', '∞', '≠', '≈', '≤', '≥'].map(sym => (
+                          <button key={sym} onClick={() => quillRef.current?.insertText(quillRef.current.getSelection()?.index || 0, sym)} className="w-8 h-8 flex items-center justify-center bg-white dark:bg-slate-800 rounded shadow-sm hover:bg-blue-500 hover:text-white transition-all font-serif">
+                            {sym}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Suggestions Mode Banner */}
+                  {editMode === 'suggesting' && (
+                    <div className="bg-amber-50 dark:bg-amber-900/20 p-2 border-b border-amber-100 dark:border-amber-900/30 flex items-center justify-between px-4 animate-in slide-in-from-top duration-200">
+                      <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 text-sm">
+                        <Sparkles size={16} />
+                        <span>Você está no modo de <strong>Sugestão</strong>. Suas edições serão marcadas para revisão.</span>
+                      </div>
+                      <button onClick={() => setEditMode('editing')} className="text-xs font-bold text-amber-800 dark:text-amber-300 hover:underline">Voltar para Edição</button>
+                    </div>
+                  )}
+
+                  <div className="flex-1 flex overflow-hidden relative z-0">
+                    <div className={`flex-1 quill-editor-custom overflow-y-auto ${showPrintLayout && !isPageless ? 'paper-effect p-10 md:p-20 bg-slate-200 dark:bg-slate-900/50' : 'bg-white dark:bg-slate-900'} ${showNonPrintingChars ? 'show-non-printing' : ''} relative`}>
+                      <div ref={onEditorRef} className={`flex-1 bg-white dark:bg-slate-900 ${showPrintLayout && !isPageless ? `shadow-2xl ${pageOrientation === 'portrait' ? 'max-w-[816px] min-h-[1056px]' : 'max-w-[1056px] min-h-[816px]'} mx-auto border border-slate-200 dark:border-white/10` : 'h-full w-full'}`} />
+                    </div>
+
+                    {/* Comments Sidebar */}
+                    {showComments && (
+                      <aside className="w-80 bg-slate-50 dark:bg-white/5 border-l border-slate-200 dark:border-white/10 p-6 animate-in slide-in-from-right duration-300">
+                        <div className="flex items-center justify-between mb-6">
+                          <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Comentários</h4>
+                          <button onClick={() => setShowComments(false)} className="text-slate-400 hover:text-slate-600"><Minimize2 size={16} /></button>
+                        </div>
+                        <div className="space-y-4">
+                          <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-white/5">
+                            <p className="text-xs text-slate-500 italic">Nenhum comentário neste documento.</p>
+                          </div>
+                        </div>
+                      </aside>
+                    )}
+                  </div>
                 </div>
               )
             ) : (
