@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map as MapIcon, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck, BookX, ScrollText, FileText, Repeat, UserX, ListTodo, Handshake, Eye, Key, CalendarCheck, Loader2, BarChart3, Search, Command } from 'lucide-react';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map as MapIcon, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck, BookX, ScrollText, FileText, Repeat, UserX, ListTodo, Handshake, Eye, Key, CalendarCheck, Loader2, BarChart3, Search, Command, ChevronLeft, ChevronRight } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel, StudyMode, Board, Notification, Friendship, UserProfile } from './types';
 import Login from './components/Login';
 import Atmosphere from './components/Atmosphere';
@@ -202,6 +202,14 @@ const App: React.FC = () => {
   };
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarMinimized, setIsSidebarMinimized] = useState(() => {
+    const saved = localStorage.getItem('sanfran_sidebar_minimized');
+    return saved ? JSON.parse(saved) : false;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('sanfran_sidebar_minimized', JSON.stringify(isSidebarMinimized));
+  }, [isSidebarMinimized]);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -944,7 +952,7 @@ const App: React.FC = () => {
   return (
     <div className={`flex h-screen overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#fcfcfc]'}`}>
       <Toaster position="top-right" richColors />
-      <Atmosphere isExtremeFocus={isExtremeFocus} isSidebarOpen={isSidebarOpen} />
+      <Atmosphere isExtremeFocus={isExtremeFocus} isSidebarOpen={isSidebarOpen} isSidebarMinimized={isSidebarMinimized} />
       
       <Suspense fallback={null}>
         <GlobalSearch 
@@ -986,53 +994,63 @@ const App: React.FC = () => {
         />
       )}
 
-      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${isExtremeFocus ? '-translate-x-full lg:-translate-x-full lg:w-0' : 'lg:relative lg:translate-x-0 lg:w-72'} fixed inset-y-0 left-0 z-40 bg-white dark:bg-[#0d0303] border-r border-slate-200 dark:border-sanfran-rubi/30 transition-all duration-700 flex flex-col shadow-2xl lg:shadow-none`}>
-        <div className="p-6 border-b border-slate-100 dark:border-sanfran-rubi/20 flex flex-col">
-          <div className="flex items-center justify-between mb-4">
+      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${isExtremeFocus ? '-translate-x-full lg:-translate-x-full lg:w-0' : `lg:relative lg:translate-x-0 ${isSidebarMinimized ? 'lg:w-20' : 'lg:w-72'}`} fixed inset-y-0 left-0 z-40 bg-white dark:bg-[#0d0303] border-r border-slate-200 dark:border-sanfran-rubi/30 transition-all duration-500 flex flex-col shadow-2xl lg:shadow-none overflow-hidden`}>
+        <div className={`p-6 border-b border-slate-100 dark:border-sanfran-rubi/20 flex flex-col ${isSidebarMinimized ? 'items-center px-2' : ''}`}>
+          <div className="flex items-center justify-between mb-4 w-full">
             <Link
               to={getPathFromView(View.Profile)}
               onClick={() => closeSidebar()}
-              className="w-full group text-left p-2 -m-2 rounded-xl transition-all duration-200 hover:bg-slate-50 dark:hover:bg-white/5 block"
+              className={`group text-left p-2 -m-2 rounded-xl transition-all duration-200 hover:bg-slate-50 dark:hover:bg-white/5 block ${isSidebarMinimized ? 'mx-auto' : 'w-full'}`}
             >
               <div className="flex items-center gap-4">
                 {/* Ícone do Livro (Mantido e Restaurado) */}
-                <div className="w-14 h-14 bg-sanfran-rubi text-white rounded-2xl flex items-center justify-center shadow-lg shadow-red-900/20 group-hover:scale-105 transition-transform duration-300">
+                <div className="w-14 h-14 bg-sanfran-rubi text-white rounded-2xl flex items-center justify-center shadow-lg shadow-red-900/20 group-hover:scale-105 transition-transform duration-300 shrink-0">
                    <BookOpen size={28} />
                 </div>
 
                 {/* Tipografia Corrigida */}
-                <div className="flex flex-col">
-                   <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter leading-[0.9]">
-                     SanFran
-                     <br />
-                     Academy
-                   </h1>
-                   <div className="h-0.5 w-full bg-sanfran-rubi/20 my-1 rounded-full group-hover:bg-sanfran-rubi transition-colors"></div>
-                   <span className="text-[9px] font-black text-sanfran-rubi uppercase tracking-[0.2em]">
-                     XI de Agosto
-                   </span>
-                </div>
+                {!isSidebarMinimized && (
+                  <div className="flex flex-col">
+                     <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter leading-[0.9]">
+                       SanFran
+                       <br />
+                       Academy
+                     </h1>
+                     <div className="h-0.5 w-full bg-sanfran-rubi/20 my-1 rounded-full group-hover:bg-sanfran-rubi transition-colors"></div>
+                     <span className="text-[9px] font-black text-sanfran-rubi uppercase tracking-[0.2em]">
+                       XI de Agosto
+                     </span>
+                  </div>
+                )}
               </div>
             </Link>
-            <button onClick={closeSidebar} className="lg:hidden p-2 text-slate-400 hover:text-sanfran-rubi transition-colors self-start">
-              <X className="w-6 h-6" />
-            </button>
+            {!isSidebarMinimized && (
+              <button onClick={closeSidebar} className="lg:hidden p-2 text-slate-400 hover:text-sanfran-rubi transition-colors self-start">
+                <X className="w-6 h-6" />
+              </button>
+            )}
           </div>
-          <BrasiliaClock />
+          
+          {!isSidebarMinimized && <BrasiliaClock />}
           
           <button 
             onClick={() => setIsSearchOpen(true)}
-            className="mt-4 w-full flex items-center gap-3 px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-sanfran-rubi hover:border-sanfran-rubi/50 transition-all group"
+            className={`mt-4 flex items-center bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-sanfran-rubi hover:border-sanfran-rubi/50 transition-all group ${isSidebarMinimized ? 'w-12 h-12 justify-center p-0' : 'w-full px-4 py-3 gap-3'}`}
+            title={isSidebarMinimized ? "Pesquisar (Cmd+K)" : ""}
           >
-            <Search className="w-4 h-4 group-hover:scale-110 transition-transform" />
-            <span>Pesquisar...</span>
-            <div className="ml-auto flex items-center gap-1 opacity-50">
-              <Command size={10} /> K
-            </div>
+            <Search className="w-4 h-4 group-hover:scale-110 transition-transform shrink-0" />
+            {!isSidebarMinimized && (
+              <>
+                <span>Pesquisar...</span>
+                <div className="ml-auto flex items-center gap-1 opacity-50">
+                  <Command size={10} /> K
+                </div>
+              </>
+            )}
           </button>
         </div>
         
-        <nav className="p-4 space-y-1 flex-1 overflow-y-auto custom-scrollbar">
+        <nav className={`p-4 space-y-1 flex-1 overflow-y-auto custom-scrollbar ${isSidebarMinimized ? 'px-2' : ''}`}>
           {navItems.map((item) => {
             const isActive = currentView === item.id || 
                              (item.id === View.SanFranEssential && isEssentialChild) ||
@@ -1049,13 +1067,14 @@ const App: React.FC = () => {
                 key={item.id} 
                 to={getPathFromView(item.id)}
                 onClick={() => closeSidebar()} 
-                className={`group w-full flex items-center gap-4 p-3 rounded-2xl transition-all duration-300 border ${
+                className={`group w-full flex items-center rounded-2xl transition-all duration-300 border relative ${isSidebarMinimized ? 'justify-center p-2' : 'gap-4 p-3'} ${
                   isActive
                     ? 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 shadow-xl scale-[1.02] z-10' 
                     : 'border-transparent hover:bg-slate-50 dark:hover:bg-white/5 opacity-70 hover:opacity-100'
                 }`}
+                title={isSidebarMinimized ? item.label : ""}
               >
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm transition-all duration-300 ${
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm transition-all duration-300 shrink-0 ${
                   isActive
                     ? `${item.bg} dark:bg-white/10` 
                     : 'bg-slate-100 dark:bg-white/5 group-hover:bg-white dark:group-hover:bg-white/10'
@@ -1067,16 +1086,18 @@ const App: React.FC = () => {
                   }`} />
                 </div>
                 
-                <div className="flex-1 text-left">
-                   <span className={`block text-[10px] font-black uppercase tracking-widest transition-colors ${
-                     isActive ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-300'
-                   }`}>
-                     {item.label}
-                   </span>
-                </div>
+                {!isSidebarMinimized && (
+                  <div className="flex-1 text-left">
+                     <span className={`block text-[10px] font-black uppercase tracking-widest transition-colors ${
+                       isActive ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-300'
+                     }`}>
+                       {item.label}
+                     </span>
+                  </div>
+                )}
 
                 {item.id === View.SanFranCommunity && presenceUsers.length > 0 && (
-                  <span className="w-5 h-5 bg-cyan-500 text-[9px] font-black rounded-full flex items-center justify-center text-white shadow-md animate-pulse">
+                  <span className={`${isSidebarMinimized ? 'absolute top-1 right-1' : 'w-5 h-5 ml-auto'} bg-cyan-500 text-[9px] font-black rounded-full flex items-center justify-center text-white shadow-md animate-pulse`}>
                     {presenceUsers.length}
                   </span>
                 )}
@@ -1085,12 +1106,32 @@ const App: React.FC = () => {
           })}
         </nav>
 
-        <div className="p-4 space-y-3 bg-slate-50 dark:bg-black/20 border-t border-slate-100 dark:border-sanfran-rubi/10">
-          <button onClick={() => setIsDarkMode(!isDarkMode)} className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-white dark:bg-sanfran-rubiDark border border-slate-200 dark:border-sanfran-rubi/30 text-[9px] font-black uppercase tracking-widest text-slate-900 dark:text-white shadow-sm hover:shadow-md transition-all">
-            {isDarkMode ? 'Modo Escuro' : 'Modo Claro'}
+        <div className={`p-4 space-y-3 bg-slate-50 dark:bg-black/20 border-t border-slate-100 dark:border-sanfran-rubi/10 ${isSidebarMinimized ? 'px-2 items-center flex flex-col' : ''}`}>
+          <button 
+            onClick={() => setIsSidebarMinimized(!isSidebarMinimized)} 
+            className={`hidden lg:flex items-center justify-center bg-white dark:bg-sanfran-rubiDark border border-slate-200 dark:border-sanfran-rubi/30 text-slate-900 dark:text-white shadow-sm hover:shadow-md transition-all rounded-xl ${isSidebarMinimized ? 'w-10 h-10' : 'w-full py-2 gap-2 text-[9px] font-black uppercase tracking-widest'}`}
+            title={isSidebarMinimized ? "Expandir Barra Lateral" : "Minimizar Barra Lateral"}
+          >
+            {isSidebarMinimized ? <ChevronRight className="w-4 h-4" /> : <><ChevronLeft className="w-4 h-4" /> Minimizar</>}
+          </button>
+
+          <button 
+            onClick={() => setIsDarkMode(!isDarkMode)} 
+            className={`flex items-center bg-white dark:bg-sanfran-rubiDark border border-slate-200 dark:border-sanfran-rubi/30 text-slate-900 dark:text-white shadow-sm hover:shadow-md transition-all rounded-2xl ${isSidebarMinimized ? 'w-10 h-10 justify-center' : 'w-full px-4 py-3 justify-between text-[9px] font-black uppercase tracking-widest'}`}
+            title={isSidebarMinimized ? (isDarkMode ? 'Modo Claro' : 'Modo Escuro') : ""}
+          >
+            {!isSidebarMinimized && (isDarkMode ? 'Modo Escuro' : 'Modo Claro')}
             {isDarkMode ? <Moon className="w-4 h-4 text-usp-blue" /> : <Sun className="w-4 h-4 text-usp-gold" />}
           </button>
-          <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 px-4 py-3 text-slate-400 hover:text-red-500 font-black uppercase text-[10px] tracking-widest transition-colors hover:bg-red-50 dark:hover:bg-red-900/10 rounded-2xl"><LogOut className="w-4 h-4" /> Encerrar Sessão</button>
+          
+          <button 
+            onClick={handleLogout} 
+            className={`flex items-center justify-center text-slate-400 hover:text-red-500 font-black uppercase tracking-widest transition-colors hover:bg-red-50 dark:hover:bg-red-900/10 rounded-2xl ${isSidebarMinimized ? 'w-10 h-10' : 'w-full gap-2 px-4 py-3 text-[10px]'}`}
+            title={isSidebarMinimized ? "Encerrar Sessão" : ""}
+          >
+            <LogOut className="w-4 h-4" /> 
+            {!isSidebarMinimized && "Encerrar Sessão"}
+          </button>
         </div>
       </aside>
 

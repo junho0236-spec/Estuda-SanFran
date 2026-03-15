@@ -22,9 +22,10 @@ const tracks: SoundTrack[] = [
 interface AtmosphereProps {
   isExtremeFocus: boolean;
   isSidebarOpen: boolean;
+  isSidebarMinimized: boolean;
 }
 
-const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus, isSidebarOpen }) => {
+const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus, isSidebarOpen, isSidebarMinimized }) => {
   const [currentTrackId, setCurrentTrackId] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(0.5);
@@ -80,7 +81,7 @@ const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus, isSidebarOpen }
 
   const leftPosition = isExtremeFocus 
     ? 'left-8' 
-    : (isSidebarOpen ? 'lg:left-80' : 'lg:left-10');
+    : (isSidebarOpen ? (isSidebarMinimized ? 'lg:left-28' : 'lg:left-80') : 'lg:left-10');
 
   return (
     <div className={`fixed z-[60] transition-all duration-700 ${isExtremeFocus ? 'bottom-8' : 'bottom-6 lg:bottom-10'} ${leftPosition}`}>
