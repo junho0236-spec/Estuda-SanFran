@@ -154,6 +154,7 @@ export interface Subject {
   workload?: number;
   p1_date?: string;
   p2_date?: string;
+  topics?: { id: string; title: string; completed: boolean }[];
 }
 
 export type TaskPriority = 'urgente' | 'alta' | 'normal';

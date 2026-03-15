@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Landmark, Scale, Gavel, Briefcase, Star, CheckCircle2, BookOpen, AlertCircle, Trophy, Target, Zap, Shield, Award, Map as MapIcon, Compass, Loader2, Plus, X, Edit2, Trash2, Check, ChevronRight, Search, Heart, Globe, Hammer, PenTool, Microscope, Music, Camera, Coffee, Car, Plane, Home } from 'lucide-react';
+import { Landmark, Scale, Gavel, Briefcase, Star, CheckCircle2, BookOpen, AlertCircle, Trophy, Target, Zap, Shield, Award, Map as MapIcon, Compass, Loader2, Plus, X, Edit2, Trash2, Check, ChevronRight, Search, Heart, Globe, Hammer, PenTool, Microscope, Music, Camera, Coffee, Car, Plane, Home, Sparkles, CheckSquare } from 'lucide-react';
 import { Subject, StudySession, LegalFrontier } from '../types';
 import { 
   Radar, RadarChart, PolarGrid, 
@@ -9,6 +9,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from '../services/offlineService';
 import { toast } from 'sonner';
+import { GoogleGenAI, Type } from "@google/genai";
 
 interface DominioJuridicoProps {
   subjects: Subject[];
@@ -60,6 +61,9 @@ const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessio
   const [editingFrontier, setEditingFrontier] = useState<Partial<LegalFrontier> | null>(null);
   const [selectedFrontierForSubjects, setSelectedFrontierForSubjects] = useState<string | null>(null);
   const [subjectSearchTerm, setSubjectSearchTerm] = useState('');
+  const [selectedSubjectForTopics, setSelectedSubjectForTopics] = useState<Subject | null>(null);
+  const [isTopicModalOpen, setIsTopicModalOpen] = useState(false);
+  const [isGeneratingTopics, setIsGeneratingTopics] = useState(false);
 
   useEffect(() => {
     const loadFrontiers = async () => {
@@ -135,10 +139,16 @@ const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessio
           const status = getStatus(hours);
           if (status !== 'locked') conqueredTerritories++;
           areaHours[frontier.id] += hours;
+          
+          const completedTopics = sub.topics?.filter(t => t.completed).length || 0;
+          const totalTopics = sub.topics?.length || 0;
+          const topicProgress = totalTopics > 0 ? (completedTopics / totalTopics) * 100 : 0;
+
           return {
             ...sub,
             hours: hours,
             status,
+            topicProgress
           };
         })
         .sort((a, b) => b.hours - a.hours);
@@ -271,6 +281,53 @@ const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessio
 
     await db.legal_frontiers.update(frontierId, { subject_ids: newSubjectIds } as any);
     setCustomFrontiers(prev => prev.map(f => f.id === frontierId ? { ...f, subject_ids: newSubjectIds } : f));
+  };
+
+  const generateTopicsWithAI = async (subject: Subject) => {
+    if (!subject.name) return;
+    setIsGeneratingTopics(true);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: `Gere uma lista de 10 a 15 tópicos principais de estudo para a disciplina de Direito: "${subject.name}". Retorne apenas um array JSON de strings com os títulos dos tópicos.`,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING }
+          }
+        }
+      });
+
+      const topicTitles = JSON.parse(response.text);
+      const newTopics = topicTitles.map((title: string) => ({
+        id: crypto.randomUUID(),
+        title,
+        completed: false
+      }));
+
+      await db.subjects.update(subject.id, { topics: newTopics });
+      setSelectedSubjectForTopics(prev => prev ? { ...prev, topics: newTopics } : null);
+      toast.success(`Ementa gerada para ${subject.name}!`);
+    } catch (error) {
+      console.error("Erro ao gerar tópicos:", error);
+      toast.error("Falha ao gerar ementa com IA.");
+    } finally {
+      setIsGeneratingTopics(false);
+    }
+  };
+
+  const toggleTopicCompletion = async (subjectId: string, topicId: string) => {
+    const subject = subjects.find(s => s.id === subjectId);
+    if (!subject || !subject.topics) return;
+
+    const newTopics = subject.topics.map(t => 
+      t.id === topicId ? { ...t, completed: !t.completed } : t
+    );
+
+    await db.subjects.update(subjectId, { topics: newTopics });
+    setSelectedSubjectForTopics(prev => prev ? { ...prev, topics: newTopics } : null);
   };
 
   return (
@@ -487,7 +544,11 @@ const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessio
                          key={sub.id} 
                          layout
                          whileHover={{ scale: 1.02 }}
-                         className={`group relative ${bgClass} p-5 rounded-3xl border-2 ${borderColor} shadow-lg transition-all ${opacity} cursor-default`}
+                         onClick={() => {
+                           setSelectedSubjectForTopics(sub);
+                           setIsTopicModalOpen(true);
+                         }}
+                         className={`group relative ${bgClass} p-5 rounded-3xl border-2 ${borderColor} shadow-lg transition-all ${opacity} cursor-pointer`}
                        >
                           <div className="flex justify-between items-start mb-4">
                              <div className="w-4 h-4 rounded-full shadow-inner" style={{ backgroundColor: sub.color }} />
@@ -504,19 +565,41 @@ const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessio
                               <span className="text-[9px] font-black uppercase tracking-tighter" style={{ color: statusInfo.color }}>
                                 {statusInfo.label}
                               </span>
-                              <span className="text-[9px] font-bold text-slate-400">
-                                {Number(sub.hours).toFixed(1)}h
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[9px] font-bold text-slate-400">
+                                  {Number(sub.hours).toFixed(1)}h
+                                </span>
+                                {sub.topics && sub.topics.length > 0 && (
+                                  <span className="text-[9px] font-bold text-sanfran-rubi">
+                                    {Math.round(sub.topicProgress)}%
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
 
-                          {/* Mini Progress Bar for each subject */}
+                          {/* Progress Bars */}
                           {!isLocked && (
-                            <div className="mt-3 h-1 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
-                              <div 
-                                className="h-full bg-slate-400/30 rounded-full" 
-                                style={{ width: `${Math.min(100, (sub.hours / TIERS.dominated.hours) * 100)}%`, backgroundColor: sub.color }} 
-                              />
+                            <div className="mt-3 space-y-2">
+                              {/* Effort Progress (Hours) */}
+                              <div className="h-1 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-slate-400/30 rounded-full" 
+                                  style={{ width: `${Math.min(100, (sub.hours / TIERS.dominated.hours) * 100)}%`, backgroundColor: sub.color }} 
+                                />
+                              </div>
+                              {/* Content Coverage Progress (Topics) */}
+                              {sub.topics && sub.topics.length > 0 && (
+                                <div className="h-1 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full bg-sanfran-rubi rounded-full" 
+                                    style={{ width: `${sub.topicProgress}%` }} 
+                                  />
+                                </div>
+                              )}
+                              {(!sub.topics || sub.topics.length === 0) && (
+                                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest text-center">Ementa não definida</p>
+                              )}
                             </div>
                           )}
                        </motion.div>
@@ -729,6 +812,109 @@ const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessio
                   className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-5 rounded-2xl font-black uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-xl"
                 >
                   Concluir Atribuição
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL: TOPIC MANAGEMENT */}
+      <AnimatePresence>
+        {isTopicModalOpen && selectedSubjectForTopics && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsTopicModalOpen(false)}
+              className="absolute inset-0 bg-slate-950/90 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-xl bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10 flex flex-col max-h-[85vh]"
+            >
+              <div className="p-8 border-b border-slate-100 dark:border-white/5 flex justify-between items-start">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: selectedSubjectForTopics.color }} />
+                    <h3 className="text-2xl font-black uppercase tracking-tight text-slate-900 dark:text-white">{selectedSubjectForTopics.name}</h3>
+                  </div>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Ementa e Cobertura de Conteúdo</p>
+                </div>
+                <button onClick={() => setIsTopicModalOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded-full transition-colors">
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
+                {(!selectedSubjectForTopics.topics || selectedSubjectForTopics.topics.length === 0) ? (
+                  <div className="py-12 flex flex-col items-center justify-center text-center space-y-6">
+                    <div className="p-6 bg-slate-50 dark:bg-white/5 rounded-full">
+                      <Sparkles className="w-12 h-12 text-sanfran-rubi animate-pulse" />
+                    </div>
+                    <div className="space-y-2">
+                      <h4 className="text-lg font-black uppercase text-slate-900 dark:text-white">Ementa não definida</h4>
+                      <p className="text-sm text-slate-500 max-w-xs">Você ainda não definiu os tópicos desta matéria. Use nossa IA para gerar uma ementa padrão baseada no currículo jurídico.</p>
+                    </div>
+                    <button 
+                      onClick={() => generateTopicsWithAI(selectedSubjectForTopics)}
+                      disabled={isGeneratingTopics}
+                      className="flex items-center gap-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-8 py-4 rounded-2xl font-black uppercase tracking-widest hover:scale-105 transition-all disabled:opacity-50"
+                    >
+                      {isGeneratingTopics ? <Loader2 className="animate-spin" size={20} /> : <Sparkles size={20} />}
+                      Gerar Ementa com IA
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-3">
+                        <CheckSquare className="text-sanfran-rubi" size={20} />
+                        <span className="text-sm font-black uppercase text-slate-900 dark:text-white">Progresso de Conteúdo</span>
+                      </div>
+                      <span className="text-lg font-black text-sanfran-rubi">
+                        {Math.round((selectedSubjectForTopics.topics.filter(t => t.completed).length / selectedSubjectForTopics.topics.length) * 100)}%
+                      </span>
+                    </div>
+
+                    <div className="grid gap-3">
+                      {selectedSubjectForTopics.topics.map(topic => (
+                        <button
+                          key={topic.id}
+                          onClick={() => toggleTopicCompletion(selectedSubjectForTopics.id, topic.id)}
+                          className={`flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left ${topic.completed ? 'border-sanfran-rubi bg-sanfran-rubi/5' : 'border-slate-100 dark:border-white/5 hover:border-slate-200'}`}
+                        >
+                          <div className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${topic.completed ? 'bg-sanfran-rubi text-white' : 'bg-slate-100 dark:bg-white/5 text-slate-300'}`}>
+                            {topic.completed && <Check size={14} />}
+                          </div>
+                          <span className={`text-sm font-bold uppercase ${topic.completed ? 'text-slate-900 dark:text-white' : 'text-slate-500'}`}>
+                            {topic.title}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+
+                    <button 
+                      onClick={() => generateTopicsWithAI(selectedSubjectForTopics)}
+                      disabled={isGeneratingTopics}
+                      className="w-full mt-8 flex items-center justify-center gap-3 py-4 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl text-slate-400 hover:border-sanfran-rubi hover:text-sanfran-rubi transition-all font-bold uppercase text-xs"
+                    >
+                      {isGeneratingTopics ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
+                      Regerar Ementa com IA
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-8 bg-slate-50 dark:bg-white/5 border-t border-slate-100 dark:border-white/5">
+                <button 
+                  onClick={() => setIsTopicModalOpen(false)}
+                  className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-5 rounded-2xl font-black uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-xl"
+                >
+                  Fechar Ementa
                 </button>
               </div>
             </motion.div>
