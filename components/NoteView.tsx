@@ -997,6 +997,23 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                         onToggleSidebar(true);
                       }
                     }} 
+                    title={selectedNote.title || 'Documento sem título'}
+                    onRename={() => {
+                      const title = prompt('Novo título:', selectedNote.title);
+                      if (title && title !== selectedNote.title) {
+                        const updatedNote = { ...selectedNote, title, updated_at: new Date().toISOString() };
+                        setSelectedNote(updatedNote);
+                        dataService.saveNote(updatedNote, userId, isOnline);
+                        setNotes(prev => prev.map(n => n.id === updatedNote.id ? updatedNote : n));
+                      }
+                    }}
+                    isStarred={!!selectedNote.is_starred}
+                    onToggleStar={() => {
+                      const updatedNote = { ...selectedNote, is_starred: !selectedNote.is_starred, updated_at: new Date().toISOString() };
+                      setSelectedNote(updatedNote);
+                      dataService.saveNote(updatedNote, userId, isOnline);
+                      setNotes(prev => prev.map(n => n.id === updatedNote.id ? updatedNote : n));
+                    }}
                   />
                   <div ref={onEditorRef} className="flex-1 quill-editor-custom paper-effect min-h-[500px] rounded-b-3xl border-t-0" />
                 </div>

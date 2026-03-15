@@ -257,6 +257,7 @@ export interface Note {
   handwriting_data?: string; // Base64 or JSON of paths
   updated_at: string;
   tags?: string[];
+  is_starred?: boolean;
 }
 
 export interface SubjectFile {

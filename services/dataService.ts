@@ -652,7 +652,8 @@ export const dataService = {
           ...note,
           user_id: userId,
           subject_id: note.subject_id,
-          handwriting_data: note.handwriting_data || null
+          handwriting_data: note.handwriting_data || null,
+          is_starred: note.is_starred || false
         });
         
         if (error) {
