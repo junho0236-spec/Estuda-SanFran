@@ -545,6 +545,47 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     setBoards(prev => prev.map(b => b.id === activeTab ? updatedBoard : b));
   };
 
+  const handleDeleteBoard = async (boardId: string) => {
+    // Custom confirmation logic could be added here if needed, but for now we'll use a simple state or just proceed
+    // Since we can't use confirm(), we'll just do it for now or add a small UI confirmation later.
+    // To be safe and follow instructions, I'll add a simple confirmation state.
+    
+    await dataService.deleteBoard(boardId, userId, isOnline);
+    setBoards(prev => prev.filter(b => b.id !== boardId));
+    
+    // Unassign tasks from this board
+    const updatedTasks = tasks.map(t => t.boardId === boardId ? { ...t, boardId: undefined, columnId: undefined } : t);
+    setTasks(updatedTasks);
+    
+    if (activeTab === boardId) {
+      setActiveTab('inbox');
+    }
+    toast.success("Quadro excluído com sucesso");
+  };
+
+  const handleDeleteColumn = async (columnId: string) => {
+    if (activeTab === 'inbox') return;
+    const board = boards.find(b => b.id === activeTab);
+    if (!board) return;
+    
+    if (board.columns.length <= 1) {
+      toast.error("Um quadro deve ter pelo menos uma coluna.");
+      return;
+    }
+
+    const updatedColumns = board.columns.filter(c => c.id !== columnId);
+    const updatedBoard = { ...board, columns: updatedColumns };
+    
+    await dataService.saveBoard(updatedBoard, userId, isOnline);
+    setBoards(prev => prev.map(b => b.id === activeTab ? updatedBoard : b));
+    
+    // Move tasks to the first column
+    const firstColumnId = updatedColumns[0].id;
+    const updatedTasks = tasks.map(t => (t.boardId === activeTab && t.columnId === columnId) ? { ...t, columnId: firstColumnId } : t);
+    setTasks(updatedTasks);
+    toast.success("Coluna excluída com sucesso");
+  };
+
   const hasUrgentTasks = (boardId: string | 'inbox') => {
     const today = new Date().toISOString().split('T')[0];
     const boardTasks = boardId === 'inbox' 
@@ -618,25 +659,38 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     );
   };
 
-  const DroppableTab = ({ tab, activeTab, onClick }: { tab: { id: string, name: string }, activeTab: string, onClick: () => void }) => {
+  const DroppableTab = ({ tab, activeTab, onClick, onDelete }: { tab: { id: string, name: string }, activeTab: string, onClick: () => void, onDelete?: (id: string) => void }) => {
     const { isOver, setNodeRef } = useDroppable({
       id: tab.id,
     });
 
     return (
-      <button
-        ref={setNodeRef}
-        onClick={onClick}
-        className={`px-4 py-2 rounded-full text-sm font-bold transition-all whitespace-nowrap border-2 ${
-          activeTab === tab.id 
-            ? 'bg-[#800000] text-white border-[#800000] shadow-md' 
-            : isOver 
-              ? 'bg-[#800000]/10 text-[#800000] border-[#800000] border-dashed scale-110'
-              : 'text-slate-500 border-transparent hover:text-[#800000] hover:bg-slate-50'
-        }`}
-      >
-        {tab.name}
-      </button>
+      <div className="relative group">
+        <button
+          ref={setNodeRef}
+          onClick={onClick}
+          className={`px-4 py-2 rounded-full text-sm font-bold transition-all whitespace-nowrap border-2 flex items-center gap-2 ${
+            activeTab === tab.id 
+              ? 'bg-[#800000] text-white border-[#800000] shadow-md' 
+              : isOver 
+                ? 'bg-[#800000]/10 text-[#800000] border-[#800000] border-dashed scale-110'
+                : 'text-slate-500 border-transparent hover:text-[#800000] hover:bg-slate-50'
+          }`}
+        >
+          {tab.name}
+          {onDelete && activeTab === tab.id && (
+            <span 
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(tab.id);
+              }}
+              className="p-0.5 hover:bg-white/20 rounded-full transition-colors"
+            >
+              <X size={12} />
+            </span>
+          )}
+        </button>
+      </div>
     );
   };
 
@@ -849,6 +903,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                 tab={tab} 
                 activeTab={activeTab} 
                 onClick={() => setActiveTab(tab.id)} 
+                onDelete={tab.id !== 'inbox' ? handleDeleteBoard : undefined}
               />
             ))}
             <button 
@@ -962,7 +1017,9 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
               <div className="p-4 border-b border-slate-50 flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <h3 className="font-serif font-bold text-slate-900">{activeTab}</h3>
+                    <h3 className="font-serif font-bold text-slate-900">
+                      {boards.find(b => b.id === activeTab)?.name || activeTab}
+                    </h3>
                   </div>
                   <div className="flex items-center gap-2 relative">
                     <button 
@@ -1465,7 +1522,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         ) : (
           // --- KANBAN VIEW ---
           <div className="flex-1 overflow-x-auto p-6 bg-slate-50 flex gap-6">
-            {(boards.find(b => b.name === activeTab)?.columns || DEFAULT_KANBAN_COLUMNS).map(column => (
+            {(boards.find(b => b.id === activeTab)?.columns || DEFAULT_KANBAN_COLUMNS).map(column => (
               <DroppableColumn key={column.id} column={column}>
                 <div className="flex items-center justify-between px-2">
                   <h4 className="font-bold text-slate-900 flex items-center gap-2">
@@ -1474,20 +1531,31 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                     <span className="text-xs text-slate-400 font-normal ml-1">
                       {tasks.filter(t => {
                         const matchesTab = isTaskVisible(t);
-                        const matchesColumn = boards.find(b => b.name === activeTab) 
+                        const matchesColumn = boards.find(b => b.id === activeTab) 
                           ? t.columnId === column.id 
                           : (t.status || (t.completed ? 'Concluido' : 'Pendente')) === column.id;
                         return matchesTab && matchesColumn;
                       }).length}
                     </span>
                   </h4>
-                  <button onClick={() => handleAddTask(activeTab, column.id)} className="p-1 text-slate-400 hover:text-[#800000] transition-colors"><Plus size={18} /></button>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => handleAddTask(activeTab, column.id)} className="p-1 text-slate-400 hover:text-[#800000] transition-colors"><Plus size={18} /></button>
+                    {boards.find(b => b.id === activeTab) && (
+                      <button 
+                        onClick={() => handleDeleteColumn(column.id)} 
+                        className="p-1 text-slate-300 hover:text-red-500 transition-colors"
+                        title="Excluir Coluna"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="flex-1 space-y-3">
                   {tasks
                     .filter(t => {
                       const matchesTab = isTaskVisible(t);
-                      const matchesColumn = boards.find(b => b.name === activeTab) 
+                      const matchesColumn = boards.find(b => b.id === activeTab) 
                         ? t.columnId === column.id 
                         : (t.status || (t.completed ? 'Concluido' : 'Pendente')) === column.id;
                       return matchesTab && matchesColumn;

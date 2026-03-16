@@ -788,6 +788,7 @@ export const dataService = {
              payload.user_id = userId;
              payload.created_at = payload.createdAt;
              delete payload.createdAt;
+             delete payload.userId;
           }
           if (item.table === 'flashcards') {
              payload.subject_id = payload.subjectId || null;
