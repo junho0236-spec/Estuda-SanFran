@@ -32,6 +32,25 @@ const SizeStyle = Quill.import('attributors/style/size') as any;
 SizeStyle.whitelist = ['8px', '10px', '12px', '14px', '16px', '18px', '20px', '24px', '32px', '48px', '64px'];
 Quill.register(SizeStyle, true);
 
+// Register Comment
+const Inline = Quill.import('blots/inline') as any;
+class CommentBlot extends Inline {
+  static create(value: string) {
+    const node = super.create();
+    node.setAttribute('data-comment', value);
+    node.setAttribute('title', value);
+    node.className = 'bg-yellow-200 dark:bg-yellow-900/50 border-b border-yellow-400 cursor-help';
+    return node;
+  }
+
+  static formats(node: HTMLElement) {
+    return node.getAttribute('data-comment');
+  }
+}
+CommentBlot.blotName = 'comment';
+CommentBlot.tagName = 'span';
+Quill.register(CommentBlot);
+
 // Set up pdfjs worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
@@ -54,7 +73,8 @@ const formats = [
   'color', 'background',
   'align',
   'code-block',
-  'lineheight'
+  'lineheight',
+  'comment'
 ];
 
 const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId, isOnline, initialTab = 'notes', onBack, onNavigateToAnki, subjects, onToggleSidebar }) => {
@@ -159,6 +179,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
 
   const modules = useMemo(() => ({
     history: { delay: 1000, maxStack: 500 },
+    table: true,
     toolbar: {
       container: '#docs-toolbar',
       handlers: {
@@ -1217,7 +1238,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
 
                   <div className="flex-1 flex overflow-hidden relative z-0">
                     <div 
-                      className={`flex-1 quill-editor-custom overflow-y-auto ${showPrintLayout && !isPageless ? 'paper-effect p-10 md:p-20 bg-slate-200 dark:bg-slate-900/50' : 'bg-white dark:bg-slate-900'} ${showNonPrintingChars ? 'show-non-printing' : ''} relative`}
+                      className={`flex-1 quill-editor-custom overflow-y-auto ${showPrintLayout && !isPageless ? 'paper-effect p-4 md:p-8' : 'bg-white dark:bg-[#1a1a1a]'} ${showNonPrintingChars ? 'show-non-printing' : ''} relative`}
                       onClick={() => {
                         const editor = document.querySelector('.ql-editor') as HTMLElement;
                         if (editor) {
@@ -1233,7 +1254,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                         contentEditable={editMode !== 'viewing'}
                         suppressContentEditableWarning={true}
                         onInput={(e) => setNoteContent(e.currentTarget.innerHTML)}
-                        className={`flex-1 bg-white dark:bg-slate-900 ${showPrintLayout && !isPageless ? `shadow-[0_1px_3px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.08)] ${pageOrientation === 'portrait' ? 'max-w-[816px] min-h-[1056px]' : 'max-w-[1056px] min-h-[816px]'} mx-auto border border-slate-200 dark:border-white/10` : 'h-full w-full'}`} 
+                        className={`flex-1 ${showPrintLayout && !isPageless ? `shadow-[0_1px_3px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.08)] ${pageOrientation === 'portrait' ? 'max-w-[816px] min-h-[1056px]' : 'max-w-[1056px] min-h-[816px]'} mx-auto border border-slate-200 dark:border-white/10` : 'h-full w-full max-w-[1200px] mx-auto'}`} 
                         style={{
                           transform: zoom !== '100%' ? `scale(${parseInt(zoom) / 100})` : 'none',
                           transformOrigin: 'top center',

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Quill from 'quill';
 import { 
   Undo2, Redo2, Printer, SpellCheck, Paintbrush, Type, Bold, Italic, 
   Underline, Strikethrough, Baseline, Highlighter, Link, MessageSquarePlus, AlignLeft, 
@@ -332,30 +333,16 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
   };
 
   const handleAddComment = () => {
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0 || selection.toString().trim() === '') {
-      toast.error('Selecione um texto para comentar.');
-      return;
-    }
-
-    const comment = window.prompt('Digite seu comentário:');
-    if (comment) {
-      const range = selection.getRangeAt(0);
-      const span = document.createElement('span');
-      span.className = 'bg-yellow-200 dark:bg-yellow-900/50 border-b border-yellow-400 cursor-help';
-      span.title = comment;
-      span.id = `comment-${Date.now()}`;
-      
-      try {
-        range.surroundContents(span);
-        console.log(`Comentário criado: ID=${span.id}, Texto="${selection.toString()}", Comentário="${comment}"`);
-        toast.success('Comentário adicionado.');
-      } catch (e) {
-        const content = range.extractContents();
-        span.appendChild(content);
-        range.insertNode(span);
-        console.log(`Comentário criado (via fallback): ID=${span.id}, Comentário="${comment}"`);
-        toast.success('Comentário adicionado.');
+    if (quillRef.current) {
+      const selection = quillRef.current.getSelection();
+      if (selection && selection.length > 0) {
+        const comment = window.prompt('Digite seu comentário:');
+        if (comment) {
+          quillRef.current.format('comment', comment);
+          toast.success('Comentário adicionado.');
+        }
+      } else {
+        toast.error('Selecione um texto para comentar.');
       }
     }
   };
@@ -553,19 +540,26 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
     const rows = parseInt(prompt('Número de linhas:', '3') || '0', 10);
     const cols = parseInt(prompt('Número de colunas:', '3') || '0', 10);
     if (rows > 0 && cols > 0 && quillRef.current) {
-      let tableHtml = '<table style="width: 100%; border-collapse: collapse;" border="1">';
-      for (let i = 0; i < rows; i++) {
-        tableHtml += '<tr>';
-        for (let j = 0; j < cols; j++) {
-          tableHtml += '<td style="border: 1px solid #ccc; padding: 8px;">&nbsp;</td>';
-        }
-        tableHtml += '</tr>';
-      }
-      tableHtml += '</table><p><br></p>';
       const quill = quillRef.current;
-      const range = quill.getSelection(true);
-      quill.clipboard.dangerouslyPasteHTML(range.index, tableHtml);
-      toast.success('Tabela inserida.');
+      const table = quill.getModule('table');
+      if (table) {
+        table.insertTable(rows, cols);
+        toast.success('Tabela inserida.');
+      } else {
+        let tableHtml = '<table style="width: 100%; border-collapse: collapse;" border="1">';
+        for (let i = 0; i < rows; i++) {
+          tableHtml += '<tr>';
+          for (let j = 0; j < cols; j++) {
+            tableHtml += '<td style="border: 1px solid #ccc; padding: 8px;">&nbsp;</td>';
+          }
+          tableHtml += '</tr>';
+        }
+        tableHtml += '</table><p><br></p>';
+        const range = quill.getSelection(true);
+        const delta = quill.clipboard.convert({ html: tableHtml });
+        quill.updateContents(new Quill.import('delta')().retain(range.index).concat(delta), 'user');
+        toast.success('Tabela inserida.');
+      }
     }
   };
 
@@ -575,7 +569,8 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
       const html = `<h2>Notas de Reunião - ${date}</h2><p><strong>Participantes:</strong> </p><p><strong>Pauta:</strong></p><ul><li></li></ul><p><strong>Ações:</strong></p><ul><li>[ ] </li></ul><p><br></p>`;
       const quill = quillRef.current;
       const range = quill.getSelection(true);
-      quill.clipboard.dangerouslyPasteHTML(range.index, html);
+      const delta = quill.clipboard.convert({ html });
+      quill.updateContents(new Quill.import('delta')().retain(range.index).concat(delta), 'user');
       toast.success('Nota de reunião inserida.');
     }
   };
@@ -585,7 +580,8 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
       const html = `<table style="width: 100%; border-collapse: collapse;" border="1"><tr style="background-color: #f3f4f6;"><th style="border: 1px solid #ccc; padding: 8px;">Tarefa</th><th style="border: 1px solid #ccc; padding: 8px;">Status</th><th style="border: 1px solid #ccc; padding: 8px;">Responsável</th><th style="border: 1px solid #ccc; padding: 8px;">Prazo</th></tr><tr><td style="border: 1px solid #ccc; padding: 8px;">Nova Tarefa</td><td style="border: 1px solid #ccc; padding: 8px;">Não Iniciado</td><td style="border: 1px solid #ccc; padding: 8px;">@Nome</td><td style="border: 1px solid #ccc; padding: 8px;">dd/mm/aaaa</td></tr></table><p><br></p>`;
       const quill = quillRef.current;
       const range = quill.getSelection(true);
-      quill.clipboard.dangerouslyPasteHTML(range.index, html);
+      const delta = quill.clipboard.convert({ html });
+      quill.updateContents(new Quill.import('delta')().retain(range.index).concat(delta), 'user');
       toast.success('Rastreador inserido.');
     }
   };
@@ -596,7 +592,8 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
       const quill = quillRef.current;
       const range = quill.getSelection(true);
       const html = `<span style="background-color: #e2e8f0; padding: 2px 6px; border-radius: 12px; font-size: 0.9em;">@${name}</span>&nbsp;`;
-      quill.clipboard.dangerouslyPasteHTML(range.index, html);
+      const delta = quill.clipboard.convert({ html });
+      quill.updateContents(new Quill.import('delta')().retain(range.index).concat(delta), 'user');
       toast.success('Pessoa marcada.');
     }
   };
@@ -607,7 +604,8 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
       const quill = quillRef.current;
       const range = quill.getSelection(true);
       const html = `<span style="background-color: #e2e8f0; padding: 2px 6px; border-radius: 12px; font-size: 0.9em;">${date}</span>&nbsp;`;
-      quill.clipboard.dangerouslyPasteHTML(range.index, html);
+      const delta = quill.clipboard.convert({ html });
+      quill.updateContents(new Quill.import('delta')().retain(range.index).concat(delta), 'user');
       toast.success('Data inserida.');
     }
   };
@@ -617,7 +615,8 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
       const html = `<hr style="page-break-after: always; border: 0; border-top: 2px dashed #ccc; margin: 20px 0;" title="Quebra de página" /><p><br></p>`;
       const quill = quillRef.current;
       const range = quill.getSelection(true);
-      quill.clipboard.dangerouslyPasteHTML(range.index, html);
+      const delta = quill.clipboard.convert({ html });
+      quill.updateContents(new Quill.import('delta')().retain(range.index).concat(delta), 'user');
       toast.success('Quebra de página inserida.');
     }
   };
@@ -627,7 +626,8 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
       const html = `<hr style="border: 0; border-top: 2px dotted #3b82f6; margin: 20px 0;" title="Quebra de seção" /><p><br></p>`;
       const quill = quillRef.current;
       const range = quill.getSelection(true);
-      quill.clipboard.dangerouslyPasteHTML(range.index, html);
+      const delta = quill.clipboard.convert({ html });
+      quill.updateContents(new Quill.import('delta')().retain(range.index).concat(delta), 'user');
       toast.success('Quebra de seção inserida.');
     }
   };
@@ -704,7 +704,8 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
       const html = `<div style="padding: 20px; background: #f8fafc; border: 1px solid #e2e8f0; text-align: center; color: #64748b;">[ Gráfico Reservado - Edite os dados na planilha vinculada ]</div><p><br></p>`;
       const quill = quillRef.current;
       const range = quill.getSelection(true);
-      quill.clipboard.dangerouslyPasteHTML(range.index, html);
+      const delta = quill.clipboard.convert({ html });
+      quill.updateContents(new Quill.import('delta')().retain(range.index).concat(delta), 'user');
       toast.success('Gráfico inserido.');
     }
   };
@@ -714,7 +715,8 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
       const html = `<div style="padding: 40px; background: #f8fafc; border: 1px dashed #cbd5e1; text-align: center; color: #64748b;">[ Área de Desenho ]</div><p><br></p>`;
       const quill = quillRef.current;
       const range = quill.getSelection(true);
-      quill.clipboard.dangerouslyPasteHTML(range.index, html);
+      const delta = quill.clipboard.convert({ html });
+      quill.updateContents(new Quill.import('delta')().retain(range.index).concat(delta), 'user');
       toast.success('Desenho inserido.');
     }
   };
@@ -726,7 +728,8 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         const html = `<a name="${name.replace(/\s+/g, '-').toLowerCase()}" style="border-left: 2px solid #3b82f6; padding-left: 4px;">[Favorito: ${name}]</a>&nbsp;`;
         const quill = quillRef.current;
         const range = quill.getSelection(true);
-        quill.clipboard.dangerouslyPasteHTML(range.index, html);
+        const delta = quill.clipboard.convert({ html });
+        quill.updateContents(new Quill.import('delta')().retain(range.index).concat(delta), 'user');
         toast.success('Favorito adicionado.');
       }
     }
@@ -779,7 +782,8 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         const html = `<div style="margin-top: 40px; text-align: center; width: 300px;"><hr style="border-top: 1px solid #000;" /><p>${name}</p></div><p><br></p>`;
         const quill = quillRef.current;
         const range = quill.getSelection(true);
-        quill.clipboard.dangerouslyPasteHTML(range.index, html);
+        const delta = quill.clipboard.convert({ html });
+        quill.updateContents(new Quill.import('delta')().retain(range.index).concat(delta), 'user');
         toast.success('Assinatura inserida.');
       }
     }

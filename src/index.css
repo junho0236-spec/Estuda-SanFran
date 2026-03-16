@@ -72,26 +72,29 @@
 
 .quill-editor-custom .ql-container {
   flex-grow: 1;
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
   border: none;
-  background-color: var(--bg-color);
   font-family: var(--font-sans);
-  font-size: 1rem;
+  font-size: 11pt;
   line-height: 1.5;
-  padding: 1rem;
+  padding: 0;
 }
 
 .quill-editor-custom .ql-editor {
   min-height: 100%;
-  padding: 1rem;
+  padding: 96px; /* 1 inch margins like Google Docs */
+  background-color: #ffffff;
+}
+
+.dark .quill-editor-custom .ql-editor {
+  background-color: #1a1a1a;
+  color: #e2e8f0;
 }
 
 .quill-editor-custom .ql-editor.ql-blank::before {
-  color: #718096;
+  color: #94a3b8;
   font-style: normal;
-  left: 1rem;
-  right: 1rem;
+  left: 96px;
+  right: 96px;
 }
 
 .ql-picker-options {
@@ -100,13 +103,12 @@
 
 /* Dark mode adjustments */
 .dark .quill-editor-custom .ql-toolbar {
-  background-color: #2D3748;
+  background-color: #1e293b;
   border-color: var(--border-color);
 }
 
 .dark .quill-editor-custom .ql-container {
-  background-color: #1A202C;
-  color: #F5F2ED;
+  color: #f8fafc;
 }
 
 .dark .quill-editor-custom .ql-editor.ql-blank::before {
@@ -215,19 +217,11 @@
 
 /* Paper Effect for Editor */
 .paper-effect {
-  background-image: 
-    linear-gradient(#f1f1f1 1px, transparent 1px),
-    linear-gradient(90deg, #f1f1f1 1px, transparent 1px);
-  background-size: 30px 30px;
-  background-color: #fff;
+  background-color: #f8f9fa; /* Google Docs gray background */
 }
 
 .dark .paper-effect {
-  background-image: 
-    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-  background-size: 30px 30px;
-  background-color: transparent;
+  background-color: #0f172a;
 }
 
 /* Maximized Mode Overrides */
