@@ -209,6 +209,8 @@ export interface Task {
     summary: boolean;
     preExamReview: boolean;
   };
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface StudySession {
@@ -233,6 +235,7 @@ export interface Reading {
   subject_id?: string;
   status: 'lendo' | 'concluido' | 'pausado';
   created_at?: string;
+  updated_at?: string;
 }
 
 export enum StudyMode {

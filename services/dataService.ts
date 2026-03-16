@@ -400,6 +400,7 @@ export const dataService = {
         subtasks: task.subtasks || [],
         delegated_to: task.delegatedTo || null,
         delegated_by: task.delegatedBy || null,
+        created_at: (task as any).created_at || (task as any).createdAt || new Date().toISOString(),
         description: JSON.stringify({
           syllabusLink: task.syllabusLink,
           importantCitations: task.importantCitations,

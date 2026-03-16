@@ -236,6 +236,10 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       title = title.replace(/hoje/gi, '');
     }
 
+    const board = boards.find(b => b.id === activeTab);
+    const boardId = board ? board.id : undefined;
+    const columnId = board ? board.columns[0]?.id : undefined;
+
     const newTask: Task = {
       id: crypto.randomUUID(),
       title: title.trim(),
@@ -250,6 +254,8 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       delegatedToName,
       delegatedBy: userId,
       delegatedByName: userProfile?.full_name || 'Você',
+      boardId,
+      columnId,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     } as any;
@@ -374,7 +380,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       if (durationMinutes > 0) {
         // Save session to feed the Ranking
         const session: StudySession = {
-          id: Math.random().toString(36).substr(2, 9),
+          id: crypto.randomUUID(),
           user_id: userId,
           subject_id: selectedTask?.subjectId || 'geral',
           duration: durationMinutes,
@@ -433,7 +439,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     const columnIdToSet = columnId || (board?.columns[0].id);
 
     const newTask: Task = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: crypto.randomUUID(),
       title,
       completed: false,
       category,
@@ -441,7 +447,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       boardId: boardId || boardIdToSet,
       columnId: columnIdToSet,
       subtasks,
-      createdAt: new Date().toISOString()
+      created_at: new Date().toISOString()
     } as any;
 
     await dataService.saveTask(newTask, userId, isOnline);
@@ -1396,7 +1402,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                             ))}
                             <button 
                               onClick={() => {
-                                const newSubtask: SubTask = { id: Math.random().toString(36).substr(2, 9), title: '', completed: false };
+                                const newSubtask: SubTask = { id: crypto.randomUUID(), title: '', completed: false };
                                 const newSubtasks = [...subtasks, newSubtask];
                                 setSubtasks(newSubtasks);
                                 handleUpdateTask({ subtasks: newSubtasks });

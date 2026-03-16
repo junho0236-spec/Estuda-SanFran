@@ -710,7 +710,8 @@ const App: React.FC = () => {
               delegatedToName: desc.delegatedToName,
               syllabusLink: desc.syllabusLink,
               importantCitations: desc.importantCitations,
-              revisionStatus: desc.revisionStatus
+              revisionStatus: desc.revisionStatus,
+              created_at: t.created_at
             };
           });
 
