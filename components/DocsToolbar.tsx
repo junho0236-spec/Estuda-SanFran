@@ -801,11 +801,14 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
         <div className="relative flex items-center has-tooltip" data-tooltip="Estilos de texto">
-          <select className="ql-header appearance-none bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded pl-2 pr-6 py-1 text-sm font-medium outline-none cursor-pointer transition-colors">
+          <select 
+            className="appearance-none bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded pl-2 pr-6 py-1 text-sm font-medium outline-none cursor-pointer transition-colors"
+            onChange={(e) => handleFormat('header', e.target.value ? parseInt(e.target.value) : false)}
+          >
+            <option value="">Texto normal</option>
             <option value="1">Título 1</option>
             <option value="2">Título 2</option>
             <option value="3">Título 3</option>
-            <option value="">Texto normal</option>
           </select>
           <ChevronDown size={14} className="absolute right-1 pointer-events-none text-slate-600 dark:text-slate-400" />
         </div>
@@ -813,7 +816,10 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
 
         <div className="relative flex items-center has-tooltip" data-tooltip="Fonte">
-          <select className="ql-font appearance-none bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded pl-2 pr-6 py-1 text-sm font-medium outline-none cursor-pointer transition-colors">
+          <select 
+            className="appearance-none bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded pl-2 pr-6 py-1 text-sm font-medium outline-none cursor-pointer transition-colors"
+            onChange={(e) => handleFormat('font', e.target.value)}
+          >
             <option value="sans-serif">Arial</option>
             <option value="serif">Times New Roman</option>
             <option value="monospace">Courier New</option>
@@ -863,21 +869,20 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
-        <div className="relative flex items-center has-tooltip" data-tooltip="Alinhamento">
-          <select className="ql-align appearance-none bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded pl-1 pr-6 py-1 outline-none cursor-pointer transition-colors">
-            <option value=""></option>
-            <option value="center"></option>
-            <option value="right"></option>
-            <option value="justify"></option>
-          </select>
-          <ChevronDown size={14} className="absolute right-1 pointer-events-none text-slate-600 dark:text-slate-400" />
-        </div>
+        <button className="ql-align p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" value="" data-tooltip="Alinhar à esquerda (Ctrl+Shift+L)"><AlignLeft size={18}/></button>
+        <button className="ql-align p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" value="center" data-tooltip="Centralizar (Ctrl+Shift+E)"><AlignCenter size={18}/></button>
+        <button className="ql-align p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" value="right" data-tooltip="Alinhar à direita (Ctrl+Shift+R)"><AlignRight size={18}/></button>
+        <button className="ql-align p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" value="justify" data-tooltip="Justificar (Ctrl+Shift+J)"><AlignJustify size={18}/></button>
         
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
 
-        <div className="relative flex items-center has-tooltip" data-tooltip="Espaçamento entre linhas">
+        <div className="relative flex items-center has-tooltip hover:bg-slate-200 dark:hover:bg-white/10 rounded px-1 py-1 cursor-pointer transition-colors" data-tooltip="Espaçamento entre linhas">
+          <div className="flex items-center gap-0.5">
+            <AlignJustify size={18} className="text-slate-600 dark:text-slate-300" />
+            <ChevronDown size={14} className="text-slate-500" />
+          </div>
           <select 
-            className="appearance-none bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded pl-2 pr-6 py-1 text-sm font-medium outline-none cursor-pointer transition-colors" 
+            className="absolute inset-0 opacity-0 cursor-pointer" 
             onChange={(e) => handleFormat('lineheight', e.target.value)}
           >
             <option value="">Padrão</option>
@@ -886,7 +891,6 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
             <option value="1.5">1.5</option>
             <option value="2">2.0</option>
           </select>
-          <ChevronDown size={14} className="absolute right-1 pointer-events-none text-slate-600 dark:text-slate-400" />
         </div>
 
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
@@ -911,8 +915,8 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         
         <button className="ql-clean p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Limpar formatação (Ctrl+\)"><Eraser size={18}/></button>
 
-        <div className="ml-auto flex items-center gap-2">
-          <button className="flex items-center gap-1.5 px-3 py-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full text-sm font-medium text-slate-700 dark:text-slate-200 transition-colors whitespace-nowrap">
+        <div className="ml-auto flex items-center gap-1">
+          <button className="flex items-center gap-1.5 px-3 py-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full text-sm font-medium text-slate-700 dark:text-slate-200 transition-colors whitespace-nowrap flex-shrink-0">
             <Pencil size={16} className="text-blue-600" />
             <span>Edição</span>
             <ChevronDown size={14} className="text-slate-500" />
