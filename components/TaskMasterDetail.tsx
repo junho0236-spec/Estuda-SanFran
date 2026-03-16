@@ -505,7 +505,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   const handleAddBoard = async () => {
     if (!newBoardName.trim()) return;
     const newBoard: Board = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: crypto.randomUUID(),
       name: newBoardName,
       columns: [
         { id: 'col-1', name: 'A fazer', order: 0 },
@@ -531,7 +531,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     if (!board) return;
 
     const newColumn: BoardColumn = {
-      id: `col-${Math.random().toString(36).substr(2, 5)}`,
+      id: crypto.randomUUID(),
       name,
       order: board.columns.length
     };
