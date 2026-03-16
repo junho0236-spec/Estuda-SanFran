@@ -8,7 +8,7 @@ import {
   MessageSquare, Link as LinkIcon, Search, Replace, Table, Layout, User, Calendar, PenTool, BarChart3,
   Smile, Minus, Scissors, Bookmark, Hash, Heading1, Heading2, Heading3, Columns, RotateCcw,
   Languages, Mic, Book, Quote, FileCheck, FileSearch, CheckSquare, SpellCheck2,
-  Puzzle, Code2, Keyboard, HelpCircle
+  Puzzle, Code2, Keyboard, HelpCircle, CloudCheck, Video, MessageSquareText, Lock, Pencil
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -295,6 +295,12 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                 className={`p-1 rounded hover:bg-slate-100 dark:hover:bg-white/5 transition-colors ${isStarred ? 'text-yellow-500' : 'text-slate-400'}`}
               >
                 <Star size={18} fill={isStarred ? 'currentColor' : 'none'} />
+              </button>
+              <button className="p-1 rounded hover:bg-slate-100 dark:hover:bg-white/5 transition-colors text-slate-400">
+                <Folder size={18} />
+              </button>
+              <button className="p-1 rounded hover:bg-slate-100 dark:hover:bg-white/5 transition-colors text-slate-400">
+                <CloudCheck size={18} />
               </button>
             </div>
             {/* Menus Row */}
@@ -748,10 +754,13 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
             <Clock size={20} />
           </button>
           <button className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
-            <MessageSquarePlus size={20} />
+            <MessageSquareText size={20} />
+          </button>
+          <button className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
+            <Video size={20} />
           </button>
           <button className="flex items-center gap-2 px-4 py-1.5 bg-[#c2e7ff] hover:bg-[#b3d9f2] text-[#001d35] rounded-full font-medium text-sm transition-colors">
-            <Share2 size={18} />
+            <Lock size={16} />
             Compartilhar
           </button>
           <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
@@ -762,6 +771,16 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
       {/* Toolbar Row */}
       <div id="docs-toolbar" className={`flex flex-wrap items-center gap-0.5 px-3 py-1 bg-[#edf2fa] dark:bg-slate-800/50 border-t border-slate-200 dark:border-white/10 transition-all ${isExpanded ? '' : 'h-0 overflow-hidden py-0 border-t-0'}`}>
+        <div className="flex items-center bg-white dark:bg-slate-900 rounded-full px-3 py-1.5 mr-2 shadow-sm border border-slate-200 dark:border-white/10 w-48">
+          <Search size={16} className="text-slate-500 mr-2" />
+          <input 
+            type="text" 
+            placeholder="Menus" 
+            className="bg-transparent border-none outline-none text-sm w-full text-slate-700 dark:text-slate-200 placeholder:text-slate-500"
+            onClick={() => setShowMenuSearch(true)}
+            readOnly
+          />
+        </div>
         <button className="ql-undo p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Desfazer (Ctrl+Z)"><Undo2 size={18}/></button>
         <button className="ql-redo p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Refazer (Ctrl+Y)"><Redo2 size={18}/></button>
         <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" onClick={onPrint} data-tooltip="Imprimir (Ctrl+P)"><Printer size={18}/></button>
@@ -776,23 +795,25 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
-        <select 
-          className="bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-2 py-1 text-sm font-medium outline-none cursor-pointer transition-colors has-tooltip" 
-          data-tooltip="Zoom" 
-          value={zoom}
-          onChange={(e) => {
-            setZoom(e.target.value);
-            const editor = quillRef.current?.root;
-            if (editor) editor.style.zoom = e.target.value.replace('%', '') + '%';
-          }}
-        >
-          <option value="50%">50%</option>
-          <option value="75%">75%</option>
-          <option value="100%">100%</option>
-          <option value="125%">125%</option>
-          <option value="150%">150%</option>
-          <option value="200%">200%</option>
-        </select>
+        <div className="relative flex items-center has-tooltip" data-tooltip="Zoom">
+          <select 
+            className="appearance-none bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded pl-2 pr-6 py-1 text-sm font-medium outline-none cursor-pointer transition-colors" 
+            value={zoom}
+            onChange={(e) => {
+              setZoom(e.target.value);
+              const editor = quillRef.current?.root;
+              if (editor) editor.style.zoom = e.target.value.replace('%', '') + '%';
+            }}
+          >
+            <option value="50%">50%</option>
+            <option value="75%">75%</option>
+            <option value="100%">100%</option>
+            <option value="125%">125%</option>
+            <option value="150%">150%</option>
+            <option value="200%">200%</option>
+          </select>
+          <ChevronDown size={14} className="absolute right-1 pointer-events-none text-slate-600 dark:text-slate-400" />
+        </div>
 
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
@@ -899,13 +920,23 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         
         <button className="ql-clean p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Limpar formatação (Ctrl+\)"><Eraser size={18}/></button>
 
-        <button 
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="ml-auto p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded text-slate-500 transition-colors has-tooltip"
-          data-tooltip={isExpanded ? "Ocultar os menus" : "Mostrar os menus"}
-        >
-          <ChevronDown size={18} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <button className="flex items-center gap-1.5 px-3 py-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full text-sm font-medium text-slate-700 dark:text-slate-200 transition-colors">
+            <Pencil size={16} className="text-blue-600" />
+            Edição
+            <ChevronDown size={14} className="text-slate-500" />
+          </button>
+          
+          <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
+
+          <button 
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded text-slate-500 transition-colors has-tooltip"
+            data-tooltip={isExpanded ? "Ocultar os menus" : "Mostrar os menus"}
+          >
+            <ChevronDown size={18} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+          </button>
+        </div>
       </div>
 
       {/* Find and Replace Modal */}
