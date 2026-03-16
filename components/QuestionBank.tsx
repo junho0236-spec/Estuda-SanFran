@@ -1243,33 +1243,45 @@ Forneça a explicação de forma concisa e didática.`;
   };
 
   const handleConfirmFlashcardCreation = async (folderId: string) => {
-    if (!flashcardToCreate || !userId) return;
+    if (!flashcardToCreate || !userId) {
+      console.error("Missing flashcard data or userId", { flashcardToCreate, userId });
+      return;
+    }
 
     try {
       setIsSubmitting(true);
+      
+      // Generate a unique ID for the flashcard
+      const cardId = crypto.randomUUID();
+      
       const { error } = await supabase
         .from('flashcards')
         .insert({
+          id: cardId,
           user_id: userId,
           folder_id: folderId,
           front: flashcardToCreate.front,
           back: flashcardToCreate.back,
-          subject: flashcardToCreate.subject,
-          topic: flashcardToCreate.topic,
+          notes: `Assunto: ${flashcardToCreate.subject} | Tópico: ${flashcardToCreate.topic}`,
           interval: 0,
-          repetition: 0,
-          efactor: 2.5,
-          next_review: new Date().toISOString()
+          learning_step: 0,
+          ease_factor: 2.5,
+          status: 'new',
+          next_review: Date.now(),
+          tags: [flashcardToCreate.subject, 'erro-questão'].filter(Boolean)
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase error creating flashcard:", error);
+        throw error;
+      }
 
       showNotification('Flashcard criado com sucesso!', 'success');
       setIsDeckModalOpen(false);
       setFlashcardToCreate(null);
     } catch (error: any) {
       console.error('Error creating flashcard:', error);
-      showNotification('Erro ao criar flashcard.', 'error');
+      showNotification(`Erro ao criar flashcard: ${error.message || 'Erro desconhecido'}`, 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -4090,15 +4102,16 @@ Forneça a explicação de forma concisa e didática.`;
                 folders.map(folder => (
                   <button
                     key={folder.id}
+                    disabled={isSubmitting}
                     onClick={() => handleConfirmFlashcardCreation(folder.id)}
-                    className="w-full flex items-center gap-3 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-200 dark:hover:border-indigo-800 transition-all text-left"
+                    className="w-full flex items-center gap-3 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-200 dark:hover:border-indigo-800 transition-all text-left disabled:opacity-50"
                   >
                     <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                      <FolderIcon size={20} />
+                      {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <FolderIcon size={20} />}
                     </div>
                     <div>
                       <p className="font-bold text-slate-900 dark:text-white">{folder.name}</p>
-                      <p className="text-xs text-slate-500">Adicionar a este baralho</p>
+                      <p className="text-xs text-slate-500">{isSubmitting ? 'Criando...' : 'Adicionar a este baralho'}</p>
                     </div>
                   </button>
                 ))
