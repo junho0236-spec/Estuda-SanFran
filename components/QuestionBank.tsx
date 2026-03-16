@@ -951,6 +951,8 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, folders = [], flash
           user_id: userId,
           correct_questions: payload.correct_questions,
           wrong_questions: payload.wrong_questions,
+          correct_count: payload.correct_count,
+          wrong_count: payload.wrong_count,
           updated_at: payload.updated_at
         };
         
