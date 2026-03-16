@@ -23,12 +23,12 @@ const LineHeightStyle = new Parchment.StyleAttributor('lineheight', 'line-height
 Quill.register(LineHeightStyle, true);
 
 // Register Fonts
-const Font = Quill.import('formats/font');
+const Font = Quill.import('formats/font') as any;
 Font.whitelist = ['sans-serif', 'serif', 'monospace', 'georgia', 'trebuchet', 'verdana', 'comic-sans', 'impact'];
 Quill.register(Font, true);
 
 // Register Sizes
-const SizeStyle = Quill.import('attributors/style/size');
+const SizeStyle = Quill.import('attributors/style/size') as any;
 SizeStyle.whitelist = ['8px', '10px', '12px', '14px', '16px', '18px', '20px', '24px', '32px', '48px', '64px'];
 Quill.register(SizeStyle, true);
 

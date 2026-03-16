@@ -751,9 +751,6 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         </div>
         <div className="flex items-center gap-3">
           <button className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
-            <Clock size={20} />
-          </button>
-          <button className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
             <MessageSquareText size={20} />
           </button>
           <button className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
@@ -761,7 +758,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
           </button>
           <button className="flex items-center gap-2 px-4 py-1.5 bg-[#c2e7ff] hover:bg-[#b3d9f2] text-[#001d35] rounded-full font-medium text-sm transition-colors">
             <Lock size={16} />
-            Compartilhar
+            Share
           </button>
           <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
             J
@@ -795,41 +792,27 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
-        <div className="relative flex items-center has-tooltip" data-tooltip="Zoom">
-          <select 
-            className="appearance-none bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded pl-2 pr-6 py-1 text-sm font-medium outline-none cursor-pointer transition-colors" 
-            value={zoom}
-            onChange={(e) => {
-              setZoom(e.target.value);
-              const editor = quillRef.current?.root;
-              if (editor) editor.style.zoom = e.target.value.replace('%', '') + '%';
-            }}
-          >
-            <option value="50%">50%</option>
-            <option value="75%">75%</option>
-            <option value="100%">100%</option>
-            <option value="125%">125%</option>
-            <option value="150%">150%</option>
-            <option value="200%">200%</option>
-          </select>
-          <ChevronDown size={14} className="absolute right-1 pointer-events-none text-slate-600 dark:text-slate-400" />
+        <div className="relative flex items-center has-tooltip hover:bg-slate-200 dark:hover:bg-white/10 rounded px-2 py-1 cursor-pointer transition-colors" data-tooltip="Zoom">
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-200 mr-1">100%</span>
+          <ChevronDown size={14} className="text-slate-600 dark:text-slate-400" />
         </div>
 
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
-        <div className="has-tooltip" data-tooltip="Estilos de texto">
-          <select className="ql-header bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-2 py-1 text-sm font-medium outline-none cursor-pointer transition-colors">
+        <div className="relative flex items-center has-tooltip" data-tooltip="Estilos de texto">
+          <select className="ql-header appearance-none bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded pl-2 pr-6 py-1 text-sm font-medium outline-none cursor-pointer transition-colors">
             <option value="1">Título 1</option>
             <option value="2">Título 2</option>
             <option value="3">Título 3</option>
             <option value="">Texto normal</option>
           </select>
+          <ChevronDown size={14} className="absolute right-1 pointer-events-none text-slate-600 dark:text-slate-400" />
         </div>
 
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
 
-        <div className="has-tooltip" data-tooltip="Fonte">
-          <select className="ql-font bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-2 py-1 text-sm font-medium outline-none cursor-pointer transition-colors">
+        <div className="relative flex items-center has-tooltip" data-tooltip="Fonte">
+          <select className="ql-font appearance-none bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded pl-2 pr-6 py-1 text-sm font-medium outline-none cursor-pointer transition-colors">
             <option value="sans-serif">Arial</option>
             <option value="serif">Times New Roman</option>
             <option value="monospace">Courier New</option>
@@ -839,25 +822,17 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
             <option value="comic-sans">Comic Sans MS</option>
             <option value="impact">Impact</option>
           </select>
+          <ChevronDown size={14} className="absolute right-1 pointer-events-none text-slate-600 dark:text-slate-400" />
         </div>
 
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
 
-        <div className="has-tooltip" data-tooltip="Tamanho da fonte">
-          <select className="ql-size bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-2 py-1 text-sm font-medium outline-none cursor-pointer transition-colors">
-            <option value="8px">8</option>
-            <option value="10px">10</option>
-            <option value="12px">12</option>
-            <option value="14px">14</option>
-            <option value="16px">16</option>
-            <option value="18px">18</option>
-            <option value="20px">20</option>
-            <option value="24px">24</option>
-            <option value="32px">32</option>
-            <option value="48px">48</option>
-            <option value="64px">64</option>
-            <option value="">Normal</option>
-          </select>
+        <div className="flex items-center bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors h-7 has-tooltip" data-tooltip="Tamanho da fonte">
+          <button className="px-1.5 h-full text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 flex items-center justify-center font-medium"><Minus size={14} /></button>
+          <div className="w-8 h-full flex items-center justify-center border-x border-slate-300 dark:border-white/20">
+            <input type="text" value="11" className="w-full bg-transparent text-center text-sm font-medium outline-none text-slate-700 dark:text-slate-200" readOnly />
+          </div>
+          <button className="px-1.5 h-full text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 flex items-center justify-center font-medium"><Plus size={14} /></button>
         </div>
 
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
@@ -884,28 +859,31 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
-        <div className="has-tooltip" data-tooltip="Alinhamento">
-          <select className="ql-align bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-1 py-1 outline-none cursor-pointer transition-colors">
+        <div className="relative flex items-center has-tooltip" data-tooltip="Alinhamento">
+          <select className="ql-align appearance-none bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded pl-1 pr-5 py-1 outline-none cursor-pointer transition-colors">
             <option value=""></option>
             <option value="center"></option>
             <option value="right"></option>
             <option value="justify"></option>
           </select>
+          <ChevronDown size={14} className="absolute right-0.5 pointer-events-none text-slate-600 dark:text-slate-400" />
         </div>
         
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
 
-        <select 
-          className="bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-2 py-1 text-sm font-medium outline-none cursor-pointer transition-colors has-tooltip" 
-          data-tooltip="Espaçamento entre linhas"
-          onChange={(e) => handleFormat('lineheight', e.target.value)}
-        >
-          <option value="">Padrão</option>
-          <option value="1">1.0</option>
-          <option value="1.15">1.15</option>
-          <option value="1.5">1.5</option>
-          <option value="2">2.0</option>
-        </select>
+        <div className="relative flex items-center has-tooltip" data-tooltip="Espaçamento entre linhas">
+          <select 
+            className="appearance-none bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded pl-2 pr-6 py-1 text-sm font-medium outline-none cursor-pointer transition-colors" 
+            onChange={(e) => handleFormat('lineheight', e.target.value)}
+          >
+            <option value="">Padrão</option>
+            <option value="1">1.0</option>
+            <option value="1.15">1.15</option>
+            <option value="1.5">1.5</option>
+            <option value="2">2.0</option>
+          </select>
+          <ChevronDown size={14} className="absolute right-1 pointer-events-none text-slate-600 dark:text-slate-400" />
+        </div>
 
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
 

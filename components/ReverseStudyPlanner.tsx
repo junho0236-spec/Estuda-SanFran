@@ -520,7 +520,7 @@ Seja realista e distribua bem o conteúdo. Foque nos tópicos principais.`;
                  {displaySchedule.map((day, idx) => (
                     <div key={idx} className="flex gap-6 group">
                        {/* Date Bubble */}
-                       <div className="w-12 flex flex-col items-center shrink-0 pt-2 bg-[#fcfcfc] dark:bg-sanfran-rubiBlack z-10">
+                       <div className="w-12 flex flex-col items-center shrink-0 pt-2 bg-[#F8F9FA] dark:bg-sanfran-rubiBlack z-10">
                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{day.date.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')}</span>
                           <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm border-2 ${idx === 0 ? 'bg-emerald-500 border-emerald-600 text-white shadow-lg scale-110' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500'}`}>
                              {day.date.getDate()}
