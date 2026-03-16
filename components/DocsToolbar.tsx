@@ -753,12 +753,13 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
           <button className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
             <MessageSquareText size={20} />
           </button>
-          <button className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
+          <button className="flex items-center gap-1 p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
             <Video size={20} />
+            <ChevronDown size={12} />
           </button>
-          <button className="flex items-center gap-2 px-4 py-1.5 bg-[#c2e7ff] hover:bg-[#b3d9f2] text-[#001d35] rounded-full font-medium text-sm transition-colors">
+          <button className="flex items-center gap-2 px-4 py-1.5 bg-[#c2e7ff] hover:bg-[#b3d9f2] text-[#001d35] rounded-full font-medium text-sm transition-colors whitespace-nowrap">
             <Lock size={16} />
-            Share
+            Compartilhar
           </button>
           <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
             J
@@ -842,13 +843,16 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         <button className="ql-underline p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Sublinhado (Ctrl+U)"><Underline size={18}/></button>
         
         <div className="flex items-center gap-0.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded px-1 transition-colors has-tooltip" data-tooltip="Cor do texto">
-          <Baseline size={16} className="text-slate-600 dark:text-slate-300" />
-          <select className="ql-color bg-transparent border-none w-6 h-6 p-0 outline-none cursor-pointer"></select>
+          <div className="flex flex-col items-center">
+            <Baseline size={16} className="text-slate-600 dark:text-slate-300" />
+            <div className="w-4 h-0.5 bg-black dark:bg-white -mt-0.5"></div>
+          </div>
+          <select className="ql-color appearance-none bg-transparent border-none w-6 h-6 p-0 outline-none cursor-pointer"></select>
         </div>
         
         <div className="flex items-center gap-0.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded px-1 transition-colors has-tooltip" data-tooltip="Cor de destaque">
           <Highlighter size={16} className="text-slate-600 dark:text-slate-300" />
-          <select className="ql-background bg-transparent border-none w-6 h-6 p-0 outline-none cursor-pointer"></select>
+          <select className="ql-background appearance-none bg-transparent border-none w-6 h-6 p-0 outline-none cursor-pointer"></select>
         </div>
         
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
@@ -860,13 +864,13 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
         <div className="relative flex items-center has-tooltip" data-tooltip="Alinhamento">
-          <select className="ql-align appearance-none bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded pl-1 pr-5 py-1 outline-none cursor-pointer transition-colors">
+          <select className="ql-align appearance-none bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded pl-1 pr-6 py-1 outline-none cursor-pointer transition-colors">
             <option value=""></option>
             <option value="center"></option>
             <option value="right"></option>
             <option value="justify"></option>
           </select>
-          <ChevronDown size={14} className="absolute right-0.5 pointer-events-none text-slate-600 dark:text-slate-400" />
+          <ChevronDown size={14} className="absolute right-1 pointer-events-none text-slate-600 dark:text-slate-400" />
         </div>
         
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
@@ -887,9 +891,18 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
 
-        <button className="ql-list p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" value="check" data-tooltip="Checklist"><ListTodo size={18}/></button>
-        <button className="ql-list p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" value="bullet" data-tooltip="Lista com marcadores (Ctrl+Shift+8)"><List size={18}/></button>
-        <button className="ql-list p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" value="ordered" data-tooltip="Lista numerada (Ctrl+Shift+7)"><ListOrdered size={18}/></button>
+        <div className="flex items-center gap-0.5">
+          <button className="ql-list p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" value="check" data-tooltip="Checklist"><ListTodo size={18}/></button>
+          <ChevronDown size={12} className="text-slate-500 -ml-1" />
+        </div>
+        <div className="flex items-center gap-0.5">
+          <button className="ql-list p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" value="bullet" data-tooltip="Lista com marcadores (Ctrl+Shift+8)"><List size={18}/></button>
+          <ChevronDown size={12} className="text-slate-500 -ml-1" />
+        </div>
+        <div className="flex items-center gap-0.5">
+          <button className="ql-list p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" value="ordered" data-tooltip="Lista numerada (Ctrl+Shift+7)"><ListOrdered size={18}/></button>
+          <ChevronDown size={12} className="text-slate-500 -ml-1" />
+        </div>
         
         <button className="ql-indent p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" value="-1" data-tooltip="Diminuir recuo (Ctrl+[)"><IndentDecrease size={18}/></button>
         <button className="ql-indent p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" value="+1" data-tooltip="Aumentar recuo (Ctrl+])"><IndentIncrease size={18}/></button>
@@ -899,9 +912,9 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         <button className="ql-clean p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Limpar formatação (Ctrl+\)"><Eraser size={18}/></button>
 
         <div className="ml-auto flex items-center gap-2">
-          <button className="flex items-center gap-1.5 px-3 py-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full text-sm font-medium text-slate-700 dark:text-slate-200 transition-colors">
+          <button className="flex items-center gap-1.5 px-3 py-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full text-sm font-medium text-slate-700 dark:text-slate-200 transition-colors whitespace-nowrap">
             <Pencil size={16} className="text-blue-600" />
-            Edição
+            <span>Edição</span>
             <ChevronDown size={14} className="text-slate-500" />
           </button>
           

@@ -1141,6 +1141,17 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                   {/* Ruler */}
                   {showRuler && !isVadeMecumMode && (
                     <div className="h-6 bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-white/10 flex items-center px-10 relative overflow-hidden">
+                      {/* Left Margin Marker */}
+                      <div className="absolute left-10 top-0 z-10 flex flex-col items-center">
+                        <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[6px] border-t-blue-600"></div>
+                        <div className="w-[2px] h-2 bg-blue-600"></div>
+                      </div>
+                      
+                      {/* Right Margin Marker */}
+                      <div className="absolute right-10 top-0 z-10 flex flex-col items-center">
+                        <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[6px] border-t-blue-600"></div>
+                      </div>
+
                       <div className="absolute inset-0 flex items-center justify-between px-10 opacity-30 pointer-events-none">
                         {[...Array(20)].map((_, i) => (
                           <div key={i} className="flex flex-col items-center">
