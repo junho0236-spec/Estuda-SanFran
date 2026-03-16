@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Undo2, Redo2, Printer, SpellCheck, Paintbrush, Type, Bold, Italic, 
-  Underline, Baseline, Highlighter, Link, MessageSquarePlus, AlignLeft, 
+  Underline, Strikethrough, Baseline, Highlighter, Link, MessageSquarePlus, AlignLeft, 
   AlignCenter, AlignRight, AlignJustify, List, ListOrdered, IndentDecrease, 
   IndentIncrease, Eraser, ChevronDown, Check, Image, Star, FileText, 
   Share2, Clock, ListTodo, LineChart, Plus, Folder, Download, Edit3, Trash2, AlertCircle,
@@ -22,7 +22,7 @@ interface DocsToolbarProps {
   isMaximized: boolean;
   setIsMaximized: (val: boolean) => void;
   title: string;
-  onRename: () => void;
+  onRename: (newTitle: string) => void;
   isStarred: boolean;
   onToggleStar: () => void;
   onNew: () => void;
@@ -37,6 +37,8 @@ interface DocsToolbarProps {
   onDetails: () => void;
   onLanguageChange: (lang: string) => void;
   onPageSetup: () => void;
+  zoom: string;
+  onZoomChange: (zoom: string) => void;
   editMode: 'editing' | 'suggesting' | 'viewing';
   setEditMode: (mode: 'editing' | 'suggesting' | 'viewing') => void;
   showComments: boolean;
@@ -60,26 +62,100 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
   isMaximized, setIsMaximized, title, onRename, isStarred, onToggleStar,
   onNew, onOpen, onCopy, onShare, onEmail, onDelete, onVersionHistory,
   onOfflineToggle, isOfflineAvailable, onDetails, onLanguageChange, onPageSetup,
+  zoom, onZoomChange,
   editMode, setEditMode, showComments, setShowComments, showPrintLayout, setShowPrintLayout,
   showRuler, setShowRuler, showEquationToolbar, setShowEquationToolbar,
   showNonPrintingChars, setShowNonPrintingChars,
   pageOrientation, setPageOrientation, isPageless, setIsPageless
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
-  const [zoom, setZoom] = useState('100%');
+  const [localTitle, setLocalTitle] = useState(title);
   const [formatPainter, setFormatPainter] = useState<any>(null);
   const [showFindReplace, setShowFindReplace] = useState(false);
   const [findText, setFindText] = useState('');
   const [replaceText, setReplaceText] = useState('');
   const [showMenuSearch, setShowMenuSearch] = useState(false);
   const [menuSearchQuery, setMenuSearchQuery] = useState('');
+  const [showZoomDropdown, setShowZoomDropdown] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const [fontSize, setFontSize] = useState('11');
+  const [fontFamily, setFontFamily] = useState('Arial');
+  const [headingStyle, setHeadingStyle] = useState('Título 1');
+  const [activeFormats, setActiveFormats] = useState({
+    bold: false,
+    italic: false,
+    underline: false,
+    strikeThrough: false,
+    alignLeft: false,
+    alignCenter: false,
+    alignRight: false,
+    alignJustify: false
+  });
+
+  useEffect(() => {
+    setLocalTitle(title);
+  }, [title]);
+
+  const handleTitleBlur = () => {
+    if (localTitle !== title) {
+      onRename(localTitle);
+    }
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      (e.target as HTMLInputElement).blur();
+    }
+  };
+
+  useEffect(() => {
+    const updateActiveFormats = () => {
+      setActiveFormats({
+        bold: document.queryCommandState('bold'),
+        italic: document.queryCommandState('italic'),
+        underline: document.queryCommandState('underline'),
+        strikeThrough: document.queryCommandState('strikeThrough'),
+        alignLeft: document.queryCommandState('justifyLeft'),
+        alignCenter: document.queryCommandState('justifyCenter'),
+        alignRight: document.queryCommandState('justifyRight'),
+        alignJustify: document.queryCommandState('justifyFull')
+      });
+    };
+
+    document.addEventListener('selectionchange', updateActiveFormats);
+    return () => document.removeEventListener('selectionchange', updateActiveFormats);
+  }, []);
+
+  useEffect(() => {
+    if (!formatPainter) return;
+
+    const applyFormat = () => {
+      const selection = window.getSelection();
+      if (selection && selection.toString().length > 0) {
+        // Apply styles
+        Object.entries(formatPainter).forEach(([command, value]) => {
+          if (value !== false && value !== 'false' && value !== null) {
+            document.execCommand(command, false, value as string);
+          }
+        });
+        
+        // Reset paintbrush
+        setFormatPainter(null);
+        document.body.style.cursor = 'default';
+        toast.success('Formatação aplicada.');
+      }
+    };
+
+    document.addEventListener('mouseup', applyFormat);
+    return () => document.removeEventListener('mouseup', applyFormat);
+  }, [formatPainter]);
 
   const handleFormat = (format: string, value: any = true) => {
     if (quillRef.current) {
       quillRef.current.format(format, value);
     }
+    document.execCommand(format, false, value);
   };
 
   const handleToggleFormat = (format: string) => {
@@ -87,10 +163,215 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
       const current = quillRef.current.getFormat()[format];
       quillRef.current.format(format, !current);
     }
+    document.execCommand(format, false);
   };
 
-  const handleUndo = () => quillRef.current?.history.undo();
-  const handleRedo = () => quillRef.current?.history.redo();
+  const handleTextColor = (color: string) => {
+    document.execCommand('foreColor', false, color);
+  };
+
+  const handleHighlightColor = (color: string) => {
+    document.execCommand('hiliteColor', false, color);
+  };
+
+  const handleAlign = (align: string) => {
+    document.execCommand(align, false);
+  };
+
+  const handleList = (type: string) => {
+    document.execCommand(type, false);
+  };
+
+  const handleIndent = () => {
+    document.execCommand('indent', false);
+  };
+
+  const handleOutdent = () => {
+    document.execCommand('outdent', false);
+  };
+
+  const handleChecklist = () => {
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const container = document.createElement('div');
+      container.className = 'flex items-center gap-2 my-1';
+      
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer';
+      
+      const span = document.createElement('span');
+      span.innerHTML = ' ';
+      span.contentEditable = 'true';
+      span.className = 'outline-none flex-1';
+      
+      container.appendChild(checkbox);
+      container.appendChild(span);
+      
+      range.insertNode(container);
+      range.collapse(false);
+      
+      // Focus the span
+      setTimeout(() => span.focus(), 0);
+    }
+  };
+
+  const handleLineSpacing = (value: string) => {
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      let node = selection.anchorNode;
+      if (node) {
+        let parent = node.parentElement;
+        while (parent && !['P', 'DIV', 'H1', 'H2', 'H3', 'LI'].includes(parent.tagName) && parent.className !== 'ql-editor') {
+          parent = parent.parentElement;
+        }
+        if (parent) {
+          parent.style.lineHeight = value;
+        }
+      }
+    }
+  };
+
+  const handleFontSizeChange = (size: string) => {
+    setFontSize(size);
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      document.execCommand('fontSize', false, '7');
+      const fontElements = document.getElementsByTagName('font');
+      for (let i = 0; i < fontElements.length; i++) {
+        if (fontElements[i].size === '7') {
+          fontElements[i].removeAttribute('size');
+          fontElements[i].style.fontSize = `${size}px`;
+        }
+      }
+    }
+  };
+
+  const incrementFontSize = () => {
+    const newSize = (parseInt(fontSize) + 1).toString();
+    handleFontSizeChange(newSize);
+  };
+
+  const decrementFontSize = () => {
+    const newSize = Math.max(1, parseInt(fontSize) - 1).toString();
+    handleFontSizeChange(newSize);
+  };
+
+  const handleFontFamilyChange = (value: string) => {
+    const labels: { [key: string]: string } = {
+      "sans-serif": "Arial",
+      "serif": "Times New Roman",
+      "monospace": "Courier New",
+      "georgia": "Georgia",
+      "trebuchet": "Trebuchet MS",
+      "verdana": "Verdana",
+      "comic-sans": "Comic Sans MS",
+      "impact": "Impact"
+    };
+    setFontFamily(labels[value] || "Arial");
+    document.execCommand('fontName', false, value);
+  };
+
+  const handleHeadingChange = (value: string) => {
+    const labels: { [key: string]: string } = {
+      "": "Texto normal",
+      "1": "Título 1",
+      "2": "Título 2",
+      "3": "Título 3"
+    };
+    setHeadingStyle(labels[value] || "Texto normal");
+    const tag = value === "" ? "P" : `H${value}`;
+    document.execCommand('formatBlock', false, tag);
+  };
+
+  const handlePaintbrushClick = () => {
+    if (formatPainter) {
+      setFormatPainter(null);
+      document.body.style.cursor = 'default';
+    } else {
+      const styles = {
+        bold: document.queryCommandState('bold'),
+        italic: document.queryCommandState('italic'),
+        underline: document.queryCommandState('underline'),
+        strikeThrough: document.queryCommandState('strikeThrough'),
+        foreColor: document.queryCommandValue('foreColor'),
+        hiliteColor: document.queryCommandValue('hiliteColor'),
+      };
+      setFormatPainter(styles);
+      document.body.style.cursor = 'crosshair';
+      toast.info('Formatação copiada. Selecione o texto para aplicar.');
+    }
+  };
+
+  const handleAddComment = () => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || selection.toString().trim() === '') {
+      toast.error('Selecione um texto para comentar.');
+      return;
+    }
+
+    const comment = window.prompt('Digite seu comentário:');
+    if (comment) {
+      const range = selection.getRangeAt(0);
+      const span = document.createElement('span');
+      span.className = 'bg-yellow-200 dark:bg-yellow-900/50 border-b border-yellow-400 cursor-help';
+      span.title = comment;
+      span.id = `comment-${Date.now()}`;
+      
+      try {
+        range.surroundContents(span);
+        console.log(`Comentário criado: ID=${span.id}, Texto="${selection.toString()}", Comentário="${comment}"`);
+        toast.success('Comentário adicionado.');
+      } catch (e) {
+        const content = range.extractContents();
+        span.appendChild(content);
+        range.insertNode(span);
+        console.log(`Comentário criado (via fallback): ID=${span.id}, Comentário="${comment}"`);
+        toast.success('Comentário adicionado.');
+      }
+    }
+  };
+
+  const handleUndo = () => {
+    document.execCommand('undo', false);
+  };
+  
+  const handleRedo = () => {
+    document.execCommand('redo', false);
+  };
+
+  const handleLink = () => {
+    const url = window.prompt('Digite a URL do link:');
+    if (url) {
+      document.execCommand('createLink', false, url);
+    }
+  };
+
+  const handleImage = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e: any) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (readerEvent: any) => {
+          const base64 = readerEvent.target.result;
+          document.execCommand('insertImage', false, base64);
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+    input.click();
+  };
+
+  const handleClearFormatting = () => {
+    document.execCommand('removeFormat', false);
+    if (quillRef.current) {
+      quillRef.current.removeFormat(0, quillRef.current.getLength());
+    }
+  };
 
   const handleSelectAll = () => {
     if (quillRef.current) {
@@ -188,34 +469,6 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
     toast.success(`${count} ocorrências substituídas.`);
   };
 
-  const handlePaintbrushClick = () => {
-    if (quillRef.current) {
-      const range = quillRef.current.getSelection();
-      if (range) {
-        const formats = quillRef.current.getFormat(range);
-        setFormatPainter(formats);
-      }
-    }
-  };
-
-  useEffect(() => {
-    if (formatPainter && quillRef.current) {
-      const quill = quillRef.current;
-      const onSelectionChange = (range: any) => {
-        if (range && range.length > 0) {
-          Object.keys(formatPainter).forEach(key => {
-            quill.format(key, formatPainter[key]);
-          });
-          setFormatPainter(null);
-        }
-      };
-      quill.on('selection-change', onSelectionChange);
-      return () => {
-        quill.off('selection-change', onSelectionChange);
-      };
-    }
-  }, [formatPainter, quillRef]);
-
   const handleWordCount = () => {
     if (quillRef.current) {
       const text = quillRef.current.getText().trim();
@@ -233,7 +486,10 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
     { name: 'Baixar Microsoft Word (.docx)', icon: <Download size={16} />, action: onExportDocx },
     { name: 'Baixar Documento PDF (.pdf)', icon: <Download size={16} />, action: onExportPdf },
     { name: 'Baixar Texto sem formatação (.txt)', icon: <Download size={16} />, action: onExportTxt },
-    { name: 'Renomear', icon: <Edit3 size={16} />, action: onRename },
+    { name: 'Renomear', icon: <Edit3 size={16} />, action: () => {
+      const input = document.querySelector('input[placeholder="Documento sem título"]') as HTMLInputElement;
+      if (input) input.focus();
+    } },
     { name: 'Mover para a lixeira', icon: <Trash2 size={16} />, action: onDelete },
     { name: 'Imprimir', icon: <Printer size={16} />, action: onPrint },
     { name: 'Desfazer', icon: <Undo2 size={16} />, action: handleUndo },
@@ -284,12 +540,15 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
           </div>
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
-              <button 
-                onClick={onRename}
-                className="text-lg font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5 px-2 py-0.5 rounded transition-colors truncate max-w-[300px]"
-              >
-                {title || 'Documento sem título'}
-              </button>
+              <input 
+                type="text"
+                value={localTitle}
+                onChange={(e) => setLocalTitle(e.target.value)}
+                onBlur={handleTitleBlur}
+                onKeyDown={handleTitleKeyDown}
+                className="text-lg font-medium text-slate-700 dark:text-slate-200 bg-transparent border-none outline-none hover:bg-slate-100 dark:hover:bg-white/5 px-2 py-0.5 rounded transition-colors truncate max-w-[300px] focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-blue-500"
+                placeholder="Documento sem título"
+              />
               <button 
                 onClick={onToggleStar}
                 className={`p-1 rounded hover:bg-slate-100 dark:hover:bg-white/5 transition-colors ${isStarred ? 'text-yellow-500' : 'text-slate-400'}`}
@@ -343,7 +602,10 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                     </div>
                   </div>
                   <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={onRename}>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => {
+                    const input = document.querySelector('input[placeholder="Documento sem título"]') as HTMLInputElement;
+                    if (input) input.focus();
+                  }}>
                     <Edit3 size={16} className="text-slate-400" /> Renomear
                   </button>
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3 text-red-600" onClick={onDelete}>
@@ -589,8 +851,8 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                       <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => handleToggleFormat('underline')}>
                         <Underline size={16} className="text-slate-400" /> Sublinhado <span className="ml-auto text-[10px] text-slate-400">Ctrl+U</span>
                       </button>
-                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => handleToggleFormat('strike')}>
-                        <Eraser size={16} className="text-slate-400" /> Tachado <span className="ml-auto text-[10px] text-slate-400">Alt+Shift+5</span>
+                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => handleToggleFormat('strikeThrough')}>
+                        <Strikethrough size={16} className="text-slate-400" /> Tachado <span className="ml-auto text-[10px] text-slate-400">Alt+Shift+5</span>
                       </button>
                       <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
                       <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => handleFormat('script', 'super')}>
@@ -779,8 +1041,20 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
             readOnly
           />
         </div>
-        <button className="ql-undo p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Desfazer (Ctrl+Z)"><Undo2 size={18}/></button>
-        <button className="ql-redo p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Refazer (Ctrl+Y)"><Redo2 size={18}/></button>
+        <button 
+          className="ql-undo p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
+          data-tooltip="Desfazer (Ctrl+Z)"
+          onClick={handleUndo}
+        >
+          <Undo2 size={18}/>
+        </button>
+        <button 
+          className="ql-redo p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
+          data-tooltip="Refazer (Ctrl+Y)"
+          onClick={handleRedo}
+        >
+          <Redo2 size={18}/>
+        </button>
         <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" onClick={onPrint} data-tooltip="Imprimir (Ctrl+P)"><Printer size={18}/></button>
         <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Verificação ortográfica" onClick={() => toast.info('Verificação ortográfica concluída.')}><SpellCheck size={18}/></button>
         <button 
@@ -793,20 +1067,39 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
-        <div className="relative flex items-center has-tooltip hover:bg-slate-200 dark:hover:bg-white/10 rounded px-2 py-1 cursor-pointer transition-colors" data-tooltip="Zoom">
-          <span className="text-sm font-medium text-slate-700 dark:text-slate-200 mr-1">100%</span>
+        <div className="relative flex items-center has-tooltip hover:bg-slate-200 dark:hover:bg-white/10 rounded px-2 py-1 cursor-pointer transition-colors" data-tooltip="Zoom" onClick={() => setShowZoomDropdown(!showZoomDropdown)}>
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-200 mr-1">{zoom}</span>
           <ChevronDown size={14} className="text-slate-600 dark:text-slate-400" />
+          
+          {showZoomDropdown && (
+            <div className="absolute top-full left-0 mt-1 w-24 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-1 z-[210]">
+              {['50%', '75%', '100%', '125%', '150%', '200%'].map((level) => (
+                <button
+                  key={level}
+                  className="w-full text-left px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm font-medium text-slate-700 dark:text-slate-200 flex items-center justify-between"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onZoomChange(level);
+                    setShowZoomDropdown(false);
+                  }}
+                >
+                  {level}
+                  {zoom === level && <Check size={14} className="text-blue-600" />}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
         <div className="relative flex items-center has-tooltip bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-2 py-1 cursor-pointer transition-colors [&_.ql-picker]:!hidden" data-tooltip="Estilos de texto">
-          <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Título 1</span>
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{headingStyle}</span>
           <ChevronDown size={14} className="ml-3 text-slate-500" />
           <select 
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            onChange={(e) => handleFormat('header', e.target.value ? parseInt(e.target.value) : false)}
-            defaultValue="1"
+            onChange={(e) => handleHeadingChange(e.target.value)}
+            value={Object.keys({"": "Texto normal", "1": "Título 1", "2": "Título 2", "3": "Título 3"}).find(key => ({"": "Texto normal", "1": "Título 1", "2": "Título 2", "3": "Título 3"} as any)[key] === headingStyle) || ""}
           >
             <option value="">Texto normal</option>
             <option value="1">Título 1</option>
@@ -818,12 +1111,12 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
 
         <div className="relative flex items-center has-tooltip bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-2 py-1 cursor-pointer transition-colors [&_.ql-picker]:!hidden" data-tooltip="Fonte">
-          <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Arial</span>
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{fontFamily}</span>
           <ChevronDown size={14} className="ml-3 text-slate-500" />
           <select 
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            onChange={(e) => handleFormat('font', e.target.value)}
-            defaultValue="sans-serif"
+            onChange={(e) => handleFontFamilyChange(e.target.value)}
+            value={Object.keys({"sans-serif": "Arial", "serif": "Times New Roman", "monospace": "Courier New", "georgia": "Georgia", "trebuchet": "Trebuchet MS", "verdana": "Verdana", "comic-sans": "Comic Sans MS", "impact": "Impact"}).find(key => ({"sans-serif": "Arial", "serif": "Times New Roman", "monospace": "Courier New", "georgia": "Georgia", "trebuchet": "Trebuchet MS", "verdana": "Verdana", "comic-sans": "Comic Sans MS", "impact": "Impact"} as any)[key] === fontFamily) || "sans-serif"}
           >
             <option value="sans-serif">Arial</option>
             <option value="serif">Times New Roman</option>
@@ -839,44 +1132,127 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
 
         <div className="flex items-center bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors h-7 has-tooltip" data-tooltip="Tamanho da fonte">
-          <button className="px-1.5 h-full text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 flex items-center justify-center font-medium"><Minus size={14} /></button>
+          <button 
+            className="px-1.5 h-full text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 flex items-center justify-center font-medium"
+            onClick={decrementFontSize}
+          >
+            <Minus size={14} />
+          </button>
           <div className="w-8 h-full flex items-center justify-center border-x border-slate-300 dark:border-white/20">
-            <input type="text" value="11" className="w-full bg-transparent text-center text-sm font-medium outline-none text-slate-700 dark:text-slate-200" readOnly />
+            <input 
+              type="text" 
+              value={fontSize} 
+              className="w-full bg-transparent text-center text-sm font-medium outline-none text-slate-700 dark:text-slate-200" 
+              onChange={(e) => setFontSize(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleFontSizeChange(fontSize);
+                }
+              }}
+            />
           </div>
-          <button className="px-1.5 h-full text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 flex items-center justify-center font-medium"><Plus size={14} /></button>
+          <button 
+            className="px-1.5 h-full text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 flex items-center justify-center font-medium"
+            onClick={incrementFontSize}
+          >
+            <Plus size={14} />
+          </button>
         </div>
 
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
-        <button className="ql-bold p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Negrito (Ctrl+B)"><Bold size={18}/></button>
-        <button className="ql-italic p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Itálico (Ctrl+I)"><Italic size={18}/></button>
-        <button className="ql-underline p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Sublinhado (Ctrl+U)"><Underline size={18}/></button>
+        <button 
+          className={`p-1.5 rounded transition-colors has-tooltip ${activeFormats.bold ? 'bg-slate-300 dark:bg-white/20' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
+          data-tooltip="Negrito (Ctrl+B)"
+          onClick={() => handleToggleFormat('bold')}
+        >
+          <Bold size={18}/>
+        </button>
+        <button 
+          className={`p-1.5 rounded transition-colors has-tooltip ${activeFormats.italic ? 'bg-slate-300 dark:bg-white/20' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
+          data-tooltip="Itálico (Ctrl+I)"
+          onClick={() => handleToggleFormat('italic')}
+        >
+          <Italic size={18}/>
+        </button>
+        <button 
+          className={`p-1.5 rounded transition-colors has-tooltip ${activeFormats.underline ? 'bg-slate-300 dark:bg-white/20' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
+          data-tooltip="Sublinhado (Ctrl+U)"
+          onClick={() => handleToggleFormat('underline')}
+        >
+          <Underline size={18}/>
+        </button>
+        <button 
+          className={`p-1.5 rounded transition-colors has-tooltip ${activeFormats.strikeThrough ? 'bg-slate-300 dark:bg-white/20' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
+          data-tooltip="Tachado"
+          onClick={() => handleToggleFormat('strikeThrough')}
+        >
+          <Strikethrough size={18}/>
+        </button>
         
-        <div className="flex items-center gap-0.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded px-1 transition-colors has-tooltip" data-tooltip="Cor do texto">
-          <div className="flex flex-col items-center">
+        <div className="flex items-center gap-0.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded px-1 transition-colors has-tooltip relative" data-tooltip="Cor do texto">
+          <label className="flex flex-col items-center cursor-pointer">
             <Baseline size={16} className="text-slate-600 dark:text-slate-300" />
             <div className="w-4 h-[3px] bg-black dark:bg-white -mt-0.5"></div>
-          </div>
-          <select className="ql-color appearance-none bg-transparent border-none w-6 h-6 p-0 outline-none cursor-pointer"></select>
+            <input 
+              type="color" 
+              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" 
+              onChange={(e) => handleTextColor(e.target.value)}
+            />
+          </label>
         </div>
         
-        <div className="flex items-center gap-0.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded px-1 transition-colors has-tooltip" data-tooltip="Cor de destaque">
-          <Highlighter size={16} className="text-slate-600 dark:text-slate-300" />
-          <select className="ql-background appearance-none bg-transparent border-none w-6 h-6 p-0 outline-none cursor-pointer"></select>
+        <div className="flex items-center gap-0.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded px-1 transition-colors has-tooltip relative" data-tooltip="Cor de destaque">
+          <label className="cursor-pointer">
+            <Highlighter size={16} className="text-slate-600 dark:text-slate-300" />
+            <input 
+              type="color" 
+              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" 
+              onChange={(e) => handleHighlightColor(e.target.value)}
+            />
+          </label>
         </div>
         
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
-        <button className="ql-link p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Inserir link (Ctrl+K)"><Link size={18}/></button>
-        <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Adicionar comentário" onClick={() => toast.info('Comentário adicionado.')}><MessageSquarePlus size={18}/></button>
-        <button className="ql-image p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Inserir imagem"><Image size={18}/></button>
+        <button className="ql-link p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Inserir link (Ctrl+K)" onClick={handleLink}><Link size={18}/></button>
+        <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Adicionar comentário" onClick={handleAddComment}><MessageSquarePlus size={18}/></button>
+        <button className="ql-image p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Inserir imagem" onClick={handleImage}><Image size={18}/></button>
         
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
-        <button className="ql-align p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" value="" data-tooltip="Alinhar à esquerda (Ctrl+Shift+L)"><AlignLeft size={18}/></button>
-        <button className="ql-align p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" value="center" data-tooltip="Centralizar (Ctrl+Shift+E)"><AlignCenter size={18}/></button>
-        <button className="ql-align p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" value="right" data-tooltip="Alinhar à direita (Ctrl+Shift+R)"><AlignRight size={18}/></button>
-        <button className="ql-align p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" value="justify" data-tooltip="Justificar (Ctrl+Shift+J)"><AlignJustify size={18}/></button>
+        <button 
+          className={`ql-align p-1.5 rounded transition-colors has-tooltip ${activeFormats.alignLeft ? 'bg-slate-300 dark:bg-white/20' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
+          value="" 
+          data-tooltip="Alinhar à esquerda (Ctrl+Shift+L)"
+          onClick={() => handleAlign('justifyLeft')}
+        >
+          <AlignLeft size={18}/>
+        </button>
+        <button 
+          className={`ql-align p-1.5 rounded transition-colors has-tooltip ${activeFormats.alignCenter ? 'bg-slate-300 dark:bg-white/20' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
+          value="center" 
+          data-tooltip="Centralizar (Ctrl+Shift+E)"
+          onClick={() => handleAlign('justifyCenter')}
+        >
+          <AlignCenter size={18}/>
+        </button>
+        <button 
+          className={`ql-align p-1.5 rounded transition-colors has-tooltip ${activeFormats.alignRight ? 'bg-slate-300 dark:bg-white/20' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
+          value="right" 
+          data-tooltip="Alinhar à direita (Ctrl+Shift+R)"
+          onClick={() => handleAlign('justifyRight')}
+        >
+          <AlignRight size={18}/>
+        </button>
+        <button 
+          className={`ql-align p-1.5 rounded transition-colors has-tooltip ${activeFormats.alignJustify ? 'bg-slate-300 dark:bg-white/20' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
+          value="justify" 
+          data-tooltip="Justificar (Ctrl+Shift+J)"
+          onClick={() => handleAlign('justifyFull')}
+        >
+          <AlignJustify size={18}/>
+        </button>
         
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
 
@@ -887,37 +1263,77 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
           </div>
           <select 
             className="absolute inset-0 opacity-0 cursor-pointer" 
-            onChange={(e) => handleFormat('lineheight', e.target.value)}
+            onChange={(e) => handleLineSpacing(e.target.value)}
           >
-            <option value="">Padrão</option>
-            <option value="1">1.0</option>
+            <option value="1">Simples</option>
             <option value="1.15">1.15</option>
             <option value="1.5">1.5</option>
-            <option value="2">2.0</option>
+            <option value="2">Duplo</option>
           </select>
         </div>
 
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
 
         <div className="flex items-center gap-0.5">
-          <button className="ql-list p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" value="check" data-tooltip="Checklist"><ListTodo size={18}/></button>
+          <button 
+            className="ql-list p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
+            value="check" 
+            data-tooltip="Checklist"
+            onClick={handleChecklist}
+          >
+            <ListTodo size={18}/>
+          </button>
           <ChevronDown size={12} className="text-slate-500 -ml-1" />
         </div>
         <div className="flex items-center gap-0.5">
-          <button className="ql-list p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" value="bullet" data-tooltip="Lista com marcadores (Ctrl+Shift+8)"><List size={18}/></button>
+          <button 
+            className="ql-list p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
+            value="bullet" 
+            data-tooltip="Lista com marcadores (Ctrl+Shift+8)"
+            onClick={() => handleList('insertUnorderedList')}
+          >
+            <List size={18}/>
+          </button>
           <ChevronDown size={12} className="text-slate-500 -ml-1" />
         </div>
         <div className="flex items-center gap-0.5">
-          <button className="ql-list p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" value="ordered" data-tooltip="Lista numerada (Ctrl+Shift+7)"><ListOrdered size={18}/></button>
+          <button 
+            className="ql-list p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
+            value="ordered" 
+            data-tooltip="Lista numerada (Ctrl+Shift+7)"
+            onClick={() => handleList('insertOrderedList')}
+          >
+            <ListOrdered size={18}/>
+          </button>
           <ChevronDown size={12} className="text-slate-500 -ml-1" />
         </div>
         
-        <button className="ql-indent p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" value="-1" data-tooltip="Diminuir recuo (Ctrl+[)"><IndentDecrease size={18}/></button>
-        <button className="ql-indent p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" value="+1" data-tooltip="Aumentar recuo (Ctrl+])"><IndentIncrease size={18}/></button>
+        <button 
+          className="ql-indent p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
+          value="-1" 
+          data-tooltip="Diminuir recuo (Ctrl+[)"
+          onClick={handleOutdent}
+        >
+          <IndentDecrease size={18}/>
+        </button>
+        <button 
+          className="ql-indent p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
+          value="+1" 
+          data-tooltip="Aumentar recuo (Ctrl+])"
+          onClick={handleIndent}
+        >
+          <IndentIncrease size={18}/>
+        </button>
         
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
-        <button className="ql-clean p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Limpar formatação (Ctrl+\)"><Eraser size={18}/></button>
+        <button 
+          className="ql-clean p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
+          data-tooltip="Limpar formatação (Ctrl+\)"
+          onClick={handleClearFormatting}
+        >
+          <Eraser size={18}/>
+        </button>
 
         <div className="ml-auto flex items-center gap-1">
           <button className="flex items-center px-3 py-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full text-sm font-medium text-slate-700 dark:text-slate-200 transition-colors whitespace-nowrap flex-shrink-0">

@@ -92,6 +92,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   // Page Layout States
   const [pageOrientation, setPageOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [isPageless, setIsPageless] = useState(false);
+  const [zoom, setZoom] = useState('100%');
   
   // Sync selectedSubjectId when initialSubjectId changes from props
   useEffect(() => {
@@ -1083,14 +1084,12 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                       }
                     }} 
                     title={selectedNote.title || 'Documento sem título'}
-                    onRename={() => {
-                      const title = prompt('Novo título:', selectedNote.title);
-                      if (title && title !== selectedNote.title) {
-                        const updatedNote = { ...selectedNote, title, updated_at: new Date().toISOString() };
-                        setSelectedNote(updatedNote);
-                        dataService.saveNote(updatedNote, userId, isOnline);
-                        setNotes(prev => prev.map(n => n.id === updatedNote.id ? updatedNote : n));
-                      }
+                    onRename={(newTitle) => {
+                      if (!selectedNote) return;
+                      const updatedNote = { ...selectedNote, title: newTitle, updated_at: new Date().toISOString() };
+                      setSelectedNote(updatedNote);
+                      dataService.saveNote(updatedNote, userId, isOnline);
+                      setNotes(prev => prev.map(n => n.id === updatedNote.id ? updatedNote : n));
                     }}
                     isStarred={!!selectedNote.is_starred}
                     onToggleStar={() => {
@@ -1120,6 +1119,8 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                       }
                     }}
                     onPageSetup={() => toast.info('Configuração da página em breve!')}
+                    zoom={zoom}
+                    onZoomChange={setZoom}
                     editMode={editMode}
                     setEditMode={setEditMode}
                     showComments={showComments}
@@ -1189,8 +1190,30 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                   )}
 
                   <div className="flex-1 flex overflow-hidden relative z-0">
-                    <div className={`flex-1 quill-editor-custom overflow-y-auto ${showPrintLayout && !isPageless ? 'paper-effect p-10 md:p-20 bg-slate-200 dark:bg-slate-900/50' : 'bg-white dark:bg-slate-900'} ${showNonPrintingChars ? 'show-non-printing' : ''} relative`}>
-                      <div ref={onEditorRef} className={`flex-1 bg-white dark:bg-slate-900 ${showPrintLayout && !isPageless ? `shadow-[0_1px_3px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.08)] ${pageOrientation === 'portrait' ? 'max-w-[816px] min-h-[1056px]' : 'max-w-[1056px] min-h-[816px]'} mx-auto border border-slate-200 dark:border-white/10` : 'h-full w-full'}`} />
+                    <div 
+                      className={`flex-1 quill-editor-custom overflow-y-auto ${showPrintLayout && !isPageless ? 'paper-effect p-10 md:p-20 bg-slate-200 dark:bg-slate-900/50' : 'bg-white dark:bg-slate-900'} ${showNonPrintingChars ? 'show-non-printing' : ''} relative`}
+                      onClick={() => {
+                        const editor = document.querySelector('.ql-editor') as HTMLElement;
+                        if (editor) {
+                          editor.focus();
+                        } else {
+                          const mainEditor = document.querySelector('[contenteditable="true"]') as HTMLElement;
+                          if (mainEditor) mainEditor.focus();
+                        }
+                      }}
+                    >
+                      <div 
+                        ref={onEditorRef} 
+                        contentEditable={editMode !== 'viewing'}
+                        suppressContentEditableWarning={true}
+                        onInput={(e) => setNoteContent(e.currentTarget.innerHTML)}
+                        className={`flex-1 bg-white dark:bg-slate-900 ${showPrintLayout && !isPageless ? `shadow-[0_1px_3px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.08)] ${pageOrientation === 'portrait' ? 'max-w-[816px] min-h-[1056px]' : 'max-w-[1056px] min-h-[816px]'} mx-auto border border-slate-200 dark:border-white/10` : 'h-full w-full'}`} 
+                        style={{
+                          transform: zoom !== '100%' ? `scale(${parseInt(zoom) / 100})` : 'none',
+                          transformOrigin: 'top center',
+                          transition: 'transform 0.2s ease-in-out'
+                        }}
+                      />
                     </div>
 
                     {/* Comments Sidebar */}
