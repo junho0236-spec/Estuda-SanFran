@@ -1140,7 +1140,14 @@ Forneça a explicação de forma concisa e didática.`;
   };
 
   const generateIntelligentCorrection = async (question: Question) => {
+    // 1. Check if already in state
     if (aiCommentary[question.id]) return;
+
+    // 2. Check if already in the question object (from DB)
+    if (question.ai_correction) {
+      setAiCommentary(prev => ({ ...prev, [question.id]: question.ai_correction }));
+      return;
+    }
 
     try {
       setLoadingAiCommentary(prev => ({ ...prev, [question.id]: true }));
@@ -1178,8 +1185,19 @@ Forneça a explicação de forma concisa e didática.`;
       if (response.text) {
         const data = JSON.parse(response.text);
         setAiCommentary(prev => ({ ...prev, [question.id]: data }));
-        // Persist to Supabase
-        supabase.from('questions').update({ explicacao_doutrinaria: data.doctrineAndContext }).eq('id', question.id).then();
+        
+        // Persist the FULL correction to Supabase so it can be reused by anyone
+        const { error } = await supabase
+          .from('questions')
+          .update({ 
+            ai_correction: data,
+            explicacao_doutrinaria: data.doctrineAndContext // Keep this for backward compatibility if needed
+          })
+          .eq('id', question.id);
+          
+        if (error) {
+          console.error('Error persisting AI correction:', error);
+        }
       }
     } catch (error) {
       console.error('Error generating intelligent correction:', error);
@@ -1256,6 +1274,17 @@ Forneça a explicação de forma concisa e didática.`;
         } else {
           setQuestions(data);
           updateFilters(data);
+          
+          // Pre-populate aiCommentary from existing data in DB
+          const existingCommentaries: Record<string, any> = {};
+          data.forEach(q => {
+            if (q.ai_correction) {
+              existingCommentaries[q.id] = q.ai_correction;
+            }
+          });
+          if (Object.keys(existingCommentaries).length > 0) {
+            setAiCommentary(prev => ({ ...prev, ...existingCommentaries }));
+          }
         }
       }
     } catch (error) {

@@ -436,6 +436,14 @@ export interface Question {
     fundamentação: string;
     jurisprudencia: string;
   };
+  ai_correction?: {
+    doctrineAndContext: string;
+    legalBasis: string;
+    alternativesAnalysis: any;
+    mnemonic: string;
+    doctrineLink?: string;
+    doctrineUrl?: string;
+  };
 }
 
 export interface Notebook {
