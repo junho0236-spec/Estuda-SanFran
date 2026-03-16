@@ -58,7 +58,8 @@ import {
   Search,
   Settings,
   Volume2,
-  Send
+  Send,
+  Folder as FolderIcon
 } from 'lucide-react';
 import { GlossaryText } from './GlossaryText.tsx';
 import { GlossaryPopover } from './GlossaryPopover.tsx';
@@ -1104,6 +1105,8 @@ Forneça a explicação de forma concisa e didática.`;
   const [isFollowUpLoading, setIsFollowUpLoading] = useState<Record<string, boolean>>({});
   const [followUpInput, setFollowUpInput] = useState<Record<string, string>>({});
   const [loadingAiCommentary, setLoadingAiCommentary] = useState<Record<string, boolean>>({});
+  const [isDeckModalOpen, setIsDeckModalOpen] = useState(false);
+  const [flashcardToCreate, setFlashcardToCreate] = useState<any>(null);
 
   const handleFollowUp = async (questionId: string, questionStatement: string) => {
     const input = followUpInput[questionId] || '';
@@ -1208,20 +1211,24 @@ Forneça a explicação de forma concisa e didática.`;
 
   const handleCreateFlashcardFromError = (question: Question, selectedIndex?: number, isCorrect?: boolean) => {
     const commentary = aiCommentary[question.id];
-    const front = `[QUESTÃO] ${question.statement}`;
     
-    let back = `**GABARITO: ${String.fromCharCode(65 + question.correct_answer)}**\n\n`;
+    // Format as Question and Answer
+    const front = `**PERGUNTA (Questão de Concurso):**\n\n${question.statement}\n\n` + 
+                  `**ALTERNATIVAS:**\n` + 
+                  question.options.map((o, i) => `${String.fromCharCode(65 + i)}) ${o}`).join('\n');
+    
+    let back = `**RESPOSTA CORRETA: ${String.fromCharCode(65 + question.correct_answer)}**\n\n`;
     
     if (selectedIndex !== undefined) {
-      back += `**Sua Resposta: ${String.fromCharCode(65 + selectedIndex)} (${isCorrect ? 'Correta' : 'Incorreta'})**\n\n`;
+      back += `**Sua Resposta anterior: ${String.fromCharCode(65 + selectedIndex)} (${isCorrect ? 'Correta' : 'Incorreta'})**\n\n`;
     }
 
     if (commentary) {
-      back += `⚖️ **Fundamentação:** ${commentary.legalBasis}\n\n`;
-      back += `❌ **Análise:** ${commentary.alternativesAnalysis}\n\n`;
-      back += `💡 **Pulo do Gato:** ${commentary.mnemonic}`;
+      back += `⚖️ **Fundamentação Legal:** ${commentary.legalBasis}\n\n`;
+      back += `📖 **Explicação Doutrinária:** ${commentary.doctrineAndContext}\n\n`;
+      back += `💡 **Mnemônico/Dica:** ${commentary.mnemonic}`;
     } else {
-      back += `Explicação: ${question.explanation || 'Nenhuma explicação fornecida.'}`;
+      back += `**Explicação:** ${question.explanation || 'Nenhuma explicação detalhada disponível no momento.'}`;
     }
 
     const flashcardData = {
@@ -1231,7 +1238,41 @@ Forneça a explicação de forma concisa e didática.`;
       topic: question.topic,
     };
 
-    navigate('/anki', { state: { newFlashcard: flashcardData } });
+    setFlashcardToCreate(flashcardData);
+    setIsDeckModalOpen(true);
+  };
+
+  const handleConfirmFlashcardCreation = async (folderId: string) => {
+    if (!flashcardToCreate || !userId) return;
+
+    try {
+      setIsSubmitting(true);
+      const { error } = await supabase
+        .from('flashcards')
+        .insert({
+          user_id: userId,
+          folder_id: folderId,
+          front: flashcardToCreate.front,
+          back: flashcardToCreate.back,
+          subject: flashcardToCreate.subject,
+          topic: flashcardToCreate.topic,
+          interval: 0,
+          repetition: 0,
+          efactor: 2.5,
+          next_review: new Date().toISOString()
+        });
+
+      if (error) throw error;
+
+      showNotification('Flashcard criado com sucesso!', 'success');
+      setIsDeckModalOpen(false);
+      setFlashcardToCreate(null);
+    } catch (error: any) {
+      console.error('Error creating flashcard:', error);
+      showNotification('Erro ao criar flashcard.', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Juridiquês Translator States
@@ -4027,6 +4068,53 @@ Forneça a explicação de forma concisa e didática.`;
           }}
           isSubmitting={isSubmitting}
         />
+      )}
+
+      {isDeckModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[120] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md animate-in zoom-in-95 duration-300">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <BrainCircuit className="text-indigo-500" />
+                Escolher Baralho
+              </h2>
+              <button onClick={() => setIsDeckModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+              {folders.length === 0 ? (
+                <p className="text-slate-500 text-center py-4">Nenhum baralho encontrado. Crie um primeiro no Anki.</p>
+              ) : (
+                folders.map(folder => (
+                  <button
+                    key={folder.id}
+                    onClick={() => handleConfirmFlashcardCreation(folder.id)}
+                    className="w-full flex items-center gap-3 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-200 dark:hover:border-indigo-800 transition-all text-left"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                      <FolderIcon size={20} />
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-900 dark:text-white">{folder.name}</p>
+                      <p className="text-xs text-slate-500">Adicionar a este baralho</p>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+
+            <div className="mt-8 flex gap-3">
+              <button
+                onClick={() => setIsDeckModalOpen(false)}
+                className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Hidden container for PDF export */}
