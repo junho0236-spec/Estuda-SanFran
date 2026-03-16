@@ -17,10 +17,20 @@ import { toast } from 'sonner';
 // Register Line Height for Quill
 const Parchment = Quill.import('parchment');
 const LineHeightStyle = new Parchment.StyleAttributor('lineheight', 'line-height', {
-  scope: Parchment.Scope.INLINE,
+  scope: Parchment.Scope.BLOCK,
   whitelist: ['1', '1.15', '1.5', '2']
 });
 Quill.register(LineHeightStyle, true);
+
+// Register Fonts
+const Font = Quill.import('formats/font');
+Font.whitelist = ['sans-serif', 'serif', 'monospace', 'georgia', 'trebuchet', 'verdana', 'comic-sans', 'impact'];
+Quill.register(Font, true);
+
+// Register Sizes
+const SizeStyle = Quill.import('attributors/style/size');
+SizeStyle.whitelist = ['8px', '10px', '12px', '14px', '16px', '18px', '20px', '24px', '32px', '48px', '64px'];
+Quill.register(SizeStyle, true);
 
 // Set up pdfjs worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
@@ -35,6 +45,17 @@ interface NoteViewProps {
   subjects: Subject[]; // List of all subjects
   onToggleSidebar: (isOpen: boolean) => void; // Function to toggle sidebar visibility
 }
+
+const formats = [
+  'header', 'font', 'size',
+  'bold', 'italic', 'underline', 'strike', 'blockquote',
+  'list', 'bullet', 'indent',
+  'link', 'image', 'video',
+  'color', 'background',
+  'align',
+  'code-block',
+  'lineheight'
+];
 
 const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId, isOnline, initialTab = 'notes', onBack, onNavigateToAnki, subjects, onToggleSidebar }) => {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -167,6 +188,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
         quillRef.current = new Quill(node, {
           theme: 'snow',
           modules: modules,
+          formats: formats,
         });
 
         // Add custom icon for legal citation button
@@ -227,16 +249,6 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     jurisprudencia: '<h2>Fatos</h2><p><br></p><h2>Fundamentos Jurídicos</h2><p><br></p><h2>Ratio Decidendi</h2><p><br></p><h2>Dispositivo</h2><p><br></p>',
     aula: '<h2>Data</h2><p><br></p><h2>Professor</h2><p><br></p><h2>Tema Central</h2><p><br></p><h2>Artigos Citados</h2><p><br></p>',
   };
-
-  const formats = [
-    'header', 'font', 'size',
-    'bold', 'italic', 'underline', 'strike', 'blockquote',
-    'list', 'bullet', 'indent',
-    'link', 'image', 'video',
-    'color', 'background',
-    'align',
-    'code-block'
-  ];
 
   useEffect(() => {
     setActiveTab(initialTab);

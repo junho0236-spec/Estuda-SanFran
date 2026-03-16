@@ -307,7 +307,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                 >
                   Arquivo
                 </button>
-                <div className={`absolute left-0 top-full mt-1 w-72 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[200] ${activeMenu === 'arquivo' ? 'block' : 'hidden'}`}>
+                <div className={`absolute left-0 top-full mt-1 w-72 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[200] ${activeMenu === 'arquivo' ? 'block' : 'hidden'}`} onClick={() => setActiveMenu(null)}>
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => { onNew(); setActiveMenu(null); }}>
                     <Plus size={16} className="text-slate-400" /> Novo
                   </button>
@@ -326,7 +326,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                   </button>
                   <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
                   <div className="relative group/sub">
-                    <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between">
+                    <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-3"><Download size={16} className="text-slate-400" /> Baixar</div>
                       <ChevronDown size={14} className="-rotate-90 text-slate-400" />
                     </button>
@@ -355,7 +355,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                     <AlertCircle size={16} className="text-slate-400" /> Detalhes
                   </button>
                   <div className="relative group/sub">
-                    <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between">
+                    <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-3"><Baseline size={16} className="text-slate-400" /> Idioma</div>
                       <ChevronDown size={14} className="-rotate-90 text-slate-400" />
                     </button>
@@ -381,7 +381,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                 >
                   Editar
                 </button>
-                <div className={`absolute left-0 top-full mt-1 w-72 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[200] ${activeMenu === 'editar' ? 'block' : 'hidden'}`}>
+                <div className={`absolute left-0 top-full mt-1 w-72 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[200] ${activeMenu === 'editar' ? 'block' : 'hidden'}`} onClick={() => setActiveMenu(null)}>
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex justify-between" onClick={() => { handleUndo(); setActiveMenu(null); }}><span>Desfazer</span><span className="text-slate-400">Ctrl+Z</span></button>
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex justify-between" onClick={() => { handleRedo(); setActiveMenu(null); }}><span>Refazer</span><span className="text-slate-400">Ctrl+Y</span></button>
                   <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
@@ -402,9 +402,9 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                 >
                   Ver
                 </button>
-                <div className={`absolute left-0 top-full mt-1 w-72 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[200] ${activeMenu === 'ver' ? 'block' : 'hidden'}`}>
+                <div className={`absolute left-0 top-full mt-1 w-72 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[200] ${activeMenu === 'ver' ? 'block' : 'hidden'}`} onClick={() => setActiveMenu(null)}>
                   <div className="relative group/sub">
-                    <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between">
+                    <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-3"><Edit3 size={16} className="text-slate-400" /> Modo</div>
                       <ChevronDown size={14} className="-rotate-90 text-slate-400" />
                     </button>
@@ -477,7 +477,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                 >
                   Inserir
                 </button>
-                <div className={`absolute left-0 top-full mt-1 w-72 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[200] ${activeMenu === 'inserir' ? 'block' : 'hidden'}`}>
+                <div className={`absolute left-0 top-full mt-1 w-72 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[200] ${activeMenu === 'inserir' ? 'block' : 'hidden'}`} onClick={() => setActiveMenu(null)}>
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={onImageUpload}>
                     <Image size={16} className="text-slate-400" /> Imagem
                   </button>
@@ -486,7 +486,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                   </button>
                   <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
                   <div className="relative group/sub">
-                    <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between">
+                    <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-3"><Layout size={16} className="text-slate-400" /> Elementos básicos</div>
                       <ChevronDown size={14} className="-rotate-90 text-slate-400" />
                     </button>
@@ -533,7 +533,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                     <Minus size={16} className="text-slate-400" /> Linha horizontal
                   </button>
                   <div className="relative group/sub">
-                    <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between">
+                    <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-3"><Scissors size={16} className="text-slate-400" /> Quebra</div>
                       <ChevronDown size={14} className="-rotate-90 text-slate-400" />
                     </button>
@@ -547,7 +547,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                     <Bookmark size={16} className="text-slate-400" /> Favorito
                   </button>
                   <div className="relative group/sub">
-                    <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between">
+                    <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-3"><Hash size={16} className="text-slate-400" /> Elementos de página</div>
                       <ChevronDown size={14} className="-rotate-90 text-slate-400" />
                     </button>
@@ -567,9 +567,9 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                 >
                   Formatar
                 </button>
-                <div className={`absolute left-0 top-full mt-1 w-72 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[200] ${activeMenu === 'formatar' ? 'block' : 'hidden'}`}>
+                <div className={`absolute left-0 top-full mt-1 w-72 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[200] ${activeMenu === 'formatar' ? 'block' : 'hidden'}`} onClick={() => setActiveMenu(null)}>
                   <div className="relative group/sub">
-                    <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between">
+                    <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-3"><Type size={16} className="text-slate-400" /> Texto</div>
                       <ChevronDown size={14} className="-rotate-90 text-slate-400" />
                     </button>
@@ -596,7 +596,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                     </div>
                   </div>
                   <div className="relative group/sub">
-                    <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between">
+                    <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-3"><AlignCenter size={16} className="text-slate-400" /> Alinhar e recuar</div>
                       <ChevronDown size={14} className="-rotate-90 text-slate-400" />
                     </button>
@@ -619,7 +619,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                     <Columns size={16} className="text-slate-400" /> Colunas
                   </button>
                   <div className="relative group/sub">
-                    <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between">
+                    <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-3"><List size={16} className="text-slate-400" /> Marcadores e numeração</div>
                       <ChevronDown size={14} className="-rotate-90 text-slate-400" />
                     </button>
@@ -634,7 +634,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                   </div>
                   <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
                   <div className="relative group/sub">
-                    <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between">
+                    <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-3"><RotateCcw size={16} className="text-slate-400" /> Orientação da página</div>
                       <ChevronDown size={14} className="-rotate-90 text-slate-400" />
                     </button>
@@ -660,7 +660,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                 >
                   Ferramentas
                 </button>
-                <div className={`absolute left-0 top-full mt-1 w-72 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[200] ${activeMenu === 'ferramentas' ? 'block' : 'hidden'}`}>
+                <div className={`absolute left-0 top-full mt-1 w-72 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[200] ${activeMenu === 'ferramentas' ? 'block' : 'hidden'}`} onClick={() => setActiveMenu(null)}>
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => toast.info('Verificação ortográfica concluída!')}>
                     <SpellCheck2 size={16} className="text-slate-400" /> Ortografia e gramática
                   </button>
@@ -701,9 +701,9 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                 >
                   Extensões
                 </button>
-                <div className={`absolute left-0 top-full mt-1 w-72 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[200] ${activeMenu === 'extensoes' ? 'block' : 'hidden'}`}>
+                <div className={`absolute left-0 top-full mt-1 w-72 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[200] ${activeMenu === 'extensoes' ? 'block' : 'hidden'}`} onClick={() => setActiveMenu(null)}>
                   <div className="relative group/sub">
-                    <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between">
+                    <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-3"><Puzzle size={16} className="text-slate-400" /> Complementos</div>
                       <ChevronDown size={14} className="-rotate-90 text-slate-400" />
                     </button>
@@ -725,7 +725,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                 >
                   Ajuda
                 </button>
-                <div className={`absolute left-0 top-full mt-1 w-72 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[200] ${activeMenu === 'ajuda' ? 'block' : 'hidden'}`}>
+                <div className={`absolute left-0 top-full mt-1 w-72 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[200] ${activeMenu === 'ajuda' ? 'block' : 'hidden'}`} onClick={() => setActiveMenu(null)}>
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between" onClick={() => { setShowMenuSearch(true); setActiveMenu(null); }}>
                     <div className="flex items-center gap-3"><Search size={16} className="text-slate-400" /> Pesquisar nos menus</div>
                     <span className="text-slate-400">Alt+/</span>
@@ -762,13 +762,13 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
       {/* Toolbar Row */}
       <div id="docs-toolbar" className={`flex flex-wrap items-center gap-0.5 px-3 py-1 bg-[#edf2fa] dark:bg-slate-800/50 border-t border-slate-200 dark:border-white/10 transition-all ${isExpanded ? '' : 'h-0 overflow-hidden py-0 border-t-0'}`}>
-        <button className="ql-undo p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors" title="Desfazer"><Undo2 size={18}/></button>
-        <button className="ql-redo p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors" title="Refazer"><Redo2 size={18}/></button>
-        <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors" onClick={onPrint} title="Imprimir"><Printer size={18}/></button>
-        <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors" title="Verificação ortográfica" onClick={() => toast.info('Verificação ortográfica concluída.')}><SpellCheck size={18}/></button>
+        <button className="ql-undo p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Desfazer (Ctrl+Z)"><Undo2 size={18}/></button>
+        <button className="ql-redo p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Refazer (Ctrl+Y)"><Redo2 size={18}/></button>
+        <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" onClick={onPrint} data-tooltip="Imprimir (Ctrl+P)"><Printer size={18}/></button>
+        <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Verificação ortográfica" onClick={() => toast.info('Verificação ortográfica concluída.')}><SpellCheck size={18}/></button>
         <button 
-          className={`p-1.5 rounded transition-colors ${formatPainter ? 'bg-blue-100 text-blue-600' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
-          title="Pintar formatação" 
+          className={`p-1.5 rounded transition-colors has-tooltip ${formatPainter ? 'bg-blue-100 text-blue-600' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
+          data-tooltip="Pintar formatação" 
           onClick={handlePaintbrushClick}
         >
           <Paintbrush size={18}/>
@@ -777,8 +777,8 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
         <select 
-          className="bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-2 py-1 text-sm font-medium outline-none cursor-pointer transition-colors" 
-          title="Zoom" 
+          className="bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-2 py-1 text-sm font-medium outline-none cursor-pointer transition-colors has-tooltip" 
+          data-tooltip="Zoom" 
           value={zoom}
           onChange={(e) => {
             setZoom(e.target.value);
@@ -796,71 +796,90 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
-        <select className="ql-header bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-2 py-1 text-sm font-medium outline-none cursor-pointer transition-colors" title="Estilos de texto">
-          <option value="1">Título 1</option>
-          <option value="2">Título 2</option>
-          <option value="3">Título 3</option>
-          <option value="">Texto normal</option>
-        </select>
+        <div className="has-tooltip" data-tooltip="Estilos de texto">
+          <select className="ql-header bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-2 py-1 text-sm font-medium outline-none cursor-pointer transition-colors">
+            <option value="1">Título 1</option>
+            <option value="2">Título 2</option>
+            <option value="3">Título 3</option>
+            <option value="">Texto normal</option>
+          </select>
+        </div>
 
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
 
-        <select className="ql-font bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-2 py-1 text-sm font-medium outline-none cursor-pointer transition-colors" title="Fonte">
-          <option value="sans-serif">Arial</option>
-          <option value="serif">Times New Roman</option>
-          <option value="monospace">Courier New</option>
-          <option value="georgia">Georgia</option>
-          <option value="trebuchet">Trebuchet MS</option>
-          <option value="verdana">Verdana</option>
-        </select>
+        <div className="has-tooltip" data-tooltip="Fonte">
+          <select className="ql-font bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-2 py-1 text-sm font-medium outline-none cursor-pointer transition-colors">
+            <option value="sans-serif">Arial</option>
+            <option value="serif">Times New Roman</option>
+            <option value="monospace">Courier New</option>
+            <option value="georgia">Georgia</option>
+            <option value="trebuchet">Trebuchet MS</option>
+            <option value="verdana">Verdana</option>
+            <option value="comic-sans">Comic Sans MS</option>
+            <option value="impact">Impact</option>
+          </select>
+        </div>
 
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
 
-        <select className="ql-size bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-2 py-1 text-sm font-medium outline-none cursor-pointer transition-colors" title="Tamanho da fonte">
-          <option value="small">8</option>
-          <option value="">11</option>
-          <option value="large">18</option>
-          <option value="huge">32</option>
-        </select>
+        <div className="has-tooltip" data-tooltip="Tamanho da fonte">
+          <select className="ql-size bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-2 py-1 text-sm font-medium outline-none cursor-pointer transition-colors">
+            <option value="8px">8</option>
+            <option value="10px">10</option>
+            <option value="12px">12</option>
+            <option value="14px">14</option>
+            <option value="16px">16</option>
+            <option value="18px">18</option>
+            <option value="20px">20</option>
+            <option value="24px">24</option>
+            <option value="32px">32</option>
+            <option value="48px">48</option>
+            <option value="64px">64</option>
+            <option value="">Normal</option>
+          </select>
+        </div>
 
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
-        <button className="ql-bold p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors" title="Negrito"><Bold size={18}/></button>
-        <button className="ql-italic p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors" title="Itálico"><Italic size={18}/></button>
-        <button className="ql-underline p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors" title="Sublinhado"><Underline size={18}/></button>
+        <button className="ql-bold p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Negrito (Ctrl+B)"><Bold size={18}/></button>
+        <button className="ql-italic p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Itálico (Ctrl+I)"><Italic size={18}/></button>
+        <button className="ql-underline p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Sublinhado (Ctrl+U)"><Underline size={18}/></button>
         
-        <div className="flex items-center gap-0.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded px-1 transition-colors">
+        <div className="flex items-center gap-0.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded px-1 transition-colors has-tooltip" data-tooltip="Cor do texto">
           <Baseline size={16} className="text-slate-600 dark:text-slate-300" />
-          <select className="ql-color bg-transparent border-none w-6 h-6 p-0 outline-none cursor-pointer" title="Cor do texto"></select>
+          <select className="ql-color bg-transparent border-none w-6 h-6 p-0 outline-none cursor-pointer"></select>
         </div>
         
-        <div className="flex items-center gap-0.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded px-1 transition-colors">
+        <div className="flex items-center gap-0.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded px-1 transition-colors has-tooltip" data-tooltip="Cor de destaque">
           <Highlighter size={16} className="text-slate-600 dark:text-slate-300" />
-          <select className="ql-background bg-transparent border-none w-6 h-6 p-0 outline-none cursor-pointer" title="Cor de destaque"></select>
+          <select className="ql-background bg-transparent border-none w-6 h-6 p-0 outline-none cursor-pointer"></select>
         </div>
         
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
-        <button className="ql-link p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors" title="Inserir link"><Link size={18}/></button>
-        <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors" title="Adicionar comentário" onClick={() => toast.info('Comentário adicionado.')}><MessageSquarePlus size={18}/></button>
-        <button className="ql-image p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors" title="Inserir imagem"><Image size={18}/></button>
+        <button className="ql-link p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Inserir link (Ctrl+K)"><Link size={18}/></button>
+        <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Adicionar comentário" onClick={() => toast.info('Comentário adicionado.')}><MessageSquarePlus size={18}/></button>
+        <button className="ql-image p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Inserir imagem"><Image size={18}/></button>
         
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
-        <select className="ql-align bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-1 py-1 outline-none cursor-pointer transition-colors" title="Alinhamento">
-          <option value=""></option>
-          <option value="center"></option>
-          <option value="right"></option>
-          <option value="justify"></option>
-        </select>
+        <div className="has-tooltip" data-tooltip="Alinhamento">
+          <select className="ql-align bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-1 py-1 outline-none cursor-pointer transition-colors">
+            <option value=""></option>
+            <option value="center"></option>
+            <option value="right"></option>
+            <option value="justify"></option>
+          </select>
+        </div>
         
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
 
         <select 
-          className="bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-2 py-1 text-sm font-medium outline-none cursor-pointer transition-colors" 
-          title="Espaçamento entre linhas"
+          className="bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-2 py-1 text-sm font-medium outline-none cursor-pointer transition-colors has-tooltip" 
+          data-tooltip="Espaçamento entre linhas"
           onChange={(e) => handleFormat('lineheight', e.target.value)}
         >
+          <option value="">Padrão</option>
           <option value="1">1.0</option>
           <option value="1.15">1.15</option>
           <option value="1.5">1.5</option>
@@ -869,20 +888,21 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
 
-        <button className="ql-list p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors" value="check" title="Checklist"><ListTodo size={18}/></button>
-        <button className="ql-list p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors" value="bullet" title="Lista com marcadores"><List size={18}/></button>
-        <button className="ql-list p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors" value="ordered" title="Lista numerada"><ListOrdered size={18}/></button>
+        <button className="ql-list p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" value="check" data-tooltip="Checklist"><ListTodo size={18}/></button>
+        <button className="ql-list p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" value="bullet" data-tooltip="Lista com marcadores (Ctrl+Shift+8)"><List size={18}/></button>
+        <button className="ql-list p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" value="ordered" data-tooltip="Lista numerada (Ctrl+Shift+7)"><ListOrdered size={18}/></button>
         
-        <button className="ql-indent p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors" value="-1" title="Diminuir recuo"><IndentDecrease size={18}/></button>
-        <button className="ql-indent p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors" value="+1" title="Aumentar recuo"><IndentIncrease size={18}/></button>
+        <button className="ql-indent p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" value="-1" data-tooltip="Diminuir recuo (Ctrl+[)"><IndentDecrease size={18}/></button>
+        <button className="ql-indent p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" value="+1" data-tooltip="Aumentar recuo (Ctrl+])"><IndentIncrease size={18}/></button>
         
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
-        <button className="ql-clean p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors" title="Limpar formatação"><Eraser size={18}/></button>
+        <button className="ql-clean p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Limpar formatação (Ctrl+\)"><Eraser size={18}/></button>
 
         <button 
           onClick={() => setIsExpanded(!isExpanded)}
-          className="ml-auto p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded text-slate-500 transition-colors"
+          className="ml-auto p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded text-slate-500 transition-colors has-tooltip"
+          data-tooltip={isExpanded ? "Ocultar os menus" : "Mostrar os menus"}
         >
           <ChevronDown size={18} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
         </button>
