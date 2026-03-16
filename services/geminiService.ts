@@ -150,7 +150,7 @@ export const geminiService = {
       Resposta Esperada: ${expectedAnswer}
       Resposta do Aluno: ${userAnswer}
       
-      Forneça uma nota de 0 a 100 e um feedback detalhado.
+      Forneça uma nota de 0 a 10, um feedback detalhado, uma lista de palavras-chave que faltaram (se houver) e se a resposta está perfeita.
     `;
     const response = await ai.models.generateContent({
       model: GEMINI_MODEL,
@@ -161,12 +161,22 @@ export const geminiService = {
           type: Type.OBJECT,
           properties: {
             score: { type: Type.NUMBER },
-            feedback: { type: Type.STRING }
-          }
+            feedback: { type: Type.STRING },
+            missing_keywords: { 
+              type: Type.ARRAY,
+              items: { type: Type.STRING }
+            },
+            is_perfect: { type: Type.BOOLEAN }
+          },
+          required: ["score", "feedback", "missing_keywords", "is_perfect"]
         }
       }
     });
-    return JSON.parse(response.text || '{}');
+    const result = JSON.parse(response.text || '{}');
+    // Ensure missing_keywords is always an array to prevent UI crashes
+    if (!result.missing_keywords) result.missing_keywords = [];
+    if (typeof result.score !== 'number') result.score = 0;
+    return result;
   },
 
   fetchTermDefinition: async (term: string) => {

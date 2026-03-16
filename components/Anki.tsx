@@ -3588,7 +3588,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                                   </button>
                                 </div>
                                 <div className="flex items-center gap-2 px-4 py-1 bg-purple-600 text-white rounded-full text-lg font-black">
-                                  {aiEvaluation.score.toFixed(1)} / 10
+                                  {(aiEvaluation.score || 0).toFixed(1)} / 10
                                 </div>
                               </div>
                               <div className="p-6 bg-white dark:bg-slate-900 rounded-3xl border-2 border-purple-500/30 text-left shadow-xl">
@@ -3597,13 +3597,13 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                                   <p className="text-sm font-medium text-slate-600 dark:text-slate-400 italic">"{userWrittenAnswer}"</p>
                                 </div>
                                 <div className="prose prose-sm dark:prose-invert max-w-none text-slate-700 dark:text-slate-200 leading-relaxed mb-4 font-bold">
-                                  <ReactMarkdown>{aiEvaluation.feedback}</ReactMarkdown>
+                                  <ReactMarkdown>{aiEvaluation.feedback || ''}</ReactMarkdown>
                                 </div>
-                                {aiEvaluation.missing_keywords.length > 0 && (
+                                {(aiEvaluation.missing_keywords || []).length > 0 && (
                                   <div className="space-y-2">
                                     <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">O que faltou:</span>
                                     <div className="flex flex-wrap gap-2">
-                                      {aiEvaluation.missing_keywords.map((kw, i) => (
+                                      {(aiEvaluation.missing_keywords || []).map((kw, i) => (
                                         <span key={i} className="px-2 py-1 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-[10px] font-black border border-red-100 dark:border-red-800/30">
                                           {kw}
                                         </span>
