@@ -304,7 +304,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
               </button>
             </div>
             {/* Menus Row */}
-            <div className="flex items-center gap-0.5 text-[13px] text-slate-600 dark:text-slate-400">
+            <div className="flex items-center gap-0.5 text-[13px] text-slate-600 dark:text-slate-400 ml-1">
               <div className="relative menu-container">
                 <button 
                   className={`px-2 py-0.5 rounded transition-colors ${activeMenu === 'arquivo' ? 'bg-slate-100 dark:hover:bg-white/10' : 'hover:bg-slate-100 dark:hover:bg-white/5'}`}
@@ -768,7 +768,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
       </div>
 
       {/* Toolbar Row */}
-      <div id="docs-toolbar" className={`flex flex-wrap items-center gap-0.5 px-3 py-1 bg-[#edf2fa] dark:bg-slate-800/50 border-t border-slate-200 dark:border-white/10 transition-all ${isExpanded ? '' : 'h-0 overflow-hidden py-0 border-t-0'}`}>
+      <div id="docs-toolbar" className={`flex flex-wrap items-center gap-1.5 px-3 py-1 bg-[#edf2fa] dark:bg-slate-800/50 border-t border-slate-200 dark:border-white/10 transition-all ${isExpanded ? '' : 'h-0 overflow-hidden py-0 border-t-0'}`}>
         <div className="flex items-center bg-white dark:bg-slate-900 rounded-full px-3 py-1.5 mr-2 shadow-sm border border-slate-200 dark:border-white/10 w-48">
           <Search size={16} className="text-slate-500 mr-2" />
           <input 
@@ -800,9 +800,9 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
-        <div className="relative flex items-center has-tooltip bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-2 py-1 cursor-pointer transition-colors [&_.ql-picker]:hidden" data-tooltip="Estilos de texto">
-          <span className="text-sm font-medium text-slate-700 dark:text-slate-200 min-w-[60px]">Título 1</span>
-          <ChevronDown size={14} className="ml-2 text-slate-500" />
+        <div className="relative flex items-center has-tooltip bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-2 py-1 cursor-pointer transition-colors [&_.ql-picker]:!hidden" data-tooltip="Estilos de texto">
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Título 1</span>
+          <ChevronDown size={14} className="ml-3 text-slate-500" />
           <select 
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             onChange={(e) => handleFormat('header', e.target.value ? parseInt(e.target.value) : false)}
@@ -817,9 +817,9 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
 
-        <div className="relative flex items-center has-tooltip bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-2 py-1 cursor-pointer transition-colors [&_.ql-picker]:hidden" data-tooltip="Fonte">
-          <span className="text-sm font-medium text-slate-700 dark:text-slate-200 min-w-[40px]">Arial</span>
-          <ChevronDown size={14} className="ml-2 text-slate-500" />
+        <div className="relative flex items-center has-tooltip bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-2 py-1 cursor-pointer transition-colors [&_.ql-picker]:!hidden" data-tooltip="Fonte">
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Arial</span>
+          <ChevronDown size={14} className="ml-3 text-slate-500" />
           <select 
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             onChange={(e) => handleFormat('font', e.target.value)}
