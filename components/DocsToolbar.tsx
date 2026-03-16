@@ -800,25 +800,30 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
-        <div className="relative flex items-center has-tooltip" data-tooltip="Estilos de texto">
+        <div className="relative flex items-center has-tooltip bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-2 py-1 cursor-pointer transition-colors [&_.ql-picker]:hidden" data-tooltip="Estilos de texto">
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-200 min-w-[60px]">Título 1</span>
+          <ChevronDown size={14} className="ml-2 text-slate-500" />
           <select 
-            className="appearance-none bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded pl-2 pr-6 py-1 text-sm font-medium outline-none cursor-pointer transition-colors"
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             onChange={(e) => handleFormat('header', e.target.value ? parseInt(e.target.value) : false)}
+            defaultValue="1"
           >
             <option value="">Texto normal</option>
             <option value="1">Título 1</option>
             <option value="2">Título 2</option>
             <option value="3">Título 3</option>
           </select>
-          <ChevronDown size={14} className="absolute right-1 pointer-events-none text-slate-600 dark:text-slate-400" />
         </div>
 
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
 
-        <div className="relative flex items-center has-tooltip" data-tooltip="Fonte">
+        <div className="relative flex items-center has-tooltip bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded px-2 py-1 cursor-pointer transition-colors [&_.ql-picker]:hidden" data-tooltip="Fonte">
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-200 min-w-[40px]">Arial</span>
+          <ChevronDown size={14} className="ml-2 text-slate-500" />
           <select 
-            className="appearance-none bg-transparent hover:bg-slate-200 dark:hover:bg-white/10 rounded pl-2 pr-6 py-1 text-sm font-medium outline-none cursor-pointer transition-colors"
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             onChange={(e) => handleFormat('font', e.target.value)}
+            defaultValue="sans-serif"
           >
             <option value="sans-serif">Arial</option>
             <option value="serif">Times New Roman</option>
@@ -829,7 +834,6 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
             <option value="comic-sans">Comic Sans MS</option>
             <option value="impact">Impact</option>
           </select>
-          <ChevronDown size={14} className="absolute right-1 pointer-events-none text-slate-600 dark:text-slate-400" />
         </div>
 
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
@@ -916,10 +920,12 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         <button className="ql-clean p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Limpar formatação (Ctrl+\)"><Eraser size={18}/></button>
 
         <div className="ml-auto flex items-center gap-1">
-          <button className="flex items-center gap-1.5 px-3 py-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full text-sm font-medium text-slate-700 dark:text-slate-200 transition-colors whitespace-nowrap flex-shrink-0">
-            <Pencil size={16} className="text-blue-600" />
-            <span>Edição</span>
-            <ChevronDown size={14} className="text-slate-500" />
+          <button className="flex items-center px-3 py-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full text-sm font-medium text-slate-700 dark:text-slate-200 transition-colors whitespace-nowrap flex-shrink-0">
+            <div className="flex flex-row items-center gap-1 whitespace-nowrap">
+              <Pencil size={16} className="text-blue-600" />
+              <span>Edição</span>
+              <ChevronDown size={14} className="text-slate-500" />
+            </div>
           </button>
           
           <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>

@@ -1190,7 +1190,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
 
                   <div className="flex-1 flex overflow-hidden relative z-0">
                     <div className={`flex-1 quill-editor-custom overflow-y-auto ${showPrintLayout && !isPageless ? 'paper-effect p-10 md:p-20 bg-slate-200 dark:bg-slate-900/50' : 'bg-white dark:bg-slate-900'} ${showNonPrintingChars ? 'show-non-printing' : ''} relative`}>
-                      <div ref={onEditorRef} className={`flex-1 bg-white dark:bg-slate-900 ${showPrintLayout && !isPageless ? `shadow-2xl ${pageOrientation === 'portrait' ? 'max-w-[816px] min-h-[1056px]' : 'max-w-[1056px] min-h-[816px]'} mx-auto border border-slate-200 dark:border-white/10` : 'h-full w-full'}`} />
+                      <div ref={onEditorRef} className={`flex-1 bg-white dark:bg-slate-900 ${showPrintLayout && !isPageless ? `shadow-[0_1px_3px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.08)] ${pageOrientation === 'portrait' ? 'max-w-[816px] min-h-[1056px]' : 'max-w-[1056px] min-h-[816px]'} mx-auto border border-slate-200 dark:border-white/10` : 'h-full w-full'}`} />
                     </div>
 
                     {/* Comments Sidebar */}
