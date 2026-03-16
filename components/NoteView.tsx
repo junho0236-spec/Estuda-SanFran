@@ -326,7 +326,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     if (!title) return;
 
     const newNote: Note = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: crypto.randomUUID(),
       subject_id: selectedSubjectId,
       user_id: userId,
       title: title,
@@ -403,7 +403,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     if (!selectedNote) return;
     const newNote: Note = {
       ...selectedNote,
-      id: Math.random().toString(36).substr(2, 9),
+      id: crypto.randomUUID(),
       title: `${selectedNote.title} (Cópia)`,
       updated_at: new Date().toISOString(),
     };
@@ -583,7 +583,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
       }
 
       const newFile: SubjectFile = {
-        id: Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         user_id: userId,
         subject_id: selectedSubjectId,
         name: file.name,

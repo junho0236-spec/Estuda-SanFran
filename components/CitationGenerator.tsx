@@ -189,7 +189,7 @@ const CitationGenerator: React.FC = () => {
   const addToHistory = () => {
     if (!citationText) return;
     const newItem: HistoryItem = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: crypto.randomUUID(),
       text: citationText,
       html: citationHTML,
       type,

@@ -222,7 +222,7 @@ const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessio
     if (!editingFrontier?.name) return;
     
     const newFrontier: LegalFrontier = {
-      id: editingFrontier.id || Math.random().toString(36).substr(2, 9),
+      id: editingFrontier.id || crypto.randomUUID(),
       user_id: userId,
       name: editingFrontier.name,
       icon: editingFrontier.icon || 'Scale',

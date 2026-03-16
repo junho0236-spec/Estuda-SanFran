@@ -61,7 +61,7 @@ const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId, onVi
       } else {
         // Add new subject
         const newSubject: Subject = {
-          id: Math.random().toString(36).substr(2, 9),
+          id: crypto.randomUUID(),
           ...subjectData
         };
         const { error } = await supabase.from('subjects').insert({ ...newSubject, user_id: userId });

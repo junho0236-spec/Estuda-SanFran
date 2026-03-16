@@ -606,7 +606,10 @@ const App: React.FC = () => {
             parentId: f.parent_id,
             color: f.color,
             icon: f.icon || undefined,
-            targetDate: f.target_date || undefined
+            targetDate: f.target_date || undefined,
+            shared: f.shared || false,
+            original_deck_id: f.original_deck_id || undefined,
+            version: f.version || 1
           }));
 
           const syncCount = await db.syncQueue.count();

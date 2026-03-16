@@ -421,7 +421,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     
     // RECORD STUDY SESSION FOR CONSTANCY
     const sessionData: StudySession = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: crypto.randomUUID(),
       user_id: userId,
       start_time: new Date().toISOString(),
       duration: cardTimer,
@@ -860,7 +860,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     setIsLoading(true);
     try {
       // 1. Create a folder for the imported deck
-      const folderId = Math.random().toString(36).substr(2, 9);
+      const folderId = crypto.randomUUID();
       const folderName = `${deck.name} (Cópia)`;
       const { error: folderError } = await supabase.from('folders').insert({
         id: folderId,
@@ -875,7 +875,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
       // 2. Import the cards
       const cardsToInsert = deck.cards.map((c: any) => ({
-        id: Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         front: c.front,
         back: c.back,
         notes: c.notes || '',
@@ -946,7 +946,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         
         if (arrayData.length > 0) {
           cardsToInsert = arrayData.map((item: any) => ({
-            id: Math.random().toString(36).substr(2, 9),
+            id: crypto.randomUUID(),
             front: item.front || item.question || item.p || item.frente,
             back: item.back || item.answer || item.r || item.verso,
             subject_id: selectedSubjectId,
@@ -975,7 +975,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
           if (parts.length < 2) return null;
           
           return {
-            id: Math.random().toString(36).substr(2, 9),
+            id: crypto.randomUUID(),
             front: parts[0].trim().replace(/^"|"$/g, ''),
             back: parts.slice(1).join(';').trim().replace(/^"|"$/g, ''),
             subject_id: selectedSubjectId,
@@ -1081,7 +1081,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     try {
       // Salva no histórico antes de gerar
       const historyItem = {
-        id: Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         text: aiSourceText,
         urls: aiUrls,
         files: [...aiFiles],
@@ -1152,7 +1152,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     setIsLoading(true);
     try {
       const cardsToInsert = aiGeneratedCardsPreview.map((c: any) => ({
-        id: Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         front: c.front,
         back: c.back,
         notes: c.notes || '',
@@ -1229,7 +1229,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
   const handleManualCreate = async () => {
     if (!manualFront.trim() || !manualBack.trim()) return;
-    const newId = Math.random().toString(36).substr(2, 9);
+    const newId = crypto.randomUUID();
     try {
       const newCard: Flashcard = { 
         id: newId, 
@@ -1274,7 +1274,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) return;
-    const newId = Math.random().toString(36).substr(2, 9);
+    const newId = crypto.randomUUID();
     try {
       const newFolder: Folder = { 
         id: newId, 
@@ -1328,7 +1328,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
     try {
       const { error } = await supabase.from('deck_requests').insert({
-        id: Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         user_id: userId,
         topic: newRequestTopic,
         votes: 0,
@@ -1364,7 +1364,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     if (!userId) { showToast("Você precisa estar logado para criar decks colaborativos.", "info"); return; }
 
     try {
-      const newFolderId = Math.random().toString(36).substr(2, 9);
+      const newFolderId = crypto.randomUUID();
       const { error } = await supabase.from('folders').insert({
         id: newFolderId,
         user_id: userId,
@@ -1955,7 +1955,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       
       // RECORD STUDY SESSION FOR CONSTANCY
       const sessionData: StudySession = {
-        id: Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         user_id: userId,
         start_time: new Date().toISOString(),
         duration: cardTimer,
