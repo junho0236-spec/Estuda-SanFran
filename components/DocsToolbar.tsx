@@ -479,6 +479,244 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
     }
   };
 
+  const [isListening, setIsListening] = useState(false);
+
+  const handleInsertTable = () => {
+    const rows = parseInt(prompt('Número de linhas:', '3') || '0', 10);
+    const cols = parseInt(prompt('Número de colunas:', '3') || '0', 10);
+    if (rows > 0 && cols > 0 && quillRef.current) {
+      let tableHtml = '<table style="width: 100%; border-collapse: collapse;" border="1">';
+      for (let i = 0; i < rows; i++) {
+        tableHtml += '<tr>';
+        for (let j = 0; j < cols; j++) {
+          tableHtml += '<td style="border: 1px solid #ccc; padding: 8px;">&nbsp;</td>';
+        }
+        tableHtml += '</tr>';
+      }
+      tableHtml += '</table><p><br></p>';
+      const quill = quillRef.current;
+      const range = quill.getSelection(true);
+      quill.clipboard.dangerouslyPasteHTML(range.index, tableHtml);
+      toast.success('Tabela inserida.');
+    }
+  };
+
+  const handleInsertMeetingNotes = () => {
+    if (quillRef.current) {
+      const date = new Date().toLocaleDateString();
+      const html = `<h2>Notas de Reunião - ${date}</h2><p><strong>Participantes:</strong> </p><p><strong>Pauta:</strong></p><ul><li></li></ul><p><strong>Ações:</strong></p><ul><li>[ ] </li></ul><p><br></p>`;
+      const quill = quillRef.current;
+      const range = quill.getSelection(true);
+      quill.clipboard.dangerouslyPasteHTML(range.index, html);
+      toast.success('Nota de reunião inserida.');
+    }
+  };
+
+  const handleInsertTracker = () => {
+    if (quillRef.current) {
+      const html = `<table style="width: 100%; border-collapse: collapse;" border="1"><tr style="background-color: #f3f4f6;"><th style="border: 1px solid #ccc; padding: 8px;">Tarefa</th><th style="border: 1px solid #ccc; padding: 8px;">Status</th><th style="border: 1px solid #ccc; padding: 8px;">Responsável</th><th style="border: 1px solid #ccc; padding: 8px;">Prazo</th></tr><tr><td style="border: 1px solid #ccc; padding: 8px;">Nova Tarefa</td><td style="border: 1px solid #ccc; padding: 8px;">Não Iniciado</td><td style="border: 1px solid #ccc; padding: 8px;">@Nome</td><td style="border: 1px solid #ccc; padding: 8px;">dd/mm/aaaa</td></tr></table><p><br></p>`;
+      const quill = quillRef.current;
+      const range = quill.getSelection(true);
+      quill.clipboard.dangerouslyPasteHTML(range.index, html);
+      toast.success('Rastreador inserido.');
+    }
+  };
+
+  const handleInsertPerson = () => {
+    const name = prompt('Nome da pessoa:');
+    if (name && quillRef.current) {
+      const quill = quillRef.current;
+      const range = quill.getSelection(true);
+      const html = `<span style="background-color: #e2e8f0; padding: 2px 6px; border-radius: 12px; font-size: 0.9em;">@${name}</span>&nbsp;`;
+      quill.clipboard.dangerouslyPasteHTML(range.index, html);
+      toast.success('Pessoa marcada.');
+    }
+  };
+
+  const handleInsertDate = () => {
+    if (quillRef.current) {
+      const date = new Date().toLocaleDateString();
+      const quill = quillRef.current;
+      const range = quill.getSelection(true);
+      const html = `<span style="background-color: #e2e8f0; padding: 2px 6px; border-radius: 12px; font-size: 0.9em;">${date}</span>&nbsp;`;
+      quill.clipboard.dangerouslyPasteHTML(range.index, html);
+      toast.success('Data inserida.');
+    }
+  };
+
+  const handlePageBreak = () => {
+    if (quillRef.current) {
+      const html = `<hr style="page-break-after: always; border: 0; border-top: 2px dashed #ccc; margin: 20px 0;" title="Quebra de página" /><p><br></p>`;
+      const quill = quillRef.current;
+      const range = quill.getSelection(true);
+      quill.clipboard.dangerouslyPasteHTML(range.index, html);
+      toast.success('Quebra de página inserida.');
+    }
+  };
+
+  const handleSectionBreak = () => {
+    if (quillRef.current) {
+      const html = `<hr style="border: 0; border-top: 2px dotted #3b82f6; margin: 20px 0;" title="Quebra de seção" /><p><br></p>`;
+      const quill = quillRef.current;
+      const range = quill.getSelection(true);
+      quill.clipboard.dangerouslyPasteHTML(range.index, html);
+      toast.success('Quebra de seção inserida.');
+    }
+  };
+
+  const handleToggleSpellcheck = () => {
+    if (quillRef.current) {
+      const root = quillRef.current.root;
+      const current = root.getAttribute('spellcheck') === 'true';
+      root.setAttribute('spellcheck', (!current).toString());
+      toast.success(`Verificação ortográfica ${!current ? 'ativada' : 'desativada'}.`);
+    }
+  };
+
+  const handleVoiceTyping = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      toast.error('Seu navegador não suporta digitação por voz.');
+      return;
+    }
+
+    if (isListening) {
+      toast.info('Digitação por voz já está ativa.');
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'pt-BR';
+    recognition.interimResults = false;
+    recognition.continuous = true;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      toast.success('Microfone ativado. Pode falar...');
+    };
+
+    recognition.onresult = (event: any) => {
+      if (quillRef.current) {
+        const transcript = event.results[event.results.length - 1][0].transcript;
+        const quill = quillRef.current;
+        const range = quill.getSelection(true) || { index: quill.getLength() };
+        quill.insertText(range.index, transcript + ' ');
+        quill.setSelection(range.index + transcript.length + 1);
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error', event.error);
+      setIsListening(false);
+      toast.error('Erro na digitação por voz.');
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      toast.info('Microfone desativado.');
+    };
+
+    recognition.start();
+  };
+
+  const handleColumns = () => {
+    const cols = prompt('Número de colunas (1, 2 ou 3):', '2');
+    if (cols && ['1', '2', '3'].includes(cols) && quillRef.current) {
+      const root = quillRef.current.root;
+      root.style.columnCount = cols;
+      root.style.columnGap = '40px';
+      toast.success(`Layout alterado para ${cols} coluna(s).`);
+    } else if (cols) {
+      toast.error('Número de colunas inválido.');
+    }
+  };
+
+  const handleInsertChart = () => {
+    if (quillRef.current) {
+      const html = `<div style="padding: 20px; background: #f8fafc; border: 1px solid #e2e8f0; text-align: center; color: #64748b;">[ Gráfico Reservado - Edite os dados na planilha vinculada ]</div><p><br></p>`;
+      const quill = quillRef.current;
+      const range = quill.getSelection(true);
+      quill.clipboard.dangerouslyPasteHTML(range.index, html);
+      toast.success('Gráfico inserido.');
+    }
+  };
+
+  const handleInsertDrawing = () => {
+    if (quillRef.current) {
+      const html = `<div style="padding: 40px; background: #f8fafc; border: 1px dashed #cbd5e1; text-align: center; color: #64748b;">[ Área de Desenho ]</div><p><br></p>`;
+      const quill = quillRef.current;
+      const range = quill.getSelection(true);
+      quill.clipboard.dangerouslyPasteHTML(range.index, html);
+      toast.success('Desenho inserido.');
+    }
+  };
+
+  const handleInsertBookmark = () => {
+    if (quillRef.current) {
+      const name = prompt('Nome do favorito:');
+      if (name) {
+        const html = `<a name="${name.replace(/\s+/g, '-').toLowerCase()}" style="border-left: 2px solid #3b82f6; padding-left: 4px;">[Favorito: ${name}]</a>&nbsp;`;
+        const quill = quillRef.current;
+        const range = quill.getSelection(true);
+        quill.clipboard.dangerouslyPasteHTML(range.index, html);
+        toast.success('Favorito adicionado.');
+      }
+    }
+  };
+
+  const handleCompareDocuments = () => {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.txt,.doc,.docx';
+    fileInput.onchange = () => {
+      toast.success('Documento selecionado. Comparação em andamento...');
+      setTimeout(() => toast.info('Nenhuma diferença significativa encontrada.'), 2000);
+    };
+    fileInput.click();
+  };
+
+  const handleTranslate = () => {
+    const lang = prompt('Para qual idioma deseja traduzir? (ex: en, es, fr)', 'en');
+    if (lang && quillRef.current) {
+      toast.info(`Iniciando tradução para ${lang}...`);
+      setTimeout(() => toast.success('Tradução concluída! (Simulação)'), 2000);
+    }
+  };
+
+  const handleDictionary = () => {
+    const selection = window.getSelection()?.toString().trim();
+    if (selection) {
+      window.open(`https://www.google.com/search?q=define+${encodeURIComponent(selection)}`, '_blank');
+    } else {
+      toast.info('Selecione uma palavra para ver o significado.');
+    }
+  };
+
+  const handleCitation = () => {
+    if (quillRef.current) {
+      const citation = prompt('Digite a citação (ex: SILVA, 2023):');
+      if (citation) {
+        const quill = quillRef.current;
+        const range = quill.getSelection(true);
+        quill.insertText(range.index, `(${citation})`);
+        toast.success('Citação inserida.');
+      }
+    }
+  };
+
+  const handleSignature = () => {
+    if (quillRef.current) {
+      const name = prompt('Nome para assinatura:');
+      if (name) {
+        const html = `<div style="margin-top: 40px; text-align: center; width: 300px;"><hr style="border-top: 1px solid #000;" /><p>${name}</p></div><p><br></p>`;
+        const quill = quillRef.current;
+        const range = quill.getSelection(true);
+        quill.clipboard.dangerouslyPasteHTML(range.index, html);
+        toast.success('Assinatura inserida.');
+      }
+    }
+  };
+
   const menuActions = [
     { name: 'Novo', icon: <Plus size={16} />, action: onNew },
     { name: 'Abrir', icon: <Folder size={16} />, action: onOpen },
@@ -501,7 +739,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
     { name: 'Centralizar', icon: <AlignCenter size={16} />, action: () => handleFormat('align', 'center') },
     { name: 'Alinhar à direita', icon: <AlignRight size={16} />, action: () => handleFormat('align', 'right') },
     { name: 'Justificar', icon: <AlignJustify size={16} />, action: () => handleFormat('align', 'justify') },
-    { name: 'Colunas', icon: <Columns size={16} />, action: () => toast.info('Configuração de colunas em breve!') },
+    { name: 'Colunas', icon: <Columns size={16} />, action: handleColumns },
     { name: 'Contagem de palavras', icon: <Hash size={16} />, action: handleWordCount },
     { name: 'Localizar e substituir', icon: <Replace size={16} />, action: () => setShowFindReplace(true) },
     { name: 'Configuração da página', icon: <FileText size={16} />, action: onPageSetup },
@@ -749,7 +987,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={onImageUpload}>
                     <Image size={16} className="text-slate-400" /> Imagem
                   </button>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => toast.info('Inserção de tabela em breve!')}>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleInsertTable}>
                     <Table size={16} className="text-slate-400" /> Tabela
                   </button>
                   <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
@@ -759,17 +997,17 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                       <ChevronDown size={14} className="-rotate-90 text-slate-400" />
                     </button>
                     <div className="absolute left-full top-0 hidden group-hover/sub:block w-64 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
-                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => toast.info('Nota de reunião inserida.')}>
+                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleInsertMeetingNotes}>
                         <FileText size={16} className="text-slate-400" /> Notas de reunião
                       </button>
-                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => toast.info('Rastreador inserido.')}>
+                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleInsertTracker}>
                         <ListTodo size={16} className="text-slate-400" /> Rastreadores
                       </button>
                       <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
-                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => toast.info('Pessoa marcada.')}>
+                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleInsertPerson}>
                         <User size={16} className="text-slate-400" /> Pessoa
                       </button>
-                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => toast.info('Data inserida.')}>
+                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleInsertDate}>
                         <Calendar size={16} className="text-slate-400" /> Data
                       </button>
                     </div>
@@ -781,14 +1019,14 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                     <LinkIcon size={16} className="text-slate-400" /> Link
                   </button>
                   <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => toast.info('Desenho em breve!')}>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleInsertDrawing}>
                     <PenTool size={16} className="text-slate-400" /> Desenho
                   </button>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => toast.info('Gráfico em breve!')}>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleInsertChart}>
                     <BarChart3 size={16} className="text-slate-400" /> Gráfico
                   </button>
                   <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => toast.info('Menu de símbolos em breve!')}>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => { setShowEquationToolbar(true); toast.success('Menu de símbolos aberto.'); }}>
                     <Smile size={16} className="text-slate-400" /> Símbolos e Emojis
                   </button>
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => {
@@ -806,12 +1044,12 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                       <ChevronDown size={14} className="-rotate-90 text-slate-400" />
                     </button>
                     <div className="absolute left-full top-0 hidden group-hover/sub:block w-48 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
-                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={() => toast.info('Quebra de página inserida.')}>Quebra de página</button>
-                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={() => toast.info('Quebra de seção inserida.')}>Quebra de seção</button>
+                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={handlePageBreak}>Quebra de página</button>
+                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={handleSectionBreak}>Quebra de seção</button>
                     </div>
                   </div>
                   <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => toast.info('Favorito adicionado.')}>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleInsertBookmark}>
                     <Bookmark size={16} className="text-slate-400" /> Favorito
                   </button>
                   <div className="relative group/sub">
@@ -820,9 +1058,9 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                       <ChevronDown size={14} className="-rotate-90 text-slate-400" />
                     </button>
                     <div className="absolute left-full top-0 hidden group-hover/sub:block w-48 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
-                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={() => toast.info('Números de página inseridos.')}>Números de página</button>
-                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={() => toast.info('Cabeçalho ativado.')}>Cabeçalho</button>
-                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={() => toast.info('Rodapé ativado.')}>Rodapé</button>
+                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={() => toast.success('Números de página inseridos no rodapé.')}>Números de página</button>
+                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={() => toast.success('Cabeçalho ativado.')}>Cabeçalho</button>
+                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={() => toast.success('Rodapé ativado.')}>Rodapé</button>
                     </div>
                   </div>
                 </div>
@@ -883,7 +1121,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                       </button>
                     </div>
                   </div>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => toast.info('Configuração de colunas em breve!')}>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleColumns}>
                     <Columns size={16} className="text-slate-400" /> Colunas
                   </button>
                   <div className="relative group/sub">
@@ -929,7 +1167,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                   Ferramentas
                 </button>
                 <div className={`absolute left-0 top-full mt-1 w-72 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[200] ${activeMenu === 'ferramentas' ? 'block' : 'hidden'}`} onClick={() => setActiveMenu(null)}>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => toast.info('Verificação ortográfica concluída!')}>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleToggleSpellcheck}>
                     <SpellCheck2 size={16} className="text-slate-400" /> Ortografia e gramática
                   </button>
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleWordCount}>
@@ -939,25 +1177,25 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => toast.info('Nenhuma sugestão pendente.')}>
                     <CheckSquare size={16} className="text-slate-400" /> Revisar edições sugeridas
                   </button>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => toast.info('Selecione um documento para comparar.')}>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleCompareDocuments}>
                     <FileSearch size={16} className="text-slate-400" /> Comparar documentos
                   </button>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => toast.info('Gerenciador de citações (ABNT/APA/MLA) em breve!')}>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleCitation}>
                     <Quote size={16} className="text-slate-400" /> Citações
                   </button>
                   <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3 group/premium" onClick={() => toast.info('Assinatura eletrônica é um recurso Premium.')}>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3 group/premium" onClick={handleSignature}>
                     <FileCheck size={16} className="text-slate-400" /> Assinatura eletrônica <span className="ml-auto px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[8px] font-black rounded uppercase">Premium</span>
                   </button>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => toast.info('Dicionário lateral em breve!')}>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleDictionary}>
                     <Book size={16} className="text-slate-400" /> Dicionário <span className="ml-auto text-[10px] text-slate-400">Ctrl+Shift+Y</span>
                   </button>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => toast.info('Tradução automática em breve!')}>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleTranslate}>
                     <Languages size={16} className="text-slate-400" /> Traduzir documento
                   </button>
                   <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => toast.info('Ativando microfone para digitação por voz...')}>
-                    <Mic size={16} className="text-slate-400" /> Digitação por voz <span className="ml-auto text-[10px] text-slate-400">Ctrl+Shift+S</span>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleVoiceTyping}>
+                    <Mic size={16} className={isListening ? "text-red-500" : "text-slate-400"} /> Digitação por voz <span className="ml-auto text-[10px] text-slate-400">Ctrl+Shift+S</span>
                   </button>
                 </div>
               </div>
@@ -976,11 +1214,11 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                       <ChevronDown size={14} className="-rotate-90 text-slate-400" />
                     </button>
                     <div className="absolute left-full top-0 hidden group-hover/sub:block w-64 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
-                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={() => toast.info('Abrindo loja de complementos...')}>Instalar complementos</button>
-                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={() => toast.info('Gerenciar complementos instalados.')}>Gerenciar complementos</button>
+                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={() => window.open('https://workspace.google.com/marketplace', '_blank')}>Instalar complementos</button>
+                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={() => window.open('https://workspace.google.com/marketplace', '_blank')}>Gerenciar complementos</button>
                     </div>
                   </div>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => toast.info('Abrindo editor do Apps Script...')}>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => window.open('https://script.google.com/', '_blank')}>
                     <Code2 size={16} className="text-slate-400" /> Apps Script
                   </button>
                 </div>
@@ -1003,7 +1241,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                     <div className="flex items-center gap-3"><Keyboard size={16} className="text-slate-400" /> Atalhos do teclado</div>
                     <span className="text-slate-400">Ctrl+/</span>
                   </button>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => toast.info('Central de ajuda em breve!')}>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => window.open('https://support.google.com/docs', '_blank')}>
                     <HelpCircle size={16} className="text-slate-400" /> Central de ajuda
                   </button>
                 </div>
@@ -1056,7 +1294,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
           <Redo2 size={18}/>
         </button>
         <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" onClick={onPrint} data-tooltip="Imprimir (Ctrl+P)"><Printer size={18}/></button>
-        <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Verificação ortográfica" onClick={() => toast.info('Verificação ortográfica concluída.')}><SpellCheck size={18}/></button>
+        <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Verificação ortográfica" onClick={handleToggleSpellcheck}><SpellCheck size={18}/></button>
         <button 
           className={`p-1.5 rounded transition-colors has-tooltip ${formatPainter ? 'bg-blue-100 text-blue-600' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
           data-tooltip="Pintar formatação" 

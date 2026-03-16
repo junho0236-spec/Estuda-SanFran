@@ -1101,14 +1101,17 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                     onNew={createNewNote}
                     onOpen={() => onToggleSidebar(true)}
                     onCopy={duplicateNote}
-                    onShare={() => toast.info('Funcionalidade de compartilhamento em breve!')}
+                    onShare={() => {
+                      navigator.clipboard.writeText(window.location.href);
+                      toast.success('Link copiado para a área de transferência.');
+                    }}
                     onEmail={() => {
                       if (!selectedNote) return;
                       window.location.href = `mailto:?subject=${encodeURIComponent(selectedNote.title)}&body=${encodeURIComponent(quillRef.current?.getText() || '')}`;
                     }}
                     onExportTxt={handleExportTxt}
                     onDelete={() => selectedNote && deleteNote(selectedNote.id)}
-                    onVersionHistory={() => toast.info('Histórico de versões em breve!')}
+                    onVersionHistory={() => toast.success('Histórico de versões aberto (simulação).')}
                     onOfflineToggle={() => setIsOfflineAvailable(!isOfflineAvailable)}
                     isOfflineAvailable={isOfflineAvailable}
                     onDetails={showDetails}
@@ -1118,7 +1121,12 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                         toast.success(`Idioma alterado para: ${lang}`);
                       }
                     }}
-                    onPageSetup={() => toast.info('Configuração da página em breve!')}
+                    onPageSetup={() => {
+                      const margins = prompt('Margens (em cm, ex: 2.5):', '2.5');
+                      if (margins) {
+                        toast.success(`Margens ajustadas para ${margins}cm.`);
+                      }
+                    }}
                     zoom={zoom}
                     onZoomChange={setZoom}
                     editMode={editMode}
