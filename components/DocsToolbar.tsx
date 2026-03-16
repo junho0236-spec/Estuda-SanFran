@@ -111,39 +111,86 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
   useEffect(() => {
     const updateActiveFormats = () => {
-      setActiveFormats({
-        bold: document.queryCommandState('bold'),
-        italic: document.queryCommandState('italic'),
-        underline: document.queryCommandState('underline'),
-        strikeThrough: document.queryCommandState('strikeThrough'),
-        alignLeft: document.queryCommandState('justifyLeft'),
-        alignCenter: document.queryCommandState('justifyCenter'),
-        alignRight: document.queryCommandState('justifyRight'),
-        alignJustify: document.queryCommandState('justifyFull')
-      });
+      if (quillRef.current) {
+        const format = quillRef.current.getFormat();
+        setActiveFormats({
+          bold: !!format.bold,
+          italic: !!format.italic,
+          underline: !!format.underline,
+          strikeThrough: !!format.strike,
+          alignLeft: !format.align,
+          alignCenter: format.align === 'center',
+          alignRight: format.align === 'right',
+          alignJustify: format.align === 'justify'
+        });
+        
+        if (format.size) {
+          setFontSize(format.size.replace('px', ''));
+        } else {
+          setFontSize('11');
+        }
+        
+        if (format.font) {
+          const labels: { [key: string]: string } = {
+            "sans-serif": "Arial",
+            "serif": "Times New Roman",
+            "monospace": "Courier New",
+            "georgia": "Georgia",
+            "trebuchet": "Trebuchet MS",
+            "verdana": "Verdana",
+            "comic-sans": "Comic Sans MS",
+            "impact": "Impact"
+          };
+          setFontFamily(labels[format.font] || format.font);
+        } else {
+          setFontFamily('Arial');
+        }
+        
+        if (format.header) {
+          const headerLabels: { [key: number]: string } = {
+            1: "Título 1",
+            2: "Título 2",
+            3: "Título 3"
+          };
+          setHeadingStyle(headerLabels[format.header] || "Texto normal");
+        } else {
+          setHeadingStyle("Texto normal");
+        }
+      }
     };
 
+    if (quillRef.current) {
+      quillRef.current.on('editor-change', updateActiveFormats);
+    }
     document.addEventListener('selectionchange', updateActiveFormats);
-    return () => document.removeEventListener('selectionchange', updateActiveFormats);
-  }, []);
+    return () => {
+      if (quillRef.current) {
+        quillRef.current.off('editor-change', updateActiveFormats);
+      }
+      document.removeEventListener('selectionchange', updateActiveFormats);
+    };
+  }, [quillRef]);
 
   useEffect(() => {
     if (!formatPainter) return;
 
     const applyFormat = () => {
-      const selection = window.getSelection();
-      if (selection && selection.toString().length > 0) {
-        // Apply styles
-        Object.entries(formatPainter).forEach(([command, value]) => {
-          if (value !== false && value !== 'false' && value !== null) {
-            document.execCommand(command, false, value as string);
-          }
-        });
-        
-        // Reset paintbrush
-        setFormatPainter(null);
-        document.body.style.cursor = 'default';
-        toast.success('Formatação aplicada.');
+      if (quillRef.current) {
+        const selection = quillRef.current.getSelection();
+        if (selection && selection.length > 0) {
+          // Apply styles
+          quillRef.current.removeFormat(selection.index, selection.length);
+          Object.entries(formatPainter).forEach(([format, value]) => {
+            if (value !== false && value !== null) {
+              quillRef.current?.format(format, value);
+            }
+          });
+          
+          // Reset paintbrush
+          setFormatPainter(null);
+          document.body.style.cursor = 'default';
+          toast.success('Formatação aplicada.');
+        }
       }
     };
 
@@ -153,9 +200,8 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
   const handleFormat = (format: string, value: any = true) => {
     if (quillRef.current) {
-      quillRef.current.format(format, value);
+      quillRef.current.format(format, value === '' ? false : value);
     }
-    document.execCommand(format, false, value);
   };
 
   const handleToggleFormat = (format: string) => {
@@ -163,88 +209,71 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
       const current = quillRef.current.getFormat()[format];
       quillRef.current.format(format, !current);
     }
-    document.execCommand(format, false);
   };
 
   const handleTextColor = (color: string) => {
-    document.execCommand('foreColor', false, color);
+    if (quillRef.current) {
+      quillRef.current.format('color', color);
+    }
   };
 
   const handleHighlightColor = (color: string) => {
-    document.execCommand('hiliteColor', false, color);
+    if (quillRef.current) {
+      quillRef.current.format('background', color);
+    }
   };
 
   const handleAlign = (align: string) => {
-    document.execCommand(align, false);
+    if (quillRef.current) {
+      let value: string | boolean = false;
+      if (align === 'justifyCenter') value = 'center';
+      if (align === 'justifyRight') value = 'right';
+      if (align === 'justifyFull') value = 'justify';
+      quillRef.current.format('align', value);
+    }
   };
 
   const handleList = (type: string) => {
-    document.execCommand(type, false);
+    if (quillRef.current) {
+      const value = type === 'insertOrderedList' ? 'ordered' : 'bullet';
+      const current = quillRef.current.getFormat().list;
+      quillRef.current.format('list', current === value ? false : value);
+    }
   };
 
   const handleIndent = () => {
-    document.execCommand('indent', false);
+    if (quillRef.current) {
+      const current = quillRef.current.getFormat().indent || 0;
+      quillRef.current.format('indent', current + 1);
+    }
   };
 
   const handleOutdent = () => {
-    document.execCommand('outdent', false);
+    if (quillRef.current) {
+      const current = quillRef.current.getFormat().indent || 0;
+      if (current > 0) {
+        quillRef.current.format('indent', current - 1);
+      }
+    }
   };
 
   const handleChecklist = () => {
-    const selection = window.getSelection();
-    if (selection && selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
-      const container = document.createElement('div');
-      container.className = 'flex items-center gap-2 my-1';
-      
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.className = 'w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer';
-      
-      const span = document.createElement('span');
-      span.innerHTML = ' ';
-      span.contentEditable = 'true';
-      span.className = 'outline-none flex-1';
-      
-      container.appendChild(checkbox);
-      container.appendChild(span);
-      
-      range.insertNode(container);
-      range.collapse(false);
-      
-      // Focus the span
-      setTimeout(() => span.focus(), 0);
+    if (quillRef.current) {
+      const current = quillRef.current.getFormat().list;
+      quillRef.current.format('list', current === 'unchecked' ? false : 'unchecked');
     }
   };
 
   const handleLineSpacing = (value: string) => {
-    const selection = window.getSelection();
-    if (selection && selection.rangeCount > 0) {
-      let node = selection.anchorNode;
-      if (node) {
-        let parent = node.parentElement;
-        while (parent && !['P', 'DIV', 'H1', 'H2', 'H3', 'LI'].includes(parent.tagName) && parent.className !== 'ql-editor') {
-          parent = parent.parentElement;
-        }
-        if (parent) {
-          parent.style.lineHeight = value;
-        }
-      }
+    if (quillRef.current) {
+      quillRef.current.format('lineheight', value === '1.15' ? false : value);
     }
   };
 
   const handleFontSizeChange = (size: string) => {
     setFontSize(size);
-    const selection = window.getSelection();
-    if (selection && selection.rangeCount > 0) {
-      document.execCommand('fontSize', false, '7');
-      const fontElements = document.getElementsByTagName('font');
-      for (let i = 0; i < fontElements.length; i++) {
-        if (fontElements[i].size === '7') {
-          fontElements[i].removeAttribute('size');
-          fontElements[i].style.fontSize = `${size}px`;
-        }
-      }
+    if (quillRef.current) {
+      quillRef.current.format('size', size === '11' ? false : `${size}px`);
     }
   };
 
@@ -270,7 +299,9 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
       "impact": "Impact"
     };
     setFontFamily(labels[value] || "Arial");
-    document.execCommand('fontName', false, value);
+    if (quillRef.current) {
+      quillRef.current.format('font', value === 'sans-serif' ? false : value);
+    }
   };
 
   const handleHeadingChange = (value: string) => {
@@ -281,8 +312,9 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
       "3": "Título 3"
     };
     setHeadingStyle(labels[value] || "Texto normal");
-    const tag = value === "" ? "P" : `H${value}`;
-    document.execCommand('formatBlock', false, tag);
+    if (quillRef.current) {
+      quillRef.current.format('header', value === "" ? false : parseInt(value));
+    }
   };
 
   const handlePaintbrushClick = () => {
@@ -290,17 +322,12 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
       setFormatPainter(null);
       document.body.style.cursor = 'default';
     } else {
-      const styles = {
-        bold: document.queryCommandState('bold'),
-        italic: document.queryCommandState('italic'),
-        underline: document.queryCommandState('underline'),
-        strikeThrough: document.queryCommandState('strikeThrough'),
-        foreColor: document.queryCommandValue('foreColor'),
-        hiliteColor: document.queryCommandValue('hiliteColor'),
-      };
-      setFormatPainter(styles);
-      document.body.style.cursor = 'crosshair';
-      toast.info('Formatação copiada. Selecione o texto para aplicar.');
+      if (quillRef.current) {
+        const format = quillRef.current.getFormat();
+        setFormatPainter(format);
+        document.body.style.cursor = 'crosshair';
+        toast.info('Formatação copiada. Selecione o texto para aplicar.');
+      }
     }
   };
 
@@ -334,17 +361,28 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
   };
 
   const handleUndo = () => {
-    document.execCommand('undo', false);
+    if (quillRef.current) {
+      quillRef.current.history.undo();
+    }
   };
   
   const handleRedo = () => {
-    document.execCommand('redo', false);
+    if (quillRef.current) {
+      quillRef.current.history.redo();
+    }
   };
 
   const handleLink = () => {
-    const url = window.prompt('Digite a URL do link:');
-    if (url) {
-      document.execCommand('createLink', false, url);
+    if (quillRef.current) {
+      const selection = quillRef.current.getSelection();
+      if (selection && selection.length > 0) {
+        const url = window.prompt('Digite a URL do link:');
+        if (url) {
+          quillRef.current.format('link', url);
+        }
+      } else {
+        toast.error('Selecione um texto para adicionar um link.');
+      }
     }
   };
 
@@ -354,11 +392,15 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
     input.accept = 'image/*';
     input.onchange = (e: any) => {
       const file = e.target.files[0];
-      if (file) {
+      if (file && quillRef.current) {
         const reader = new FileReader();
         reader.onload = (readerEvent: any) => {
           const base64 = readerEvent.target.result;
-          document.execCommand('insertImage', false, base64);
+          const range = quillRef.current?.getSelection(true);
+          if (range) {
+            quillRef.current?.insertEmbed(range.index, 'image', base64);
+            quillRef.current?.setSelection(range.index + 1, 0);
+          }
         };
         reader.readAsDataURL(file);
       }
@@ -367,9 +409,13 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
   };
 
   const handleClearFormatting = () => {
-    document.execCommand('removeFormat', false);
     if (quillRef.current) {
-      quillRef.current.removeFormat(0, quillRef.current.getLength());
+      const selection = quillRef.current.getSelection();
+      if (selection && selection.length > 0) {
+        quillRef.current.removeFormat(selection.index, selection.length);
+      } else {
+        quillRef.current.removeFormat(0, quillRef.current.getLength());
+      }
     }
   };
 
@@ -380,11 +426,33 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
   };
 
   const handleCut = () => {
-    document.execCommand('cut');
+    if (quillRef.current) {
+      const selection = quillRef.current.getSelection();
+      if (selection && selection.length > 0) {
+        const text = quillRef.current.getText(selection.index, selection.length);
+        navigator.clipboard.writeText(text).then(() => {
+          quillRef.current?.deleteText(selection.index, selection.length);
+        }).catch(() => {
+          document.execCommand('cut');
+        });
+      }
+    } else {
+      document.execCommand('cut');
+    }
   };
 
   const handleCopy = () => {
-    document.execCommand('copy');
+    if (quillRef.current) {
+      const selection = quillRef.current.getSelection();
+      if (selection && selection.length > 0) {
+        const text = quillRef.current.getText(selection.index, selection.length);
+        navigator.clipboard.writeText(text).catch(() => {
+          document.execCommand('copy');
+        });
+      }
+    } else {
+      document.execCommand('copy');
+    }
   };
 
   const handlePaste = async () => {
@@ -1089,7 +1157,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                       <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => handleToggleFormat('underline')}>
                         <Underline size={16} className="text-slate-400" /> Sublinhado <span className="ml-auto text-[10px] text-slate-400">Ctrl+U</span>
                       </button>
-                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => handleToggleFormat('strikeThrough')}>
+                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => handleToggleFormat('strike')}>
                         <Strikethrough size={16} className="text-slate-400" /> Tachado <span className="ml-auto text-[10px] text-slate-400">Alt+Shift+5</span>
                       </button>
                       <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
@@ -1423,7 +1491,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         <button 
           className={`p-1.5 rounded transition-colors has-tooltip ${activeFormats.strikeThrough ? 'bg-slate-300 dark:bg-white/20' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
           data-tooltip="Tachado"
-          onClick={() => handleToggleFormat('strikeThrough')}
+          onClick={() => handleToggleFormat('strike')}
         >
           <Strikethrough size={18}/>
         </button>

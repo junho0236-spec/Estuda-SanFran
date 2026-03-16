@@ -360,6 +360,24 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     URL.revokeObjectURL(url);
   };
 
+  const toggleStar = async () => {
+    if (!selectedNote) return;
+    const newStarredStatus = !selectedNote.is_starred;
+    const updatedNote = { ...selectedNote, is_starred: newStarredStatus };
+    setSelectedNote(updatedNote);
+    setNotes(prev => prev.map(n => n.id === selectedNote.id ? updatedNote : n));
+    try {
+      await dataService.saveNote(updatedNote, userId, isOnline);
+      toast.success(newStarredStatus ? 'Documento marcado com estrela!' : 'Estrela removida.');
+    } catch (error) {
+      console.error("Error toggling star:", error);
+      toast.error("Erro ao atualizar estrela.");
+      // Revert on error
+      setSelectedNote(selectedNote);
+      setNotes(prev => prev.map(n => n.id === selectedNote.id ? selectedNote : n));
+    }
+  };
+
   const duplicateNote = async () => {
     if (!selectedNote) return;
     const newNote: Note = {
@@ -731,11 +749,11 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                     <span className="text-[7px] font-black uppercase">Renomear</span>
                   </button>
                   <button 
-                    className="p-2 text-slate-300 hover:text-yellow-500 transition-colors"
-                    title="Marcar com estrela"
-                    onClick={() => toast.success('Documento marcado com estrela!')}
+                    className={`p-2 transition-colors ${selectedNote.is_starred ? 'text-yellow-500' : 'text-slate-300 hover:text-yellow-500'}`}
+                    title={selectedNote.is_starred ? "Remover estrela" : "Marcar com estrela"}
+                    onClick={toggleStar}
                   >
-                    <Star size={20} />
+                    <Star size={20} fill={selectedNote.is_starred ? "currentColor" : "none"} />
                   </button>
                 </div>
               ) : isRenaming ? (
