@@ -304,7 +304,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
               </button>
             </div>
             {/* Menus Row */}
-            <div className="flex items-center gap-0.5 text-[13px] text-slate-600 dark:text-slate-400 ml-1">
+            <div className="flex items-center gap-0.5 text-[13px] font-medium text-slate-800 dark:text-slate-200 ml-1">
               <div className="relative menu-container">
                 <button 
                   className={`px-2 py-0.5 rounded transition-colors ${activeMenu === 'arquivo' ? 'bg-slate-100 dark:hover:bg-white/10' : 'hover:bg-slate-100 dark:hover:bg-white/5'}`}
@@ -770,7 +770,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
       {/* Toolbar Row */}
       <div id="docs-toolbar" className={`flex flex-wrap items-center gap-1.5 px-3 py-1 bg-[#edf2fa] dark:bg-slate-800/50 border-t border-slate-200 dark:border-white/10 transition-all ${isExpanded ? '' : 'h-0 overflow-hidden py-0 border-t-0'}`}>
         <div className="flex items-center bg-white dark:bg-slate-900 rounded-full px-3 py-1.5 mr-2 shadow-sm border border-slate-200 dark:border-white/10 w-48">
-          <Search size={16} className="text-slate-500 mr-2" />
+          <Search size={16} strokeWidth={2.5} className="text-slate-700 dark:text-slate-300 mr-2" />
           <input 
             type="text" 
             placeholder="Menus" 
@@ -855,7 +855,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         <div className="flex items-center gap-0.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded px-1 transition-colors has-tooltip" data-tooltip="Cor do texto">
           <div className="flex flex-col items-center">
             <Baseline size={16} className="text-slate-600 dark:text-slate-300" />
-            <div className="w-4 h-0.5 bg-black dark:bg-white -mt-0.5"></div>
+            <div className="w-4 h-[3px] bg-black dark:bg-white -mt-0.5"></div>
           </div>
           <select className="ql-color appearance-none bg-transparent border-none w-6 h-6 p-0 outline-none cursor-pointer"></select>
         </div>
@@ -924,7 +924,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
             <div className="flex flex-row items-center gap-1 whitespace-nowrap">
               <Pencil size={16} className="text-blue-600" />
               <span>Edição</span>
-              <ChevronDown size={14} className="text-slate-500" />
+              <ChevronDown size={11} className="text-slate-500" />
             </div>
           </button>
           
