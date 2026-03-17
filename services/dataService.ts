@@ -290,7 +290,6 @@ export const dataService = {
 
     // Delete locally
     await db.folders.bulkDelete(allFolderIdsToDelete);
-    await db.flashcards.where('folderId').anyOf(allFolderIdsToDelete).delete();
 
     if (isOnline) {
       // Delete in Supabase
@@ -547,61 +546,54 @@ export const dataService = {
 
   // FLASHCARDS
   async saveFlashcard(card: any, userId: string, isOnline: boolean) {
-    // 1. Salva localmente primeiro (IndexedDB)
-    await db.flashcards.put(card);
+    if (isOnline) {
+      // Prepara o payload EXATO que o banco espera (snake_case)
+      const payload = {
+        id: card.id,
+        user_id: userId,
+        subject_id: card.subjectId || null,
+        folder_id: card.folderId || null,
+        front: card.front,
+        back: card.back,
+        notes: card.notes || null,
+        next_review: card.nextReview ? Math.floor(card.nextReview) : Date.now(),
+        interval: card.interval || 0,
+        status: card.status || 'new',
+        learning_step: card.learningStep || 0,
+        ease_factor: card.easeFactor || 2.5,
+        archived_at: card.archived_at || null,
+        tags: card.tags || [],
+        source: card.source || null,
+        is_suspended: card.is_suspended || false,
+        total_errors: card.total_errors || 0
+      };
 
-      if (isOnline) {
-        // 2. Prepara o payload EXATO que o banco espera (snake_case)
-        const payload = {
-          id: card.id,
-          user_id: userId,
-          subject_id: card.subjectId || null,
-          folder_id: card.folderId || null,
-          front: card.front,
-          back: card.back,
-          notes: card.notes || null,
-          next_review: card.nextReview ? Math.floor(card.nextReview) : Date.now(),
-          interval: card.interval || 0,
-          status: card.status || 'new',
-          learning_step: card.learningStep || 0,
-          ease_factor: card.easeFactor || 2.5,
-          archived_at: card.archived_at || null,
-          tags: card.tags || [],
-          source: card.source || null,
-          is_suspended: card.is_suspended || false,
-          total_errors: card.total_errors || 0
-        };
+      console.log(`[dataService] Salvando card ${card.id} no Supabase. Status: ${payload.status}`);
+      
+      const { data, error } = await supabase
+        .from('flashcards')
+        .upsert(payload, { onConflict: 'id' })
+        .select();
 
-        console.log(`[dataService] Salvando card ${card.id} no Supabase. Status: ${payload.status}`);
-        
-        const { data, error } = await supabase
-          .from('flashcards')
-          .upsert(payload, { onConflict: 'id' })
-          .select();
-
-        if (error) {
-          console.error("[dataService] Erro ao salvar no Supabase:", error);
-          await addToSyncQueue({ table: 'flashcards', action: 'update', data: card });
-          throw new Error(`Erro ao salvar no nuvem: ${error.message}`);
-        } else {
-          console.log("[dataService] Card salvo com sucesso no Supabase:", data?.[0]?.id);
-        }
+      if (error) {
+        console.error("[dataService] Erro ao salvar no Supabase:", error);
+        throw new Error(`Erro ao salvar no nuvem: ${error.message}`);
       } else {
-      console.log("Modo Offline: Card agendado para sincronização.");
-      await addToSyncQueue({ table: 'flashcards', action: 'update', data: card });
+        console.log("[dataService] Card salvo com sucesso no Supabase:", data?.[0]?.id);
+      }
+    } else {
+      throw new Error("Você precisa estar online para salvar flashcards.");
     }
   },
 
   async deleteFlashcard(id: string, userId: string, isOnline: boolean) {
-    await db.flashcards.delete(id);
-
     if (isOnline) {
       const { error } = await supabase.from('flashcards').delete().eq('id', id).eq('user_id', userId);
       if (error) {
-        await addToSyncQueue({ table: 'flashcards', action: 'delete', data: { id } });
+        throw new Error(`Erro ao deletar na nuvem: ${error.message}`);
       }
     } else {
-      await addToSyncQueue({ table: 'flashcards', action: 'delete', data: { id } });
+      throw new Error("Você precisa estar online para deletar flashcards.");
     }
   },
 

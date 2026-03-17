@@ -212,6 +212,7 @@ const App: React.FC = () => {
   }, [isSidebarMinimized]);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isLoadingFlashcards, setIsLoadingFlashcards] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [session, setSession] = useState<any>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -580,6 +581,7 @@ const App: React.FC = () => {
     const userId = session.user.id;
     
     try {
+      setIsLoadingFlashcards(true);
       if (isOnline) {
         // Fetch subjects first as they are often dependencies
         const { data: subs } = await supabase.from('subjects').select('*').eq('user_id', userId);
@@ -643,50 +645,25 @@ const App: React.FC = () => {
         }
         
         if (resCards.data) {
-          const localCards = await db.flashcards.toArray();
-          const localCardsMap = new Map(localCards.map(c => [c.id, c]));
-
-          const formattedCards = resCards.data.map(c => {
-            const local = localCardsMap.get(c.id);
-            return {
-              id: c.id, 
-              front: c.front, 
-              back: c.back, 
-              notes: c.notes || '',
-              tags: c.tags || [],
-              source: c.source || '',
-              subjectId: c.subject_id || '', 
-              folderId: c.folder_id || null, 
-              nextReview: c.next_review != null ? Number(c.next_review) : (local?.nextReview || Date.now()), 
-              interval: c.interval != null ? c.interval : (local?.interval || 0), 
-              status: c.status || local?.status || 'new',
-              learningStep: c.learning_step != null ? c.learning_step : (local?.learningStep || 0),
-              easeFactor: c.ease_factor != null ? c.ease_factor : (local?.easeFactor || 2.5),
-              total_errors: c.total_errors != null ? c.total_errors : (local?.total_errors || 0),
-              archived_at: c.archived_at || null
-            };
-          });
+          const formattedCards = resCards.data.map(c => ({
+            id: c.id, 
+            front: c.front, 
+            back: c.back, 
+            notes: c.notes || '',
+            tags: c.tags || [],
+            source: c.source || '',
+            subjectId: c.subject_id || '', 
+            folderId: c.folder_id || null, 
+            nextReview: c.next_review != null ? Number(c.next_review) : Date.now(), 
+            interval: c.interval != null ? c.interval : 0, 
+            status: c.status || 'new',
+            learningStep: c.learning_step != null ? c.learning_step : 0,
+            easeFactor: c.ease_factor != null ? c.ease_factor : 2.5,
+            total_errors: c.total_errors != null ? c.total_errors : 0,
+            archived_at: c.archived_at || null
+          }));
           
-          // Only update local DB if we are not in the middle of a sync
-          const syncCount = await db.syncQueue.count();
-          if (syncCount === 0) {
-            console.log(`[App] Sincronizando ${formattedCards.length} flashcards do Supabase para o IndexedDB local.`);
-            
-            const remoteIds = new Set(formattedCards.map(c => c.id));
-            const idsToDelete = localCards.filter(c => !remoteIds.has(c.id)).map(c => c.id);
-            if (idsToDelete.length > 0) {
-              console.log(`[App] Removendo ${idsToDelete.length} flashcards locais obsoletos.`);
-              await db.flashcards.bulkDelete(idsToDelete);
-            }
-
-            setFlashcards(formattedCards);
-            await db.flashcards.bulkPut(formattedCards);
-          } else {
-            console.log(`[App] Pulando bulkPut de flashcards pois existem ${syncCount} itens pendentes na fila de sincronização.`);
-            // Still update state but maybe merge? For now, let's trust local more if sync is pending
-            const localCards = await db.flashcards.toArray();
-            setFlashcards(localCards);
-          }
+          setFlashcards(formattedCards);
         }
 
         if (resTks.data) {
@@ -754,14 +731,12 @@ const App: React.FC = () => {
 
         if (resReadings.data) setReadings(resReadings.data);
       } else {
-        const [localCards, localTasks, localBoards, localSessions, localFolders] = await Promise.all([
-          db.flashcards.toArray(),
+        const [localTasks, localBoards, localSessions, localFolders] = await Promise.all([
           db.tasks.toArray(),
           db.boards.toArray(),
           db.study_sessions.toArray(),
           db.folders.toArray()
         ]);
-        setFlashcards(localCards);
         setTasks(localTasks);
         setBoards(localBoards);
         setStudySessions(localSessions);
@@ -769,18 +744,18 @@ const App: React.FC = () => {
       }
     } catch (err) {
       console.error("Erro no carregamento dos dados:", err);
-      const [localCards, localTasks, localBoards, localSessions, localFolders] = await Promise.all([
-        db.flashcards.toArray(),
+      const [localTasks, localBoards, localSessions, localFolders] = await Promise.all([
         db.tasks.toArray(),
         db.boards.toArray(),
         db.study_sessions.toArray(),
         db.folders.toArray()
       ]);
-      setFlashcards(localCards);
       setTasks(localTasks);
       setBoards(localBoards);
       setStudySessions(localSessions);
       setFolders(localFolders);
+    } finally {
+      setIsLoadingFlashcards(false);
     }
   };
 
@@ -1242,6 +1217,7 @@ const App: React.FC = () => {
                     userId={session.user.id} 
                     isOnline={isOnline}
                     setStudySessions={setStudySessions}
+                    isLoadingFlashcards={isLoadingFlashcards}
                   />
                 } />
                 <Route path={getPathFromView(View.Library)} element={<Library readings={readings} setReadings={setReadings} subjects={subjects} userId={session.user.id} />} />

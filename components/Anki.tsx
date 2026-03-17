@@ -107,6 +107,7 @@ interface AnkiProps {
   initialText: string | null;
   setInitialText: React.Dispatch<React.SetStateAction<string | null>>;
   setStudySessions?: React.Dispatch<React.SetStateAction<any[]>>;
+  isLoadingFlashcards?: boolean;
 }
 
 const FOLDER_COLORS = [
@@ -134,7 +135,7 @@ const FOLDER_ICONS = [
   { name: 'Documento', value: 'document', icon: FileText }
 ];
 
-const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folders, setFolders, userId, isOnline, initialText, setInitialText, setStudySessions }) => {
+const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folders, setFolders, userId, isOnline, initialText, setInitialText, setStudySessions, isLoadingFlashcards }) => {
   const location = useLocation();
   const { state } = location;
 
@@ -2274,6 +2275,15 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       </div>
     );
   };
+
+  if (isLoadingFlashcards) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-8 min-h-[400px]">
+        <div className="animate-spin w-12 h-12 border-4 border-usp-blue/30 border-t-usp-blue rounded-full mb-4"></div>
+        <h3 className="text-xl font-bold text-slate-700 dark:text-slate-300">Carregando seus flashcards da nuvem...</h3>
+      </div>
+    );
+  }
 
   if (!subjects || subjects.length === 0) {
     return (
