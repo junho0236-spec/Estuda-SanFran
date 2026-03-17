@@ -1698,11 +1698,18 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       if (!currentCard) throw new Error("Card não encontrado na fila de revisão.");
       const evaluation = await evaluateDissertativeAnswer(currentCard.front, currentCard.back, userWrittenAnswer);
       setAiEvaluation(evaluation);
-      setIsFlipped(true); // Flip to show the feedback and correct answer
     } catch (err) {
-      showToast("Erro ao avaliar resposta. Tente novamente.", "error");
+      console.error("Error evaluating answer:", err);
+      showToast("Erro ao avaliar resposta. Exibindo gabarito padrão.", "error");
+      setAiEvaluation({
+        score: 0,
+        feedback: "Não foi possível gerar a avaliação da IA no momento. Por favor, confira o gabarito padrão abaixo.",
+        missing_keywords: [],
+        is_perfect: false
+      });
     } finally {
       setIsEvaluating(false);
+      setIsFlipped(true); // Always flip to show the correct answer
     }
   };
 

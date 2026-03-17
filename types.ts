@@ -431,6 +431,7 @@ export interface Question {
   listen_count?: number;
   status?: 'Acertou' | 'Errado';
   is_reinforcement?: boolean;
+  texto_gabarito_ia?: string;
   ai_summary?: {
     tese: string;
     fundamentação: string;

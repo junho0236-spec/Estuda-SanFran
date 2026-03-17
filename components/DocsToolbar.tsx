@@ -557,7 +557,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         tableHtml += '</table><p><br></p>';
         const range = quill.getSelection(true);
         const delta = quill.clipboard.convert({ html: tableHtml });
-        quill.updateContents(new Quill.import('delta')().retain(range.index).concat(delta), 'user');
+        quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
         toast.success('Tabela inserida.');
       }
     }
@@ -570,7 +570,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
       const quill = quillRef.current;
       const range = quill.getSelection(true);
       const delta = quill.clipboard.convert({ html });
-      quill.updateContents(new Quill.import('delta')().retain(range.index).concat(delta), 'user');
+      quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
       toast.success('Nota de reunião inserida.');
     }
   };
@@ -581,7 +581,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
       const quill = quillRef.current;
       const range = quill.getSelection(true);
       const delta = quill.clipboard.convert({ html });
-      quill.updateContents(new Quill.import('delta')().retain(range.index).concat(delta), 'user');
+      quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
       toast.success('Rastreador inserido.');
     }
   };
@@ -593,7 +593,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
       const range = quill.getSelection(true);
       const html = `<span style="background-color: #e2e8f0; padding: 2px 6px; border-radius: 12px; font-size: 0.9em;">@${name}</span>&nbsp;`;
       const delta = quill.clipboard.convert({ html });
-      quill.updateContents(new Quill.import('delta')().retain(range.index).concat(delta), 'user');
+      quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
       toast.success('Pessoa marcada.');
     }
   };
@@ -605,7 +605,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
       const range = quill.getSelection(true);
       const html = `<span style="background-color: #e2e8f0; padding: 2px 6px; border-radius: 12px; font-size: 0.9em;">${date}</span>&nbsp;`;
       const delta = quill.clipboard.convert({ html });
-      quill.updateContents(new Quill.import('delta')().retain(range.index).concat(delta), 'user');
+      quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
       toast.success('Data inserida.');
     }
   };
@@ -616,7 +616,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
       const quill = quillRef.current;
       const range = quill.getSelection(true);
       const delta = quill.clipboard.convert({ html });
-      quill.updateContents(new Quill.import('delta')().retain(range.index).concat(delta), 'user');
+      quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
       toast.success('Quebra de página inserida.');
     }
   };
@@ -627,7 +627,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
       const quill = quillRef.current;
       const range = quill.getSelection(true);
       const delta = quill.clipboard.convert({ html });
-      quill.updateContents(new Quill.import('delta')().retain(range.index).concat(delta), 'user');
+      quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
       toast.success('Quebra de seção inserida.');
     }
   };
@@ -705,7 +705,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
       const quill = quillRef.current;
       const range = quill.getSelection(true);
       const delta = quill.clipboard.convert({ html });
-      quill.updateContents(new Quill.import('delta')().retain(range.index).concat(delta), 'user');
+      quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
       toast.success('Gráfico inserido.');
     }
   };
@@ -716,7 +716,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
       const quill = quillRef.current;
       const range = quill.getSelection(true);
       const delta = quill.clipboard.convert({ html });
-      quill.updateContents(new Quill.import('delta')().retain(range.index).concat(delta), 'user');
+      quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
       toast.success('Desenho inserido.');
     }
   };
@@ -729,7 +729,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         const quill = quillRef.current;
         const range = quill.getSelection(true);
         const delta = quill.clipboard.convert({ html });
-        quill.updateContents(new Quill.import('delta')().retain(range.index).concat(delta), 'user');
+        quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
         toast.success('Favorito adicionado.');
       }
     }
@@ -783,7 +783,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         const quill = quillRef.current;
         const range = quill.getSelection(true);
         const delta = quill.clipboard.convert({ html });
-        quill.updateContents(new Quill.import('delta')().retain(range.index).concat(delta), 'user');
+        quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
         toast.success('Assinatura inserida.');
       }
     }

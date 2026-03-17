@@ -770,9 +770,13 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, folders = [], flash
       let back = `**GABARITO: ${String.fromCharCode(65 + question.correct_answer)}**\n\n`;
       
       if (commentary) {
-        back += `⚖️ **Fundamentação:** ${commentary.legalBasis}\n\n`;
-        back += `❌ **Análise:** ${commentary.alternativesAnalysis}\n\n`;
-        back += `💡 **Pulo do Gato:** ${commentary.mnemonic}`;
+        if (typeof commentary === 'string') {
+          back += `⚖️ **Correção IA:**\n\n${commentary}\n\n`;
+        } else {
+          back += `⚖️ **Fundamentação:** ${commentary.legalBasis}\n\n`;
+          back += `❌ **Análise:** ${commentary.alternativesAnalysis}\n\n`;
+          back += `💡 **Pulo do Gato:** ${commentary.mnemonic}`;
+        }
       } else {
         back += `Explicação: ${question.explanation || 'Nenhuma explicação fornecida.'}`;
       }
@@ -1146,14 +1150,48 @@ Forneça a explicação de forma concisa e didática.`;
     // 1. Check if already in state
     if (aiCommentary[question.id]) return;
 
-    // 2. Check if already in the question object (from DB)
-    if (question.ai_correction) {
-      setAiCommentary(prev => ({ ...prev, [question.id]: question.ai_correction }));
-      return;
-    }
-
     try {
       setLoadingAiCommentary(prev => ({ ...prev, [question.id]: true }));
+
+      // 2. Check-First Pattern: SELECT from database
+      let { data: dbQuestion, error: fetchError } = await supabase
+        .from('questions')
+        .select('texto_gabarito_ia, ai_correction')
+        .eq('id', question.id)
+        .single();
+        
+      // Se a coluna texto_gabarito_ia não existir, tenta buscar apenas ai_correction
+      if (fetchError && fetchError.code === '42703') {
+        const result = await supabase
+          .from('questions')
+          .select('ai_correction')
+          .eq('id', question.id)
+          .single();
+        
+        dbQuestion = result.data ? { texto_gabarito_ia: null, ai_correction: result.data.ai_correction } : null;
+        fetchError = result.error;
+      }
+
+      // Cenário A (Cache Hit)
+      if (!fetchError) {
+        if (dbQuestion?.texto_gabarito_ia) {
+          try {
+            const parsedData = JSON.parse(dbQuestion.texto_gabarito_ia);
+            setAiCommentary(prev => ({ ...prev, [question.id]: parsedData }));
+            return;
+          } catch (e) {
+            // Se não for JSON, exibe como string simples
+            setAiCommentary(prev => ({ ...prev, [question.id]: dbQuestion.texto_gabarito_ia }));
+            return;
+          }
+        } else if (dbQuestion?.ai_correction) {
+          // Fallback para o formato antigo
+          setAiCommentary(prev => ({ ...prev, [question.id]: dbQuestion.ai_correction }));
+          return;
+        }
+      }
+
+      // Cenário B (Primeira Geração)
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
       
       const prompt = `Como um professor de Direito especialista em concursos, forneça uma correção técnica e didática para esta questão:
@@ -1189,17 +1227,30 @@ Forneça a explicação de forma concisa e didática.`;
         const data = JSON.parse(response.text);
         setAiCommentary(prev => ({ ...prev, [question.id]: data }));
         
-        // Persist the FULL correction to Supabase so it can be reused by anyone
-        const { error } = await supabase
+        // Imediatamente faça um UPDATE no banco de dados
+        let { error: updateError } = await supabase
           .from('questions')
           .update({ 
-            ai_correction: data,
-            explicacao_doutrinaria: data.doctrineAndContext // Keep this for backward compatibility if needed
+            texto_gabarito_ia: response.text, // Salva a string gerada
+            ai_correction: data, // Mantém para compatibilidade
+            explicacao_doutrinaria: data.doctrineAndContext
           })
           .eq('id', question.id);
           
-        if (error) {
-          console.error('Error persisting AI correction:', error);
+        if (updateError && updateError.code === '42703') {
+          // Fallback se a coluna texto_gabarito_ia não existir
+          const result = await supabase
+            .from('questions')
+            .update({ 
+              ai_correction: data,
+              explicacao_doutrinaria: data.doctrineAndContext
+            })
+            .eq('id', question.id);
+          updateError = result.error;
+        }
+
+        if (updateError) {
+          console.error('Error persisting AI correction:', updateError);
         }
       }
     } catch (error) {
@@ -1224,9 +1275,13 @@ Forneça a explicação de forma concisa e didática.`;
     }
 
     if (commentary) {
-      back += `⚖️ **Fundamentação Legal:** ${commentary.legalBasis}\n\n`;
-      back += `📖 **Explicação Doutrinária:** ${commentary.doctrineAndContext}\n\n`;
-      back += `💡 **Mnemônico/Dica:** ${commentary.mnemonic}`;
+      if (typeof commentary === 'string') {
+        back += `⚖️ **Correção IA:**\n\n${commentary}\n\n`;
+      } else {
+        back += `⚖️ **Fundamentação Legal:** ${commentary.legalBasis}\n\n`;
+        back += `📖 **Explicação Doutrinária:** ${commentary.doctrineAndContext}\n\n`;
+        back += `💡 **Mnemônico/Dica:** ${commentary.mnemonic}`;
+      }
     } else {
       back += `**Explicação:** ${question.explanation || 'Nenhuma explicação detalhada disponível no momento.'}`;
     }
@@ -3318,9 +3373,17 @@ Forneça a explicação de forma concisa e didática.`;
                                   <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Gerando Correção Estratégica...</p>
                                 </div>
                               ) : aiCommentary[q.id] ? (
-                                <div className="space-y-4">
-                                  {/* Doutrina e Contexto */}
-                                  <div className="p-4 bg-indigo-50 dark:bg-indigo-900/10 rounded-xl border border-indigo-100 dark:border-indigo-900/30">
+                                <>
+                                  {typeof aiCommentary[q.id] === 'string' ? (
+                                  <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
+                                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                                      <Markdown>{aiCommentary[q.id]}</Markdown>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-4">
+                                    {/* Doutrina e Contexto */}
+                                    <div className="p-4 bg-indigo-50 dark:bg-indigo-900/10 rounded-xl border border-indigo-100 dark:border-indigo-900/30">
                                     <h4 className="font-black text-indigo-800 dark:text-indigo-400 text-[10px] uppercase tracking-widest mb-2 flex items-center gap-2">
                                       <BookOpen size={14} /> Doutrina e Contexto
                                     </h4>
@@ -3371,8 +3434,8 @@ Forneça a explicação de forma concisa e didática.`;
                                       "{aiCommentary[q.id].mnemonic}"
                                     </p>
                                   </div>
-
-                                  {/* Follow-up Chat */}
+                                </div>
+                                )}
                                   <div className="mt-6 pt-6 border-t border-slate-100 dark:border-white/5 space-y-4">
                                     <div className="flex items-center gap-2 mb-2">
                                       <MessageSquareText size={16} className="text-purple-500" />
@@ -3434,7 +3497,7 @@ Forneça a explicação de forma concisa e didática.`;
                                       <PlusSquare size={16} /> Virar Flashcard do Erro
                                     </button>
                                   </div>
-                                </div>
+                                </>
                               ) : (
                                 <div className="p-6 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30">
                                   <h4 className="font-bold text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
@@ -3636,12 +3699,27 @@ Forneça a explicação de forma concisa e didática.`;
                         <p className="text-xs font-black text-slate-500 uppercase tracking-[0.3em] animate-pulse">Consultando Jurisprudência...</p>
                       </div>
                     ) : aiCommentary[currentQuestion.id] ? (
-                      <div className="space-y-6">
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800"></div>
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Correção Comentada IA</span>
-                          <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800"></div>
+                      <>
+                        {typeof aiCommentary[currentQuestion.id] === 'string' ? (
+                        <div className="space-y-6">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800"></div>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Correção Comentada IA</span>
+                            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800"></div>
+                          </div>
+                          <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-[2rem] border-2 border-slate-200 dark:border-slate-700">
+                            <div className="prose prose-sm dark:prose-invert max-w-none">
+                              <Markdown>{aiCommentary[currentQuestion.id]}</Markdown>
+                            </div>
+                          </div>
                         </div>
+                      ) : (
+                        <div className="space-y-6">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800"></div>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Correção Comentada IA</span>
+                            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800"></div>
+                          </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {/* Doutrina e Contexto */}
@@ -3694,8 +3772,8 @@ Forneça a explicação de forma concisa e didática.`;
                             </p>
                           )}
                         </div>
-
-                        {/* Follow-up Chat */}
+                      </div>
+                      )}
                         <div className="mt-6 pt-6 border-t border-slate-100 dark:border-white/5 space-y-4">
                           <div className="flex items-center gap-2 mb-2">
                             <MessageSquareText size={16} className="text-purple-500" />
@@ -3769,7 +3847,7 @@ Forneça a explicação de forma concisa e didática.`;
                             Salvar como Precedente
                           </button>
                         </div>
-                      </div>
+                      </>
                     ) : (
                       <div className="p-6 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30">
                         <h4 className="font-bold text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">

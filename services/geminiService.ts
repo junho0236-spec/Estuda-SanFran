@@ -189,7 +189,27 @@ export const geminiService = {
         }
       }
     });
-    const result = JSON.parse(response.text || '{}');
+    let resultText = response.text || '{}';
+    // Remove markdown code blocks if present
+    if (resultText.startsWith('```json')) {
+      resultText = resultText.replace(/^```json\n/, '').replace(/\n```$/, '');
+    } else if (resultText.startsWith('```')) {
+      resultText = resultText.replace(/^```\n/, '').replace(/\n```$/, '');
+    }
+    
+    let result;
+    try {
+      result = JSON.parse(resultText);
+    } catch (e) {
+      console.error("Failed to parse AI evaluation JSON:", resultText);
+      result = {
+        score: 0,
+        feedback: "Erro ao processar a avaliação da IA. Por favor, tente novamente.",
+        missing_keywords: [],
+        is_perfect: false
+      };
+    }
+    
     if (!result.missing_keywords) result.missing_keywords = [];
     if (typeof result.score !== 'number') result.score = 0;
     return result;
