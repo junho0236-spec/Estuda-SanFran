@@ -145,12 +145,29 @@ export const geminiService = {
 
   evaluateDissertativeAnswer: async (question: string, expectedAnswer: string, userAnswer: string) => {
     const prompt = `
-      Avalie a resposta dissertativa do aluno.
-      Pergunta: ${question}
-      Resposta Esperada: ${expectedAnswer}
-      Resposta do Aluno: ${userAnswer}
-      
-      Forneça uma nota de 0 a 10, um feedback detalhado, uma lista de palavras-chave que faltaram (se houver) e se a resposta está perfeita.
+      Você é um Professor Doutor da Faculdade de Direito do Largo São Francisco (USP), especialista em avaliação acadêmica rigorosa.
+      Sua tarefa é avaliar a resposta dissertativa de um aluno para um flashcard de revisão.
+
+      CONTEÚDO DO FLASHCARD:
+      - Pergunta/Frente: ${question}
+      - Resposta Padrão/Gabarito: ${expectedAnswer}
+
+      RESPOSTA DO ALUNO:
+      - "${userAnswer}"
+
+      DIRETRIZES DE AVALIAÇÃO:
+      1. Profundidade Técnica: Analise se o aluno utilizou a terminologia jurídica correta e se demonstrou compreensão dos institutos envolvidos.
+      2. Contextualização: Relacione a resposta com a doutrina, jurisprudência ou legislação pertinente mencionada no gabarito.
+      3. Lacunas: Identifique precisamente o que faltou para a resposta ser considerada excelente (nota 10).
+      4. Feedback Construtivo: O feedback deve ser denso, acadêmico, porém encorajador. Não seja genérico. Aponte onde o raciocínio foi correto e onde houve imprecisão técnica.
+
+      REQUISITOS DO JSON DE RETORNO:
+      - score: Nota de 0.0 a 10.0 (seja criterioso, como um professor da SanFran).
+      - feedback: Um texto rico e estruturado (use Markdown para negrito em termos importantes). Explique o "porquê" da nota.
+      - missing_keywords: Lista de termos técnicos, artigos de lei ou conceitos fundamentais que o aluno omitiu.
+      - is_perfect: Boolean (true apenas se a resposta for equivalente ou superior ao gabarito em técnica e precisão).
+
+      IMPORTANTE: Se a resposta for muito curta ou vaga, a nota deve refletir isso. Se for excelente, elogie a precisão técnica.
     `;
     const response = await ai.models.generateContent({
       model: GEMINI_MODEL,
@@ -173,7 +190,6 @@ export const geminiService = {
       }
     });
     const result = JSON.parse(response.text || '{}');
-    // Ensure missing_keywords is always an array to prevent UI crashes
     if (!result.missing_keywords) result.missing_keywords = [];
     if (typeof result.score !== 'number') result.score = 0;
     return result;
