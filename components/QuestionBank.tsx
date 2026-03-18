@@ -359,6 +359,41 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, folders = [], flash
   const [favorites, setFavorites] = useState<string[]>([]);
   const [wrongQuestions, setWrongQuestions] = useState<string[]>([]);
   const [correctQuestions, setCorrectQuestions] = useState<string[]>([]);
+
+  // Load from localStorage as soon as userId is available
+  useEffect(() => {
+    if (userId) {
+      const savedCorrect = localStorage.getItem(`correct_questions_${userId}`);
+      if (savedCorrect) {
+        try {
+          setCorrectQuestions(JSON.parse(savedCorrect));
+        } catch (e) {
+          console.error('Error parsing correct questions from storage', e);
+        }
+      }
+      
+      const savedWrong = localStorage.getItem(`wrong_questions_${userId}`);
+      if (savedWrong) {
+        try {
+          setWrongQuestions(JSON.parse(savedWrong));
+        } catch (e) {
+          console.error('Error parsing wrong questions from storage', e);
+        }
+      }
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    if (userId && correctQuestions.length > 0) {
+      localStorage.setItem(`correct_questions_${userId}`, JSON.stringify(correctQuestions));
+    }
+  }, [correctQuestions, userId]);
+
+  useEffect(() => {
+    if (userId && wrongQuestions.length > 0) {
+      localStorage.setItem(`wrong_questions_${userId}`, JSON.stringify(wrongQuestions));
+    }
+  }, [wrongQuestions, userId]);
   const [questionStatus, setQuestionStatus] = useState<'all' | 'resolved' | 'unresolved' | 'correct' | 'wrong'>('all');
   const [showFilters, setShowFilters] = useState(false);
   const [showXRay, setShowXRay] = useState(true);
@@ -3249,10 +3284,17 @@ Forneça a explicação de forma concisa e didática.`;
                     </div>
                     
                     <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col gap-3">
-                      <div className="flex gap-4 text-xs font-medium text-slate-500">
-                        <span>Ano: <span className="text-slate-900 dark:text-white">{q.year || 'N/A'}</span></span>
-                        <span>Banca: <span className="text-slate-900 dark:text-white">{q.exam_board || 'N/A'}</span></span>
-                        <span>Dificuldade: <span className="text-slate-900 dark:text-white capitalize">{q.difficulty}</span></span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex gap-4 text-xs font-medium text-slate-500">
+                          <span>Ano: <span className="text-slate-900 dark:text-white">{q.year || 'N/A'}</span></span>
+                          <span>Banca: <span className="text-slate-900 dark:text-white">{q.exam_board || 'N/A'}</span></span>
+                          <span>Dificuldade: <span className="text-slate-900 dark:text-white capitalize">{q.difficulty}</span></span>
+                        </div>
+                        {(correctQuestions.includes(q.id) || wrongQuestions.includes(q.id)) && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-[10px] font-black uppercase tracking-widest border border-blue-100 dark:border-blue-900/30">
+                            <MessageSquare size={10} /> Discussão Liberada
+                          </span>
+                        )}
                       </div>
                       
                       {showXRay && (
@@ -3561,6 +3603,7 @@ Forneça a explicação de forma concisa e didática.`;
                                     userId={userId} 
                                     isAnswered={correctQuestions.includes(q.id) || wrongQuestions.includes(q.id) || (expandedQuestionId === q.id && showExplanation)}
                                     questionTitle={q.statement}
+                                    showNotification={showNotification}
                                   />
                                 </>
                               ) : (
@@ -3974,6 +4017,7 @@ Forneça a explicação de forma concisa e didática.`;
                   userId={userId} 
                   isAnswered={correctQuestions.includes(currentQuestion.id) || wrongQuestions.includes(currentQuestion.id) || showExplanation}
                   questionTitle={currentQuestion.statement}
+                  showNotification={showNotification}
                 />
               </div>
 

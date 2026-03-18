@@ -10,13 +10,15 @@ interface QuestionCommentsProps {
   userId: string;
   isAnswered: boolean;
   questionTitle?: string;
+  showNotification?: (message: string, type: 'success' | 'error') => void;
 }
 
 export const QuestionComments: React.FC<QuestionCommentsProps> = ({ 
   questionId, 
   userId, 
   isAnswered,
-  questionTitle = "uma questão"
+  questionTitle = "uma questão",
+  showNotification
 }) => {
   const [comments, setComments] = useState<QuestionComment[]>([]);
   const [newComment, setNewComment] = useState('');
@@ -64,6 +66,15 @@ export const QuestionComments: React.FC<QuestionCommentsProps> = ({
       setComments(data || []);
     } catch (error) {
       console.error('Error fetching comments:', error);
+      // Fallback fetch without join if join fails
+      try {
+        const { data, error: fallbackError } = await supabase
+          .from('question_comments')
+          .select('*')
+          .eq('question_id', questionId)
+          .order('created_at', { ascending: true });
+        if (!fallbackError) setComments(data || []);
+      } catch (e) {}
     } finally {
       setLoading(false);
     }
@@ -86,11 +97,9 @@ export const QuestionComments: React.FC<QuestionCommentsProps> = ({
         commentData.reply_to_user_id = replyingTo.user_id;
       }
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('question_comments')
-        .insert(commentData)
-        .select()
-        .single();
+        .insert(commentData);
 
       if (error) throw error;
 
@@ -106,8 +115,13 @@ export const QuestionComments: React.FC<QuestionCommentsProps> = ({
 
       setNewComment('');
       setReplyingTo(null);
+      if (showNotification) showNotification('Comentário enviado com sucesso!', 'success');
+      
+      // Manual refresh in case realtime is slow
+      fetchComments();
     } catch (error) {
       console.error('Error posting comment:', error);
+      if (showNotification) showNotification('Erro ao enviar comentário. Verifique se as tabelas foram criadas no Supabase.', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -124,8 +138,11 @@ export const QuestionComments: React.FC<QuestionCommentsProps> = ({
         .eq('user_id', userId);
 
       if (error) throw error;
+      if (showNotification) showNotification('Comentário excluído.', 'success');
+      fetchComments();
     } catch (error) {
       console.error('Error deleting comment:', error);
+      if (showNotification) showNotification('Erro ao excluir comentário.', 'error');
     }
   };
 
