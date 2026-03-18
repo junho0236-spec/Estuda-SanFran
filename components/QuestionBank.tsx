@@ -3556,7 +3556,12 @@ Forneça a explicação de forma concisa e didática.`;
                                     </button>
                                   </div>
 
-                                  <QuestionComments questionId={q.id} userId={userId} />
+                                  <QuestionComments 
+                                    questionId={q.id} 
+                                    userId={userId} 
+                                    isAnswered={correctQuestions.includes(q.id) || wrongQuestions.includes(q.id) || (expandedQuestionId === q.id && showExplanation)}
+                                    questionTitle={q.statement}
+                                  />
                                 </>
                               ) : (
                                 <div className="p-6 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30">
@@ -3964,7 +3969,12 @@ Forneça a explicação de forma concisa e didática.`;
                   </div>
                 </div>
 
-                <QuestionComments questionId={currentQuestion.id} userId={userId} />
+                <QuestionComments 
+                  questionId={currentQuestion.id} 
+                  userId={userId} 
+                  isAnswered={correctQuestions.includes(currentQuestion.id) || wrongQuestions.includes(currentQuestion.id) || showExplanation}
+                  questionTitle={currentQuestion.statement}
+                />
               </div>
 
               {/* Footer / Navigation */}

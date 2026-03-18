@@ -487,6 +487,8 @@ export interface QuestionComment {
   user_id: string;
   content: string;
   created_at: string;
+  parent_id?: string;
+  reply_to_user_id?: string;
   user_profile?: {
     full_name: string;
     avatar_url: string;
