@@ -86,10 +86,32 @@ export const QuestionComments: React.FC<QuestionCommentsProps> = ({
 
     try {
       setSubmitting(true);
+      
+      // Optimistic update
+      const tempId = 'temp-' + Date.now();
+      const newCommentObj: any = {
+        id: tempId,
+        question_id: questionId,
+        user_id: userId,
+        content: newComment.trim(),
+        created_at: new Date().toISOString(),
+        parent_id: replyingTo?.id,
+        reply_to_user_id: replyingTo?.user_id,
+        user_profile: {
+          full_name: 'Você',
+          avatar_url: ''
+        }
+      };
+      
+      setComments(prev => [...prev, newCommentObj]);
+      const commentToSubmit = newComment.trim();
+      setNewComment('');
+      setReplyingTo(null);
+
       const commentData: any = {
         question_id: questionId,
         user_id: userId,
-        content: newComment.trim()
+        content: commentToSubmit
       };
 
       if (replyingTo) {
@@ -113,14 +135,14 @@ export const QuestionComments: React.FC<QuestionCommentsProps> = ({
         );
       }
 
-      setNewComment('');
-      setReplyingTo(null);
       if (showNotification) showNotification('Comentário enviado com sucesso!', 'success');
       
-      // Manual refresh in case realtime is slow
+      // Manual refresh to get real ID and profile
       fetchComments();
     } catch (error) {
       console.error('Error posting comment:', error);
+      // Rollback optimistic update
+      fetchComments();
       if (showNotification) showNotification('Erro ao enviar comentário. Verifique se as tabelas foram criadas no Supabase.', 'error');
     } finally {
       setSubmitting(false);

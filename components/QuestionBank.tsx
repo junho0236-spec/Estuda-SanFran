@@ -60,6 +60,7 @@ import {
   Settings,
   Volume2,
   Send,
+  MessageSquare,
   Folder as FolderIcon
 } from 'lucide-react';
 import { GlossaryText } from './GlossaryText.tsx';
@@ -383,6 +384,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, folders = [], flash
     }
   }, [userId]);
 
+  // Save to localStorage whenever state changes
   useEffect(() => {
     if (userId && correctQuestions.length > 0) {
       localStorage.setItem(`correct_questions_${userId}`, JSON.stringify(correctQuestions));
@@ -975,8 +977,9 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, folders = [], flash
       if (data) {
         setUserProgress(data);
         setFavorites(data.favorites || []);
-        setWrongQuestions(data.wrong_questions || data.wrong_question_ids || []);
-        setCorrectQuestions(data.correct_questions || []);
+        // Merge with local state to ensure progress is not lost
+        setWrongQuestions(prev => [...new Set([...prev, ...(data.wrong_questions || data.wrong_question_ids || [])])]);
+        setCorrectQuestions(prev => [...new Set([...prev, ...(data.correct_questions || [])])]);
         setNotes(data.notes || {});
         setCorrectCount(data.correct_count || 0);
         setWrongCount(data.wrong_count || 0);
