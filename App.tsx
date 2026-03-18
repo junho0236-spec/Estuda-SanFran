@@ -363,8 +363,7 @@ const App: React.FC = () => {
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
-        table: 'questions', 
-        filter: `user_id=eq.${userId}` 
+        table: 'questions' 
       }, () => {
         console.log("[Realtime] Questions changed, reloading...");
         loadUserData();
