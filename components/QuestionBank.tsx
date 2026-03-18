@@ -427,6 +427,27 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, folders = [], flash
     };
   };
 
+  const handleDeleteQuestion = async (questionId: string) => {
+    if (!window.confirm('Tem certeza que deseja excluir esta questão permanentemente do banco de dados?')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('questions')
+        .delete()
+        .eq('id', questionId);
+
+      if (error) throw error;
+
+      setQuestions(prev => prev.filter(q => q.id !== questionId));
+      showNotification('Questão excluída com sucesso.', 'success');
+    } catch (error) {
+      console.error('Error deleting question:', error);
+      showNotification('Erro ao excluir questão.', 'error');
+    }
+  };
+
   const handleSavePrecedent = async (q: Question) => {
     try {
       setGeneratingPrecedentId(q.id);
@@ -814,6 +835,30 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, folders = [], flash
     exam_board: '',
     year: new Date().getFullYear().toString()
   });
+
+  useEffect(() => {
+    // Set up real-time listener for questions
+    const questionsChannel = supabase
+      .channel('question_bank_changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'questions' 
+      }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setQuestions(prev => [payload.new as Question, ...prev]);
+        } else if (payload.eventType === 'UPDATE') {
+          setQuestions(prev => prev.map(q => q.id === payload.new.id ? payload.new as Question : q));
+        } else if (payload.eventType === 'DELETE') {
+          setQuestions(prev => prev.filter(q => q.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(questionsChannel);
+    };
+  }, []);
 
   useEffect(() => {
     fetchQuestions();
@@ -3170,14 +3215,27 @@ Forneça a explicação de forma concisa e didática.`;
                       
                       {(() => {
                         const stats = getXRayStats(q.id);
-                        if (stats.totalAttempts > 0) {
-                          return (
-                            <div className={`absolute top-8 right-8 z-10 ${stats.lastAttemptCorrect ? 'text-green-500' : 'text-red-500'}`}>
-                              <Target size={32} />
-                            </div>
-                          );
-                        }
-                        return null;
+                        return (
+                          <div className="absolute top-8 right-8 z-10 flex items-center gap-3">
+                            {q.user_id === userId && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteQuestion(q.id);
+                                }}
+                                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-all"
+                                title="Excluir questão permanentemente"
+                              >
+                                <X size={20} />
+                              </button>
+                            )}
+                            {stats.totalAttempts > 0 && (
+                              <div className={stats.lastAttemptCorrect ? 'text-green-500' : 'text-red-500'}>
+                                <Target size={32} />
+                              </div>
+                            )}
+                          </div>
+                        );
                       })()}
 
                       <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2 text-sm">
@@ -3523,17 +3581,30 @@ Forneça a explicação de forma concisa e didática.`;
                   <ArrowLeft size={18} /> Voltar para a Lista
                 </button>
             <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden relative">
-              {/* Target Icon */}
+              {/* Target & Delete Icons */}
               {(() => {
                 const stats = getXRayStats(currentQuestion.id);
-                if (stats.totalAttempts > 0) {
-                  return (
-                    <div className={`absolute top-6 right-6 z-10 ${stats.lastAttemptCorrect ? 'text-green-500' : 'text-red-500'}`}>
-                      <Target size={32} />
-                    </div>
-                  );
-                }
-                return null;
+                return (
+                  <div className="absolute top-6 right-6 z-10 flex items-center gap-3">
+                    {currentQuestion.user_id === userId && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteQuestion(currentQuestion.id);
+                        }}
+                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-all"
+                        title="Excluir questão permanentemente"
+                      >
+                        <X size={20} />
+                      </button>
+                    )}
+                    {stats.totalAttempts > 0 && (
+                      <div className={stats.lastAttemptCorrect ? 'text-green-500' : 'text-red-500'}>
+                        <Target size={32} />
+                      </div>
+                    )}
+                  </div>
+                );
               })()}
               {/* Question Header */}
               <div className="bg-slate-50 dark:bg-slate-800/50 p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
