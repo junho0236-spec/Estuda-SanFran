@@ -10,6 +10,7 @@ import Markdown from 'react-markdown';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
+import { QuestionComments } from './QuestionComments';
 import { 
   BookOpen, 
   CheckCircle2, 
@@ -3554,6 +3555,8 @@ Forneça a explicação de forma concisa e didática.`;
                                       <PlusSquare size={16} /> Virar Flashcard do Erro
                                     </button>
                                   </div>
+
+                                  <QuestionComments questionId={q.id} userId={userId} />
                                 </>
                               ) : (
                                 <div className="p-6 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30">
@@ -3960,6 +3963,8 @@ Forneça a explicação de forma concisa e didática.`;
                     </div>
                   </div>
                 </div>
+
+                <QuestionComments questionId={currentQuestion.id} userId={userId} />
               </div>
 
               {/* Footer / Navigation */}

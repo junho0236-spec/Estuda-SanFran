@@ -424,6 +424,7 @@ export interface Question {
   correct_answer: number;
   explanation?: string;
   difficulty: 'facil' | 'media' | 'dificil';
+  user_id?: string;
   exam_board?: string;
   year?: string;
   created_at?: string;
@@ -478,6 +479,18 @@ export interface Duel {
   opponent_progress: number;
   winner_id: string | null;
   created_at: string;
+}
+
+export interface QuestionComment {
+  id: string;
+  question_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  user_profile?: {
+    full_name: string;
+    avatar_url: string;
+  };
 }
 
 export interface UserProfile {
