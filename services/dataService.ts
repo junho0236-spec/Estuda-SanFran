@@ -70,52 +70,72 @@ export const dataService = {
 
   // USER PROFILE
   async saveUserProfile(profile: any, userId: string, isOnline: boolean) {
+    const sanitizeProfile = (p: any) => {
+      if (!p) return null;
+      return {
+        ...p,
+        idiomas: Array.isArray(p.idiomas) ? p.idiomas : (p.idiomas ? [p.idiomas] : []),
+        mural_fotos: Array.isArray(p.mural_fotos) ? p.mural_fotos : [],
+        experiencias_lideranca: Array.isArray(p.experiencias_lideranca) ? p.experiencias_lideranca : [],
+        badges: Array.isArray(p.badges) ? p.badges : [],
+        social_links: p.social_links || {},
+        entidades: Array.isArray(p.entidades) ? p.entidades : (p.entidades ? [p.entidades] : []),
+        cargos_academicos: {
+          monitoria: Array.isArray(p.cargos_academicos?.monitoria) ? p.cargos_academicos.monitoria : [],
+          pesquisa: Array.isArray(p.cargos_academicos?.pesquisa) ? p.cargos_academicos.pesquisa : [],
+          pites: Array.isArray(p.cargos_academicos?.pites) ? p.cargos_academicos.pites : [],
+          diretoria: Array.isArray(p.cargos_academicos?.diretoria) ? p.cargos_academicos.diretoria : [],
+          coordenacao: Array.isArray(p.cargos_academicos?.coordenacao) ? p.cargos_academicos.coordenacao : []
+        }
+      };
+    };
+
+    const sanitized = sanitizeProfile(profile);
     const cloudPayload = {
       id: userId,
       persona_data: {
-        archetype: profile.archetype,
-        answers: profile.answers,
-        scores: profile.scores,
-        matrix: profile.matrix,
-        tags: profile.tags,
-        answeredQuestionIds: profile.answeredQuestionIds,
-        persona_mode: profile.persona_mode,
-        onboarding_completed: profile.onboarding_completed,
-        visibility: profile.visibility,
-        viewPreferences: profile.viewPreferences || {}
+        archetype: sanitized.archetype,
+        answers: sanitized.answers,
+        scores: sanitized.scores,
+        matrix: sanitized.matrix,
+        tags: sanitized.tags,
+        answeredQuestionIds: sanitized.answeredQuestionIds,
+        persona_mode: sanitized.persona_mode,
+        onboarding_completed: sanitized.onboarding_completed,
+        visibility: sanitized.visibility,
+        viewPreferences: sanitized.viewPreferences || {}
       },
-      profile_completion: profile.arcadia_score || 0,
-      full_name: profile.full_name || null,
-      bio: profile.bio || null,
-      avatar_url: profile.avatar_url || null,
-      turma_ano: profile.turma_ano || null,
-      turma: Number(profile.turma) || null,
-      sala: profile.sala || null,
-      aniversario: profile.aniversario || null,
-      idiomas: profile.idiomas || [],
-      intercambio: profile.intercambio || null,
-      progresso_total: Number(profile.progresso_total) || 0,
-      progresso_obrigatorias: Number(profile.progresso_obrigatorias) || 0,
-      progresso_optativas: Number(profile.progresso_optativas) || 0,
-      mural_fotos: profile.mural_fotos || [],
-      experiencias_lideranca: profile.experiencias_lideranca || [],
-      status_geral_integralizacao: Number(profile.status_geral_integralizacao) || 0,
-      cargos_academicos: profile.cargos_academicos || {},
-      integralizacao_curriculo: profile.integralizacao_curriculo || {},
-      curriculo_url: profile.curriculo_url || null,
-      badges: profile.badges || [],
-      social_links: profile.social_links || {},
-      // New fields
-      creditos_aula: Number(profile.creditos_aula) || null,
-      creditos_trabalho: Number(profile.creditos_trabalho) || null,
-      media: Number(profile.media) || null,
-      horas_extensao: Number(profile.horas_extensao) || null,
-      entidades: profile.entidades || []
+      profile_completion: sanitized.arcadia_score || 0,
+      full_name: sanitized.full_name || null,
+      bio: sanitized.bio || null,
+      avatar_url: sanitized.avatar_url || null,
+      turma_ano: sanitized.turma_ano || null,
+      turma: Number(sanitized.turma) || null,
+      sala: sanitized.sala || null,
+      aniversario: sanitized.aniversario || null,
+      idiomas: sanitized.idiomas,
+      intercambio: sanitized.intercambio || null,
+      progresso_total: Number(sanitized.progresso_total) || 0,
+      progresso_obrigatorias: Number(sanitized.progresso_obrigatorias) || 0,
+      progresso_optativas: Number(sanitized.progresso_optativas) || 0,
+      mural_fotos: sanitized.mural_fotos,
+      experiencias_lideranca: sanitized.experiencias_lideranca,
+      status_geral_integralizacao: Number(sanitized.status_geral_integralizacao) || 0,
+      cargos_academicos: sanitized.cargos_academicos,
+      integralizacao_curriculo: sanitized.integralizacao_curriculo || {},
+      curriculo_url: sanitized.curriculo_url || null,
+      badges: sanitized.badges,
+      social_links: sanitized.social_links,
+      creditos_aula: Number(sanitized.creditos_aula) || null,
+      creditos_trabalho: Number(sanitized.creditos_trabalho) || null,
+      media: Number(sanitized.media) || null,
+      horas_extensao: Number(sanitized.horas_extensao) || null,
+      entidades: sanitized.entidades
     };
 
-    console.log("[dataService] Saving user profile, mural_fotos:", cloudPayload.mural_fotos);
+    console.log("[dataService] Saving user profile to local DB and cloud:", userId);
 
-    await db.user_profile.put({ ...profile, id: userId });
+    await db.user_profile.put({ ...sanitized, id: userId });
     
     if (isOnline) {
       try {
@@ -124,7 +144,6 @@ export const dataService = {
           console.warn("[dataService] Full upsert failed, falling back to field-by-field update:", error.message);
           
           // Fallback: try to update field by field to ignore problematic columns
-          // First ensure row exists with minimal data
           await supabase.from('user_persona').upsert({ id: userId });
           
           for (const [key, value] of Object.entries(cloudPayload)) {
@@ -143,7 +162,7 @@ export const dataService = {
         console.error("[dataService] Error saving user profile:", e);
       }
     } else {
-      await addToSyncQueue({ table: 'user_profile' as any, action: 'update', data: profile });
+      await addToSyncQueue({ table: 'user_profile' as any, action: 'update', data: sanitized });
     }
   },
 
@@ -814,11 +833,13 @@ export const dataService = {
 
           const tableName = item.table as string;
           if (tableName === 'user_profile') {
-            // No special mapping needed, but ensure id is userId
-            payload.id = userId;
+            // Use the same logic as saveUserProfile
+            await this.saveUserProfile(item.data, userId, true);
+            await db.syncQueue.delete(item.id!);
+            continue;
           }
           
-          const { error } = await supabase.from(tableName === 'user_profile' ? 'user_profiles' : (item.table as any)).upsert(payload);
+          const { error } = await supabase.from(item.table as any).upsert(payload);
           if (error) throw error;
         }
         await db.syncQueue.delete(item.id!);

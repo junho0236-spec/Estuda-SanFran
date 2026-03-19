@@ -34,7 +34,8 @@ const Profile: React.FC = () => {
   const [selectedFoto, setSelectedFoto] = useState<{ url: string; caption?: string; date?: string } | null>(null);
   const [showConfirmClear, setShowConfirmClear] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [editForm, setEditForm] = useState({
+  const [editForm, setEditForm] = useState<UserProfile>({
+    id: '',
     full_name: '',
     bio: '',
     turma_ano: 0,
@@ -46,7 +47,7 @@ const Profile: React.FC = () => {
     idiomas: [] as string[],
     intercambio: '',
     memorias: '',
-    progresso_curso: 0,
+    progresso_total: 0,
     curriculo_url: '',
     mural_fotos: [] as { url: string; caption?: string; date?: string }[],
     cargos_academicos: {
@@ -55,7 +56,41 @@ const Profile: React.FC = () => {
       pites: [] as string[],
       diretoria: [] as string[],
       coordenacao: [] as string[]
-    }
+    },
+    creditos_aula: 0,
+    creditos_trabalho: 0,
+    media: 0,
+    horas_extensao: 0,
+    progresso_obrigatorias: 0,
+    progresso_optativas: 0,
+    entidades: [] as string[],
+    archetype: '',
+    answers: {},
+    scores: {
+      social: 0,
+      corporativo: 0,
+      academico: 0,
+      politico: 0,
+      resiliencia: 0,
+      tecnologico: 0
+    },
+    matrix: {
+      academicoVsPratico: 0,
+      extensaoVsCarreira: 0,
+      socialVsReservado: 0,
+      urgenciaVsPlanejamento: 0
+    },
+    tags: [],
+    answeredQuestionIds: [],
+    persona_mode: false,
+    onboarding_completed: false,
+    visibility: 'public',
+    viewPreferences: {},
+    arcadia_score: 0,
+    status_geral_integralizacao: 0,
+    experiencias_lideranca: [],
+    integralizacao_curriculo: {},
+    badges: []
   });
 
   const [session, setSession] = useState<any>(null);
@@ -78,28 +113,37 @@ const Profile: React.FC = () => {
         if (discData) setDisciplinas(discData);
 
         setEditForm({
-        full_name: userProfile?.full_name || session.user.user_metadata?.full_name || '',
-        bio: userProfile?.bio || '',
-        turma_ano: userProfile?.turma_ano || 0,
-        turma: userProfile?.turma || 0,
-        sala: userProfile?.sala || '',
-        aniversario: userProfile?.aniversario || '',
-        avatar_url: userProfile?.avatar_url || '',
-        social_links: userProfile?.social_links || {},
-        idiomas: userProfile?.idiomas || [],
-        intercambio: userProfile?.intercambio || '',
-        memorias: userProfile?.memorias || '',
-        progresso_curso: userProfile?.progresso_curso || 0,
-        curriculo_url: userProfile?.curriculo_url || '',
-        mural_fotos: userProfile?.mural_fotos || [],
-        cargos_academicos: userProfile?.cargos_academicos || {
-          monitoria: [],
-          pesquisa: [],
-          pites: [],
-          diretoria: [],
-          coordenacao: []
-        }
-      });
+          ...userProfile,
+          full_name: userProfile?.full_name || session.user.user_metadata?.full_name || '',
+          bio: userProfile?.bio || '',
+          turma_ano: userProfile?.turma_ano || 0,
+          turma: userProfile?.turma || 0,
+          sala: userProfile?.sala || '',
+          aniversario: userProfile?.aniversario || '',
+          avatar_url: userProfile?.avatar_url || '',
+          social_links: userProfile?.social_links || {},
+          idiomas: userProfile?.idiomas || [],
+          intercambio: userProfile?.intercambio || '',
+          memorias: userProfile?.memorias || '',
+          progresso_total: userProfile?.progresso_total || 0,
+          progresso_obrigatorias: userProfile?.progresso_obrigatorias || 0,
+          progresso_optativas: userProfile?.progresso_optativas || 0,
+          status_geral_integralizacao: userProfile?.status_geral_integralizacao || 0,
+          creditos_aula: userProfile?.creditos_aula || 0,
+          creditos_trabalho: userProfile?.creditos_trabalho || 0,
+          media: userProfile?.media || 0,
+          horas_extensao: userProfile?.horas_extensao || 0,
+          entidades: userProfile?.entidades || [],
+          curriculo_url: userProfile?.curriculo_url || '',
+          mural_fotos: userProfile?.mural_fotos || [],
+          cargos_academicos: userProfile?.cargos_academicos || {
+            monitoria: [],
+            pesquisa: [],
+            pites: [],
+            diretoria: [],
+            coordenacao: []
+          }
+        });
     }
     setLoading(false);
   } catch (err) {
@@ -109,30 +153,19 @@ const Profile: React.FC = () => {
 };
 
   const handleSaveProfile = async () => {
-    if (!session?.user || !profile) return;
+    if (!session?.user || !profile || !editForm) return;
     setLoading(true);
-    const updatedProfile = {
-      ...profile,
-      full_name: editForm.full_name,
-      bio: editForm.bio,
-      turma_ano: editForm.turma_ano,
-      turma: editForm.turma,
-      sala: editForm.sala,
-      aniversario: editForm.aniversario,
-      avatar_url: editForm.avatar_url,
-      social_links: editForm.social_links,
-      idiomas: editForm.idiomas,
-      intercambio: editForm.intercambio,
-      memorias: editForm.memorias,
-      progresso_curso: editForm.progresso_curso,
-      curriculo_url: editForm.curriculo_url,
-      mural_fotos: editForm.mural_fotos,
-      cargos_academicos: editForm.cargos_academicos
-    };
-    await dataService.saveUserProfile(updatedProfile, session.user.id, navigator.onLine);
-    setProfile(updatedProfile);
-    setIsEditing(false);
-    setLoading(false);
+    try {
+      await dataService.saveUserProfile(editForm, session.user.id, navigator.onLine);
+      setProfile(editForm);
+      setIsEditing(false);
+      toast.success("Perfil atualizado com sucesso!");
+    } catch (err) {
+      console.error("[Profile] Error saving profile:", err);
+      toast.error("Erro ao salvar alterações.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleTogglePersona = async () => {
@@ -143,6 +176,83 @@ const Profile: React.FC = () => {
     };
     await dataService.saveUserProfile(updatedProfile, session.user.id, navigator.onLine);
     setProfile(updatedProfile);
+  };
+
+  const handleResetProfile = async () => {
+    if (!session?.user || !profile) return;
+    if (!confirm("Tem certeza que deseja resetar seu perfil? Isso apagará suas informações de persona e progresso acadêmico.")) return;
+    
+    setLoading(true);
+    try {
+      const defaultProfile: UserProfile = {
+        id: session.user.id,
+        full_name: session.user.user_metadata?.full_name || '',
+        bio: '',
+        turma_ano: 0,
+        turma: 0,
+        sala: '',
+        aniversario: '',
+        avatar_url: '',
+        social_links: {},
+        idiomas: [],
+        intercambio: '',
+        memorias: '',
+        progresso_total: 0,
+        progresso_obrigatorias: 0,
+        progresso_optativas: 0,
+        status_geral_integralizacao: 0,
+        creditos_aula: 0,
+        creditos_trabalho: 0,
+        media: 0,
+        horas_extensao: 0,
+        entidades: [],
+        curriculo_url: '',
+        mural_fotos: [],
+        cargos_academicos: {
+          monitoria: [],
+          pesquisa: [],
+          pites: [],
+          diretoria: [],
+          coordenacao: []
+        },
+        persona_mode: true,
+        onboarding_completed: false,
+        visibility: 'private',
+        archetype: '',
+        answers: {},
+        scores: {
+          social: 0,
+          corporativo: 0,
+          academico: 0,
+          politico: 0,
+          resiliencia: 0,
+          tecnologico: 0
+        },
+        matrix: {
+          academicoVsPratico: 0,
+          extensaoVsCarreira: 0,
+          socialVsReservado: 0,
+          urgenciaVsPlanejamento: 0
+        },
+        tags: [],
+        answeredQuestionIds: [],
+        viewPreferences: {},
+        arcadia_score: 0,
+        experiencias_lideranca: [],
+        integralizacao_curriculo: {},
+        badges: []
+      };
+      
+      await dataService.saveUserProfile(defaultProfile, session.user.id, navigator.onLine);
+      setProfile(defaultProfile);
+      setEditForm(defaultProfile);
+      toast.success("Perfil resetado com sucesso!");
+    } catch (err) {
+      console.error("[Profile] Error resetting profile:", err);
+      toast.error("Erro ao resetar perfil.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleVisibilityChange = async (visibility: 'public' | 'friends' | 'private') => {
@@ -953,6 +1063,17 @@ const Profile: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* Reset Profile */}
+                  <div className="pt-8 border-t border-slate-100 dark:border-white/5">
+                    <button 
+                      onClick={handleResetProfile}
+                      className="w-full flex items-center justify-center gap-3 py-5 bg-slate-50 text-slate-600 rounded-3xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-100 transition-all border border-slate-200"
+                    >
+                      <RefreshCw size={16} />
+                      Resetar Perfil (Persona e Progresso)
+                    </button>
+                  </div>
+
                   {/* Clear History */}
                   <div className="pt-8 border-t border-slate-100 dark:border-white/5">
                     {!showConfirmClear ? (
@@ -1129,8 +1250,8 @@ const Profile: React.FC = () => {
                       <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Progresso (%)</label>
                       <input 
                         type="number" 
-                        value={editForm.progresso_curso}
-                        onChange={(e) => setEditForm({...editForm, progresso_curso: parseInt(e.target.value)})}
+                        value={editForm.progresso_total}
+                        onChange={(e) => setEditForm({...editForm, progresso_total: parseInt(e.target.value)})}
                         className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
                       />
                     </div>
@@ -1185,6 +1306,84 @@ const Profile: React.FC = () => {
                       rows={2}
                       className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold resize-none"
                     />
+                  </div>
+
+                  <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-white/5">
+                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Métricas Acadêmicas</h3>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Créditos Aula</label>
+                        <input 
+                          type="number" 
+                          value={editForm.creditos_aula}
+                          onChange={(e) => setEditForm({...editForm, creditos_aula: parseInt(e.target.value)})}
+                          className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Créditos Trabalho</label>
+                        <input 
+                          type="number" 
+                          value={editForm.creditos_trabalho}
+                          onChange={(e) => setEditForm({...editForm, creditos_trabalho: parseInt(e.target.value)})}
+                          className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Média Ponderada</label>
+                        <input 
+                          type="number" 
+                          step="0.01"
+                          value={editForm.media}
+                          onChange={(e) => setEditForm({...editForm, media: parseFloat(e.target.value)})}
+                          className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Horas Extensão</label>
+                        <input 
+                          type="number" 
+                          value={editForm.horas_extensao}
+                          onChange={(e) => setEditForm({...editForm, horas_extensao: parseInt(e.target.value)})}
+                          className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Progresso Obrigatórias (%)</label>
+                        <input 
+                          type="number" 
+                          value={editForm.progresso_obrigatorias}
+                          onChange={(e) => setEditForm({...editForm, progresso_obrigatorias: parseInt(e.target.value)})}
+                          className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Progresso Optativas (%)</label>
+                        <input 
+                          type="number" 
+                          value={editForm.progresso_optativas}
+                          onChange={(e) => setEditForm({...editForm, progresso_optativas: parseInt(e.target.value)})}
+                          className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Entidades (separadas por vírgula)</label>
+                      <input 
+                        type="text" 
+                        value={editForm.entidades?.join(', ') || ''}
+                        onChange={(e) => setEditForm({...editForm, entidades: e.target.value.split(',').map(s => s.trim()).filter(s => s)})}
+                        className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-white/5">
