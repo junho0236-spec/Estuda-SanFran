@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
 import { Question, UserProgress, Notebook, Folder, Flashcard } from '../types';
+import { dataService } from '../services/dataService';
 import { sampleQuestions } from './sampleQuestions';
 import { NotebookModal } from './NotebookModal';
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
@@ -85,9 +86,15 @@ interface QuestionBankProps {
   userId: string;
   folders?: Folder[];
   flashcards?: Flashcard[];
+  isOnline?: boolean;
 }
 
-const QuestionBank: React.FC<QuestionBankProps> = ({ userId, folders = [], flashcards = [] }) => {
+const QuestionBank: React.FC<QuestionBankProps> = ({ 
+  userId, 
+  folders = [], 
+  flashcards = [],
+  isOnline = true
+}) => {
   const navigate = useNavigate();
   // ... (rest of the component)
 
@@ -809,18 +816,17 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, folders = [], flash
       let folderId = precedentFolder?.id;
 
       if (!folderId) {
-        const { data, error } = await supabase
-          .from('folders')
-          .insert({
-            user_id: userId,
-            name: 'Precedentes Relevantes',
-            color: '#8b5cf6' // Purple
-          })
-          .select()
-          .single();
-        
-        if (error) throw error;
-        folderId = data.id;
+        const newFolderId = crypto.randomUUID();
+        const newFolder: Folder = {
+          id: newFolderId,
+          user_id: userId,
+          name: 'Precedentes Relevantes',
+          parentId: null,
+          color: '#8b5cf6'
+        };
+
+        await dataService.saveFolder(newFolder, userId, isOnline);
+        folderId = newFolderId;
       }
 
       // 2. Create the flashcard
@@ -840,19 +846,23 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ userId, folders = [], flash
         back += `Explicação: ${question.explanation || 'Nenhuma explicação fornecida.'}`;
       }
 
-      const { error: cardError } = await supabase
-        .from('flashcards')
-        .insert({
-          user_id: userId,
-          folder_id: folderId,
-          front,
-          back,
-          subject: question.subject,
-          topic: question.topic,
-          next_review: new Date().toISOString()
-        });
+      const cardId = crypto.randomUUID();
+      const newCard: any = {
+        id: cardId,
+        user_id: userId,
+        folderId: folderId,
+        front,
+        back,
+        subjectId: '', // Could be mapped if needed
+        nextReview: Date.now(),
+        interval: 0,
+        status: 'new',
+        learningStep: 0,
+        easeFactor: 2.5,
+        tags: [question.subject, question.topic].filter(Boolean)
+      };
 
-      if (cardError) throw cardError;
+      await dataService.saveFlashcard(newCard, userId, isOnline);
 
       showNotification('Salvo em Precedentes Relevantes!', 'success');
     } catch (error: any) {
@@ -1393,27 +1403,22 @@ Forneça a explicação de forma concisa e didática.`;
       // Generate a unique ID for the flashcard
       const cardId = crypto.randomUUID();
       
-      const { error } = await supabase
-        .from('flashcards')
-        .insert({
-          id: cardId,
-          user_id: userId,
-          folder_id: folderId,
-          front: flashcardToCreate.front,
-          back: flashcardToCreate.back,
-          notes: `Assunto: ${flashcardToCreate.subject} | Tópico: ${flashcardToCreate.topic}`,
-          interval: 0,
-          learning_step: 0,
-          ease_factor: 2.5,
-          status: 'new',
-          next_review: Date.now(),
-          tags: [flashcardToCreate.subject, 'erro-questão'].filter(Boolean)
-        });
+      const newCard: any = {
+        id: cardId,
+        user_id: userId,
+        folderId: folderId,
+        front: flashcardToCreate.front,
+        back: flashcardToCreate.back,
+        notes: `Assunto: ${flashcardToCreate.subject} | Tópico: ${flashcardToCreate.topic}`,
+        interval: 0,
+        learningStep: 0,
+        easeFactor: 2.5,
+        status: 'new',
+        nextReview: Date.now(),
+        tags: [flashcardToCreate.subject, 'erro-questão'].filter(Boolean)
+      };
 
-      if (error) {
-        console.error("Supabase error creating flashcard:", error);
-        throw error;
-      }
+      await dataService.saveFlashcard(newCard, userId, isOnline);
 
       showNotification('Flashcard criado com sucesso!', 'success');
       setIsDeckModalOpen(false);
