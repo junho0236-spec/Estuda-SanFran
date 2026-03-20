@@ -433,6 +433,8 @@ export interface Question {
   status?: 'Acertou' | 'Errado';
   is_reinforcement?: boolean;
   texto_gabarito_ia?: string;
+  legislation_tags?: string[];
+  jurisprudence_tags?: string[];
   ai_summary?: {
     tese: string;
     fundamentação: string;

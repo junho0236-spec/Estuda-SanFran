@@ -357,11 +357,15 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
   const [topics, setTopics] = useState<string[]>([]);
   const [examBoards, setExamBoards] = useState<string[]>([]);
   const [years, setYears] = useState<string[]>([]);
+  const [legislationTags, setLegislationTags] = useState<string[]>([]);
+  const [jurisprudenceTags, setJurisprudenceTags] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [selectedTopic, setSelectedTopic] = useState<string>('');
   const [selectedExamBoard, setSelectedExamBoard] = useState<string>('');
   const [selectedYear, setSelectedYear] = useState<string>('');
+  const [selectedLegislation, setSelectedLegislation] = useState<string>('');
+  const [selectedJurisprudence, setSelectedJurisprudence] = useState<string>('');
   const [difficultyFilter, setDifficultyFilter] = useState<string>('');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'difficulty_asc' | 'difficulty_desc'>('newest');
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -881,7 +885,9 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
     explanation: '',
     difficulty: 'media',
     exam_board: '',
-    year: new Date().getFullYear().toString()
+    year: new Date().getFullYear().toString(),
+    legislation_tags: [],
+    jurisprudence_tags: []
   });
 
   useEffect(() => {
@@ -1499,17 +1505,23 @@ Forneça a explicação de forma concisa e didática.`;
 
   const updateFilters = (data: Question[]) => {
     // Extract unique subjects and topics
-    const uniqueSubjects = Array.from(new Set(data.map(q => q.subject))).filter(Boolean);
+    const uniqueSubjects = Array.from(new Set(data.map(q => q.subject))).filter(Boolean).sort();
     setSubjects(uniqueSubjects);
     
-    const uniqueTopics = Array.from(new Set(data.map(q => q.topic))).filter(Boolean);
+    const uniqueTopics = Array.from(new Set(data.map(q => q.topic))).filter(Boolean).sort();
     setTopics(uniqueTopics);
 
-    const uniqueExamBoards = Array.from(new Set(data.map(q => q.exam_board))).filter(Boolean) as string[];
+    const uniqueExamBoards = Array.from(new Set(data.map(q => q.exam_board))).filter(Boolean).sort() as string[];
     setExamBoards(uniqueExamBoards);
 
     const uniqueYears = Array.from(new Set(data.map(q => q.year?.toString()))).filter(Boolean) as string[];
     setYears(uniqueYears.sort((a, b) => b.localeCompare(a)));
+
+    const uniqueLegislation = Array.from(new Set(data.flatMap(q => q.legislation_tags || []))).filter(Boolean).sort();
+    setLegislationTags(uniqueLegislation);
+
+    const uniqueJurisprudence = Array.from(new Set(data.flatMap(q => q.jurisprudence_tags || []))).filter(Boolean).sort();
+    setJurisprudenceTags(uniqueJurisprudence);
   };
 
   const handleAddQuestion = async (e: React.FormEvent) => {
@@ -1539,7 +1551,9 @@ Forneça a explicação de forma concisa e didática.`;
         explanation: newQuestion.explanation,
         difficulty: newQuestion.difficulty,
         exam_board: newQuestion.exam_board,
-        year: newQuestion.year?.toString()
+        year: newQuestion.year?.toString(),
+        legislation_tags: newQuestion.legislation_tags || [],
+        jurisprudence_tags: newQuestion.jurisprudence_tags || []
       };
 
       console.log('DEBUG: Sanitized question to insert:', sanitizedInitialQuestion);
@@ -1599,7 +1613,9 @@ Forneça a explicação de forma concisa e didática.`;
           explanation: '',
           difficulty: 'media',
           exam_board: '',
-          year: new Date().getFullYear().toString()
+          year: new Date().getFullYear().toString(),
+          legislation_tags: [],
+          jurisprudence_tags: []
         });
         
         if (!subjects.includes(data.subject)) {
@@ -1792,6 +1808,7 @@ Forneça a explicação de forma concisa e didática.`;
         Estilo de Prova: ${aiConfig.examStyle}.
         Foco Jurídico: ${aiConfig.legalFocus.join(', ') || 'Geral'}.
         Tipo de Enunciado: ${aiConfig.statementType}.
+        Ano da Questão: OBRIGATORIAMENTE ${new Date().getFullYear()}.
         ${jurisprudencePrompt}
         ${contextFromFlashcards}
         ${contextFromText}
@@ -1799,7 +1816,8 @@ Forneça a explicação de forma concisa e didática.`;
         Cada questão deve ter 5 alternativas (A, B, C, D, E).
         A explicação deve ser EXTREMAMENTE detalhada, contendo uma análise individual para cada alternativa (A, B, C, D, E), explicando por que a alternativa correta está certa e por que cada uma das outras alternativas está incorreta, fundamentando com base no foco jurídico selecionado (${aiConfig.legalFocus.join(', ') || 'Lei, Jurisprudência e Doutrina'}).
         
-        Inclua também uma banca real compatível com o estilo selecionado e o ano atual.
+        IMPORTANTE: Identifique e extraia tags de legislação (ex: "Art. 5, CF", "Código Penal") e jurisprudência (ex: "Súmula 123 STJ", "Informativo 999 STF") associadas a cada questão.
+        
         Retorne as questões no formato JSON.`;
 
         const response = await ai.models.generateContent({
@@ -1824,8 +1842,18 @@ Forneça a explicação de forma concisa e didática.`;
                   correct_answer: { type: Type.INTEGER, description: "O índice da alternativa correta (0 a 4)" },
                   explanation: { type: Type.STRING, description: "Explicação detalhada de cada alternativa (A, B, C, D, E)" },
                   difficulty: { type: Type.STRING, description: "A dificuldade: 'facil', 'media' ou 'dificil'" },
-                  exam_board: { type: Type.STRING, description: "A banca examinadora" },
-                  year: { type: Type.STRING, description: "O ano da questão" }
+                  exam_board: { type: Type.STRING, description: "A banca examinadora (Estilo)" },
+                  year: { type: Type.STRING, description: "O ano da questão" },
+                  legislation_tags: { 
+                    type: Type.ARRAY, 
+                    items: { type: Type.STRING },
+                    description: "Tags de legislação (ex: Artigos de Lei, Códigos)"
+                  },
+                  jurisprudence_tags: { 
+                    type: Type.ARRAY, 
+                    items: { type: Type.STRING },
+                    description: "Tags de jurisprudência (ex: Súmulas, Informativos)"
+                  }
                 },
                 required: ["subject", "topic", "statement", "options", "correct_answer", "explanation", "difficulty", "exam_board", "year"]
               }
@@ -1853,7 +1881,9 @@ Forneça a explicação de forma concisa e didática.`;
           explanation: q.explanation,
           difficulty: q.difficulty,
           exam_board: q.exam_board,
-          year: q.year?.toString()
+          year: new Date().getFullYear().toString(),
+          legislation_tags: q.legislation_tags || [],
+          jurisprudence_tags: q.jurisprudence_tags || []
         }));
         // ... (rest of the insertion logic) ...
 
@@ -1956,6 +1986,12 @@ Forneça a explicação de forma concisa e didática.`;
     }
   };
 
+  const filteredTopics = selectedSubject && selectedSubject !== 'Todos'
+    ? Array.from(new Set(questions.filter(q => q.subject === selectedSubject).map(q => q.topic))).filter(Boolean).sort()
+    : topics;
+
+  const currentYear = new Date().getFullYear().toString();
+
   const filteredQuestions = questions.filter(q => {
     const matchSearch = searchTerm === '' || 
       q.statement.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -1965,6 +2001,8 @@ Forneça a explicação de forma concisa e didática.`;
     const matchDifficulty = difficultyFilter === '' || difficultyFilter === 'Todos' || q.difficulty === difficultyFilter;
     const matchExamBoard = selectedExamBoard === '' || selectedExamBoard === 'Todos' || q.exam_board === selectedExamBoard;
     const matchYear = selectedYear === '' || selectedYear === 'Todos' || q.year?.toString() === selectedYear;
+    const matchLegislation = selectedLegislation === '' || selectedLegislation === 'Todos' || (q.legislation_tags && q.legislation_tags.includes(selectedLegislation));
+    const matchJurisprudence = selectedJurisprudence === '' || selectedJurisprudence === 'Todos' || (q.jurisprudence_tags && q.jurisprudence_tags.includes(selectedJurisprudence));
     
     let matchNotebook = true;
     if (selectedNotebookId) {
@@ -1988,7 +2026,7 @@ Forneça a explicação de forma concisa e didática.`;
       matchStatus = !isWrong && !isCorrect;
     }
     
-    return matchSearch && matchSubject && matchTopic && matchDifficulty && matchExamBoard && matchYear && matchNotebook && matchStatus;
+    return matchSearch && matchSubject && matchTopic && matchDifficulty && matchExamBoard && matchYear && matchLegislation && matchJurisprudence && matchNotebook && matchStatus;
   }).sort((a, b) => {
     if (sortBy === 'newest') return 0; // Already sorted by created_at desc from DB
     if (sortBy === 'oldest') return -1; // Reverse order
@@ -3113,7 +3151,10 @@ Forneça a explicação de forma concisa e didática.`;
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4 animate-in slide-in-from-top-2 duration-300">
                   <select
                     value={selectedSubject}
-                    onChange={(e) => setSelectedSubject(e.target.value)}
+                    onChange={(e) => {
+                      setSelectedSubject(e.target.value);
+                      setSelectedTopic(''); // Reset topic when subject changes
+                    }}
                     className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
                   >
                     <option value="">Disciplina</option>
@@ -3128,7 +3169,7 @@ Forneça a explicação de forma concisa e didática.`;
                     className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
                   >
                     <option value="">Assunto</option>
-                    {topics.map(t => (
+                    {filteredTopics.map(t => (
                       <option key={t} value={t}>{t}</option>
                     ))}
                   </select>
@@ -3138,32 +3179,32 @@ Forneça a explicação de forma concisa e didática.`;
                     onChange={(e) => setSelectedExamBoard(e.target.value)}
                     className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
                   >
-                    <option value="">Banca</option>
+                    <option value="">Estilo de Banca</option>
                     {examBoards.map(b => (
                       <option key={b} value={b}>{b}</option>
                     ))}
                   </select>
 
                   <select
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(e.target.value)}
+                    value={selectedLegislation}
+                    onChange={(e) => setSelectedLegislation(e.target.value)}
                     className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
                   >
-                    <option value="">Ano</option>
-                    {years.map(y => (
-                      <option key={y} value={y.toString()}>{y}</option>
+                    <option value="">Legislação</option>
+                    {legislationTags.map(tag => (
+                      <option key={tag} value={tag}>{tag}</option>
                     ))}
                   </select>
 
                   <select
-                    value={difficultyFilter}
-                    onChange={(e) => setDifficultyFilter(e.target.value)}
+                    value={selectedJurisprudence}
+                    onChange={(e) => setSelectedJurisprudence(e.target.value)}
                     className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
                   >
-                    <option value="">Dificuldade</option>
-                    <option value="facil">Fácil</option>
-                    <option value="media">Média</option>
-                    <option value="dificil">Difícil</option>
+                    <option value="">Jurisprudência</option>
+                    {jurisprudenceTags.map(tag => (
+                      <option key={tag} value={tag}>{tag}</option>
+                    ))}
                   </select>
                 </div>
               )}
@@ -3294,10 +3335,28 @@ Forneça a explicação de forma concisa e didática.`;
                     <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col gap-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <div className="flex gap-4 text-xs font-medium text-slate-500">
-                          <span>Ano: <span className="text-slate-900 dark:text-white">{q.year || 'N/A'}</span></span>
-                          <span>Banca: <span className="text-slate-900 dark:text-white">{q.exam_board || 'N/A'}</span></span>
+                          <span>Ano: <span className="text-slate-900 dark:text-white">{new Date().getFullYear()}</span></span>
+                          <span>Estilo: <span className="text-slate-900 dark:text-white">{q.exam_board || 'N/A'}</span></span>
                           <span>Dificuldade: <span className="text-slate-900 dark:text-white capitalize">{q.difficulty}</span></span>
                         </div>
+                        {q.legislation_tags && q.legislation_tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {q.legislation_tags.map(tag => (
+                              <span key={tag} className="px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold border border-amber-100 dark:border-amber-900/30">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {q.jurisprudence_tags && q.jurisprudence_tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {q.jurisprudence_tags.map(tag => (
+                              <span key={tag} className="px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 text-[10px] font-bold border border-purple-100 dark:border-purple-900/30">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                         {(correctQuestions.includes(q.id) || wrongQuestions.includes(q.id)) && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-[10px] font-black uppercase tracking-widest border border-blue-100 dark:border-blue-900/30">
                             <MessageSquare size={10} /> Discussão Liberada
