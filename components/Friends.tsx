@@ -27,19 +27,37 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
 
   useEffect(() => {
     fetchData();
+
+    // Set up Realtime listener for friendships
+    const friendshipsChannel = supabase
+      .channel('friendships_realtime')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'friendships' 
+      }, () => {
+        fetchData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(friendshipsChannel);
+    };
   }, [userId]);
 
   const fetchData = async () => {
+    if (!userId) return;
     setLoading(true);
     try {
-      // Fetch all users
+      // Fetch all users from user_persona
       const { data: usersData, error: usersError } = await supabase
         .from('user_persona')
         .select('*');
       
       if (usersError) throw usersError;
 
-      // Fetch friendships
+      // Fetch friendships involving the current user
+      // Using a more robust query format
       const { data: friendshipsData, error: friendshipsError } = await supabase
         .from('friendships')
         .select('*')
@@ -47,13 +65,14 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
 
       if (friendshipsError) throw friendshipsError;
 
-      setFriendships(friendshipsData || []);
+      const currentFriendships = friendshipsData || [];
+      setFriendships(currentFriendships);
       
       const otherUsers = (usersData || []).filter(u => u.id !== userId);
       setCommunityUsers(otherUsers);
 
-      // Filter friends
-      const acceptedFriendIds = (friendshipsData || [])
+      // Filter accepted friends
+      const acceptedFriendIds = currentFriendships
         .filter(f => f.status === 'accepted')
         .map(f => f.user_id === userId ? f.friend_id : f.user_id);
       
@@ -62,7 +81,6 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
 
     } catch (error) {
       console.error('Error fetching friends data:', error);
-      toast.error('Erro ao carregar dados');
     } finally {
       setLoading(false);
     }
