@@ -21,6 +21,7 @@ import {
   ChevronLeft,
   Filter,
   Plus,
+  Save,
   Loader2,
   AlertCircle,
   Download,
@@ -366,7 +367,16 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
   const [selectedYear, setSelectedYear] = useState<string>('');
   const [selectedLegislation, setSelectedLegislation] = useState<string>('');
   const [selectedJurisprudence, setSelectedJurisprudence] = useState<string>('');
+  const [selectedInstitution, setSelectedInstitution] = useState<string>('');
+  const [selectedExamName, setSelectedExamName] = useState<string>('');
+  const [selectedModality, setSelectedModality] = useState<string>('');
+  const [selectedLegalDiploma, setSelectedLegalDiploma] = useState<string>('');
   const [difficultyFilter, setDifficultyFilter] = useState<string>('');
+  const [hideResolved, setHideResolved] = useState(false);
+  const [institutions, setInstitutions] = useState<string[]>([]);
+  const [examNames, setExamNames] = useState<string[]>([]);
+  const [modalities, setModalities] = useState<string[]>([]);
+  const [legalDiplomas, setLegalDiplomas] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'difficulty_asc' | 'difficulty_desc'>('newest');
   const [favorites, setFavorites] = useState<string[]>([]);
   const [wrongQuestions, setWrongQuestions] = useState<string[]>([]);
@@ -737,14 +747,18 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
     topic: '',
     context: '',
     count: 3,
-    difficulty: 'media' as 'facil' | 'media' | 'dificil',
-    examStyle: 'OAB (FGV)' as 'OAB (FGV)' | 'Magistratura/Promotoria' | 'Acadêmico (SanFran)',
+    difficulty: 'media' as 'muito_facil' | 'facil' | 'media' | 'dificil' | 'muito_dificil',
+    examStyle: 'OAB (FGV)' as string,
     legalFocus: [] as string[],
     statementType: 'Caso Prático (Situação Hipotética)' as 'Caso Prático (Situação Hipotética)' | 'Enunciado Direto',
     baseOnFlashcards: false,
     selectedFolderId: '',
     tribunal: 'Ambos' as 'Jurisprudência STF' | 'Jurisprudência STJ' | 'Ambos',
-    yearFilter: 'Últimos 2 anos' as '2025-2026' | 'Últimos 2 anos'
+    yearFilter: 'Últimos 2 anos' as '2025-2026' | 'Últimos 2 anos',
+    institution: '',
+    examName: '',
+    modality: 'Múltipla Escolha' as 'Múltipla Escolha' | 'Certo ou Errado',
+    legalDiploma: ''
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [voiceSpeed, setVoiceSpeed] = useState(1);
@@ -876,19 +890,6 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
       setIsSavingPrecedent(prev => ({ ...prev, [question.id]: false }));
     }
   };
-  const [newQuestion, setNewQuestion] = useState<Partial<Question>>({
-    subject: '',
-    topic: '',
-    statement: '',
-    options: ['', '', '', ''],
-    correct_answer: 0,
-    explanation: '',
-    difficulty: 'media',
-    exam_board: '',
-    year: new Date().getFullYear().toString(),
-    legislation_tags: [],
-    jurisprudence_tags: []
-  });
 
   useEffect(() => {
     // Set up real-time listener for questions
@@ -1522,123 +1523,18 @@ Forneça a explicação de forma concisa e didática.`;
 
     const uniqueJurisprudence = Array.from(new Set(data.flatMap(q => q.jurisprudence_tags || []))).filter(Boolean).sort();
     setJurisprudenceTags(uniqueJurisprudence);
-  };
 
-  const handleAddQuestion = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Basic validation
-    if (!newQuestion.subject || !newQuestion.statement || newQuestion.options?.some(o => !o)) {
-      showNotification('Preencha todos os campos obrigatórios e as 4 alternativas.', 'error');
-      return;
-    }
+    const uniqueInstitutions = Array.from(new Set(data.map(q => q.institution))).filter(Boolean).sort() as string[];
+    setInstitutions(uniqueInstitutions);
 
-    try {
-      setIsSubmitting(true);
-      console.log('DEBUG: handleAddQuestion starting...');
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuário não autenticado");
-      console.log('DEBUG: Authenticated user for add:', user.id);
+    const uniqueExamNames = Array.from(new Set(data.map(q => q.exam_name))).filter(Boolean).sort() as string[];
+    setExamNames(uniqueExamNames);
 
-      // Sanitize question to ensure only valid columns are sent
-      const sanitizedInitialQuestion = {
-        user_id: user.id,
-        subject: newQuestion.subject,
-        topic: newQuestion.topic,
-        statement: newQuestion.statement,
-        options: newQuestion.options,
-        correct_answer: newQuestion.correct_answer,
-        explanation: newQuestion.explanation,
-        difficulty: newQuestion.difficulty,
-        exam_board: newQuestion.exam_board,
-        year: newQuestion.year?.toString(),
-        legislation_tags: newQuestion.legislation_tags || [],
-        jurisprudence_tags: newQuestion.jurisprudence_tags || []
-      };
+    const uniqueModalities = Array.from(new Set(data.map(q => q.modality))).filter(Boolean).sort() as string[];
+    setModalities(uniqueModalities);
 
-      console.log('DEBUG: Sanitized question to insert:', sanitizedInitialQuestion);
-
-      let { data, error } = await supabase
-        .from('questions')
-        .insert([sanitizedInitialQuestion])
-        .select()
-        .single();
-
-      // Fallback for missing columns
-      if (error) {
-        console.warn("Initial insert failed, attempting fallback...", error.message);
-        
-        // Try removing columns one by one if they are suspected to be missing
-        const fallbackQuestion: any = { ...sanitizedInitialQuestion };
-        const problematicColumns = ['exam_board', 'year', 'difficulty', 'explanation', 'topic'];
-        
-        let lastError = error;
-        for (const col of problematicColumns) {
-          if (lastError.message?.includes(col) || lastError.message?.includes("column")) {
-            delete fallbackQuestion[col];
-            console.log(`Retrying without column: ${col}`);
-            const retry = await supabase
-              .from('questions')
-              .insert([fallbackQuestion])
-              .select()
-              .single();
-            
-            if (!retry.error) {
-              data = retry.data;
-              error = null;
-              break;
-            }
-            lastError = retry.error;
-          }
-        }
-        
-        if (error) error = lastError;
-      }
-
-      if (error) {
-        handleFirestoreError(error, OperationType.WRITE, 'questions');
-        return;
-      }
-
-      if (data) {
-        setQuestions([data, ...questions]);
-        showNotification('Questão adicionada com sucesso!', 'success');
-        // Reset form
-        setNewQuestion({
-          subject: '',
-          topic: '',
-          statement: '',
-          options: ['', '', '', ''],
-          correct_answer: 0,
-          explanation: '',
-          difficulty: 'media',
-          exam_board: '',
-          year: new Date().getFullYear().toString(),
-          legislation_tags: [],
-          jurisprudence_tags: []
-        });
-        
-        if (!subjects.includes(data.subject)) {
-          setSubjects([...subjects, data.subject]);
-        }
-        if (data.topic && !topics.includes(data.topic)) {
-          setTopics([...topics, data.topic]);
-        }
-        if (data.exam_board && !examBoards.includes(data.exam_board)) {
-          setExamBoards([...examBoards, data.exam_board]);
-        }
-        if (data.year && !years.includes(data.year.toString())) {
-          setYears([...years, data.year.toString()].sort((a, b) => b.localeCompare(a)));
-        }
-        
-        setViewMode('list');
-      }
-    } catch (error: any) {
-      console.error('Error adding question:', error);
-      showNotification(`Erro ao adicionar questão: ${error.message || JSON.stringify(error)}`, 'error');
-    } finally {
-      setIsSubmitting(false);
-    }
+    const uniqueLegalDiplomas = Array.from(new Set(data.map(q => q.legal_diploma))).filter(Boolean).sort() as string[];
+    setLegalDiplomas(uniqueLegalDiplomas);
   };
 
   const handleSpeak = (statement: string, hint: string, id: string) => {
@@ -1804,8 +1700,12 @@ Forneça a explicação de forma concisa e didática.`;
         const currentBatchSize = Math.min(chunkSize, totalQuestions - i);
         setGeneratingStatus(`Gerando lote ${Math.floor(i / chunkSize) + 1} de ${Math.ceil(totalQuestions / chunkSize)}... (${i + currentBatchSize}/${totalQuestions} concluídas)`);
 
-        const prompt = `Crie ${currentBatchSize} questões de múltipla escolha de nível ${aiConfig.difficulty} sobre a matéria "${aiConfig.subject}" e tópico "${aiConfig.topic}".
+        const prompt = `Crie ${currentBatchSize} questões de nível ${aiConfig.difficulty} sobre a matéria "${aiConfig.subject}" e tópico "${aiConfig.topic}".
+        Modalidade: ${aiConfig.modality}.
         Estilo de Prova: ${aiConfig.examStyle}.
+        Instituição: ${aiConfig.institution || 'Geral'}.
+        Nome do Exame/Concurso: ${aiConfig.examName || 'Geral'}.
+        Diploma Legal de Referência: ${aiConfig.legalDiploma || 'Geral'}.
         Foco Jurídico: ${aiConfig.legalFocus.join(', ') || 'Geral'}.
         Tipo de Enunciado: ${aiConfig.statementType}.
         Ano da Questão: OBRIGATORIAMENTE ${new Date().getFullYear()}.
@@ -1813,8 +1713,8 @@ Forneça a explicação de forma concisa e didática.`;
         ${contextFromFlashcards}
         ${contextFromText}
         
-        Cada questão deve ter 5 alternativas (A, B, C, D, E).
-        A explicação deve ser EXTREMAMENTE detalhada, contendo uma análise individual para cada alternativa (A, B, C, D, E), explicando por que a alternativa correta está certa e por que cada uma das outras alternativas está incorreta, fundamentando com base no foco jurídico selecionado (${aiConfig.legalFocus.join(', ') || 'Lei, Jurisprudência e Doutrina'}).
+        ${aiConfig.modality === 'Múltipla Escolha' ? 'Cada questão deve ter 5 alternativas (A, B, C, D, E).' : 'Cada questão deve ser de Certo ou Errado.'}
+        A explicação deve ser EXTREMAMENTE detalhada, contendo uma análise individual para cada alternativa (ou para o item Certo/Errado), explicando por que a resposta correta está certa e por que as incorretas estão erradas, fundamentando com base no foco jurídico selecionado e no diploma legal mencionado.
         
         IMPORTANTE: Identifique e extraia tags de legislação (ex: "Art. 5, CF", "Código Penal") e jurisprudência (ex: "Súmula 123 STJ", "Informativo 999 STF") associadas a cada questão.
         
@@ -1843,6 +1743,10 @@ Forneça a explicação de forma concisa e didática.`;
                   explanation: { type: Type.STRING, description: "Explicação detalhada de cada alternativa (A, B, C, D, E)" },
                   difficulty: { type: Type.STRING, description: "A dificuldade: 'facil', 'media' ou 'dificil'" },
                   exam_board: { type: Type.STRING, description: "A banca examinadora (Estilo)" },
+                  institution: { type: Type.STRING, description: "A instituição (ex: USP, OAB, TJ-SP)" },
+                  exam_name: { type: Type.STRING, description: "O nome do exame/concurso" },
+                  modality: { type: Type.STRING, description: "A modalidade: 'Múltipla Escolha' ou 'Certo ou Errado'" },
+                  legal_diploma: { type: Type.STRING, description: "O diploma legal de referência (ex: CPC, CP, CF/88)" },
                   year: { type: Type.STRING, description: "O ano da questão" },
                   legislation_tags: { 
                     type: Type.ARRAY, 
@@ -1880,25 +1784,38 @@ Forneça a explicação de forma concisa e didática.`;
           correct_answer: q.correct_answer,
           explanation: q.explanation,
           difficulty: q.difficulty,
-          exam_board: q.exam_board,
-          year: new Date().getFullYear().toString(),
+          exam_board: q.exam_board || aiConfig.examStyle,
+          institution: q.institution || aiConfig.institution,
+          exam_name: q.exam_name || aiConfig.examName,
+          modality: q.modality || aiConfig.modality,
+          legal_diploma: q.legal_diploma || aiConfig.legalDiploma,
+          year: q.year || new Date().getFullYear().toString(),
           legislation_tags: q.legislation_tags || [],
           jurisprudence_tags: q.jurisprudence_tags || []
         }));
-        // ... (rest of the insertion logic) ...
 
         let { data, error } = await supabase
           .from('questions')
           .insert(sanitizedInitialQuestions)
           .select();
 
-        // Fallback for missing exam_board column
-        if (error && error.message?.includes("exam_board")) {
-          console.warn("Column 'exam_board' not found, retrying without it...");
-          const sanitizedQuestions = sanitizedInitialQuestions.map(({ exam_board, ...rest }: any) => rest);
+        // Fallback for missing columns
+        if (error && error.message?.includes("column")) {
+          console.warn("Some columns not found, retrying with basic columns...");
+          const basicColumns = ['user_id', 'subject', 'topic', 'statement', 'options', 'correct_answer', 'explanation', 'difficulty', 'year'];
+          const retryQuestions = sanitizedInitialQuestions.map((q: any) => {
+            const filtered: any = {};
+            basicColumns.forEach(col => { if (q[col] !== undefined) filtered[col] = q[col]; });
+            // Add tags if they exist
+            if (q.legislation_tags) filtered.legislation_tags = q.legislation_tags;
+            if (q.jurisprudence_tags) filtered.jurisprudence_tags = q.jurisprudence_tags;
+            // Try adding new columns one by one or just use a safer approach
+            return filtered;
+          });
+          
           const retry = await supabase
             .from('questions')
-            .insert(sanitizedQuestions)
+            .insert(retryQuestions)
             .select();
           data = retry.data;
           error = retry.error;
@@ -1939,12 +1856,6 @@ Forneça a explicação de forma concisa e didática.`;
     } finally {
       setIsGenerating(false);
     }
-  };
-
-  const handleOptionChange = (index: number, value: string) => {
-    const newOptions = [...(newQuestion.options || [])];
-    newOptions[index] = value;
-    setNewQuestion({ ...newQuestion, options: newOptions });
   };
 
   const startErrorRetrain = () => {
@@ -2003,6 +1914,10 @@ Forneça a explicação de forma concisa e didática.`;
     const matchYear = selectedYear === '' || selectedYear === 'Todos' || q.year?.toString() === selectedYear;
     const matchLegislation = selectedLegislation === '' || selectedLegislation === 'Todos' || (q.legislation_tags && q.legislation_tags.includes(selectedLegislation));
     const matchJurisprudence = selectedJurisprudence === '' || selectedJurisprudence === 'Todos' || (q.jurisprudence_tags && q.jurisprudence_tags.includes(selectedJurisprudence));
+    const matchInstitution = selectedInstitution === '' || selectedInstitution === 'Todos' || q.institution === selectedInstitution;
+    const matchExamName = selectedExamName === '' || selectedExamName === 'Todos' || q.exam_name === selectedExamName;
+    const matchModality = selectedModality === '' || selectedModality === 'Todos' || q.modality === selectedModality;
+    const matchLegalDiploma = selectedLegalDiploma === '' || selectedLegalDiploma === 'Todos' || q.legal_diploma === selectedLegalDiploma;
     
     let matchNotebook = true;
     if (selectedNotebookId) {
@@ -2025,13 +1940,17 @@ Forneça a explicação de forma concisa e didática.`;
     } else if (questionStatus === 'unresolved') {
       matchStatus = !isWrong && !isCorrect;
     }
+
+    if (hideResolved && (isWrong || isCorrect)) {
+      matchStatus = false;
+    }
     
-    return matchSearch && matchSubject && matchTopic && matchDifficulty && matchExamBoard && matchYear && matchLegislation && matchJurisprudence && matchNotebook && matchStatus;
+    return matchSearch && matchSubject && matchTopic && matchDifficulty && matchExamBoard && matchYear && matchLegislation && matchJurisprudence && matchNotebook && matchStatus && matchInstitution && matchExamName && matchModality && matchLegalDiploma;
   }).sort((a, b) => {
     if (sortBy === 'newest') return 0; // Already sorted by created_at desc from DB
     if (sortBy === 'oldest') return -1; // Reverse order
     
-    const difficultyMap = { 'facil': 1, 'media': 2, 'dificil': 3 };
+    const difficultyMap = { 'muito_facil': 1, 'facil': 2, 'media': 3, 'dificil': 4, 'muito_dificil': 5 };
     const diffA = difficultyMap[a.difficulty] || 0;
     const diffB = difficultyMap[b.difficulty] || 0;
     
@@ -2891,13 +2810,80 @@ Forneça a explicação de forma concisa e didática.`;
                   <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Estilo de Prova</label>
                   <select
                     value={aiConfig.examStyle}
-                    onChange={e => setAiConfig({...aiConfig, examStyle: e.target.value as any})}
+                    onChange={e => setAiConfig({...aiConfig, examStyle: e.target.value})}
                     className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
                   >
-                    <option value="OAB (FGV)">OAB (FGV)</option>
-                    <option value="Magistratura/Promotoria">Magistratura/Promotoria</option>
-                    <option value="Acadêmico (SanFran)">Acadêmico (SanFran)</option>
+                    <optgroup label="Exames de Ordem">
+                      <option value="OAB (FGV)">OAB (FGV)</option>
+                    </optgroup>
+                    <optgroup label="Carreiras Jurídicas">
+                      <option value="Magistratura Estadual">Magistratura Estadual</option>
+                      <option value="Magistratura Federal">Magistratura Federal</option>
+                      <option value="Ministério Público">Ministério Público</option>
+                      <option value="Promotor de Justiça">Promotor de Justiça</option>
+                      <option value="Procurador da República">Procurador da República</option>
+                      <option value="Defensoria Pública">Defensoria Pública</option>
+                      <option value="Defensor Público da União">Defensor Público da União</option>
+                      <option value="Procuradorias (AGU/PGE/PGM)">Procuradorias</option>
+                      <option value="Delegado de Polícia">Delegado de Polícia</option>
+                      <option value="Delegado Federal">Delegado Federal</option>
+                      <option value="Diplomacia (CACD)">Diplomacia (CACD)</option>
+                    </optgroup>
+                    <optgroup label="Tribunais e Outros">
+                      <option value="Analista Judiciário">Analista Judiciário</option>
+                      <option value="Técnico Judiciário">Técnico Judiciário</option>
+                      <option value="Carreiras Policiais (Agente/Escrivão)">Carreiras Policiais</option>
+                      <option value="Cartórios">Cartórios</option>
+                      <option value="Acadêmico (SanFran)">Acadêmico (SanFran)</option>
+                    </optgroup>
                   </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Modalidade</label>
+                  <select
+                    value={aiConfig.modality}
+                    onChange={e => setAiConfig({...aiConfig, modality: e.target.value as any})}
+                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
+                  >
+                    <option value="Múltipla Escolha">Múltipla Escolha (ABCDE)</option>
+                    <option value="Certo ou Errado">Certo ou Errado (CESPE)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Instituição</label>
+                  <input
+                    type="text"
+                    value={aiConfig.institution}
+                    onChange={e => setAiConfig({...aiConfig, institution: e.target.value})}
+                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
+                    placeholder="Ex: USP, FGV, VUNESP"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Diploma Legal</label>
+                  <input
+                    type="text"
+                    value={aiConfig.legalDiploma}
+                    onChange={e => setAiConfig({...aiConfig, legalDiploma: e.target.value})}
+                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
+                    placeholder="Ex: CPC, CP, CF/88"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Nome do Exame</label>
+                  <input
+                    type="text"
+                    value={aiConfig.examName}
+                    onChange={e => setAiConfig({...aiConfig, examName: e.target.value})}
+                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
+                    placeholder="Ex: XXXIX Exame OAB"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Tipo de Enunciado</label>
@@ -2915,7 +2901,7 @@ Forneça a explicação de forma concisa e didática.`;
               <div>
                 <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Foco Jurídico</label>
                 <div className="flex flex-wrap gap-3">
-                  {['Lei Seca', 'Jurisprudência Atualizada', 'Doutrina Clássica'].map(focus => (
+                  {['Lei Seca', 'Jurisprudência Atualizada', 'Doutrina Clássica', 'Súmulas STF/STJ', 'Informativos Recentes', 'Ética Profissional', 'Direitos Humanos', 'Direito Comparado', 'Teoria Geral', 'Prática Processual', 'Filosofia do Direito', 'Sociologia Jurídica'].map(focus => (
                     <label key={focus} className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
@@ -3012,9 +2998,11 @@ Forneça a explicação de forma concisa e didática.`;
                     onChange={e => setAiConfig({...aiConfig, difficulty: e.target.value as any})}
                     className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
                   >
+                    <option value="muito_facil">Muito Fácil</option>
                     <option value="facil">Fácil</option>
                     <option value="media">Média</option>
                     <option value="dificil">Difícil</option>
+                    <option value="muito_dificil">Muito Difícil</option>
                   </select>
                 </div>
               </div>
@@ -3206,6 +3194,62 @@ Forneça a explicação de forma concisa e didática.`;
                       <option key={tag} value={tag}>{tag}</option>
                     ))}
                   </select>
+
+                  <select
+                    value={selectedInstitution}
+                    onChange={(e) => setSelectedInstitution(e.target.value)}
+                    className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
+                  >
+                    <option value="">Instituição</option>
+                    {institutions.map(inst => (
+                      <option key={inst} value={inst}>{inst}</option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={selectedExamName}
+                    onChange={(e) => setSelectedExamName(e.target.value)}
+                    className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
+                  >
+                    <option value="">Prova</option>
+                    {examNames.map(exam => (
+                      <option key={exam} value={exam}>{exam}</option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={selectedModality}
+                    onChange={(e) => setSelectedModality(e.target.value)}
+                    className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
+                  >
+                    <option value="">Modalidade</option>
+                    <option value="multipla_escolha">Múltipla Escolha</option>
+                    <option value="certo_errado">Certo/Errado</option>
+                  </select>
+
+                  <select
+                    value={selectedLegalDiploma}
+                    onChange={(e) => setSelectedLegalDiploma(e.target.value)}
+                    className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
+                  >
+                    <option value="">Diploma Legal</option>
+                    {legalDiplomas.map(diploma => (
+                      <option key={diploma} value={diploma}>{diploma}</option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={difficultyFilter}
+                    onChange={(e) => setDifficultyFilter(e.target.value)}
+                    className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
+                  >
+                    <option value="">Dificuldade</option>
+                    <option value="muito_facil">Muito Fácil</option>
+                    <option value="facil">Fácil</option>
+                    <option value="media">Média</option>
+                    <option value="dificil">Difícil</option>
+                    <option value="muito_dificil">Muito Difícil</option>
+                  </select>
                 </div>
               )}
               
@@ -3246,6 +3290,12 @@ Forneça a explicação de forma concisa e didática.`;
                     >
                       Erradas
                     </button>
+                    <button 
+                      onClick={() => setHideResolved(!hideResolved)}
+                      className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${hideResolved ? 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800 shadow-inner' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700 dark:hover:bg-slate-800'}`}
+                    >
+                      {hideResolved ? 'Mostrando Ocultas' : 'Ocultar Resolvidas'}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -3265,6 +3315,11 @@ Forneça a explicação de forma concisa e didática.`;
                     setDifficultyFilter('');
                     setQuestionStatus('all');
                     setSelectedNotebookId('');
+                    setSelectedInstitution('');
+                    setSelectedExamName('');
+                    setSelectedModality('');
+                    setSelectedLegalDiploma('');
+                    setHideResolved(false);
                   }}
                   className="text-sm font-medium text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                 >
@@ -4119,14 +4174,16 @@ Forneça a explicação de forma concisa e didática.`;
               <h3 className="text-xl font-bold text-slate-700 dark:text-slate-300 mb-2">Nenhuma questão encontrada</h3>
               <p className="text-slate-500">
                 {questions.length === 0 
-                  ? "O banco de questões está vazio. Adicione a primeira questão!" 
+                  ? "O banco de questões está vazio. Use o Gerador de IA para criar questões!" 
                   : "Nenhuma questão corresponde aos filtros selecionados."}
               </p>
               {questions.length === 0 && (
                 <button
-                  className="mt-6 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors"
+                  onClick={() => setShowAIGenerator(true)}
+                  className="mt-6 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold transition-colors flex items-center gap-2 mx-auto"
                 >
-                  Adicionar Questão
+                  <Sparkles size={18} />
+                  Gerar Questões com IA
                 </button>
               )}
             </div>
@@ -4403,6 +4460,7 @@ Forneça a explicação de forma concisa e didática.`;
           </div>
         </div>
       )}
+
 
       {/* Hidden container for PDF export */}
       {isExporting && (

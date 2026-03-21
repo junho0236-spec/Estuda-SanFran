@@ -423,9 +423,13 @@ export interface Question {
   options: string[];
   correct_answer: number;
   explanation?: string;
-  difficulty: 'facil' | 'media' | 'dificil';
+  difficulty: 'muito_facil' | 'facil' | 'media' | 'dificil' | 'muito_dificil';
   user_id?: string;
   exam_board?: string;
+  institution?: string;
+  exam_name?: string;
+  modality?: 'multipla_escolha' | 'certo_errado';
+  legal_diploma?: string;
   year?: string;
   created_at?: string;
   audio_hint?: string;
