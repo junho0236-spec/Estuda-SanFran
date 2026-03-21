@@ -81,7 +81,7 @@ const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessio
           accent: f.accent,
           subject_ids: []
         }));
-        await db.legal_frontiers.bulkAdd(initial);
+        await db.legal_frontiers.bulkPut(initial);
         setCustomFrontiers(initial);
       } else {
         setCustomFrontiers(saved);

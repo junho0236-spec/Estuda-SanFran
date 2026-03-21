@@ -98,6 +98,8 @@ const SanFranHelp = React.lazy(() => import('./components/SanFranHelp'));
 const FAQ = React.lazy(() => import('./components/FAQ'));
 const Settings = React.lazy(() => import('./components/Settings'));
 const SanFranOAB = React.lazy(() => import('./components/SanFranOAB'));
+const SanFranConcursos = React.lazy(() => import('./components/SanFranConcursos'));
+const ApprovalTrail = React.lazy(() => import('./components/ApprovalTrail'));
 const LegalCinema = React.lazy(() => import('./components/LegalCinema'));
 const GeneralLanguages = React.lazy(() => import('./components/GeneralLanguages')); 
 const LegalSimplifier = React.lazy(() => import('./components/LegalSimplifier'));
@@ -820,32 +822,33 @@ const App: React.FC = () => {
     // RAMOS PRINCIPAIS AGORA NO NÍVEL SUPERIOR
     { id: View.Subjects, icon: BookOpen, label: 'Disciplinas', color: 'text-pink-600', bg: 'bg-pink-100' },
     { id: View.Tasks, icon: CheckSquare, label: 'Tarefas', color: 'text-emerald-600', bg: 'bg-emerald-100' },
-    { id: View.Anki, icon: BrainCircuit, label: 'Anki Flashcards', color: 'text-slate-900', bg: 'bg-slate-200' },
+    { id: View.Anki, icon: BrainCircuit, label: 'FLASHCARDS', color: 'text-slate-900', bg: 'bg-slate-200' },
     { id: View.Statistics, icon: BarChart3, label: 'Estatísticas', color: 'text-usp-gold', bg: 'bg-usp-gold/10' },
     { id: View.Timer, icon: TimerIcon, label: 'Controle de Tempo', color: 'text-red-600', bg: 'bg-red-100' },
 
     // HUBS
-    { id: View.SanFranCommunity, icon: Users, label: 'Comunidade', color: 'text-cyan-600', bg: 'bg-cyan-100' },
+    { id: View.SanFranCommunity, icon: Users, label: 'COMMUNITY', color: 'text-cyan-600', bg: 'bg-cyan-100' },
     { id: View.SanFranImprovement, icon: GraduationCap, label: 'Improvement', color: 'text-purple-600', bg: 'bg-purple-100' },
-    { id: View.SanFranEssential, icon: LayoutGrid, label: 'Mais Ferramentas', color: 'text-indigo-600', bg: 'bg-indigo-100' }, // Renomeado
+    { id: View.SanFranEssential, icon: LayoutGrid, label: 'ESSENTIAL', color: 'text-indigo-600', bg: 'bg-indigo-100' }, // Renomeado
     { id: View.SanFranLanguages, icon: Languages, label: 'Languages', color: 'text-sky-600', bg: 'bg-sky-100' },
-    { id: View.SanFranLife, icon: Leaf, label: 'SanFran Life', color: 'text-emerald-600', bg: 'bg-emerald-100' },
+    { id: View.SanFranLife, icon: Leaf, label: 'LIFE', color: 'text-emerald-600', bg: 'bg-emerald-100' },
     { id: View.SanFranGames, icon: Gamepad2, label: 'Games', color: 'text-orange-500', bg: 'bg-orange-100' },
-    { id: View.SanFranHelp, icon: Wrench, label: 'Help Jurídico', color: 'text-slate-500', bg: 'bg-slate-100' },
-    { id: View.SanFranOAB, icon: ShieldCheck, label: 'OAB Foco', color: 'text-red-600', bg: 'bg-red-100' },
+    { id: View.SanFranHelp, icon: Wrench, label: 'HELP', color: 'text-slate-500', bg: 'bg-slate-100' },
+    { id: View.SanFranOAB, icon: ShieldCheck, label: 'OAB', color: 'text-red-600', bg: 'bg-red-100' },
+    { id: View.SanFranConcursos, icon: ClipboardList, label: 'CONCURSOS', color: 'text-indigo-600', bg: 'bg-indigo-100' },
   ];
 
   // Helper to check if current view is a child of SanFran Essential (Updated List)
   const isEssentialChild = [View.Calendar, View.Ranking, View.DeadArchive, View.Calculator, View.ErrorLog, View.CodeTracker, View.IracMethod, View.SpacedRepetition, View.AttendanceCalculator, View.SyllabusTracker, View.DeadlinePlanner, View.SpeedReader, View.Mnemonics, View.ReverseSchedule, View.Statistics].includes(currentView);
   
   // Helper to check if current view is a child of SanFran Community
-  const isCommunityChild = [View.Debate, View.ClassificadosPatio, View.JurisprudenceMural, View.CaseAnalyzer, View.Societies, View.Largo, View.StudyRoom, View.Mural, View.Mentorship, View.MockJury, View.PetitionWiki, View.StudyPact, View.LargoAuction, View.SocialEvents, View.TheVault, View.CaronasRepublicas, View.BalcaoEstagios, View.TribunalOpiniao, View.BussolaOptativas, View.AchadosPerdidos, View.PerolasTribuna, View.GuiaSobrevivencia, View.ClubeLivro, View.GuerraTurmas].includes(currentView);
+  const isCommunityChild = [View.Debate, View.ClassificadosPatio, View.JurisprudenceMural, View.Societies, View.Largo, View.StudyRoom, View.Mural, View.Mentorship, View.MockJury, View.PetitionWiki, View.StudyPact, View.LargoAuction, View.SocialEvents, View.TheVault, View.CaronasRepublicas, View.BalcaoEstagios, View.TribunalOpiniao, View.BussolaOptativas, View.AchadosPerdidos, View.PerolasTribuna, View.GuiaSobrevivencia, View.ClubeLivro, View.GuerraTurmas].includes(currentView);
 
   // Helper to check if current view is a child of SanFran Improvement
-  const isImprovementChild = [View.Specialization, View.TypingChallenge, View.DominioJuridico, View.Timeline, View.LeiSeca, View.Library, View.OralArgument, View.QuestionBank, View.IntelligentSummarizer, View.StudyBuddy, View.Certificates].includes(currentView);
+  const isImprovementChild = [View.Specialization, View.TypingChallenge, View.TypingLab, View.DominioJuridico, View.Timeline, View.LeiSeca, View.Library, View.Sumulas, View.OralArgument, View.QuestionBank, View.IntelligentSummarizer, View.StudyBuddy, View.Certificates, View.CaseAnalyzer].includes(currentView);
 
   // Helper to check if current view is a child of SanFran Languages
-  const isLanguagesChild = [View.SanFranIdiomas, View.LegalCinema, View.GeneralLanguages, View.PronunciationLab, View.LyricalVibes, View.TheExchangeStudent, View.VisualFlashcards, View.BilingualNews, View.SlangChallenge].includes(currentView);
+  const isLanguagesChild = [View.SanFranIdiomas, View.LegalCinema, View.GeneralLanguages, View.PronunciationLab, View.LyricalVibes, View.TheExchangeStudent, View.VisualFlashcards, View.BilingualNews, View.SlangChallenge, View.LatinGame].includes(currentView);
 
   // Helper to check if current view is a child of SanFran Life
   const isLifeChild = [View.Office, View.Sebo].includes(currentView);
@@ -854,10 +857,13 @@ const App: React.FC = () => {
   const isGamesChild = [View.InternRPG, View.JurisTinder, View.LatinGame, View.Trunfo, View.SumulaChallenge].includes(currentView);
 
   // Helper to check if current view is a child of SanFran Help
-  const isHelpChild = [View.PrescriptionCalculator, View.SucessaoSimulator, View.InvestigationBoard, View.Checklist, View.Honorarios, View.Dosimetria, View.Petitum, View.CitationGenerator, View.DeadlineCalculator, View.LegalSimplifier].includes(currentView);
+  const isHelpChild = [View.PrescriptionCalculator, View.SucessaoSimulator, View.InvestigationBoard, View.Checklist, View.Honorarios, View.FeeCalculator, View.Dosimetria, View.Petitum, View.DraftGenerator, View.CitationGenerator, View.DeadlineCalculator, View.CostSplitter, View.ForensicCalendar, View.LegalSimplifier].includes(currentView);
 
   // Helper to check if current view is a child of SanFran OAB
   const isOABChild = [View.OabCountdown, View.Specialization].includes(currentView);
+
+  // Helper to check if current view is a child of SanFran Concursos
+  const isConcursosChild = [View.Editais, View.Timeline, View.QuestionBank].includes(currentView);
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [friends, setFriends] = useState<Friendship[]>([]);
@@ -1040,7 +1046,8 @@ const App: React.FC = () => {
                              (item.id === View.SanFranLife && isLifeChild) ||
                              (item.id === View.SanFranGames && isGamesChild) ||
                              (item.id === View.SanFranHelp && isHelpChild) ||
-                             (item.id === View.SanFranOAB && isOABChild);
+                             (item.id === View.SanFranOAB && isOABChild) ||
+                             (item.id === View.SanFranConcursos && isConcursosChild);
             
             return (
               <Link 
@@ -1164,6 +1171,7 @@ const App: React.FC = () => {
                 <Route path={getPathFromView(View.FAQ)} element={<FAQ onNavigate={setCurrentView} />} />
                 <Route path={getPathFromView(View.Settings)} element={<Settings />} />
                 <Route path={getPathFromView(View.SanFranOAB)} element={<SanFranOAB onNavigate={setCurrentView} />} />
+                <Route path={getPathFromView(View.SanFranConcursos)} element={<SanFranConcursos onNavigate={setCurrentView} />} />
 
                 <Route path={getPathFromView(View.Profile)} element={<Profile />} />
                 <Route path={getPathFromView(View.DominioJuridico)} element={<DominioJuridico subjects={subjects} studySessions={studySessions} userId={session.user.id} />} />
@@ -1193,6 +1201,7 @@ const App: React.FC = () => {
                 <Route path={getPathFromView(View.LeiSeca)} element={<LeiSeca userId={session.user.id} />} />
                 <Route path={getPathFromView(View.CitationGenerator)} element={<CitationGenerator />} />
                 <Route path={getPathFromView(View.Editais)} element={<Editais userId={session.user.id} />} />
+                <Route path={getPathFromView(View.ApprovalTrail)} element={<ApprovalTrail userId={session.user.id} onNavigate={setCurrentView} />} />
                 <Route path={getPathFromView(View.Timeline)} element={<TimelineBuilder />} />
                 <Route path={getPathFromView(View.DeadArchive)} element={<DeadArchive userId={session.user.id} />} />
                 <Route path={getPathFromView(View.Anki)} element={

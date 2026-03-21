@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Target, Calendar, Clock, BookOpen, ShieldCheck, Zap, AlertTriangle, Scale, Gavel, CheckCircle2, Save, Info, ArrowRight } from 'lucide-react';
+import { Target, Calendar, Clock, BookOpen, ShieldCheck, Zap, AlertTriangle, Scale, Gavel, CheckCircle2, Save, Info, ArrowRight, Lock } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 
 interface OabCountdownProps {
@@ -12,6 +12,24 @@ interface Suggestion {
   topic: string;
   priority: 'baixa' | 'media' | 'alta' | 'urgente';
 }
+
+const LockedOverlay: React.FC = () => (
+  <div className="absolute inset-0 z-20 flex flex-col items-center justify-center overflow-hidden rounded-[3rem]">
+    <div className="absolute inset-0 bg-white/5 dark:bg-black/10 backdrop-blur-[1px] pointer-events-none"></div>
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[0.5px] bg-slate-400/20 rotate-[35deg]"></div>
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[0.5px] bg-slate-400/20 -rotate-[35deg]"></div>
+    </div>
+    <div className="relative z-30 bg-white/60 dark:bg-slate-800/60 p-1.5 rounded-full shadow-sm border border-white/40 dark:border-slate-700/40 backdrop-blur-md">
+      <Lock size={12} className="text-slate-500/70" />
+    </div>
+    <div className="absolute bottom-6 left-0 right-0 text-center z-30">
+      <span className="text-[7px] font-black uppercase tracking-[0.3em] text-slate-500/60 bg-white/30 dark:bg-black/20 px-2.5 py-1 rounded-full backdrop-blur-sm border border-white/10">
+        Desenvolvendo
+      </span>
+    </div>
+  </div>
+);
 
 const OabCountdown: React.FC<OabCountdownProps> = ({ userId }) => {
   const [examDate, setExamDate] = useState<string>('2024-12-01');
@@ -183,7 +201,8 @@ const OabCountdown: React.FC<OabCountdownProps> = ({ userId }) => {
 
          {/* LADO DIREITO: RECOMENDAÇÕES */}
          <div className="lg:col-span-7 space-y-6">
-            <div className="bg-white dark:bg-[#0d0303] rounded-[3rem] border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl overflow-hidden flex flex-col h-full">
+            <div className="relative bg-white dark:bg-[#0d0303] rounded-[3rem] border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl overflow-hidden flex flex-col h-full cursor-default">
+               <LockedOverlay />
                <div className="p-8 md:p-10 border-b border-slate-100 dark:border-white/5">
                   <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-4">
                      <Scale className="text-sanfran-rubi" /> Foco Sugerido pela Academia
@@ -193,7 +212,7 @@ const OabCountdown: React.FC<OabCountdownProps> = ({ userId }) => {
 
                <div className="flex-1 p-8 md:p-10 space-y-6">
                   {recommendations.map((rec, idx) => (
-                    <div key={idx} className="group p-6 rounded-3xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 hover:border-sanfran-rubi transition-all">
+                    <div key={idx} className="group p-6 rounded-3xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 transition-all">
                        <div className="flex items-center justify-between mb-3">
                           <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{rec.category}</span>
                           <div className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-2 ${
@@ -206,9 +225,9 @@ const OabCountdown: React.FC<OabCountdownProps> = ({ userId }) => {
                           </div>
                        </div>
                        <h4 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-4">{rec.topic}</h4>
-                       <button className="flex items-center gap-2 text-[10px] font-black uppercase text-sanfran-rubi hover:underline transition-all">
+                       <div className="flex items-center gap-2 text-[10px] font-black uppercase text-sanfran-rubi opacity-50">
                           Ver Flashcards Relacionados <ArrowRight size={12} />
-                       </button>
+                       </div>
                     </div>
                   ))}
                </div>
@@ -223,9 +242,9 @@ const OabCountdown: React.FC<OabCountdownProps> = ({ userId }) => {
                         <p className="text-[10px] font-bold text-slate-400 uppercase">Indispensável em todas as fases</p>
                      </div>
                   </div>
-                  <button className="px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg">
+                  <div className="px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg opacity-50">
                      Acessar Simulados
-                  </button>
+                  </div>
                </div>
             </div>
          </div>

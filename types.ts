@@ -100,7 +100,15 @@ export enum View {
   Certificates = 'certificates',
   NoteView = 'note_view',
   Repository = 'repository',
-  Assignments = 'assignments'
+  Assignments = 'assignments',
+  CostSplitter = 'cost_splitter',
+  FeeCalculator = 'fee_calculator',
+  DraftGenerator = 'draft_generator',
+  ForensicCalendar = 'forensic_calendar',
+  TypingLab = 'typing_lab',
+  Sumulas = 'sumulas',
+  SanFranConcursos = 'sanfran_concursos',
+  ApprovalTrail = 'approval_trail'
 }
 
 export interface Folder {
@@ -1245,10 +1253,42 @@ export interface CollectedSlang {
   collected_at: string;
 }
 
+export interface Edital {
+  id: string;
+  title: string;
+  status: 'Aberto' | 'Previsto' | 'Inscrições Abertas' | 'Encerrado';
+  category: 'Magistratura' | 'MP' | 'Defensoria' | 'Procuradoria' | 'Outros';
+  salary: string;
+  deadline?: string;
+  link?: string;
+  description?: string;
+  institution?: string;
+  region?: string;
+  created_at?: string;
+}
+
 export interface GlossaryTerm {
   term: string;
   definition: string;
   translation?: string;
   example: string;
   isLatin: boolean;
+}
+
+export interface TrailStep {
+  id: string;
+  title: string;
+  description: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'locked';
+  type: 'study' | 'practice' | 'review' | 'exam';
+  resources?: { label: string; url?: string; view?: View }[];
+}
+
+export interface UserTrail {
+  id: string;
+  user_id: string;
+  goal: string;
+  current_step_id: string;
+  completed_steps: string[];
+  created_at: string;
 }

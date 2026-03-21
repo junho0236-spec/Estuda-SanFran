@@ -14,13 +14,32 @@ import {
   Plane,
   Image as ImageIcon,
   Newspaper,
-  MessageCircle
+  MessageCircle,
+  Lock
 } from 'lucide-react';
 import { View } from '../types';
 
 interface SanFranLanguagesProps {
   onNavigate: (view: View) => void;
 }
+
+const LockedOverlay: React.FC = () => (
+  <div className="absolute inset-0 z-20 flex flex-col items-center justify-center overflow-hidden rounded-[2.5rem]">
+    <div className="absolute inset-0 bg-white/5 dark:bg-black/10 backdrop-blur-[1px] pointer-events-none"></div>
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[0.5px] bg-slate-400/20 rotate-[35deg]"></div>
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[0.5px] bg-slate-400/20 -rotate-[35deg]"></div>
+    </div>
+    <div className="relative z-30 bg-white/60 dark:bg-slate-800/60 p-1.5 rounded-full shadow-sm border border-white/40 dark:border-slate-700/40 backdrop-blur-md">
+      <Lock size={12} className="text-slate-500/70" />
+    </div>
+    <div className="absolute bottom-6 left-0 right-0 text-center z-30">
+      <span className="text-[7px] font-black uppercase tracking-[0.3em] text-slate-500/60 bg-white/30 dark:bg-black/20 px-2.5 py-1 rounded-full backdrop-blur-sm border border-white/10">
+        Desenvolvendo
+      </span>
+    </div>
+  </div>
+);
 
 const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
   return (
@@ -42,249 +61,222 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
         <div className="absolute bottom-0 left-1/3 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl -z-10"></div>
       </header>
 
-      {/* BENTO GRID LAYOUT */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 auto-rows-[minmax(180px,auto)]">
-        
-        {/* CARD 1: LEGAL LANGUAGES (Main Focus) */}
-        <button
-          onClick={() => onNavigate(View.SanFranIdiomas)}
-          className="group relative col-span-1 md:col-span-2 lg:col-span-2 row-span-2 bg-[#0c4a6e] text-white rounded-[2.5rem] p-8 md:p-10 flex flex-col justify-between overflow-hidden shadow-2xl hover:shadow-sky-500/20 hover:scale-[1.01] transition-all duration-500"
-        >
-          {/* Abstract Background Decoration */}
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/shattered-island.png')] opacity-10"></div>
-          <div className="absolute -right-20 -top-20 w-96 h-96 bg-gradient-to-bl from-sky-400/30 to-transparent rounded-full blur-3xl group-hover:scale-125 transition-transform duration-700"></div>
+      {/* SEÇÃO: IMERSÃO E PRÁTICA */}
+      <div className="space-y-6 pt-6">
+        <div className="flex items-center gap-4">
+          <h2 className="text-xs font-black uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">Imersão e Prática</h2>
+          <div className="h-px flex-1 bg-slate-200 dark:bg-white/10"></div>
+        </div>
 
-          <div className="relative z-10 flex justify-between items-start">
-            <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
-               <BookA className="w-8 h-8 text-sky-300" />
-            </div>
-            <div className="bg-sky-500/20 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md text-sky-100 border border-sky-500/30 flex items-center gap-2">
-               Terminologia Jurídica
-            </div>
-          </div>
-
-          <div className="relative z-10 space-y-4 text-left mt-8">
-             <div>
-                <h3 className="text-3xl md:text-4xl font-black tracking-tight leading-none text-white mb-2">Legal Languages</h3>
-                <p className="text-sm md:text-base font-medium text-sky-100 opacity-90">
-                  Focado em jurisdição, contratos e tribunais.
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 auto-rows-[minmax(180px,auto)]">
+          {/* CARD 1: GENERAL LANGUAGES */}
+          <div className="group relative col-span-1 md:col-span-2 row-span-2 bg-indigo-600 text-white rounded-[2.5rem] p-8 md:p-10 border border-indigo-500 shadow-2xl flex flex-col justify-between overflow-hidden cursor-default">
+             <LockedOverlay />
+             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20"></div>
+             <div className="relative z-10 flex justify-between items-start">
+                <div className="p-3 bg-white/20 rounded-2xl shadow-lg">
+                   <Languages size={32} className="text-white" />
+                </div>
+                <div className="bg-white/20 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md border border-white/10">
+                   Gramática Geral
+                </div>
+             </div>
+             <div className="relative z-10 text-left mt-8">
+                <h3 className="text-3xl md:text-4xl font-black tracking-tight leading-none text-white mb-2">General Languages</h3>
+                <p className="text-sm md:text-base font-medium text-indigo-100 opacity-90">
+                   Domine a base do idioma com foco em gramática e conversação cotidiana.
                 </p>
+             </div>
+             <div className="absolute bottom-8 right-8 opacity-0 transition-all duration-300 translate-x-4">
+                <div className="bg-white text-indigo-600 p-3 rounded-full shadow-lg">
+                   <ArrowUpRight size={24} />
+                </div>
              </div>
           </div>
 
-          <div className="absolute bottom-8 right-8 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-4 group-hover:translate-x-0">
-             <div className="bg-sky-500 text-white p-3 rounded-full shadow-lg">
+          {/* CARD 2: LEGAL LANGUAGES (Main Focus) */}
+          <div className="group relative col-span-1 md:col-span-2 row-span-2 bg-[#0c4a6e] text-white rounded-[2.5rem] p-8 md:p-10 flex flex-col justify-between overflow-hidden shadow-2xl cursor-default">
+            <LockedOverlay />
+            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/shattered-island.png')] opacity-10"></div>
+            <div className="absolute -right-20 -top-20 w-96 h-96 bg-gradient-to-bl from-sky-400/30 to-transparent rounded-full blur-3xl"></div>
+
+            <div className="relative z-10 flex justify-between items-start">
+              <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+                 <BookA className="w-8 h-8 text-sky-300" />
+              </div>
+              <div className="bg-sky-500/20 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md text-sky-100 border border-sky-500/30 flex items-center gap-2">
+                 Terminologia Jurídica
+              </div>
+            </div>
+
+            <div className="relative z-10 space-y-4 text-left mt-8">
+               <div>
+                  <h3 className="text-3xl md:text-4xl font-black tracking-tight leading-none text-white mb-2">Legal Languages</h3>
+                  <p className="text-sm md:text-base font-medium text-sky-100 opacity-90">
+                     Focado em jurisdição, contratos e tribunais.
+                  </p>
+               </div>
+            </div>
+
+            <div className="absolute bottom-8 right-8 opacity-0 transition-all duration-300 translate-x-4">
+               <div className="bg-sky-500 text-white p-3 rounded-full shadow-lg">
+                  <ArrowUpRight size={24} />
+               </div>
+            </div>
+          </div>
+
+          {/* CARD 3: BILINGUAL NEWS (Wide) */}
+          <div className="group relative col-span-1 md:col-span-2 bg-[#1e293b] text-white rounded-[2.5rem] p-8 border border-slate-600 shadow-xl flex flex-col justify-between overflow-hidden cursor-default">
+             <LockedOverlay />
+             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/newspaper.png')] opacity-10"></div>
+             
+             <div className="flex justify-between items-start relative z-10">
+                <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
+                   <Newspaper size={24} className="text-white" />
+                </div>
+                <div className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md border border-white/10">
+                   Notícias & Atualidades
+                </div>
+             </div>
+             
+             <div className="relative z-10 mt-8">
+                <h3 className="text-2xl md:text-3xl font-black uppercase tracking-tight leading-none">News Reader</h3>
+                <p className="text-sm font-medium text-slate-300 leading-snug max-w-sm mt-2">
+                   Leia sobre Tech, Cultura e Esportes. Clique em qualquer palavra para tradução imediata.
+                </p>
+             </div>
+             
+             <div className="absolute bottom-8 right-8 opacity-0 transition-all duration-300 translate-x-4">
                 <ArrowUpRight size={24} />
              </div>
           </div>
-        </button>
 
-        {/* CARD 2: O INTERCAMBISTA (New Hero) */}
-        <button
-          onClick={() => onNavigate(View.TheExchangeStudent)}
-          className="group relative col-span-1 md:col-span-2 lg:col-span-2 row-span-2 bg-[#4c1d95] text-white rounded-[2.5rem] p-8 md:p-10 flex flex-col justify-between overflow-hidden shadow-2xl hover:shadow-violet-500/20 hover:scale-[1.01] transition-all duration-500"
-        >
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/p5.png')] opacity-10"></div>
-          <div className="absolute -left-20 -bottom-20 w-96 h-96 bg-gradient-to-tr from-violet-400/30 to-transparent rounded-full blur-3xl group-hover:scale-125 transition-transform duration-700"></div>
-
-          <div className="relative z-10 flex justify-between items-start">
-            <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
-               <Plane className="w-8 h-8 text-violet-200" />
+          {/* CARD 4: O INTERCAMBISTA */}
+          <div className="group relative col-span-1 md:col-span-2 bg-[#4c1d95] text-white rounded-[2.5rem] p-8 border border-violet-500 shadow-xl flex flex-col justify-between overflow-hidden cursor-default">
+            <LockedOverlay />
+            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/p5.png')] opacity-10"></div>
+            
+            <div className="relative z-10 flex justify-between items-start">
+              <div className="bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/10">
+                 <Plane className="w-6 h-6 text-violet-200" />
+              </div>
+              <div className="bg-violet-400/20 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md text-violet-100 border border-violet-500/30 flex items-center gap-2">
+                 <Globe size={12} /> RPG Textual
+              </div>
             </div>
-            <div className="bg-violet-400/20 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md text-violet-100 border border-violet-500/30 flex items-center gap-2">
-               <Globe size={12} /> RPG Textual
+
+            <div className="relative z-10 mt-4">
+               <h3 className="text-2xl md:text-3xl font-black uppercase tracking-tight leading-none">O Intercambista</h3>
+               <p className="text-sm font-medium text-violet-100 opacity-90 mt-2">
+                 Sobreviva em Londres, Paris, Berlim ou Roma. Aprenda vivendo.
+               </p>
+            </div>
+
+            <div className="absolute bottom-8 right-8 opacity-0 transition-all duration-300 translate-x-4">
+               <ArrowUpRight size={24} />
             </div>
           </div>
+        </div>
+      </div>
 
-          <div className="relative z-10 space-y-4 text-left mt-8">
-             <div>
-                <h3 className="text-3xl md:text-4xl font-black tracking-tight leading-none text-white mb-2">O Intercambista</h3>
-                <p className="text-sm md:text-base font-medium text-violet-100 opacity-90">
-                  Sobreviva em Londres, Paris, Berlim ou Roma. Aprenda vivendo.
-                </p>
+      {/* SEÇÃO: LABORATÓRIO DE HABILIDADES */}
+      <div className="space-y-6 pt-6">
+        <div className="flex items-center gap-4">
+          <h2 className="text-xs font-black uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">Laboratório de Habilidades</h2>
+          <div className="h-px flex-1 bg-slate-200 dark:bg-white/10"></div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 auto-rows-[180px]">
+          {/* CARD 5: PRONÚNCIA LAB */}
+          <div className="group relative col-span-1 bg-[#0d9488] text-white rounded-[2.5rem] p-6 border border-teal-500/50 shadow-xl flex flex-col justify-between overflow-hidden cursor-default">
+             <LockedOverlay />
+             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/sound-wave.png')] opacity-20"></div>
+             <div className="flex justify-between items-start relative z-10">
+                <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
+                   <Mic2 size={20} className="text-white" />
+                </div>
+                <ArrowUpRight size={16} className="text-teal-200" />
              </div>
-             <div className="flex gap-2">
-                <span className="px-2 py-1 bg-white/10 rounded-lg text-[9px] font-bold uppercase">UK</span>
-                <span className="px-2 py-1 bg-white/10 rounded-lg text-[9px] font-bold uppercase">FR</span>
-                <span className="px-2 py-1 bg-white/10 rounded-lg text-[9px] font-bold uppercase">DE</span>
-                <span className="px-2 py-1 bg-white/10 rounded-lg text-[9px] font-bold uppercase">IT</span>
+             <div className="relative z-10 text-left">
+                <h3 className="text-lg font-black uppercase tracking-tight leading-none">Pronúncia Lab</h3>
+                <p className="text-[10px] font-bold text-teal-100/90 uppercase mt-1">Feedback com IA</p>
              </div>
           </div>
 
-          <div className="absolute bottom-8 right-8 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-4 group-hover:translate-x-0">
-             <div className="bg-white text-violet-600 p-3 rounded-full shadow-lg">
-                <ArrowUpRight size={24} />
+          {/* CARD 6: VISUAL FLASHCARDS */}
+          <div className="group relative col-span-1 bg-gradient-to-br from-amber-500 to-orange-600 text-white rounded-[2.5rem] p-6 border border-white/20 shadow-xl flex flex-col justify-between overflow-hidden cursor-default">
+             <LockedOverlay />
+             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20"></div>
+             <div className="flex justify-between items-start relative z-10">
+                <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
+                   <ImageIcon size={20} className="text-white" />
+                </div>
+                <ArrowUpRight size={16} className="text-orange-200" />
+             </div>
+             <div className="relative z-10 text-left">
+                <h3 className="text-lg font-black uppercase tracking-tight leading-none">Flashcards</h3>
+                <p className="text-[10px] font-bold text-orange-100/90 uppercase mt-1">Vocabulário Visual</p>
              </div>
           </div>
-        </button>
 
-        {/* CARD 3: PRONÚNCIA LAB */}
-        <button
-          onClick={() => onNavigate(View.PronunciationLab)}
-          className="group relative col-span-1 md:col-span-1 lg:col-span-1 row-span-2 bg-[#0d9488] text-white rounded-[2.5rem] p-8 border border-teal-500/50 shadow-xl hover:shadow-2xl hover:shadow-teal-500/20 hover:scale-[1.01] transition-all duration-300 flex flex-col justify-between overflow-hidden"
-        >
-           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/sound-wave.png')] opacity-20"></div>
-           <div className="absolute top-0 right-0 w-64 h-64 bg-teal-400/20 rounded-full blur-3xl -mr-16 -mt-16 group-hover:scale-125 transition-transform duration-700"></div>
-           
-           <div className="flex justify-between items-start relative z-10">
-              <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
-                 <Mic2 size={24} className="text-white" />
-              </div>
-           </div>
-           
-           <div className="relative z-10 space-y-2 mt-8">
-              <h3 className="text-xl md:text-2xl font-black uppercase tracking-tight leading-none">Pronúncia Lab</h3>
-              <p className="text-xs font-medium text-teal-100/90 leading-snug">
-                 Feedback de voz instantâneo com IA.
-              </p>
-           </div>
-           
-           <div className="absolute bottom-8 right-8 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-4 group-hover:translate-x-0">
-              <ArrowUpRight size={24} />
-           </div>
-        </button>
+          {/* CARD 7: SLANG CHALLENGE */}
+          <div className="group relative col-span-1 bg-gradient-to-br from-pink-500 to-rose-600 text-white rounded-[2.5rem] p-6 border border-white/20 shadow-xl flex flex-col justify-between overflow-hidden cursor-default">
+             <LockedOverlay />
+             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/wall-4-light.png')] opacity-20"></div>
+             <div className="flex justify-between items-start relative z-10">
+                <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
+                   <MessageCircle size={20} className="text-white" />
+                </div>
+                <ArrowUpRight size={16} className="text-pink-200" />
+             </div>
+             <div className="relative z-10 text-left">
+                <h3 className="text-lg font-black uppercase tracking-tight leading-none">Gírias</h3>
+                <p className="text-[10px] font-bold text-pink-100/90 uppercase mt-1">Idioma das Ruas</p>
+             </div>
+          </div>
+        </div>
+      </div>
 
-        {/* CARD 4: VISUAL FLASHCARDS */}
-        <button
-          onClick={() => onNavigate(View.VisualFlashcards)}
-          className="group relative col-span-1 md:col-span-1 lg:col-span-1 row-span-2 bg-gradient-to-br from-amber-500 to-orange-600 text-white rounded-[2.5rem] p-8 border border-white/20 shadow-xl hover:shadow-2xl hover:shadow-orange-500/20 hover:scale-[1.01] transition-all duration-300 flex flex-col justify-between overflow-hidden"
-        >
-           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20"></div>
-           
-           <div className="flex justify-between items-start relative z-10">
-              <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
-                 <ImageIcon size={24} className="text-white" />
-              </div>
-           </div>
-           
-           <div className="relative z-10 mt-8">
-              <h3 className="text-xl md:text-2xl font-black uppercase tracking-tight leading-none">Flashcards Visuais</h3>
-              <p className="text-xs font-medium text-orange-100/90 leading-snug mt-2">
-                 Vocabulário A1 com imagens. Rápido e intuitivo.
-              </p>
-           </div>
-           
-           <div className="absolute bottom-8 right-8 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-4 group-hover:translate-x-0">
-              <ArrowUpRight size={24} />
-           </div>
-        </button>
+      {/* SEÇÃO: ENTRETENIMENTO E CULTURA */}
+      <div className="space-y-6 pt-6">
+        <div className="flex items-center gap-4">
+          <h2 className="text-xs font-black uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">Entretenimento e Cultura</h2>
+          <div className="h-px flex-1 bg-slate-200 dark:bg-white/10"></div>
+        </div>
 
-        {/* CARD 5: BILINGUAL NEWS */}
-        <button
-          onClick={() => onNavigate(View.BilingualNews)}
-          className="group relative col-span-1 md:col-span-1 lg:col-span-2 row-span-2 bg-[#1e293b] text-white rounded-[2.5rem] p-8 border border-slate-600 shadow-xl hover:shadow-2xl hover:shadow-slate-500/20 hover:scale-[1.01] transition-all duration-300 flex flex-col justify-between overflow-hidden"
-        >
-           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/newspaper.png')] opacity-10"></div>
-           
-           <div className="flex justify-between items-start relative z-10">
-              <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
-                 <Newspaper size={24} className="text-white" />
-              </div>
-              <div className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md border border-white/10">
-                 Notícias & Atualidades
-              </div>
-           </div>
-           
-           <div className="relative z-10 mt-8">
-              <h3 className="text-2xl md:text-3xl font-black uppercase tracking-tight leading-none">News Reader</h3>
-              <p className="text-sm font-medium text-slate-300 leading-snug max-w-sm mt-2">
-                 Leia sobre Tech, Cultura e Esportes. Clique em qualquer palavra para tradução imediata.
-              </p>
-           </div>
-           
-           <div className="absolute bottom-8 right-8 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-4 group-hover:translate-x-0">
-              <ArrowUpRight size={24} />
-           </div>
-        </button>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 auto-rows-[180px]">
+          {/* CARD 8: LYRICAL VIBES */}
+          <div className="group relative col-span-1 md:col-span-2 bg-[#4338ca] text-white rounded-[2.5rem] p-6 border border-indigo-500 shadow-xl flex flex-col justify-between overflow-hidden cursor-default">
+             <LockedOverlay />
+             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')] opacity-10"></div>
+             <div className="flex justify-between items-start relative z-10">
+                <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
+                   <Music2 size={24} className="text-white" />
+                </div>
+                <ArrowUpRight size={20} className="text-indigo-200" />
+             </div>
+             <div className="relative z-10 text-left">
+                <h3 className="text-2xl font-black uppercase tracking-tight leading-none">Lyrical Vibes</h3>
+                <p className="text-sm font-medium text-indigo-100/90 mt-1">Aprenda com Música e Letras</p>
+             </div>
+          </div>
 
-        {/* CARD 6: SLANG CHALLENGE (NEW!) */}
-        <button
-          onClick={() => onNavigate(View.SlangChallenge)}
-          className="group relative col-span-1 md:col-span-1 lg:col-span-1 row-span-2 bg-gradient-to-br from-pink-500 to-rose-600 text-white rounded-[2.5rem] p-8 border border-white/20 shadow-xl hover:shadow-2xl hover:shadow-pink-500/20 hover:scale-[1.01] transition-all duration-300 flex flex-col justify-between overflow-hidden"
-        >
-           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/wall-4-light.png')] opacity-20"></div>
-           
-           <div className="flex justify-between items-start relative z-10">
-              <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
-                 <MessageCircle size={24} className="text-white" />
-              </div>
-           </div>
-           
-           <div className="relative z-10 mt-8">
-              <h3 className="text-xl md:text-2xl font-black uppercase tracking-tight leading-none">Desafio da Gíria</h3>
-              <p className="text-xs font-medium text-pink-100/90 leading-snug mt-2">
-                 Aprenda o idioma das ruas. Gírias e expressões nativas.
-              </p>
-           </div>
-           
-           <div className="absolute bottom-8 right-8 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-4 group-hover:translate-x-0">
-              <ArrowUpRight size={24} />
-           </div>
-        </button>
-
-        {/* CARD 7: LYRICAL VIBES */}
-        <button
-          onClick={() => onNavigate(View.LyricalVibes)}
-          className="group relative col-span-1 md:col-span-1 lg:col-span-1 row-span-2 bg-[#4338ca] text-white rounded-[2.5rem] p-8 border border-indigo-500 shadow-xl hover:shadow-2xl hover:shadow-indigo-500/20 hover:scale-[1.01] transition-all duration-300 flex flex-col justify-between overflow-hidden"
-        >
-           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')] opacity-10"></div>
-           
-           <div className="flex justify-between items-start relative z-10">
-              <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
-                 <Music2 size={24} className="text-white" />
-              </div>
-           </div>
-           
-           <div className="relative z-10 mt-8">
-              <h3 className="text-xl md:text-2xl font-black uppercase tracking-tight leading-none">Lyrical Vibes</h3>
-              <p className="text-xs font-medium text-indigo-100/90 leading-snug mt-2">
-                 Aprenda com Música. Preencha as lacunas.
-              </p>
-           </div>
-        </button>
-
-         {/* CARD 8: GENERAL LANGUAGES (Standard) */}
-        <button
-          onClick={() => onNavigate(View.GeneralLanguages)}
-          className="group relative col-span-1 md:col-span-1 lg:col-span-1 row-span-2 bg-indigo-600 text-white rounded-[2.5rem] p-8 border border-indigo-500 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between overflow-hidden"
-        >
-           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20"></div>
-           
-           <div className="flex items-start justify-between relative z-10">
-              <div className="bg-white/20 p-3 rounded-2xl shadow-lg">
-                 <Languages size={24} className="text-white" />
-              </div>
-           </div>
-           
-           <div className="relative z-10 mt-6">
-              <h3 className="text-xl font-black uppercase tracking-tight leading-none mb-1">General App</h3>
-              <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest">
-                 Gramática & Vocabulário Geral.
-              </p>
-           </div>
-        </button>
-
-        {/* CARD 9: LEGAL CINEMA (Standard) - NOVO */}
-        <button
-          onClick={() => onNavigate(View.LegalCinema)}
-          className="group relative col-span-1 md:col-span-1 lg:col-span-1 row-span-2 bg-slate-900 text-white rounded-[2.5rem] p-8 border border-slate-700 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between overflow-hidden"
-        >
-           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/film.png')] opacity-10"></div>
-           
-           <div className="flex items-start justify-between relative z-10">
-              <div className="bg-white/10 p-3 rounded-2xl shadow-lg border border-white/10">
-                 <Film size={24} className="text-white" />
-              </div>
-           </div>
-           
-           <div className="relative z-10 mt-6">
-              <h3 className="text-xl font-black uppercase tracking-tight leading-none mb-1">Legal Cinema</h3>
-              <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest">
-                 Aprenda com Filmes Jurídicos.
-              </p>
-           </div>
-        </button>
-
+          {/* CARD 9: LEGAL CINEMA */}
+          <div className="group relative col-span-1 bg-slate-900 text-white rounded-[2.5rem] p-6 border border-slate-700 shadow-xl flex flex-col justify-between overflow-hidden cursor-default">
+             <LockedOverlay />
+             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/film.png')] opacity-10"></div>
+             <div className="flex justify-between items-start relative z-10">
+                <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10">
+                   <Film size={20} className="text-white" />
+                </div>
+                <ArrowUpRight size={16} className="text-slate-400" />
+             </div>
+             <div className="relative z-10 text-left">
+                <h3 className="text-lg font-black uppercase tracking-tight leading-none">Legal Cinema</h3>
+                <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">Filmes Jurídicos</p>
+             </div>
+          </div>
+        </div>
       </div>
 
     </div>

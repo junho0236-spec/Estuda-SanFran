@@ -16,7 +16,11 @@ import {
   Key,
   HelpCircle,
   Bot,
-  BrainCircuit
+  BrainCircuit,
+  BookOpen,
+  Zap,
+  Clock,
+  Gavel
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -44,289 +48,290 @@ const SanFranImprovement: React.FC<SanFranImprovementProps> = ({ onNavigate }) =
         <div className="absolute bottom-0 left-1/3 w-96 h-96 bg-teal-500/5 rounded-full blur-3xl -z-10"></div>
       </header>
 
-      {/* BENTO GRID LAYOUT */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 auto-rows-[minmax(180px,auto)]">
-        
-        {/* CARD 1: DOMÍNIO JURÍDICO (Hero - Wide) */}
-        <button
-          onClick={() => onNavigate(View.DominioJuridico)}
-          className="group relative col-span-1 md:col-span-2 row-span-2 bg-[#1e1b4b] text-white rounded-[2.5rem] p-8 md:p-10 flex flex-col justify-between overflow-hidden shadow-2xl hover:shadow-purple-500/20 hover:scale-[1.01] transition-all duration-500"
-        >
-          {/* Abstract Background Decoration */}
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-          <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-bl from-amber-500/20 to-transparent rounded-full blur-3xl -mr-20 -mt-20 group-hover:scale-125 transition-transform duration-700"></div>
+      {/* SEÇÃO: MAPA DE CARREIRA */}
+      <div className="space-y-6 pt-6">
+        <div className="flex items-center gap-4">
+          <h2 className="text-xs font-black uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">Mapa de Carreira</h2>
+          <div className="h-px flex-1 bg-slate-200 dark:bg-white/10"></div>
+        </div>
 
-          <div className="relative z-10 flex justify-between items-start">
-            <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
-               <Landmark className="w-8 h-8 md:w-10 md:h-10 text-amber-400" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 auto-rows-[minmax(180px,auto)]">
+          {/* CARD 1: DOMÍNIO JURÍDICO (Hero - Wide) */}
+          <button
+            onClick={() => onNavigate(View.DominioJuridico)}
+            className="group relative col-span-1 md:col-span-2 row-span-2 bg-[#1e1b4b] text-white rounded-[2.5rem] p-8 md:p-10 flex flex-col justify-between overflow-hidden shadow-2xl hover:shadow-purple-500/20 hover:scale-[1.01] transition-all duration-500"
+          >
+            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+            <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-bl from-amber-500/20 to-transparent rounded-full blur-3xl -mr-20 -mt-20 group-hover:scale-125 transition-transform duration-700"></div>
+
+            <div className="relative z-10 flex justify-between items-start">
+              <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+                 <Landmark className="w-8 h-8 md:w-10 md:h-10 text-amber-400" />
+              </div>
+              <div className="bg-amber-500/20 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md text-amber-200 border border-amber-500/30 flex items-center gap-2">
+                 <TrendingUp size={12} /> Mapa de Competências
+              </div>
             </div>
-            <div className="bg-amber-500/20 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md text-amber-200 border border-amber-500/30 flex items-center gap-2">
-               <TrendingUp size={12} /> Mapa de Competências
+
+            <div className="relative z-10 space-y-2 text-left mt-12">
+               <h3 className="text-3xl md:text-5xl font-black tracking-tight leading-none text-white">Domínio Jurídico</h3>
+               <p className="text-sm md:text-base font-medium text-slate-300 max-w-sm leading-relaxed">
+                 Visualize seu progresso nas grandes áreas do Direito: Civil, Penal, Público e Corporativo.
+               </p>
             </div>
-          </div>
 
-          <div className="relative z-10 space-y-2 text-left mt-12">
-             <h3 className="text-3xl md:text-5xl font-black tracking-tight leading-none text-white">Domínio Jurídico</h3>
-             <p className="text-sm md:text-base font-medium text-slate-300 max-w-sm leading-relaxed">
-               Visualize seu progresso nas grandes áreas do Direito: Civil, Penal, Público e Corporativo.
-             </p>
-          </div>
+            <div className="absolute bottom-8 right-8 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-4 group-hover:translate-x-0">
+               <div className="bg-amber-500 text-white p-3 rounded-full shadow-lg">
+                  <ArrowUpRight size={24} />
+               </div>
+            </div>
+          </button>
 
-          <div className="absolute bottom-8 right-8 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-4 group-hover:translate-x-0">
-             <div className="bg-amber-500 text-white p-3 rounded-full shadow-lg">
-                <ArrowUpRight size={24} />
+          {/* CARD 2: ÁRVORE DE ESPECIALIZAÇÃO (Tall) */}
+          <button
+            onClick={() => onNavigate(View.Specialization)}
+            className="group relative col-span-1 md:col-span-1 row-span-2 bg-purple-50 dark:bg-purple-900/10 rounded-[2.5rem] p-8 border border-purple-100 dark:border-purple-800 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col items-center justify-between text-center overflow-hidden"
+          >
+             <div className="absolute inset-0 bg-gradient-to-b from-transparent to-purple-100/50 dark:to-purple-900/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+             <div className="w-full flex justify-between items-start relative z-10">
+                <Network size={20} className="text-purple-400" />
+                <div className="w-2 h-2 rounded-full bg-purple-500"></div>
              </div>
-          </div>
-        </button>
+             <div className="relative z-10 my-4">
+                <div className="w-20 h-20 rounded-2xl bg-white dark:bg-white/10 flex items-center justify-center shadow-lg transform rotate-3 group-hover:rotate-0 transition-transform duration-500">
+                   <Brain size={32} className="text-purple-600 dark:text-purple-300" />
+                </div>
+             </div>
+             <div className="relative z-10 space-y-1">
+                <h3 className="text-xl font-black text-purple-900 dark:text-white uppercase tracking-tight leading-tight">Árvore de Especialização</h3>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Skill Tree</p>
+             </div>
+             <div className="w-full pt-4 border-t border-purple-200 dark:border-purple-800/50 mt-4 relative z-10">
+                <span className="text-[9px] font-black uppercase text-slate-400 group-hover:text-purple-500 transition-colors">Ver Caminhos</span>
+             </div>
+          </button>
 
-        {/* CARD 2: ÁRVORE DE ESPECIALIZAÇÃO (Tall) */}
-        <button
-          onClick={() => onNavigate(View.Specialization)}
-          className="group relative col-span-1 md:col-span-1 row-span-2 bg-purple-50 dark:bg-purple-900/10 rounded-[2.5rem] p-8 border border-purple-100 dark:border-purple-800 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col items-center justify-between text-center overflow-hidden"
-        >
-           <div className="absolute inset-0 bg-gradient-to-b from-transparent to-purple-100/50 dark:to-purple-900/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-           
-           <div className="w-full flex justify-between items-start relative z-10">
-              <Network size={20} className="text-purple-400" />
-              <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-           </div>
+          {/* CARD 3: CERTIFICADOS */}
+          <button
+            onClick={() => onNavigate(View.Certificates)}
+            className="group relative col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-emerald-400 transition-all flex flex-col justify-between h-full"
+          >
+             <div className="flex justify-between items-start">
+                <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 rounded-2xl">
+                   <Scroll size={20} />
+                </div>
+                <ArrowUpRight size={16} className="text-slate-300 group-hover:text-emerald-500 transition-colors" />
+             </div>
+             <div className="text-left mt-4">
+                <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Certificados</h4>
+                <p className="text-[10px] font-bold text-slate-400 uppercase">Suas Conquistas</p>
+             </div>
+          </button>
 
-           <div className="relative z-10 my-4">
-              <div className="w-20 h-20 rounded-2xl bg-white dark:bg-white/10 flex items-center justify-center shadow-lg transform rotate-3 group-hover:rotate-0 transition-transform duration-500">
-                 <Brain size={32} className="text-purple-600 dark:text-purple-300" />
-              </div>
-           </div>
-           
-           <div className="relative z-10 space-y-1">
-              <h3 className="text-xl font-black text-purple-900 dark:text-white uppercase tracking-tight">Especialização</h3>
-              <p className="text-[10px] font-bold text-purple-600 dark:text-purple-300 uppercase tracking-widest">Skill Tree & Carreira</p>
-           </div>
-           
-           <div className="w-full pt-4 border-t border-purple-200 dark:border-purple-800/50 mt-4 relative z-10">
-              <span className="text-[9px] font-black uppercase text-slate-400 group-hover:text-purple-500 transition-colors">Ver Evolução</span>
-           </div>
-        </button>
+          {/* CARD 4: LINHA DO TEMPO (Timeline) */}
+          <button
+            onClick={() => onNavigate(View.Timeline)}
+            className="group relative col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-amber-400 transition-all flex flex-col justify-between h-full"
+          >
+             <div className="flex justify-between items-start">
+                <div className="p-3 bg-amber-50 dark:bg-amber-900/20 text-amber-600 rounded-2xl">
+                   <GitCommit size={20} />
+                </div>
+                <ArrowUpRight size={16} className="text-slate-300 group-hover:text-amber-500 transition-colors" />
+             </div>
+             <div className="text-left mt-4">
+                <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Linha do Tempo</h4>
+                <p className="text-[10px] font-bold text-slate-400 uppercase">Histórico Acadêmico</p>
+             </div>
+          </button>
+        </div>
+      </div>
 
-        {/* CARD 3: LEI SECA (Tall) */}
-        <button
-          onClick={() => onNavigate(View.LeiSeca)}
-          className="group relative col-span-1 md:col-span-1 row-span-2 bg-slate-50 dark:bg-slate-900/50 rounded-[2.5rem] p-8 border border-slate-200 dark:border-slate-800 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col items-center justify-between text-center overflow-hidden"
-        >
-           <div className="absolute inset-0 bg-gradient-to-b from-transparent to-slate-200/50 dark:to-slate-800/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-           
-           <div className="w-full flex justify-between items-start relative z-10">
-              <Scroll size={20} className="text-slate-400" />
-              <div className="w-2 h-2 rounded-full bg-slate-500"></div>
-           </div>
+      {/* SEÇÃO: HABILIDADES TÉCNICAS */}
+      <div className="space-y-6 pt-6">
+        <div className="flex items-center gap-4">
+          <h2 className="text-xs font-black uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">Habilidades Técnicas</h2>
+          <div className="h-px flex-1 bg-slate-200 dark:bg-white/10"></div>
+        </div>
 
-           <div className="relative z-10 my-4">
-              <div className="w-20 h-20 rounded-2xl bg-white dark:bg-white/10 flex items-center justify-center shadow-lg transform -rotate-3 group-hover:rotate-0 transition-transform duration-500">
-                 <Scale size={32} className="text-slate-600 dark:text-slate-300" />
-              </div>
-           </div>
-           
-           <div className="relative z-10 space-y-1">
-              <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Lei Seca</h3>
-              <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Vade Mecum Digital</p>
-           </div>
-           
-           <div className="w-full pt-4 border-t border-slate-200 dark:border-slate-800/50 mt-4 relative z-10">
-              <span className="text-[9px] font-black uppercase text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200 transition-colors">Acessar Códigos</span>
-           </div>
-        </button>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 auto-rows-[180px]">
+          {/* CARD 4: DIGITAÇÃO JURÍDICA */}
+          <button
+            onClick={() => onNavigate(View.TypingLab)}
+            className="group relative col-span-1 md:col-span-2 bg-slate-900 text-white rounded-[2.5rem] p-8 border border-slate-800 shadow-xl hover:shadow-emerald-500/10 hover:scale-[1.01] transition-all duration-300 flex items-center gap-8 overflow-hidden"
+          >
+             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
+             <div className="relative z-10 w-20 h-20 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                <Keyboard size={40} className="text-emerald-400" />
+             </div>
+             <div className="relative z-10 text-left">
+                <h3 className="text-2xl font-black text-white uppercase tracking-tight">Digitação Jurídica</h3>
+                <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Velocidade & Precisão</p>
+             </div>
+             <ArrowUpRight size={24} className="absolute top-8 right-8 text-slate-500 group-hover:text-emerald-400 transition-colors" />
+          </button>
 
-        {/* CARD 4: DATILOGRAFIA (Wide) */}
-        <button
-          onClick={() => onNavigate(View.TypingChallenge)}
-          className="group col-span-1 md:col-span-2 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-teal-400 transition-all flex flex-col justify-between h-full hover:shadow-teal-500/10"
-        >
-           <div className="flex justify-between items-start">
-              <div className="p-3 bg-teal-100 dark:bg-teal-900/20 text-teal-600 rounded-2xl">
-                 <Keyboard size={20} />
-              </div>
-              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-teal-500 transition-colors" />
-           </div>
-           <div className="text-left mt-4">
-              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Datilografia</h4>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Velocidade & Precisão</p>
-           </div>
-        </button>
+          {/* CARD 6: ORATÓRIA LAB */}
+          <button
+            onClick={() => onNavigate(View.OralArgument)}
+            className="group relative col-span-1 md:col-span-2 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-rose-400 transition-all flex items-center gap-6"
+          >
+             <div className="p-4 bg-rose-50 dark:bg-rose-900/20 text-rose-600 rounded-2xl shrink-0 group-hover:scale-110 transition-transform">
+                <Mic size={32} />
+             </div>
+             <div className="text-left">
+                <h4 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Oratória Lab</h4>
+                <p className="text-xs font-bold text-slate-400 uppercase">Sustentação Oral</p>
+             </div>
+             <ArrowUpRight size={20} className="absolute top-6 right-6 text-slate-300 group-hover:text-rose-500 transition-colors" />
+          </button>
 
-        {/* CARD 5: LEITURA DINÂMICA (Wide) */}
-        <button
-          onClick={() => onNavigate(View.SpeedReader)}
-          className="group col-span-1 md:col-span-2 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-orange-400 transition-all flex flex-col justify-between h-full hover:shadow-orange-500/10"
-        >
-           <div className="flex justify-between items-start">
-              <div className="p-3 bg-orange-100 dark:bg-orange-900/20 text-orange-600 rounded-2xl">
-                 <Eye size={20} />
-              </div>
-              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-orange-500 transition-colors" />
-           </div>
-           <div className="text-left mt-4">
-              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Leitura Dinâmica</h4>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Treino RSVP & Velocidade</p>
-           </div>
-        </button>
+          {/* CARD 7: DESAFIO DE DIGITAÇÃO */}
+          <button
+            onClick={() => onNavigate(View.TypingChallenge)}
+            className="group relative col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-indigo-400 transition-all flex flex-col justify-between"
+          >
+             <div className="flex justify-between items-start">
+                <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 rounded-2xl">
+                   <Zap size={20} />
+                </div>
+                <ArrowUpRight size={16} className="text-slate-300 group-hover:text-indigo-500 transition-colors" />
+             </div>
+             <div className="text-left mt-4">
+                <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Desafio</h4>
+                <p className="text-[10px] font-bold text-slate-400 uppercase">Ranking de Digitação</p>
+             </div>
+          </button>
+        </div>
+      </div>
 
-        {/* CARD: MNEMONICA VAULT (Wide) - ADICIONADO */}
-        <button
-          onClick={() => onNavigate(View.Mnemonics)}
-          className="group col-span-1 md:col-span-2 bg-[#1e293b] text-white rounded-[2.5rem] p-6 border border-slate-600 shadow-lg hover:shadow-amber-500/30 hover:scale-[1.02] transition-all flex flex-col justify-between relative overflow-hidden h-full"
-        >
-           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')] opacity-10"></div>
-           <div className="flex justify-between items-start relative z-10">
-              <div className="p-3 bg-white/10 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20">
-                 <Key size={20} className="text-amber-500" />
-              </div>
-              <ArrowUpRight size={16} className="text-amber-200 group-hover:text-white transition-colors" />
-           </div>
-           <div className="text-left mt-4 relative z-10">
-              <h4 className="text-lg font-black uppercase tracking-tight text-white">Mnemônica Vault</h4>
-              <p className="text-[10px] font-bold text-amber-200 uppercase">Banco de Macetes</p>
-           </div>
-        </button>
+      {/* SEÇÃO: CONHECIMENTO PROFUNDO */}
+      <div className="space-y-6 pt-6">
+        <div className="flex items-center gap-4">
+          <h2 className="text-xs font-black uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">Conhecimento Profundo</h2>
+          <div className="h-px flex-1 bg-slate-200 dark:bg-white/10"></div>
+        </div>
 
-        {/* CARD 6: BIBLIOTECA (Wide) */}
-        <button
-          onClick={() => onNavigate(View.Library)}
-          className="group col-span-1 md:col-span-2 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-indigo-400 transition-all flex flex-col justify-between h-full hover:shadow-indigo-500/10"
-        >
-           <div className="flex justify-between items-start">
-              <div className="p-3 bg-indigo-100 dark:bg-indigo-900/20 text-indigo-600 rounded-2xl">
-                 <Library size={20} />
-              </div>
-              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-indigo-500 transition-colors" />
-           </div>
-           <div className="text-left mt-4">
-              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Biblioteca</h4>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Acervo de Doutrinas</p>
-           </div>
-        </button>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 auto-rows-[180px]">
+          {/* CARD 6: BIBLIOTECA DE SÚMULAS */}
+          <button
+            onClick={() => onNavigate(View.Sumulas)}
+            className="group relative col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-amber-400 transition-all flex flex-col justify-between"
+          >
+             <div className="flex justify-between items-start">
+                <div className="p-3 bg-amber-50 dark:bg-amber-900/20 text-amber-600 rounded-2xl">
+                   <Library size={20} />
+                </div>
+                <ArrowUpRight size={16} className="text-slate-300 group-hover:text-amber-500 transition-colors" />
+             </div>
+             <div className="text-left mt-4">
+                <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Súmulas</h4>
+                <p className="text-[10px] font-bold text-slate-400 uppercase">Biblioteca Completa</p>
+             </div>
+          </button>
 
-        {/* CARD: RESUMIDOR INTELIGENTE (Wide) - NOVO */}
-        <button
-          onClick={() => onNavigate(View.IntelligentSummarizer)}
-          className="group col-span-1 md:col-span-2 bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-[2.5rem] p-6 border border-blue-500 shadow-lg hover:shadow-blue-500/30 hover:scale-[1.02] transition-all flex flex-col justify-between relative overflow-hidden h-full"
-        >
-           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')] opacity-10"></div>
-           <div className="flex justify-between items-start relative z-10">
-              <div className="p-3 bg-white/20 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20">
-                 <Brain size={20} className="text-white" />
-              </div>
-              <ArrowUpRight size={16} className="text-blue-200 group-hover:text-white transition-colors" />
-           </div>
-           <div className="text-left mt-4 relative z-10">
-              <h4 className="text-lg font-black uppercase tracking-tight text-white">Resumidor Inteligente</h4>
-              <p className="text-[10px] font-bold text-blue-100 uppercase">IA: Resumos & Mapas Mentais</p>
-           </div>
-        </button>
+          {/* CARD 7: JURISPRUDÊNCIA COMENTADA */}
+          <button
+            onClick={() => onNavigate(View.CaseAnalyzer)}
+            className="group relative col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-teal-400 transition-all flex flex-col justify-between"
+          >
+             <div className="flex justify-between items-start">
+                <div className="p-3 bg-teal-50 dark:bg-teal-900/20 text-teal-600 rounded-2xl">
+                   <Scale size={20} />
+                </div>
+                <ArrowUpRight size={16} className="text-slate-300 group-hover:text-teal-500 transition-colors" />
+             </div>
+             <div className="text-left mt-4">
+                <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Jurisprudência</h4>
+                <p className="text-[10px] font-bold text-slate-400 uppercase">Análise com IA</p>
+             </div>
+          </button>
 
-        {/* CARD 7: TIMELINE (Wide) */}
-        <button
-          onClick={() => onNavigate(View.Timeline)}
-          className="group col-span-1 md:col-span-2 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-pink-400 transition-all flex flex-col justify-between h-full hover:shadow-pink-500/10"
-        >
-           <div className="flex justify-between items-start">
-              <div className="p-3 bg-pink-100 dark:bg-pink-900/20 text-pink-600 rounded-2xl">
-                 <GitCommit size={20} />
-              </div>
-              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-pink-500 transition-colors" />
-           </div>
-           <div className="text-left mt-4">
-              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Timeline</h4>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Fluxograma Processual</p>
-           </div>
-        </button>
+          {/* CARD 8: BANCO DE QUESTÕES */}
+          <button
+            onClick={() => onNavigate(View.QuestionBank)}
+            className="group relative col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-blue-400 transition-all flex flex-col justify-between"
+          >
+             <div className="flex justify-between items-start">
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-2xl">
+                   <BrainCircuit size={20} />
+                </div>
+                <ArrowUpRight size={16} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
+             </div>
+             <div className="text-left mt-4">
+                <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Banco de Questões</h4>
+                <p className="text-[10px] font-bold text-slate-400 uppercase">Treinamento Intensivo</p>
+             </div>
+          </button>
 
-        {/* CARD 8: SUSTENTAÇÃO (Wide) */}
-        <button
-          onClick={() => onNavigate(View.OralArgument)}
-          className="group col-span-1 md:col-span-2 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-rose-400 transition-all flex flex-col justify-between h-full hover:shadow-rose-500/10"
-        >
-           <div className="flex justify-between items-start">
-              <div className="p-3 bg-rose-100 dark:bg-rose-900/20 text-rose-600 rounded-2xl">
-                 <Mic size={20} />
-              </div>
-              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-rose-500 transition-colors" />
-           </div>
-           <div className="text-left mt-4">
-              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Sustentação</h4>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Oratória & Tempo Regimental</p>
-           </div>
-        </button>
+          {/* CARD 10: RESUMIDOR IA */}
+          <button
+            onClick={() => onNavigate(View.IntelligentSummarizer)}
+            className="group relative col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-purple-400 transition-all flex flex-col justify-between"
+          >
+             <div className="flex justify-between items-start">
+                <div className="p-3 bg-purple-50 dark:bg-purple-900/20 text-purple-600 rounded-2xl">
+                   <Bot size={20} />
+                </div>
+                <ArrowUpRight size={16} className="text-slate-300 group-hover:text-purple-500 transition-colors" />
+             </div>
+             <div className="text-left mt-4">
+                <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Resumidor IA</h4>
+                <p className="text-[10px] font-bold text-slate-400 uppercase">Estudo Inteligente</p>
+             </div>
+          </button>
 
-        {/* CARD 9: BANCO DE QUESTÕES (Wide) */}
-        <button
-          onClick={() => onNavigate(View.QuestionBank)}
-          className="group col-span-1 md:col-span-2 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-blue-400 transition-all flex flex-col justify-between h-full hover:shadow-blue-500/10"
-        >
-           <div className="flex justify-between items-start">
-              <div className="p-3 bg-blue-100 dark:bg-blue-900/20 text-blue-600 rounded-2xl">
-                 <HelpCircle size={20} />
-              </div>
-              <ArrowUpRight size={16} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
-           </div>
-           <div className="text-left mt-4">
-              <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Banco de Questões</h4>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Treino de Múltipla Escolha</p>
-           </div>
-        </button>
+          {/* CARD 11: LEI SECA */}
+          <button
+            onClick={() => onNavigate(View.LeiSeca)}
+            className="group relative col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-red-400 transition-all flex flex-col justify-between"
+          >
+             <div className="flex justify-between items-start">
+                <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-2xl">
+                   <Gavel size={20} />
+                </div>
+                <ArrowUpRight size={16} className="text-slate-300 group-hover:text-red-500 transition-colors" />
+             </div>
+             <div className="text-left mt-4">
+                <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Lei Seca</h4>
+                <p className="text-[10px] font-bold text-slate-400 uppercase">Treinamento de Artigos</p>
+             </div>
+          </button>
 
-        {/* CARD 10: AMIGO DE ESTUDO IA (Wide) - NOVO */}
-        <button
-          onClick={() => onNavigate(View.StudyBuddy)}
-          className="group col-span-1 md:col-span-2 bg-gradient-to-br from-sanfran-rubi to-red-800 text-white rounded-[2.5rem] p-6 border border-sanfran-rubi shadow-lg hover:shadow-red-500/30 hover:scale-[1.02] transition-all flex flex-col justify-between relative overflow-hidden h-full"
-        >
-           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')] opacity-10"></div>
-           <div className="flex justify-between items-start relative z-10">
-              <div className="p-3 bg-white/20 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20">
-                 <Bot size={20} className="text-white" />
-              </div>
-              <ArrowUpRight size={16} className="text-red-200 group-hover:text-white transition-colors" />
-           </div>
-           <div className="text-left mt-4 relative z-10">
-              <h4 className="text-lg font-black uppercase tracking-tight text-white">Amigo de Estudo IA</h4>
-              <p className="text-[10px] font-bold text-red-100 uppercase">Mentor Jurídico Inteligente</p>
-           </div>
-        </button>
+          {/* CARD 12: BIBLIOTECA DIGITAL */}
+          <button
+            onClick={() => onNavigate(View.Library)}
+            className="group relative col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-sky-400 transition-all flex flex-col justify-between"
+          >
+             <div className="flex justify-between items-start">
+                <div className="p-3 bg-sky-50 dark:bg-sky-900/20 text-sky-600 rounded-2xl">
+                   <BookOpen size={20} />
+                </div>
+                <ArrowUpRight size={16} className="text-slate-300 group-hover:text-sky-500 transition-colors" />
+             </div>
+             <div className="text-left mt-4">
+                <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Biblioteca</h4>
+                <p className="text-[10px] font-bold text-slate-400 uppercase">Acervo Digital</p>
+             </div>
+          </button>
 
-        {/* CARD 11: ANALISADOR DE CASOS IA (Wide) - NOVO */}
-        <button
-          onClick={() => onNavigate(View.CaseAnalyzer)}
-          className="group col-span-1 md:col-span-2 bg-gradient-to-br from-indigo-600 to-blue-800 text-white rounded-[2.5rem] p-6 border border-indigo-500 shadow-lg hover:shadow-indigo-500/30 hover:scale-[1.02] transition-all flex flex-col justify-between relative overflow-hidden h-full"
-        >
-           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')] opacity-10"></div>
-           <div className="flex justify-between items-start relative z-10">
-              <div className="p-3 bg-white/20 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20">
-                 <BrainCircuit size={20} className="text-white" />
-              </div>
-              <ArrowUpRight size={16} className="text-indigo-200 group-hover:text-white transition-colors" />
-           </div>
-           <div className="text-left mt-4 relative z-10">
-              <h4 className="text-lg font-black uppercase tracking-tight text-white">Analisador de Casos IA</h4>
-              <p className="text-[10px] font-bold text-indigo-100 uppercase">Análise de Precedentes & Fundamentos</p>
-           </div>
-        </button>
-
-        {/* CARD 12: CERTIFICADOS (Wide) - NOVO */}
-        <button
-          onClick={() => onNavigate(View.Certificates)}
-          className="group col-span-1 md:col-span-2 bg-gradient-to-br from-amber-500 to-yellow-600 text-white rounded-[2.5rem] p-6 border border-amber-400 shadow-lg hover:shadow-amber-500/30 hover:scale-[1.02] transition-all flex flex-col justify-between relative overflow-hidden h-full"
-        >
-           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')] opacity-10"></div>
-           <div className="flex justify-between items-start relative z-10">
-              <div className="p-3 bg-white/20 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20">
-                 <Scroll size={20} className="text-white" />
-              </div>
-              <ArrowUpRight size={16} className="text-amber-200 group-hover:text-white transition-colors" />
-           </div>
-           <div className="text-left mt-4 relative z-10">
-              <h4 className="text-lg font-black uppercase tracking-tight text-white">Certificados</h4>
-              <p className="text-[10px] font-bold text-amber-100 uppercase">Reconhecimento & Conquistas</p>
-           </div>
-        </button>
-
+          {/* CARD 13: STUDY BUDDY IA */}
+          <button
+            onClick={() => onNavigate(View.StudyBuddy)}
+            className="group relative col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg hover:border-indigo-400 transition-all flex flex-col justify-between"
+          >
+             <div className="flex justify-between items-start">
+                <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 rounded-2xl">
+                   <BrainCircuit size={20} />
+                </div>
+                <ArrowUpRight size={16} className="text-slate-300 group-hover:text-indigo-500 transition-colors" />
+             </div>
+             <div className="text-left mt-4">
+                <h4 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Study Buddy</h4>
+                <p className="text-[10px] font-bold text-slate-400 uppercase">Mentor IA 24/7</p>
+             </div>
+          </button>
+        </div>
       </div>
 
     </div>
