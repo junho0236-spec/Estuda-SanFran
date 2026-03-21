@@ -525,17 +525,39 @@ const App: React.FC = () => {
   };
 
   const syncProfile = async (user: any) => {
-    const name = user.user_metadata?.full_name;
-    if (!name) return;
+    const name = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuário';
     
     try {
-      const { error } = await supabase.from('profiles').upsert({
+      // Sync to profiles table
+      const { error: profileError } = await supabase.from('profiles').upsert({
         id: user.id,
         full_name: name,
         updated_at: new Date().toISOString()
       }, { onConflict: 'id' });
       
-      if (error) throw error;
+      if (profileError) console.warn("Sincronização de 'profiles' falhou.", profileError);
+
+      // Also ensure user_persona exists so they appear in community
+      const { data: existingPersona, error: checkError } = await supabase
+        .from('user_persona')
+        .select('id')
+        .eq('id', user.id)
+        .single();
+
+      if (checkError || !existingPersona) {
+        const { error: personaError } = await supabase.from('user_persona').upsert({
+          id: user.id,
+          full_name: name,
+          persona_data: {
+            nome: name,
+            email: user.email,
+            avatar_url: user.user_metadata?.avatar_url || null
+          },
+          profile_completion: 10
+        }, { onConflict: 'id' });
+        
+        if (personaError) console.warn("Sincronização de 'user_persona' falhou.", personaError);
+      }
     } catch (e) {
       console.warn("Sincronização de perfil falhou.", e);
     }
