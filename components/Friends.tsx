@@ -70,6 +70,19 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
 
   const sendFriendRequest = async (targetUserId: string, targetUserName: string) => {
     try {
+      // Check if a friendship already exists in either direction
+      const { data: existing, error: checkError } = await supabase
+        .from('friendships')
+        .select('id')
+        .or(`and(user_id.eq.${userId},friend_id.eq.${targetUserId}),and(user_id.eq.${targetUserId},friend_id.eq.${userId})`)
+        .maybeSingle();
+
+      if (checkError) throw checkError;
+      if (existing) {
+        toast.info('Já existe uma solicitação ou amizade com este usuário.');
+        return;
+      }
+
       const { error } = await supabase
         .from('friendships')
         .insert({
@@ -78,20 +91,28 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
           status: 'pending'
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase Friendship Insert Error:', error);
+        throw error;
+      }
 
       // Create notification for the target user
-      await supabase.from('notifications').insert({
-        user_id: targetUserId,
-        message: `${userName} enviou uma solicitação de amizade.`,
-        type: 'friend_request'
-      });
+      try {
+        await supabase.from('notifications').insert({
+          user_id: targetUserId,
+          message: `${userName} enviou uma solicitação de amizade.`,
+          type: 'friend_request'
+        });
+      } catch (notifErr) {
+        console.warn('Could not send notification, but friendship was created:', notifErr);
+      }
 
       toast.success('Solicitação enviada!');
       fetchData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending friend request:', error);
-      toast.error('Erro ao enviar solicitação');
+      const message = error.message || 'Erro ao enviar solicitação';
+      toast.error(`Erro: ${message}`);
     }
   };
 
