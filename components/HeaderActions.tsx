@@ -72,6 +72,7 @@ const HeaderActions: React.FC<HeaderActionsProps> = ({
     switch (type) {
       case 'completed': return <CheckCircle2 size={16} className="text-emerald-500" />;
       case 'friend_request': return <UserPlus size={16} className="text-blue-500" />;
+      case 'friend_accepted': return <CheckCircle2 size={16} className="text-emerald-500" />;
       case 'delegated': return <ShieldAlert size={16} className="text-amber-500" />;
       default: return <Bell size={16} className="text-slate-400" />;
     }

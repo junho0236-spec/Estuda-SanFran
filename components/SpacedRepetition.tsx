@@ -1,9 +1,16 @@
 
 import React, { useState, useEffect } from 'react';
-import { Repeat, Calendar, CheckCircle2, Circle, Plus, Trash2, BookOpen, AlertCircle, RefreshCw } from 'lucide-react';
+import { 
+  Repeat, Calendar, CheckCircle2, Circle, Plus, Trash2, 
+  BookOpen, AlertCircle, RefreshCw, Flame, Zap, Trophy, 
+  Star, Ghost, Sword, X, TrendingUp, Award, Target,
+  ChevronRight, Brain, Sparkles, ZapIcon, ShieldCheck, Clock
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../services/supabaseClient';
-import { SpacedTopic } from '../types';
+import { SpacedTopic, UserProfile } from '../types';
 import confetti from 'canvas-confetti';
+import { toast } from 'sonner';
 
 interface SpacedRepetitionProps {
   userId: string;
@@ -22,6 +29,7 @@ const INTERVALS = [1, 7, 15, 30];
 
 const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId }) => {
   const [topics, setTopics] = useState<SpacedTopic[]>([]);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   
@@ -32,10 +40,27 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId }) => {
 
   // Derived state
   const [todaysReviews, setTodaysReviews] = useState<ReviewTask[]>([]);
+  const [weeklyActivity, setWeeklyActivity] = useState<boolean[]>(new Array(7).fill(false));
 
   useEffect(() => {
     fetchTopics();
+    fetchProfile();
   }, [userId]);
+
+  const fetchProfile = async () => {
+    const { data, error } = await supabase
+      .from('user_persona')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    
+    if (data) {
+      // Map persona_data to profile fields if needed, 
+      // but based on Profile.tsx it seems it's flattened or handled in dataService
+      // Let's assume it's flattened for now or just use what we get
+      setProfile(data);
+    }
+  };
 
   const fetchTopics = async () => {
     setLoading(true);
@@ -48,8 +73,27 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId }) => {
     if (data) {
       setTopics(data);
       calculateReviews(data);
+      calculateWeeklyActivity(data);
     }
     setLoading(false);
+  };
+
+  const calculateWeeklyActivity = (data: SpacedTopic[]) => {
+    const activity = new Array(7).fill(false);
+    const today = new Date();
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay()); // Sunday
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    data.forEach(t => {
+      const studyDate = new Date(t.study_date);
+      studyDate.setHours(0, 0, 0, 0);
+      const diff = Math.floor((studyDate.getTime() - startOfWeek.getTime()) / (1000 * 60 * 60 * 24));
+      if (diff >= 0 && diff < 7) {
+        activity[diff] = true;
+      }
+    });
+    setWeeklyActivity(activity);
   };
 
   const calculateReviews = (data: SpacedTopic[]) => {
@@ -136,8 +180,28 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId }) => {
     setTopics(updatedTopics);
     calculateReviews(updatedTopics);
     
-    if (task.status === 'pending') {
-       confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+    if (task.status === 'pending' || task.status === 'overdue') {
+       confetti({ 
+         particleCount: 100, 
+         spread: 70, 
+         origin: { y: 0.6 },
+         colors: ['#0ea5e9', '#f59e0b', '#10b981']
+       });
+       toast.success("+50 XP: Revisão Concluída!", {
+         icon: <Zap className="text-amber-500" size={16} />,
+         description: "Você está derrotando a curva do esquecimento!"
+       });
+
+       // Update XP in profile
+       if (profile) {
+         const newXP = (profile.arcadia_score || 0) + 50;
+         setProfile({ ...profile, arcadia_score: newXP });
+         
+         // Update in DB
+         await supabase.from('user_persona').update({
+           arcadia_score: newXP
+         }).eq('id', userId);
+       }
     }
 
     try {
@@ -146,7 +210,7 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId }) => {
       }).eq('id', task.topicId);
     } catch (e) {
       console.error(e);
-      alert("Erro ao sincronizar.");
+      toast.error("Erro ao sincronizar.");
     }
   };
 
@@ -170,9 +234,53 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId }) => {
     }
   };
 
+  const getLevel = (xp: number) => Math.floor(xp / 500) + 1;
+  const getProgressToNextLevel = (xp: number) => (xp % 500) / 500 * 100;
+
+  const daysOfWeek = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+
   return (
     <div className="space-y-10 animate-in fade-in duration-700 pb-24 px-4 md:px-0 max-w-5xl mx-auto h-full flex flex-col font-sans">
       
+      {/* GAMIFICATION HEADER */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white dark:bg-[#1a1a1a] p-4 rounded-3xl border border-slate-200 dark:border-white/5 shadow-sm flex items-center gap-4"
+        >
+          <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/20 rounded-2xl flex items-center justify-center text-orange-600 dark:text-orange-400">
+            <Flame size={24} className="animate-pulse" />
+          </div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Ofensiva</p>
+            <p className="text-2xl font-black text-slate-900 dark:text-white">{profile?.productivityStats?.streak || 0} Dias</p>
+          </div>
+        </motion.div>
+
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-white dark:bg-[#1a1a1a] p-4 rounded-3xl border border-slate-200 dark:border-white/5 shadow-sm md:col-span-2 flex flex-col justify-center"
+        >
+          <div className="flex justify-between items-end mb-2">
+            <div className="flex items-center gap-2">
+              <Award className="text-amber-500" size={20} />
+              <span className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">Estudante Nível {getLevel(profile?.arcadia_score || 0)}</span>
+            </div>
+            <span className="text-[10px] font-bold text-slate-400">{(profile?.arcadia_score || 0) % 500} / 500 XP</span>
+          </div>
+          <div className="h-3 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+            <motion.div 
+              initial={{ width: 0 }}
+              animate={{ width: `${getProgressToNextLevel(profile?.arcadia_score || 0)}%` }}
+              className="h-full bg-gradient-to-r from-amber-400 to-orange-500"
+            />
+          </div>
+        </motion.div>
+      </div>
+
       {/* HEADER */}
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 shrink-0">
         <div>
@@ -180,16 +288,37 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId }) => {
               <Repeat className="w-4 h-4 text-sky-600 dark:text-sky-400" />
               <span className="text-[10px] font-black uppercase tracking-widest text-sky-600 dark:text-sky-400">Método Ebbinghaus</span>
            </div>
-           <h2 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-none">Revisão Espaçada</h2>
-           <p className="text-lg font-medium text-slate-500 mt-2 italic">Derrote a Curva do Esquecimento com revisões programadas.</p>
+           <h2 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-none flex items-center gap-4">
+             Revisão Espaçada
+           </h2>
+           <div className="flex items-center gap-3 mt-2">
+             <p className="text-lg font-medium text-slate-500 italic">Derrote o Monstro do Esquecimento!</p>
+             <motion.div
+               animate={{ y: [0, -5, 0] }}
+               transition={{ repeat: Infinity, duration: 2 }}
+             >
+               <Ghost className="text-slate-300 dark:text-slate-700" size={24} />
+             </motion.div>
+           </div>
         </div>
         
-        <button 
+        <motion.button 
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
           onClick={() => setIsAdding(true)}
-          className="flex items-center gap-2 px-8 py-4 bg-sky-600 hover:bg-sky-700 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:scale-105 transition-all"
+          className="group relative flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all overflow-hidden"
         >
-           <Plus size={16} /> Registrar Estudo
-        </button>
+           <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+           <Plus size={16} className="relative z-10" /> 
+           <span className="relative z-10">Registrar Estudo</span>
+           <motion.div 
+             animate={{ scale: [1, 1.2, 1] }}
+             transition={{ repeat: Infinity, duration: 1.5 }}
+             className="absolute -right-1 -top-1"
+           >
+             <Sparkles size={12} className="text-white/50" />
+           </motion.div>
+        </motion.button>
       </header>
 
       {/* CREATE MODAL */}
@@ -253,10 +382,45 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId }) => {
 
             <div className="flex-1 bg-white dark:bg-[#1a1a1a] rounded-[2.5rem] border border-slate-200 dark:border-white/5 shadow-xl overflow-hidden flex flex-col relative">
                {todaysReviews.length === 0 ? (
-                  <div className="flex-1 flex flex-col items-center justify-center opacity-50 p-8 text-center">
-                     <CheckCircle2 size={64} className="text-sky-300 mb-4" />
-                     <p className="text-xl font-black text-slate-400 uppercase">Tudo em dia!</p>
-                     <p className="text-xs font-bold text-slate-300 mt-2">Nenhuma revisão pendente para hoje.</p>
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-6">
+                     <motion.div 
+                       initial={{ scale: 0 }}
+                       animate={{ scale: 1 }}
+                       className="relative"
+                     >
+                        <div className="absolute inset-0 bg-amber-400/20 blur-3xl rounded-full" />
+                        <Trophy size={80} className="text-amber-500 relative z-10" />
+                        <motion.div 
+                          animate={{ rotate: 360 }}
+                          transition={{ repeat: Infinity, duration: 10, ease: "linear" }}
+                          className="absolute -inset-4 border-2 border-dashed border-amber-200 dark:border-amber-900/30 rounded-full"
+                        />
+                     </motion.div>
+                     
+                     <div>
+                        <p className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Missão Cumprida!</p>
+                        <p className="text-sm font-bold text-slate-400 mt-2">Você derrotou a curva do esquecimento hoje.</p>
+                     </div>
+
+                     <div className="bg-slate-50 dark:bg-black/20 p-6 rounded-[2rem] w-full max-w-sm border border-slate-100 dark:border-white/5">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Atividade da Semana</p>
+                        <div className="flex justify-between items-center">
+                           {daysOfWeek.map((day, i) => (
+                              <div key={i} className="flex flex-col items-center gap-2">
+                                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-[10px] font-black transition-all ${weeklyActivity[i] ? 'bg-green-500 text-white shadow-lg shadow-green-500/20' : 'bg-slate-200 dark:bg-white/5 text-slate-400'}`}>
+                                    {weeklyActivity[i] ? <CheckCircle2 size={14} /> : day}
+                                 </div>
+                              </div>
+                           ))}
+                        </div>
+                     </div>
+
+                     <button 
+                       onClick={() => setIsAdding(true)}
+                       className="text-sky-500 font-bold text-xs uppercase tracking-widest hover:underline"
+                     >
+                       + Registrar novo estudo
+                     </button>
                   </div>
                ) : (
                   <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
@@ -299,37 +463,72 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId }) => {
 
             <div className="flex-1 bg-slate-100 dark:bg-black/20 rounded-[2.5rem] border border-slate-200 dark:border-white/5 overflow-hidden flex flex-col">
                <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-                  {topics.length === 0 && (
+                  {topics.length === 0 ? (
                      <div className="text-center py-20 opacity-40">
                         <p className="text-xs font-black uppercase">Nenhum tópico registrado</p>
                      </div>
-                  )}
-                  {topics.map(t => {
+                  ) : (
+                    topics.map(t => {
                      const progress = (t.reviews_completed.length / 4) * 100;
+                     const isMastered = progress === 100;
+                     const isUrgent = todaysReviews.some(r => r.topicId === t.id && r.status === 'overdue');
+                     const isDueSoon = todaysReviews.some(r => r.topicId === t.id && r.status === 'pending');
+
                      return (
-                        <div key={t.id} className="bg-white dark:bg-[#1a1a1a] p-4 rounded-2xl shadow-sm border border-slate-200 dark:border-white/5 relative group">
+                        <motion.div 
+                          layout
+                          key={t.id} 
+                          className={`bg-white dark:bg-[#1a1a1a] p-4 rounded-2xl shadow-sm border transition-all relative group ${isUrgent ? 'border-red-200 dark:border-red-900/30' : 'border-slate-200 dark:border-white/5'}`}
+                        >
                            <button onClick={() => deleteTopic(t.id)} className="absolute top-2 right-2 p-1.5 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-50 dark:bg-black/20 rounded-lg">
                               <Trash2 size={12} />
                            </button>
                            
                            <div className="mb-2">
-                              <span className="text-[8px] font-black uppercase text-slate-400 tracking-widest">{t.subject}</span>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[8px] font-black uppercase text-slate-400 tracking-widest">{t.subject}</span>
+                                {isMastered ? (
+                                  <span className="text-[8px] font-black uppercase text-green-500 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded flex items-center gap-1">
+                                    <ShieldCheck size={10} /> Forte
+                                  </span>
+                                ) : isUrgent ? (
+                                  <motion.span 
+                                    animate={{ x: [-1, 1, -1] }}
+                                    transition={{ repeat: Infinity, duration: 0.2 }}
+                                    className="text-[8px] font-black uppercase text-red-500 bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded flex items-center gap-1"
+                                  >
+                                    <AlertCircle size={10} /> Quase Esquecendo!
+                                  </motion.span>
+                                ) : isDueSoon ? (
+                                  <span className="text-[8px] font-black uppercase text-amber-500 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded flex items-center gap-1">
+                                    <Clock size={10} /> Revisar em breve
+                                  </span>
+                                ) : (
+                                  <span className="text-[8px] font-black uppercase text-sky-500 bg-sky-50 dark:bg-sky-900/20 px-2 py-0.5 rounded flex items-center gap-1">
+                                    <Brain size={10} /> Em Memória
+                                  </span>
+                                )}
+                              </div>
                               <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate pr-6">{t.topic}</h4>
                            </div>
 
                            <div className="flex items-center gap-1 mb-2">
                               {INTERVALS.map(int => (
-                                 <div key={int} className={`h-1.5 flex-1 rounded-full ${t.reviews_completed.includes(int) ? 'bg-sky-500' : 'bg-slate-100 dark:bg-white/10'}`}></div>
+                                 <div key={int} className={`h-1.5 flex-1 rounded-full ${t.reviews_completed.includes(int) ? 'bg-gradient-to-r from-sky-400 to-sky-600 shadow-sm' : 'bg-slate-100 dark:bg-white/10'}`}></div>
                               ))}
                            </div>
                            
                            <div className="flex justify-between items-center text-[9px] text-slate-400 font-bold uppercase">
-                              <span>Estudado em: {new Date(t.study_date).toLocaleDateString()}</span>
-                              <span>{Math.round(progress)}%</span>
+                              <div className="flex items-center gap-1">
+                                <Sword size={10} className="text-slate-300" />
+                                <span>Domínio: {Math.round(progress)}%</span>
+                              </div>
+                              <span>{new Date(t.study_date).toLocaleDateString()}</span>
                            </div>
-                        </div>
+                        </motion.div>
                      )
-                  })}
+                    })
+                  )}
                </div>
             </div>
          </div>

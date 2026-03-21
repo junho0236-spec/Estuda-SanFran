@@ -293,7 +293,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   useEffect(() => {
     const fetchColabData = async () => {
       const [friendsData, notificationsData] = await Promise.all([
-        dataService.getFriends(userId),
+        dataService.getFriendships(userId),
         dataService.getNotifications(userId)
       ]);
       setFriends(friendsData);

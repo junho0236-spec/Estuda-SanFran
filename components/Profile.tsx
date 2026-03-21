@@ -6,7 +6,7 @@ import {
   AlertTriangle, Github, Linkedin, Twitter, Globe, Save,
   GraduationCap, BookOpen, Trophy, Star, ShieldCheck,
   History, UserCheck, ToggleLeft, ToggleRight, Share2, X, Users,
-  MapPin, Calendar, Languages, Plane, FileText, Image as ImageIcon, Heart, Briefcase, GraduationCap as GradIcon, Search, RefreshCw, Plus, Clock
+  MapPin, Calendar, Languages, Plane, FileText, Image as ImageIcon, Heart, Briefcase, GraduationCap as GradIcon, Search, RefreshCw, Plus, Clock, Instagram
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import imageCompression from 'browser-image-compression';
@@ -90,8 +90,14 @@ const Profile: React.FC = () => {
     status_geral_integralizacao: 0,
     experiencias_lideranca: [],
     integralizacao_curriculo: {},
-    badges: []
+    badges: [],
+    skills: [],
+    interests: [],
+    academic_background: [],
+    visible_modules: ['jornada', 'grade', 'evolucao', 'mural', 'lideranca', 'conexoes']
   });
+
+  const [activeTab, setActiveTab] = useState<'perfil' | 'academico' | 'mural' | 'config'>('perfil');
 
   const [session, setSession] = useState<any>(null);
   const [disciplinas, setDisciplinas] = useState<any[]>([]);
@@ -142,7 +148,12 @@ const Profile: React.FC = () => {
             pites: [],
             diretoria: [],
             coordenacao: []
-          }
+          },
+          skills: userProfile?.skills || [],
+          interests: userProfile?.interests || [],
+          archetype: userProfile?.archetype || 'Novato',
+          academic_background: userProfile?.academic_background || [],
+          visible_modules: userProfile?.visible_modules || ['jornada', 'grade', 'evolucao', 'mural', 'lideranca', 'conexoes']
         });
     }
     setLoading(false);
@@ -240,7 +251,11 @@ const Profile: React.FC = () => {
         arcadia_score: 0,
         experiencias_lideranca: [],
         integralizacao_curriculo: {},
-        badges: []
+        badges: [],
+        skills: [],
+        interests: [],
+        academic_background: [],
+        visible_modules: ['jornada', 'grade', 'evolucao', 'mural', 'lideranca', 'conexoes']
       };
       
       await dataService.saveUserProfile(defaultProfile, session.user.id, navigator.onLine);
@@ -253,6 +268,19 @@ const Profile: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const toggleModule = async (moduleId: string) => {
+    if (!profile || !session?.user) return;
+    const currentModules = profile.visible_modules || [];
+    const newModules = currentModules.includes(moduleId)
+      ? currentModules.filter(m => m !== moduleId)
+      : [...currentModules, moduleId];
+    
+    const updatedProfile = { ...profile, visible_modules: newModules };
+    setProfile(updatedProfile);
+    setEditForm(updatedProfile);
+    await dataService.saveUserProfile(updatedProfile, session.user.id, navigator.onLine);
   };
 
   const handleVisibilityChange = async (visibility: 'public' | 'friends' | 'private') => {
@@ -553,568 +581,589 @@ const Profile: React.FC = () => {
           </div>
         </motion.div>
 
-        {/* 📚 JORNADA ACADÊMICA */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white dark:bg-white/5 p-6 rounded-3xl border border-slate-200 dark:border-white/10 shadow-lg">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900/20 text-blue-600 rounded-xl">
-                <GradIcon size={18} />
-              </div>
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Progresso Total</h3>
-            </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500">
-                <span>Integralização</span>
-                <span>{typeof profile?.progresso_total === 'number' || typeof profile?.progresso_total === 'string' ? profile.progresso_total : 0}%</span>
-              </div>
-              <div className="h-2 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
-                <motion.div 
-                  initial={{ width: 0 }}
-                  animate={{ width: `${typeof profile?.progresso_total === 'number' || typeof profile?.progresso_total === 'string' ? profile.progresso_total : 0}%` }}
-                  className="h-full bg-blue-500 rounded-full"
-                />
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white dark:bg-white/5 p-6 rounded-3xl border border-slate-200 dark:border-white/10 shadow-lg">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 rounded-xl">
-                <CheckCircle2 size={18} />
-              </div>
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Obrigatórias</h3>
-            </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500">
-                <span>Concluído</span>
-                <span>{typeof profile?.progresso_obrigatorias === 'number' || typeof profile?.progresso_obrigatorias === 'string' ? profile.progresso_obrigatorias : 0}%</span>
-              </div>
-              <div className="h-2 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
-                <motion.div 
-                  initial={{ width: 0 }}
-                  animate={{ width: `${typeof profile?.progresso_obrigatorias === 'number' || typeof profile?.progresso_obrigatorias === 'string' ? profile.progresso_obrigatorias : 0}%` }}
-                  className="h-full bg-emerald-500 rounded-full"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-white/5 p-6 rounded-3xl border border-slate-200 dark:border-white/10 shadow-lg">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-amber-100 dark:bg-amber-900/20 text-amber-600 rounded-xl">
-                <BookOpen size={18} />
-              </div>
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Optativas</h3>
-            </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500">
-                <span>Concluído</span>
-                <span>{typeof profile?.progresso_optativas === 'number' || typeof profile?.progresso_optativas === 'string' ? profile.progresso_optativas : 0}%</span>
-              </div>
-              <div className="h-2 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
-                <motion.div 
-                  initial={{ width: 0 }}
-                  animate={{ width: `${typeof profile?.progresso_optativas === 'number' || typeof profile?.progresso_optativas === 'string' ? profile.progresso_optativas : 0}%` }}
-                  className="h-full bg-amber-500 rounded-full"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-white/5 p-6 rounded-3xl border border-slate-200 dark:border-white/10 shadow-lg">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-sanfran-rubi/10 text-sanfran-rubi rounded-xl">
-                <ShieldCheck size={18} />
-              </div>
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Status Integralização</h3>
-            </div>
-            <div className="flex items-end gap-2">
-              <span className="text-2xl font-serif font-bold text-sanfran-rubi">{profile?.status_geral_integralizacao || 0}%</span>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Concluído</span>
-            </div>
-          </div>
-
-          {/* New Academic Metrics */}
-          <div className="bg-white dark:bg-white/5 p-6 rounded-3xl border border-slate-200 dark:border-white/10 shadow-lg">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-indigo-100 dark:bg-indigo-900/20 text-indigo-600 rounded-xl">
-                <BookOpen size={18} />
-              </div>
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Créditos Aula</h3>
-            </div>
-            <div className="flex items-end gap-2">
-              <span className="text-2xl font-serif font-bold text-indigo-600 dark:text-indigo-400">{typeof profile?.creditos_aula === 'number' || typeof profile?.creditos_aula === 'string' ? profile.creditos_aula : 0}</span>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Créditos</span>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-white/5 p-6 rounded-3xl border border-slate-200 dark:border-white/10 shadow-lg">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-teal-100 dark:bg-teal-900/20 text-teal-600 rounded-xl">
-                <Briefcase size={18} />
-              </div>
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Créditos Trabalho</h3>
-            </div>
-            <div className="flex items-end gap-2">
-              <span className="text-2xl font-serif font-bold text-teal-600 dark:text-teal-400">{typeof profile?.creditos_trabalho === 'number' || typeof profile?.creditos_trabalho === 'string' ? profile.creditos_trabalho : 0}</span>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Créditos</span>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-white/5 p-6 rounded-3xl border border-slate-200 dark:border-white/10 shadow-lg">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-rose-100 dark:bg-rose-900/20 text-rose-600 rounded-xl">
-                <Star size={18} />
-              </div>
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Média Ponderada</h3>
-            </div>
-            <div className="flex items-end gap-2">
-              <span className="text-2xl font-serif font-bold text-rose-600 dark:text-rose-400">{typeof profile?.media === 'number' || typeof profile?.media === 'string' ? profile.media : '0.0'}</span>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Média</span>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-white/5 p-6 rounded-3xl border border-slate-200 dark:border-white/10 shadow-lg">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-orange-100 dark:bg-orange-900/20 text-orange-600 rounded-xl">
-                <Clock size={18} />
-              </div>
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Horas de Extensão</h3>
-            </div>
-            <div className="flex items-end gap-2">
-              <span className="text-2xl font-serif font-bold text-orange-600 dark:text-orange-400">{typeof profile?.horas_extensao === 'number' || typeof profile?.horas_extensao === 'string' ? profile.horas_extensao : 0}h</span>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Horas</span>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-white/5 p-6 rounded-3xl border border-slate-200 dark:border-white/10 shadow-lg">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-cyan-100 dark:bg-cyan-900/20 text-cyan-600 rounded-xl">
-                <Users size={18} />
-              </div>
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Entidades</h3>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {profile?.entidades?.length ? profile.entidades.map((ent, idx) => (
-                <span key={idx} className="px-2 py-1 bg-cyan-50 dark:bg-cyan-900/10 text-cyan-600 dark:text-cyan-400 rounded-lg text-[9px] font-black uppercase tracking-widest border border-cyan-100 dark:border-cyan-900/20">
-                  {typeof ent === 'string' ? ent : JSON.stringify(ent)}
-                </span>
-              )) : <span className="text-[9px] text-slate-400 uppercase font-black">Nenhuma</span>}
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-white/5 p-6 rounded-3xl border border-slate-200 dark:border-white/10 shadow-lg">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 rounded-xl">
-                <Languages size={18} />
-              </div>
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Idiomas</h3>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {profile?.idiomas?.length ? profile.idiomas.map((lang, idx) => (
-                <span key={idx} className="px-2 py-1 bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 rounded-lg text-[9px] font-black uppercase tracking-widest border border-emerald-100 dark:border-emerald-900/20">
-                  {typeof lang === 'string' ? lang : JSON.stringify(lang)}
-                </span>
-              )) : <span className="text-[9px] text-slate-400 uppercase font-black">Nenhum</span>}
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-white/5 p-6 rounded-3xl border border-slate-200 dark:border-white/10 shadow-lg">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-purple-100 dark:bg-purple-900/20 text-purple-600 rounded-xl">
-                <Plane size={18} />
-              </div>
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Intercâmbio</h3>
-            </div>
-            <p className="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase leading-tight">
-              {typeof profile?.intercambio === 'string' ? profile.intercambio : (profile?.intercambio ? JSON.stringify(profile.intercambio) : 'Não realizado')}
-            </p>
-          </div>
-
-          <div className="bg-white dark:bg-white/5 p-6 rounded-3xl border border-slate-200 dark:border-white/10 shadow-lg">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-amber-100 dark:bg-amber-900/20 text-amber-600 rounded-xl">
-                <Calendar size={18} />
-              </div>
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Aniversário</h3>
-            </div>
-            <p className="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase leading-tight">
-              {profile?.aniversario ? new Date(profile.aniversario).toLocaleDateString('pt-BR') : 'Não informado'}
-            </p>
-          </div>
+        {/* 📑 TABS NAVIGATION */}
+        <div className="flex items-center justify-center gap-2 p-1.5 bg-white dark:bg-white/5 rounded-[2rem] border border-slate-200 dark:border-white/10 shadow-sm sticky top-4 z-50 backdrop-blur-md">
+          {[
+            { id: 'perfil', label: 'Perfil', icon: <User size={16} />, alwaysVisible: true },
+            { id: 'academico', label: 'Acadêmico', icon: <BookOpen size={16} /> },
+            { id: 'mural', label: 'Mural', icon: <ImageIcon size={16} /> },
+            { id: 'config', label: 'Ajustes', icon: <Settings size={16} />, alwaysVisible: true },
+          ].filter(tab => tab.alwaysVisible || profile?.visible_modules?.includes(tab.id)).map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`flex items-center gap-2 px-6 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-sanfran-rubi text-white shadow-lg shadow-red-900/20' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}
+            >
+              {tab.icon}
+              <span className="hidden sm:inline">{tab.label}</span>
+            </button>
+          ))}
         </div>
 
-        {/* 📅 GRADE HORÁRIA (Sincronizada Júpiter) */}
-        {disciplinas.length > 0 && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white dark:bg-white/5 p-8 rounded-[2.5rem] border border-slate-200 dark:border-white/10 shadow-xl"
-          >
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 rounded-xl">
-                  <Calendar size={20} />
-                </div>
-                <h2 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Grade Horária Atual</h2>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="px-3 py-1 bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 rounded-full text-[9px] font-black uppercase tracking-widest border border-emerald-100 dark:border-emerald-900/20">
-                  {disciplinas.length} Matérias Sincronizadas
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {disciplinas.map((disc, idx) => (
-                <div key={idx} className="p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/5 hover:border-emerald-200 dark:hover:border-emerald-900/30 transition-all group">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">{typeof disc.codigo === 'string' ? disc.codigo : JSON.stringify(disc.codigo)}</span>
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{typeof disc.turma_sala === 'string' ? disc.turma_sala : JSON.stringify(disc.turma_sala)}</span>
+        <AnimatePresence mode="wait">
+          {activeTab === 'perfil' && (
+            <motion.div
+              key="perfil"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-8"
+            >
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 space-y-8">
+                  <div className="bg-white dark:bg-white/5 p-10 rounded-[3rem] border border-slate-200 dark:border-white/10 shadow-sm">
+                    <h2 className="text-xl font-serif font-bold text-sanfran-rubi dark:text-white mb-6">Sobre Mim</h2>
+                    <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
+                      {profile?.bio || 'Nenhuma biografia definida.'}
+                    </p>
+                    
+                    {profile?.visible_modules?.includes('skills') && (
+                      <div className="mt-10 pt-10 border-t border-slate-100 dark:border-white/10">
+                        <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-6">Habilidades & Competências</h3>
+                        <div className="flex flex-wrap gap-2">
+                          {profile?.skills?.length ? profile.skills.map(skill => (
+                            <span key={skill} className="px-4 py-2 bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 rounded-xl text-[10px] font-bold uppercase tracking-wider">
+                              {skill}
+                            </span>
+                          )) : (
+                            <p className="text-[10px] font-bold text-slate-400 italic">Nenhuma habilidade listada.</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <h4 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-tight mb-3 group-hover:text-emerald-600 transition-colors">{typeof disc.nome === 'string' ? disc.nome : JSON.stringify(disc.nome)}</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {Object.entries(disc.horarios || {}).map(([dia, hora]) => (
-                      <div key={dia} className="flex items-center gap-1 px-2 py-1 bg-white dark:bg-white/10 rounded-lg border border-slate-200 dark:border-white/10">
-                        <span className="text-[8px] font-black text-slate-400 uppercase">{dia.substring(0, 3)}</span>
-                        <span className="text-[8px] font-bold text-slate-600 dark:text-slate-300">{typeof hora === 'string' ? hora : JSON.stringify(hora)}</span>
+
+                  {profile?.visible_modules?.includes('interests') && (
+                    <div className="bg-white dark:bg-white/5 p-10 rounded-[3rem] border border-slate-200 dark:border-white/10 shadow-sm">
+                      <h2 className="text-xl font-serif font-bold text-sanfran-rubi dark:text-white mb-6">Interesses</h2>
+                      <div className="flex flex-wrap gap-2">
+                        {profile?.interests?.length ? profile.interests.map(interest => (
+                          <span key={interest} className="px-4 py-2 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl text-[10px] font-bold uppercase tracking-wider">
+                            {interest}
+                          </span>
+                        )) : (
+                          <p className="text-[10px] font-bold text-slate-400 italic">Nenhum interesse listado.</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-8">
+                  {profile?.visible_modules?.includes('social') && (
+                    <div className="bg-sanfran-rubi p-8 rounded-[3rem] shadow-xl shadow-red-900/20 text-white">
+                      <h3 className="text-lg font-serif font-bold mb-6 text-center">Conexões</h3>
+                      <div className="space-y-4">
+                        {profile?.social_links?.linkedin && (
+                          <a href={profile.social_links.linkedin} target="_blank" rel="noreferrer" className="flex items-center justify-between p-4 bg-white/10 hover:bg-white/20 rounded-2xl border border-white/10 transition-all">
+                            <div className="flex items-center gap-3">
+                              <Linkedin size={18} />
+                              <span className="text-[10px] font-black uppercase tracking-widest">LinkedIn</span>
+                            </div>
+                            <ExternalLink size={14} className="opacity-50" />
+                          </a>
+                        )}
+                        {profile?.social_links?.instagram && (
+                          <a href={profile.social_links.instagram} target="_blank" rel="noreferrer" className="flex items-center justify-between p-4 bg-white/10 hover:bg-white/20 rounded-2xl border border-white/10 transition-all">
+                            <div className="flex items-center gap-3">
+                              <Instagram size={18} />
+                              <span className="text-[10px] font-black uppercase tracking-widest">Instagram</span>
+                            </div>
+                            <ExternalLink size={14} className="opacity-50" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {profile?.visible_modules?.includes('idiomas') && (
+                    <div className="bg-white dark:bg-white/5 p-8 rounded-[3rem] border border-slate-200 dark:border-white/10 shadow-sm">
+                      <h3 className="text-lg font-serif font-bold text-slate-900 dark:text-white mb-6">Idiomas</h3>
+                      <div className="space-y-4">
+                        {profile?.idiomas?.length ? profile.idiomas.map(lang => (
+                          <div key={lang} className="flex items-center justify-between">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300">{lang}</span>
+                            <div className="flex gap-1">
+                              <div className="w-2 h-2 rounded-full bg-sanfran-rubi"></div>
+                              <div className="w-2 h-2 rounded-full bg-sanfran-rubi"></div>
+                              <div className="w-2 h-2 rounded-full bg-sanfran-rubi/30"></div>
+                            </div>
+                          </div>
+                        )) : (
+                          <p className="text-[10px] font-bold text-slate-400 italic">Nenhum idioma listado.</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'academico' && (
+            <motion.div
+              key="academico"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-12"
+            >
+              {/* 📊 BENTO GRID DE MÉTRICAS ACADÊMICAS */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white dark:bg-white/5 p-6 rounded-3xl border border-slate-200 dark:border-white/10 shadow-lg hover:shadow-xl transition-all group">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-indigo-100 dark:bg-indigo-900/20 text-indigo-600 rounded-xl group-hover:scale-110 transition-transform">
+                      <Award size={18} />
+                    </div>
+                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Arcadia Score</h3>
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <span className="text-3xl font-serif font-bold text-indigo-600 dark:text-indigo-400">{profile?.arcadia_score || 0}</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Pontos</span>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-white/5 p-6 rounded-3xl border border-slate-200 dark:border-white/10 shadow-lg hover:shadow-xl transition-all group">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-teal-100 dark:bg-teal-900/20 text-teal-600 rounded-xl group-hover:scale-110 transition-transform">
+                      <Users size={18} />
+                    </div>
+                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Entidades</h3>
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <span className="text-3xl font-serif font-bold text-teal-600 dark:text-teal-400">{profile?.entidades?.length || 0}</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Ativas</span>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-white/5 p-6 rounded-3xl border border-slate-200 dark:border-white/10 shadow-lg hover:shadow-xl transition-all group">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-rose-100 dark:bg-rose-900/20 text-rose-600 rounded-xl group-hover:scale-110 transition-transform">
+                      <Plane size={18} />
+                    </div>
+                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Intercâmbio</h3>
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <span className="text-xs font-black text-rose-600 dark:text-rose-400 uppercase tracking-widest mb-1">
+                      {profile?.intercambio && profile.intercambio !== 'Não realizado' ? 'Realizado' : 'Não Realizado'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-white/5 p-6 rounded-3xl border border-slate-200 dark:border-white/10 shadow-lg hover:shadow-xl transition-all group">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-orange-100 dark:bg-orange-900/20 text-orange-600 rounded-xl group-hover:scale-110 transition-transform">
+                      <GraduationCap size={18} />
+                    </div>
+                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Jornada Acadêmica</h3>
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <span className="text-3xl font-serif font-bold text-orange-600 dark:text-orange-400">{profile?.turma || '---'}</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Turma</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 📊 EVOLUÇÃO NAS ARCADAS */}
+              <div className="bg-white dark:bg-white/5 p-10 rounded-[3rem] border border-slate-200 dark:border-white/10 shadow-sm">
+                <div className="flex items-center justify-between mb-10">
+                  <div className="space-y-1">
+                    <h2 className="text-2xl font-serif font-bold text-sanfran-rubi dark:text-white">Evolução nas Arcadas</h2>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Integralização do Currículo • Graduação em Direito</p>
+                  </div>
+                  <div className="p-3 bg-sanfran-rubi/5 text-sanfran-rubi rounded-2xl">
+                    <BookOpen size={24} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 items-center">
+                  {/* Circular Progress */}
+                  <div className="flex flex-col items-center justify-center space-y-4">
+                    <div className="relative w-48 h-48">
+                      <svg className="w-full h-full transform -rotate-90">
+                        <circle
+                          cx="96"
+                          cy="96"
+                          r="88"
+                          stroke="currentColor"
+                          strokeWidth="12"
+                          fill="transparent"
+                          className="text-slate-100 dark:text-white/5"
+                        />
+                        <motion.circle
+                          cx="96"
+                          cy="96"
+                          r="88"
+                          stroke="currentColor"
+                          strokeWidth="12"
+                          fill="transparent"
+                          strokeDasharray={552.92}
+                          initial={{ strokeDashoffset: 552.92 }}
+                          animate={{ strokeDashoffset: 552.92 - (552.92 * (profile?.status_geral_integralizacao || 0)) / 100 }}
+                          className="text-sanfran-rubi"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="text-5xl font-serif font-bold text-sanfran-rubi">{profile?.status_geral_integralizacao || 0}%</span>
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Concluído</span>
+                      </div>
+                    </div>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase text-center max-w-[150px]">Status Geral de Integralização</p>
+                  </div>
+
+                  {/* Linear Progress Bars */}
+                  <div className="lg:col-span-2 space-y-8">
+                    {[
+                      { label: 'Disciplinas Obrigatórias', progress: profile?.progresso_obrigatorias || 0, color: 'bg-sanfran-rubi' },
+                      { label: 'Disciplinas Optativas', progress: profile?.progresso_optativas || 0, color: 'bg-sanfran-rubi/60' },
+                      { label: 'Atividades Complementares', progress: profile?.horas_extensao ? Math.min(100, (profile.horas_extensao / 200) * 100) : 0, color: 'bg-emerald-500' },
+                    ].map((item) => (
+                      <div key={item.label} className="space-y-3">
+                        <div className="flex justify-between items-end">
+                          <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{item.label}</span>
+                          <span className="text-[10px] font-black text-sanfran-rubi">{item.progress}%</span>
+                        </div>
+                        <div className="h-4 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden p-1 border border-slate-200 dark:border-white/10">
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${item.progress}%` }}
+                            className={`h-full ${item.color} rounded-full relative ${item.progress === 100 ? 'shadow-[0_0_15px_rgba(139,26,26,0.5)]' : ''}`}
+                          >
+                            {item.progress === 100 && (
+                              <motion.div 
+                                animate={{ opacity: [0.4, 0.8, 0.4] }}
+                                transition={{ repeat: Infinity, duration: 2 }}
+                                className="absolute inset-0 bg-white/20"
+                              />
+                            )}
+                          </motion.div>
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
-              ))}
-            </div>
-          </motion.div>
-        )}
-
-        {/* 📊 EVOLUÇÃO NAS ARCADAS */}
-        <div className="bg-white dark:bg-white/5 p-10 rounded-[3rem] border border-slate-200 dark:border-white/10 shadow-sm">
-          <div className="flex items-center justify-between mb-10">
-            <div className="space-y-1">
-              <h2 className="text-2xl font-serif font-bold text-sanfran-rubi dark:text-white">Evolução nas Arcadas</h2>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Integralização do Currículo • Graduação em Direito</p>
-            </div>
-            <div className="p-3 bg-sanfran-rubi/5 text-sanfran-rubi rounded-2xl">
-              <BookOpen size={24} />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 items-center">
-            {/* Circular Progress */}
-            <div className="flex flex-col items-center justify-center space-y-4">
-              <div className="relative w-48 h-48">
-                <svg className="w-full h-full transform -rotate-90">
-                  <circle
-                    cx="96"
-                    cy="96"
-                    r="88"
-                    stroke="currentColor"
-                    strokeWidth="12"
-                    fill="transparent"
-                    className="text-slate-100 dark:text-white/5"
-                  />
-                  <motion.circle
-                    cx="96"
-                    cy="96"
-                    r="88"
-                    stroke="currentColor"
-                    strokeWidth="12"
-                    fill="transparent"
-                    strokeDasharray={552.92}
-                    initial={{ strokeDashoffset: 552.92 }}
-                    animate={{ strokeDashoffset: 552.92 - (552.92 * (profile?.status_geral_integralizacao || 0)) / 100 }}
-                    className="text-sanfran-rubi"
-                    strokeLinecap="round"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-5xl font-serif font-bold text-sanfran-rubi">{profile?.status_geral_integralizacao || 0}%</span>
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Concluído</span>
-                </div>
               </div>
-              <p className="text-[10px] font-bold text-slate-500 uppercase text-center max-w-[150px]">Status Geral de Integralização</p>
-            </div>
 
-            {/* Linear Progress Bars */}
-            <div className="lg:col-span-2 space-y-8">
-              {[
-                { label: 'Disciplinas Obrigatórias', progress: typeof profile?.progresso_obrigatorias === 'number' || typeof profile?.progresso_obrigatorias === 'string' ? profile.progresso_obrigatorias : 0, color: 'bg-sanfran-rubi' },
-                { label: 'Disciplinas Optativas', progress: typeof profile?.progresso_optativas === 'number' || typeof profile?.progresso_optativas === 'string' ? profile.progresso_optativas : 0, color: 'bg-sanfran-rubi/60' },
-                { label: 'Atividades Complementares', progress: 90, color: 'bg-emerald-500' },
-              ].map((item) => (
-                <div key={item.label} className="space-y-3">
-                  <div className="flex justify-between items-end">
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{item.label}</span>
-                    <span className="text-[10px] font-black text-sanfran-rubi">{item.progress}%</span>
-                  </div>
-                  <div className="h-4 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden p-1 border border-slate-200 dark:border-white/10">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${item.progress}%` }}
-                      className={`h-full ${item.color} rounded-full relative ${item.progress === 100 ? 'shadow-[0_0_15px_rgba(139,26,26,0.5)]' : ''}`}
-                    >
-                      {item.progress === 100 && (
-                        <motion.div 
-                          animate={{ opacity: [0.4, 0.8, 0.4] }}
-                          transition={{ repeat: Infinity, duration: 2 }}
-                          className="absolute inset-0 bg-white/20"
-                        />
-                      )}
-                    </motion.div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* 🖼️ MURAL DE MEMÓRIAS E LIDERANÇA */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Polaroid Photo Grid */}
-          <div className="lg:col-span-2 bg-white dark:bg-white/5 p-6 sm:p-10 rounded-3xl sm:rounded-[3rem] border border-slate-200 dark:border-white/10 shadow-sm">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 sm:mb-10 gap-4">
-              <div className="space-y-1">
-                <h2 className="text-xl sm:text-2xl font-serif font-bold text-sanfran-rubi dark:text-white">Mural de Memórias</h2>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Momentos Vividos no Largo</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="p-3 bg-sanfran-rubi text-white rounded-2xl cursor-pointer hover:bg-sanfran-rubi/90 transition-all shadow-lg shadow-red-900/20">
-                  <Plus size={24} />
-                  <input 
-                    type="file" 
-                    accept="image/*"
-                    className="hidden"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (file && session?.user) {
-                        try {
-                          setLoading(true);
-                          setSyncStatus('Otimizando foto...');
-                          
-                          const options = {
-                            maxSizeMB: 0.8,
-                            maxWidthOrHeight: 1200,
-                            useWebWorker: true,
-                            initialQuality: 0.8
-                          };
-                          const compressedFile = await imageCompression(file, options);
-                          
-                          setSyncStatus('Enviando...');
-                          const path = `${session.user.id}/mural_${Date.now()}_${compressedFile.name}`;
-                          const url = await dataService.uploadFile(compressedFile, path, 'mural_fotos', compressedFile.type);
-                          const newFoto = { url, caption: '', date: new Date().toISOString() };
-                          
-                          const updatedFotos = await dataService.addMuralFoto(session.user.id, newFoto);
-                          
-                          const updatedProfile = {
-                            ...profile,
-                            mural_fotos: updatedFotos
-                          };
-                          setProfile(updatedProfile);
-                        } catch (err) {
-                          console.error("[Profile] Mural photo upload error:", err);
-                          toast.error("Erro ao enviar foto. Verifique as permissões ou tente novamente.");
-                        } finally {
-                          setLoading(false);
-                          setSyncStatus('');
-                        }
-                      }
-                    }}
-                  />
-                </label>
-                <div className="p-3 bg-pink-50 text-pink-600 rounded-2xl">
-                  <Heart size={24} />
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-8">
-              {profile?.mural_fotos?.length ? profile.mural_fotos.map((foto, idx) => (
+              {/* 📅 GRADE HORÁRIA (Sincronizada Júpiter) */}
+              {disciplinas.length > 0 && (
                 <motion.div 
-                  key={idx}
-                  whileHover={{ scale: 1.05, zIndex: 10, rotate: 0 }}
-                  initial={{ rotate: (idx % 2 === 0 ? -3 : 3) }}
-                  onClick={() => setSelectedFoto(foto)}
-                  className="bg-white p-3 pb-8 shadow-xl border border-slate-100 transform transition-all cursor-pointer rounded-sm"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-white dark:bg-white/5 p-8 rounded-[2.5rem] border border-slate-200 dark:border-white/10 shadow-xl"
                 >
-                  <div className="aspect-square overflow-hidden mb-3">
-                    <img src={foto.url} alt={foto.caption} className="w-full h-full object-cover" />
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 rounded-xl">
+                        <Calendar size={20} />
+                      </div>
+                      <h2 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Grade Horária Atual</h2>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-3 py-1 bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 rounded-full text-[9px] font-black uppercase tracking-widest border border-emerald-100 dark:border-emerald-900/20">
+                        {disciplinas.length} Matérias Sincronizadas
+                      </span>
+                    </div>
                   </div>
-                  <p className="text-[10px] font-serif italic text-slate-500 text-center truncate px-2">{typeof foto.caption === 'string' ? foto.caption : (foto.caption ? JSON.stringify(foto.caption) : 'Sem legenda')}</p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {disciplinas.map((disc, idx) => (
+                      <div key={idx} className="p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/5 hover:border-emerald-200 dark:hover:border-emerald-900/30 transition-all group">
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">{typeof disc.codigo === 'string' ? disc.codigo : JSON.stringify(disc.codigo)}</span>
+                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{typeof disc.turma_sala === 'string' ? disc.turma_sala : JSON.stringify(disc.turma_sala)}</span>
+                        </div>
+                        <h4 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-tight mb-3 group-hover:text-emerald-600 transition-colors">{typeof disc.nome === 'string' ? disc.nome : JSON.stringify(disc.nome)}</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {Object.entries(disc.horarios || {}).map(([dia, hora]) => (
+                            <div key={dia} className="flex items-center gap-1 px-2 py-1 bg-white dark:bg-white/10 rounded-lg border border-slate-200 dark:border-white/10">
+                              <span className="text-[8px] font-black text-slate-400 uppercase">{dia.substring(0, 3)}</span>
+                              <span className="text-[8px] font-bold text-slate-600 dark:text-slate-300">{typeof hora === 'string' ? hora : JSON.stringify(hora)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </motion.div>
-              )) : (
-                <div className="col-span-full py-20 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-white/10 rounded-[2rem]">
-                  <ImageIcon size={48} className="text-slate-200 dark:text-white/10 mb-4" />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nenhuma polaroide no mural</p>
+              )}
+            </motion.div>
+          )}
+
+          {activeTab === 'mural' && (
+            <motion.div
+              key="mural"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-12"
+            >
+              {/* 🖼️ MURAL DE MEMÓRIAS */}
+              <div className="bg-white dark:bg-white/5 p-6 sm:p-10 rounded-3xl sm:rounded-[3rem] border border-slate-200 dark:border-white/10 shadow-sm">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 sm:mb-10 gap-4">
+                  <div className="space-y-1">
+                    <h2 className="text-xl sm:text-2xl font-serif font-bold text-sanfran-rubi dark:text-white">Mural de Memórias</h2>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Momentos Vividos no Largo</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="p-3 bg-sanfran-rubi text-white rounded-2xl cursor-pointer hover:bg-sanfran-rubi/90 transition-all shadow-lg shadow-red-900/20">
+                      <Plus size={24} />
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file && session?.user) {
+                            try {
+                              setLoading(true);
+                              setSyncStatus('Otimizando foto...');
+                              
+                              const options = {
+                                maxSizeMB: 0.8,
+                                maxWidthOrHeight: 1200,
+                                useWebWorker: true,
+                                initialQuality: 0.8
+                              };
+                              const compressedFile = await imageCompression(file, options);
+                              
+                              setSyncStatus('Enviando...');
+                              const path = `${session.user.id}/mural_${Date.now()}_${compressedFile.name}`;
+                              const url = await dataService.uploadFile(compressedFile, path, 'mural_fotos', compressedFile.type);
+                              const newFoto = { url, caption: '', date: new Date().toISOString() };
+                              
+                              const updatedFotos = await dataService.addMuralFoto(session.user.id, newFoto);
+                              
+                              const updatedProfile = {
+                                ...profile,
+                                mural_fotos: updatedFotos
+                              };
+                              setProfile(updatedProfile as UserProfile);
+                            } catch (err) {
+                              console.error("[Profile] Mural photo upload error:", err);
+                              toast.error("Erro ao enviar foto. Verifique as permissões ou tente novamente.");
+                            } finally {
+                              setLoading(false);
+                              setSyncStatus('');
+                            }
+                          }
+                        }}
+                      />
+                    </label>
+                    <div className="p-3 bg-pink-50 text-pink-600 rounded-2xl">
+                      <Heart size={24} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-8">
+                  {profile?.mural_fotos?.length ? profile.mural_fotos.map((foto, idx) => (
+                    <motion.div 
+                      key={idx}
+                      whileHover={{ scale: 1.05, zIndex: 10, rotate: 0 }}
+                      initial={{ rotate: (idx % 2 === 0 ? -3 : 3) }}
+                      onClick={() => setSelectedFoto(foto)}
+                      className="bg-white p-3 pb-8 shadow-xl border border-slate-100 transform transition-all cursor-pointer rounded-sm group relative"
+                    >
+                      <div className="aspect-square overflow-hidden mb-3">
+                        <img src={foto.url} alt={foto.caption} className="w-full h-full object-cover" />
+                      </div>
+                      <p className="text-[10px] font-serif italic text-slate-500 text-center truncate px-2">{foto.caption || 'Sem legenda'}</p>
+                      
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const newFotos = profile.mural_fotos?.filter((_, i) => i !== idx);
+                          const updatedProfile = { ...profile, mural_fotos: newFotos };
+                          dataService.saveUserProfile(updatedProfile, session?.user?.id || '', navigator.onLine);
+                          setProfile(updatedProfile as UserProfile);
+                        }}
+                        className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X size={12} />
+                      </button>
+                    </motion.div>
+                  )) : (
+                    <div className="col-span-full py-20 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-white/10 rounded-[2rem]">
+                      <ImageIcon size={48} className="text-slate-200 dark:text-white/10 mb-4" />
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nenhuma polaroide no mural</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 🏆 LIDERANÇAS & CARGOS */}
+              {profile?.visible_modules?.includes('liderancas') && (
+                <div className="bg-white dark:bg-white/5 p-6 sm:p-10 rounded-3xl sm:rounded-[3rem] border border-slate-200 dark:border-white/10 shadow-sm">
+                  <div className="flex items-center gap-3 mb-8">
+                    <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
+                      <Trophy size={20} />
+                    </div>
+                    <h2 className="text-xl font-serif font-bold text-slate-900 dark:text-white">Lideranças & Cargos</h2>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {[
+                      { id: 'xi', name: 'XI de Agosto', icon: <Star size={14} />, color: 'text-amber-600', bg: 'bg-amber-50' },
+                      { id: 'sfjr', name: 'SanFran Jr.', icon: <Briefcase size={14} />, color: 'text-blue-600', bg: 'bg-blue-50' },
+                      { id: 'casa', name: 'Casa do Estudante', icon: <ShieldCheck size={14} />, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                      { id: 'monitoria', name: 'Monitoria', icon: <BookOpen size={14} />, color: 'text-purple-600', bg: 'bg-purple-50' },
+                      { id: 'pesquisa', name: 'Pesquisa Acadêmica', icon: <Search size={14} />, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                    ].map((badge) => {
+                      const isEarned = profile?.badges?.includes(badge.id) || 
+                                      profile?.cargos_academicos?.[badge.id as keyof typeof profile.cargos_academicos]?.length;
+                      return (
+                        <div 
+                          key={badge.id}
+                          className={`flex items-center justify-between p-5 rounded-2xl border transition-all ${isEarned ? 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 shadow-sm' : 'opacity-30 grayscale'}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`p-3 rounded-xl ${badge.bg} ${badge.color}`}>
+                              {badge.icon}
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300">{badge.name}</span>
+                              {isEarned && <span className="text-[8px] font-bold text-emerald-600 uppercase">Membro Ativo</span>}
+                            </div>
+                          </div>
+                          {isEarned && <CheckCircle2 size={16} className="text-emerald-500" />}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
-            </div>
-          </div>
+            </motion.div>
+          )}
 
-          {/* Leadership & Badges */}
-          <div className="space-y-8">
-            <div className="bg-white dark:bg-white/5 p-6 sm:p-8 rounded-3xl sm:rounded-[3rem] border border-slate-200 dark:border-white/10 shadow-sm">
-              <div className="flex items-center gap-3 mb-6 sm:mb-8">
-                <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
-                  <Trophy size={20} />
-                </div>
-                <h2 className="text-lg font-serif font-bold text-slate-900 dark:text-white">Lideranças</h2>
-              </div>
-
-              <div className="space-y-4">
-                {[
-                  { id: 'xi', name: 'XI de Agosto', icon: <Star size={14} />, color: 'text-amber-600', bg: 'bg-amber-50' },
-                  { id: 'sfjr', name: 'SanFran Jr.', icon: <Briefcase size={14} />, color: 'text-blue-600', bg: 'bg-blue-50' },
-                  { id: 'casa', name: 'Casa do Estudante', icon: <ShieldCheck size={14} />, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                  { id: 'monitoria', name: 'Monitoria', icon: <BookOpen size={14} />, color: 'text-purple-600', bg: 'bg-purple-50' },
-                  { id: 'pesquisa', name: 'Pesquisa Acadêmica', icon: <Search size={14} />, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-                ].map((badge) => {
-                  const isEarned = profile?.badges?.includes(badge.id) || 
-                                  profile?.cargos_academicos?.[badge.id as keyof typeof profile.cargos_academicos]?.length;
-                  return (
-                    <div 
-                      key={badge.id}
-                      className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${isEarned ? 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 shadow-sm' : 'opacity-30 grayscale'}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg ${badge.bg} ${badge.color}`}>
-                          {badge.icon}
-                        </div>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300">{badge.name}</span>
-                      </div>
-                      {isEarned && <CheckCircle2 size={14} className="text-emerald-500" />}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="bg-sanfran-rubi p-8 rounded-[3rem] shadow-xl shadow-red-900/20 text-white">
-              <h3 className="text-lg font-serif font-bold mb-4">Conexões SanFran</h3>
-              <p className="text-[10px] font-medium opacity-80 mb-6 leading-relaxed">Permita que a IA conheça sua trajetória corporativa e técnica para gerar insights personalizados.</p>
-              <div className="space-y-3">
-                <button className="w-full flex items-center justify-between p-4 bg-white/10 hover:bg-white/20 rounded-2xl border border-white/10 transition-all">
-                  <div className="flex items-center gap-3">
-                    <Linkedin size={18} />
-                    <span className="text-[10px] font-black uppercase tracking-widest">LinkedIn</span>
-                  </div>
-                  <ExternalLink size={14} className="opacity-50" />
-                </button>
-                <button className="w-full flex items-center justify-between p-4 bg-white/10 hover:bg-white/20 rounded-2xl border border-white/10 transition-all">
-                  <div className="flex items-center gap-3">
-                    <Github size={18} />
-                    <span className="text-[10px] font-black uppercase tracking-widest">GitHub</span>
-                  </div>
-                  <ExternalLink size={14} className="opacity-50" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-            {/* ⚙️ 3. CENTRAL DE DADOS E PREFERÊNCIAS */}
-            <div className="space-y-8">
+          {activeTab === 'config' && (
+            <motion.div
+              key="config"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-12"
+            >
               <div className="bg-white dark:bg-white/5 p-10 rounded-[3rem] border border-slate-200 dark:border-white/10 shadow-sm">
                 <div className="flex items-center gap-3 mb-10">
                   <div className="p-2 bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-white rounded-xl">
                     <Settings size={20} />
                   </div>
-                  <h2 className="text-lg font-serif font-bold text-slate-900 dark:text-white">Privacidade</h2>
+                  <h2 className="text-lg font-serif font-bold text-slate-900 dark:text-white">Privacidade & Personalização</h2>
                 </div>
 
-                <div className="space-y-8">
-                  {/* AI Persona Toggle */}
-                  <div className="flex items-center justify-between p-5 bg-sanfran-offwhite dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/5">
+                <div className="space-y-10">
+                  {/* Modo Persona */}
+                  <div className="flex items-center justify-between p-6 bg-slate-50 dark:bg-white/5 rounded-[2rem] border border-slate-200 dark:border-white/5">
                     <div className="flex items-center gap-4">
-                      <div className={`p-2 rounded-xl ${profile?.persona_mode ? 'bg-sanfran-rubi text-white' : 'bg-slate-200 text-slate-400'}`}>
-                        <Zap size={18} />
+                      <div className={`p-3 rounded-2xl ${profile?.persona_mode ? 'bg-sanfran-rubi text-white' : 'bg-slate-200 text-slate-400'}`}>
+                        <Zap size={20} />
                       </div>
                       <div>
                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-900 dark:text-white">Modo Persona</p>
-                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">IA Inteligente Ativa</p>
+                        <p className="text-[9px] font-medium text-slate-400 uppercase tracking-tighter">Permite que a IA analise seu perfil para insights</p>
                       </div>
                     </div>
-                    <button 
-                      onClick={handleTogglePersona}
-                      className="transition-transform active:scale-95"
-                    >
-                      {profile?.persona_mode ? <ToggleRight size={40} className="text-sanfran-rubi" /> : <ToggleLeft size={40} className="text-slate-300" />}
+                    <button onClick={handleTogglePersona} className="transition-transform active:scale-95">
+                      {profile?.persona_mode ? <ToggleRight size={44} className="text-sanfran-rubi" /> : <ToggleLeft size={44} className="text-slate-300" />}
                     </button>
                   </div>
 
-                  {/* Visibility Settings */}
+                  {/* Visibilidade do Perfil */}
                   <div className="space-y-4">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Visibilidade</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Visibilidade do Perfil</p>
                     <div className="grid grid-cols-3 gap-3">
                       {[
-                        { id: 'public', label: 'Largo', icon: <Globe size={14} /> },
-                        { id: 'friends', label: 'Amigos', icon: <Users size={14} /> },
-                        { id: 'private', label: 'Privado', icon: <EyeOff size={14} /> },
+                        { id: 'public', label: 'Largo', icon: <Globe size={14} />, desc: 'Todos podem ver' },
+                        { id: 'friends', label: 'Amigos', icon: <Users size={14} />, desc: 'Apenas conexões' },
+                        { id: 'private', label: 'Privado', icon: <EyeOff size={14} />, desc: 'Apenas você' },
                       ].map((opt) => (
                         <button
                           key={opt.id}
                           onClick={() => handleVisibilityChange(opt.id as any)}
-                          className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${profile?.visibility === opt.id ? 'bg-sanfran-rubi text-white border-sanfran-rubi shadow-lg shadow-red-900/20' : 'bg-white dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/5 hover:bg-slate-50'}`}
+                          className={`flex flex-col items-center gap-2 p-5 rounded-3xl border transition-all ${profile?.visibility === opt.id ? 'bg-sanfran-rubi text-white border-sanfran-rubi shadow-xl shadow-red-900/20' : 'bg-white dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/5 hover:bg-slate-50'}`}
                         >
                           {opt.icon}
                           <span className="text-[9px] font-black uppercase tracking-widest">{opt.label}</span>
+                          <span className="text-[7px] font-bold opacity-60 uppercase tracking-tighter">{opt.desc}</span>
                         </button>
                       ))}
                     </div>
                   </div>
 
-                  {/* Reset Profile */}
-                  <div className="pt-8 border-t border-slate-100 dark:border-white/5">
-                    <button 
-                      onClick={handleResetProfile}
-                      className="w-full flex items-center justify-center gap-3 py-5 bg-slate-50 text-slate-600 rounded-3xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-100 transition-all border border-slate-200"
-                    >
-                      <RefreshCw size={16} />
-                      Resetar Perfil (Persona e Progresso)
-                    </button>
+                  {/* Módulos Visíveis */}
+                  <div className="space-y-4">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Módulos Visíveis</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {[
+                        { id: 'academico', label: 'Acadêmico', icon: <BookOpen size={14} /> },
+                        { id: 'mural', label: 'Mural', icon: <ImageIcon size={14} /> },
+                        { id: 'liderancas', label: 'Lideranças', icon: <Trophy size={14} /> },
+                        { id: 'skills', label: 'Habilidades', icon: <Award size={14} /> },
+                        { id: 'idiomas', label: 'Idiomas', icon: <Languages size={14} /> },
+                        { id: 'social', label: 'Conexões', icon: <Share2 size={14} /> },
+                        { id: 'interests', label: 'Interesses', icon: <Heart size={14} /> },
+                      ].map((mod) => {
+                        const isVisible = profile?.visible_modules?.includes(mod.id);
+                        return (
+                          <button
+                            key={mod.id}
+                            onClick={() => toggleModule(mod.id)}
+                            className={`flex items-center gap-3 p-4 rounded-2xl border transition-all ${isVisible ? 'bg-indigo-50 dark:bg-indigo-900/10 text-indigo-600 border-indigo-100 dark:border-indigo-900/20' : 'bg-white dark:bg-white/5 text-slate-400 border-slate-200 dark:border-white/5'}`}
+                          >
+                            {mod.icon}
+                            <span className="text-[9px] font-black uppercase tracking-widest">{mod.label}</span>
+                            <div className="ml-auto">
+                              {isVisible ? <CheckCircle2 size={12} /> : <X size={12} />}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
 
-                  {/* Clear History */}
-                  <div className="pt-8 border-t border-slate-100 dark:border-white/5">
+                  {/* Ações de Conta */}
+                  <div className="pt-10 border-t border-slate-100 dark:border-white/5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button 
+                      onClick={handleResetProfile}
+                      className="flex items-center justify-center gap-3 py-5 bg-slate-50 dark:bg-white/5 text-slate-600 dark:text-slate-400 rounded-3xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-100 transition-all border border-slate-200 dark:border-white/10"
+                    >
+                      <RefreshCw size={16} />
+                      Resetar Perfil
+                    </button>
+
                     {!showConfirmClear ? (
                       <button 
                         onClick={() => setShowConfirmClear(true)}
-                        className="w-full flex items-center justify-center gap-3 py-5 bg-amber-50 text-amber-700 rounded-3xl font-black uppercase text-[10px] tracking-widest hover:bg-amber-100 transition-all border border-amber-100"
+                        className="flex items-center justify-center gap-3 py-5 bg-red-50 text-red-600 rounded-3xl font-black uppercase text-[10px] tracking-widest hover:bg-red-100 transition-all border border-red-100"
                       >
-                        <History size={16} />
-                        Limpar Histórico e Nuvem
+                        <Trash2 size={16} />
+                        Apagar Tudo
                       </button>
                     ) : (
-                      <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-300">
-                        <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-100 rounded-2xl">
-                          <AlertTriangle className="text-red-500 shrink-0" size={18} />
-                          <p className="text-[9px] font-bold text-red-700 leading-tight">
-                            Atenção: Esta ação é irreversível e apagará todos os seus dados da SanFran Academy.
-                          </p>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <button 
-                            onClick={() => setShowConfirmClear(false)}
-                            className="py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase text-[9px] tracking-widest"
-                          >
-                            Cancelar
-                          </button>
-                          <button 
-                            onClick={handleClearAllData}
-                            disabled={isClearing}
-                            className="py-4 bg-red-600 text-white rounded-2xl font-black uppercase text-[9px] tracking-widest shadow-lg shadow-red-900/20 flex items-center justify-center gap-2"
-                          >
-                            {isClearing ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                            Confirmar
-                          </button>
-                        </div>
+                      <div className="flex items-center gap-2 animate-in slide-in-from-right-4">
+                        <button 
+                          onClick={() => setShowConfirmClear(false)}
+                          className="flex-1 py-5 bg-slate-100 text-slate-500 rounded-3xl font-black uppercase text-[10px] tracking-widest"
+                        >
+                          Cancelar
+                        </button>
+                        <button 
+                          onClick={handleClearAllData}
+                          disabled={isClearing}
+                          className="flex-[2] py-5 bg-red-600 text-white rounded-3xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-red-900/20 flex items-center justify-center gap-2"
+                        >
+                          {isClearing ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                          Confirmar
+                        </button>
                       </div>
                     )}
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* 📝 MODAL DE FOTO */}
         <AnimatePresence>
@@ -1209,7 +1258,7 @@ const Profile: React.FC = () => {
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Nome Completo</label>
                     <input 
                       type="text" 
-                      value={editForm.full_name}
+                      value={editForm.full_name || ''}
                       onChange={(e) => setEditForm({...editForm, full_name: e.target.value})}
                       className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
                     />
@@ -1220,7 +1269,7 @@ const Profile: React.FC = () => {
                       <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Turma (Ano)</label>
                       <input 
                         type="number" 
-                        value={editForm.turma}
+                        value={editForm.turma ?? 0}
                         onChange={(e) => setEditForm({...editForm, turma: parseInt(e.target.value)})}
                         className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
                       />
@@ -1229,7 +1278,7 @@ const Profile: React.FC = () => {
                       <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Sala</label>
                       <input 
                         type="text" 
-                        value={editForm.sala}
+                        value={editForm.sala || ''}
                         onChange={(e) => setEditForm({...editForm, sala: e.target.value})}
                         className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
                       />
@@ -1241,7 +1290,7 @@ const Profile: React.FC = () => {
                       <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Aniversário</label>
                       <input 
                         type="date" 
-                        value={editForm.aniversario}
+                        value={editForm.aniversario || ''}
                         onChange={(e) => setEditForm({...editForm, aniversario: e.target.value})}
                         className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
                       />
@@ -1250,7 +1299,7 @@ const Profile: React.FC = () => {
                       <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Progresso (%)</label>
                       <input 
                         type="number" 
-                        value={editForm.progresso_total}
+                        value={editForm.progresso_total ?? 0}
                         onChange={(e) => setEditForm({...editForm, progresso_total: parseInt(e.target.value)})}
                         className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
                       />
@@ -1261,7 +1310,7 @@ const Profile: React.FC = () => {
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Avatar URL</label>
                     <input 
                       type="text" 
-                      value={editForm.avatar_url}
+                      value={editForm.avatar_url || ''}
                       onChange={(e) => setEditForm({...editForm, avatar_url: e.target.value})}
                       className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
                       placeholder="https://..."
@@ -1271,7 +1320,7 @@ const Profile: React.FC = () => {
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Bio Curta</label>
                     <textarea 
-                      value={editForm.bio}
+                      value={editForm.bio || ''}
                       onChange={(e) => setEditForm({...editForm, bio: e.target.value})}
                       rows={2}
                       className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold resize-none"
@@ -1279,10 +1328,40 @@ const Profile: React.FC = () => {
                   </div>
 
                   <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Arquétipo</label>
+                    <input 
+                      type="text" 
+                      value={editForm.archetype || ''}
+                      onChange={(e) => setEditForm({...editForm, archetype: e.target.value})}
+                      className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Habilidades (separadas por vírgula)</label>
+                    <input 
+                      type="text" 
+                      value={editForm.skills?.join(', ') || ''}
+                      onChange={(e) => setEditForm({...editForm, skills: e.target.value.split(',').map(s => s.trim()).filter(s => s)})}
+                      className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Interesses (separados por vírgula)</label>
+                    <input 
+                      type="text" 
+                      value={editForm.interests?.join(', ') || ''}
+                      onChange={(e) => setEditForm({...editForm, interests: e.target.value.split(',').map(s => s.trim()).filter(s => s)})}
+                      className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Idiomas (separados por vírgula)</label>
                     <input 
                       type="text" 
-                      value={editForm.idiomas.join(', ')}
+                      value={editForm.idiomas?.join(', ') || ''}
                       onChange={(e) => setEditForm({...editForm, idiomas: e.target.value.split(',').map(s => s.trim()).filter(s => s)})}
                       className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
                     />
@@ -1292,7 +1371,7 @@ const Profile: React.FC = () => {
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Intercâmbio</label>
                     <input 
                       type="text" 
-                      value={editForm.intercambio}
+                      value={editForm.intercambio || ''}
                       onChange={(e) => setEditForm({...editForm, intercambio: e.target.value})}
                       className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
                     />
@@ -1301,7 +1380,7 @@ const Profile: React.FC = () => {
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Memórias</label>
                     <textarea 
-                      value={editForm.memorias}
+                      value={editForm.memorias || ''}
                       onChange={(e) => setEditForm({...editForm, memorias: e.target.value})}
                       rows={2}
                       className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold resize-none"
@@ -1316,7 +1395,7 @@ const Profile: React.FC = () => {
                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Créditos Aula</label>
                         <input 
                           type="number" 
-                          value={editForm.creditos_aula}
+                          value={editForm.creditos_aula ?? 0}
                           onChange={(e) => setEditForm({...editForm, creditos_aula: parseInt(e.target.value)})}
                           className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
                         />
@@ -1325,7 +1404,7 @@ const Profile: React.FC = () => {
                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Créditos Trabalho</label>
                         <input 
                           type="number" 
-                          value={editForm.creditos_trabalho}
+                          value={editForm.creditos_trabalho ?? 0}
                           onChange={(e) => setEditForm({...editForm, creditos_trabalho: parseInt(e.target.value)})}
                           className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
                         />
@@ -1338,7 +1417,7 @@ const Profile: React.FC = () => {
                         <input 
                           type="number" 
                           step="0.01"
-                          value={editForm.media}
+                          value={editForm.media ?? 0}
                           onChange={(e) => setEditForm({...editForm, media: parseFloat(e.target.value)})}
                           className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
                         />
@@ -1347,7 +1426,7 @@ const Profile: React.FC = () => {
                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Horas Extensão</label>
                         <input 
                           type="number" 
-                          value={editForm.horas_extensao}
+                          value={editForm.horas_extensao ?? 0}
                           onChange={(e) => setEditForm({...editForm, horas_extensao: parseInt(e.target.value)})}
                           className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
                         />
@@ -1359,7 +1438,7 @@ const Profile: React.FC = () => {
                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Progresso Obrigatórias (%)</label>
                         <input 
                           type="number" 
-                          value={editForm.progresso_obrigatorias}
+                          value={editForm.progresso_obrigatorias ?? 0}
                           onChange={(e) => setEditForm({...editForm, progresso_obrigatorias: parseInt(e.target.value)})}
                           className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
                         />
@@ -1368,7 +1447,7 @@ const Profile: React.FC = () => {
                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Progresso Optativas (%)</label>
                         <input 
                           type="number" 
-                          value={editForm.progresso_optativas}
+                          value={editForm.progresso_optativas ?? 0}
                           onChange={(e) => setEditForm({...editForm, progresso_optativas: parseInt(e.target.value)})}
                           className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
                         />
@@ -1416,6 +1495,16 @@ const Profile: React.FC = () => {
                       type="text" 
                       value={editForm.social_links.linkedin || ''}
                       onChange={(e) => setEditForm({...editForm, social_links: {...editForm.social_links, linkedin: e.target.value}})}
+                      className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Instagram URL</label>
+                    <input 
+                      type="text" 
+                      value={editForm.social_links.instagram || ''}
+                      onChange={(e) => setEditForm({...editForm, social_links: {...editForm.social_links, instagram: e.target.value}})}
                       className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-sanfran-rubi outline-none transition-all text-sm font-bold"
                     />
                   </div>
@@ -1581,6 +1670,7 @@ const Profile: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+      </div>
     </div>
   );
 };

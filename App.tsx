@@ -64,6 +64,8 @@ const ErrorLog = React.lazy(() => import('./components/ErrorLog'));
 const CodeTracker = React.lazy(() => import('./components/CodeTracker'));
 const IracMethod = React.lazy(() => import('./components/IracMethod')); 
 const SpacedRepetition = React.lazy(() => import('./components/SpacedRepetition'));
+const Connect = React.lazy(() => import('./components/Connect'));
+const Friends = React.lazy(() => import('./components/Friends'));
 const AttendanceCalculator = React.lazy(() => import('./components/AttendanceCalculator'));
 const SyllabusTracker = React.lazy(() => import('./components/SyllabusTracker')); 
 const DeadlinePlanner = React.lazy(() => import('./components/DeadlinePlanner'));
@@ -823,6 +825,8 @@ const App: React.FC = () => {
     { id: View.Subjects, icon: BookOpen, label: 'Disciplinas', color: 'text-pink-600', bg: 'bg-pink-100' },
     { id: View.Tasks, icon: CheckSquare, label: 'Tarefas', color: 'text-emerald-600', bg: 'bg-emerald-100' },
     { id: View.Anki, icon: BrainCircuit, label: 'FLASHCARDS', color: 'text-slate-900', bg: 'bg-slate-200' },
+    { id: View.Connect, icon: MessageSquare, label: 'CONNECT', color: 'text-blue-600', bg: 'bg-blue-100' },
+    { id: View.Friends, icon: Users, label: 'FRIENDS', color: 'text-emerald-600', bg: 'bg-emerald-100' },
     { id: View.Statistics, icon: BarChart3, label: 'Estatísticas', color: 'text-usp-gold', bg: 'bg-usp-gold/10' },
     { id: View.Timer, icon: TimerIcon, label: 'Controle de Tempo', color: 'text-red-600', bg: 'bg-red-100' },
 
@@ -874,7 +878,7 @@ const App: React.FC = () => {
       if (session?.user?.id) {
         const [notifs, frnds] = await Promise.all([
           dataService.getNotifications(session.user.id),
-          dataService.getFriends(session.user.id)
+          dataService.getFriendships(session.user.id)
         ]);
         setNotifications(notifs);
         setFriends(frnds);
@@ -1256,6 +1260,8 @@ const App: React.FC = () => {
                 <Route path={getPathFromView(View.CodeTracker)} element={<CodeTracker userId={session.user.id} />} />
                 <Route path={getPathFromView(View.IracMethod)} element={<IracMethod userId={session.user.id} />} />
                 <Route path={getPathFromView(View.SpacedRepetition)} element={<SpacedRepetition userId={session.user.id} />} />
+                <Route path={getPathFromView(View.Connect)} element={<Connect userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />} />
+                <Route path={getPathFromView(View.Friends)} element={<Friends userId={session.user.id} userName={userProfile?.full_name || session.user.email || 'Usuário'} onNavigate={setCurrentView} />} />
                 <Route path={getPathFromView(View.AttendanceCalculator)} element={<AttendanceCalculator userId={session.user.id} />} />
                 <Route path={getPathFromView(View.SyllabusTracker)} element={<SyllabusTracker userId={session.user.id} />} />
                 <Route path={getPathFromView(View.DeadlinePlanner)} element={<DeadlinePlanner userId={session.user.id} />} />

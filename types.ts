@@ -108,7 +108,9 @@ export enum View {
   TypingLab = 'typing_lab',
   Sumulas = 'sumulas',
   SanFranConcursos = 'sanfran_concursos',
-  ApprovalTrail = 'approval_trail'
+  ApprovalTrail = 'approval_trail',
+  Connect = 'connect',
+  Friends = 'friends',
 }
 
 export interface Folder {
@@ -576,6 +578,10 @@ export interface UserProfile {
   media?: number;
   horas_extensao?: number;
   entidades?: string[];
+  skills?: string[];
+  interests?: string[];
+  academic_background?: { degree: string; institution: string; year: string }[];
+  visible_modules?: string[];
 }
 
 export interface UserConfig {
@@ -919,9 +925,11 @@ export interface Friendship {
   id: string;
   user_id: string;
   friend_id: string;
-  friend_name: string;
-  status: 'pending' | 'accepted' | 'pendente' | 'aceito';
+  status: 'pending' | 'accepted' | 'declined';
   created_at: string;
+  updated_at: string;
+  friend_name?: string;
+  friend_avatar?: string;
 }
 
 // Auction Types
@@ -990,6 +998,42 @@ export interface MobilityPost {
   available_spots: number;
   user_id: string;
   user_name: string;
+  created_at: string;
+}
+
+// Connect (Chat) Types
+export interface ChatRoom {
+  id: string;
+  name?: string; // For groups
+  is_group: boolean;
+  last_message?: string;
+  last_message_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  room_id: string;
+  sender_id: string;
+  sender_name: string;
+  content: string;
+  attachment_url?: string;
+  attachment_name?: string;
+  attachment_type?: string;
+  status: 'sent' | 'delivered' | 'read';
+  created_at: string;
+}
+
+export interface ChatParticipant {
+  id: string;
+  room_id: string;
+  user_id: string;
+  user_name: string;
+  user_avatar?: string;
+  unread_count: number;
+  is_typing: boolean;
+  last_read_at?: string;
   created_at: string;
 }
 

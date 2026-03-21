@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 import { db, addToSyncQueue } from './offlineService';
-import { Flashcard, Task, StudySession, Note, SubjectFile, Folder, Board, UserProgress } from '../types';
+import { Flashcard, Task, StudySession, Note, SubjectFile, Folder, Board, UserProgress, Friendship, Notification } from '../types';
 
 export const dataService = {
   // BOARDS
@@ -103,7 +103,11 @@ export const dataService = {
         persona_mode: sanitized.persona_mode,
         onboarding_completed: sanitized.onboarding_completed,
         visibility: sanitized.visibility,
-        viewPreferences: sanitized.viewPreferences || {}
+        viewPreferences: sanitized.viewPreferences || {},
+        skills: sanitized.skills || [],
+        interests: sanitized.interests || [],
+        academic_background: sanitized.academic_background || [],
+        visible_modules: sanitized.visible_modules || ['jornada', 'grade', 'evolucao', 'mural', 'lideranca', 'conexoes']
       },
       profile_completion: sanitized.arcadia_score || 0,
       full_name: sanitized.full_name || null,
@@ -215,6 +219,11 @@ export const dataService = {
           badges: data.badges,
           social_links: data.social_links,
           viewPreferences: data.persona_data?.viewPreferences || {},
+          archetype: data.persona_data?.archetype || null,
+          skills: data.persona_data?.skills || [],
+          interests: data.persona_data?.interests || [],
+          academic_background: data.persona_data?.academic_background || [],
+          visible_modules: data.persona_data?.visible_modules || ['jornada', 'grade', 'evolucao', 'mural', 'lideranca', 'conexoes'],
           creditos_aula: data.creditos_aula,
           creditos_trabalho: data.creditos_trabalho,
           media: data.media,
@@ -483,30 +492,59 @@ export const dataService = {
   },
 
   // COLLABORATION
-  async getFriends(userId: string) {
-    // Tenta buscar amizades aceitas (aceito ou accepted para compatibilidade)
+  async getFriendships(userId: string) {
     const { data, error } = await supabase
       .from('friendships')
       .select('*')
-      .eq('user_id', userId)
-      .in('status', ['aceito', 'accepted']);
+      .or(`user_id.eq.${userId},friend_id.eq.${userId}`);
     
     if (error || !data) return [];
 
-    // Busca os nomes dos amigos na tabela user_persona
-    const friendIds = data.map(f => f.friend_id);
+    const friendIds = data.map(f => f.user_id === userId ? f.friend_id : f.user_id);
     const { data: profiles } = await supabase
       .from('user_persona')
       .select('id, persona_data')
       .in('id', friendIds);
 
     return data.map(f => {
-      const profile = profiles?.find(p => p.id === f.friend_id);
+      const friendId = f.user_id === userId ? f.friend_id : f.user_id;
+      const profile = profiles?.find(p => p.id === friendId);
       return {
         ...f,
-        friend_name: profile?.persona_data?.answers?.['nome'] || profile?.persona_data?.name || 'Amigo'
+        friend_name: profile?.persona_data?.nome || profile?.persona_data?.name || 'Amigo',
+        friend_avatar: profile?.persona_data?.avatar_url
       };
-    });
+    }) as Friendship[];
+  },
+
+  async sendFriendRequest(userId: string, friendId: string) {
+    const { data, error } = await supabase
+      .from('friendships')
+      .insert({
+        user_id: userId,
+        friend_id: friendId,
+        status: 'pending'
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data as Friendship;
+  },
+
+  async handleFriendRequest(friendshipId: string, status: 'accepted' | 'declined') {
+    const { data, error } = await supabase
+      .from('friendships')
+      .update({ 
+        status,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', friendshipId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data as Friendship;
   },
 
   async getNotifications(userId: string) {
