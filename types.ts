@@ -10,6 +10,8 @@ export enum View {
   SanFranLife = 'sanfran_life',
   SanFranGames = 'sanfran_games',
   SanFranHelp = 'sanfran_help',
+  FAQ = 'faq',
+  Settings = 'settings',
   SanFranOAB = 'sanfran_oab',
   Profile = 'profile',
   Anki = 'anki',

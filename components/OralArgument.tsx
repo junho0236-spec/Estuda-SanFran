@@ -14,6 +14,7 @@ const OralArgument: React.FC = () => {
   
   // Ref para o elemento de áudio
   const bellRef = useRef<HTMLAudioElement | null>(null);
+  const playPromiseRef = useRef<Promise<void> | null>(null);
   
   // URL estável para som de campainha de serviço (Mixkit CDN)
   const BELL_SOUND_URL = "https://assets.mixkit.co/sfx/preview/mixkit-service-bell-ring-1461.mp3";
@@ -76,11 +77,30 @@ const OralArgument: React.FC = () => {
     }
   }, [timeLeft, isActive]);
 
-  const playBell = () => {
-    if (bellRef.current) {
-      bellRef.current.currentTime = 0;
-      bellRef.current.volume = 1.0;
-      bellRef.current.play().catch(e => console.log("Erro ao tocar áudio (Autoplay bloqueado?):", e));
+  const playBell = async () => {
+    const audio = bellRef.current;
+    if (!audio) return;
+
+    // Se houver uma promessa de play pendente, esperamos ela terminar
+    if (playPromiseRef.current) {
+      try {
+        await playPromiseRef.current;
+      } catch (e) {
+        // Ignora erros de interrupção prévios
+      }
+    }
+
+    try {
+      audio.currentTime = 0;
+      audio.volume = 1.0;
+      playPromiseRef.current = audio.play();
+      await playPromiseRef.current;
+    } catch (error: any) {
+      if (error.name !== 'AbortError' && error.name !== 'NotAllowedError') {
+        console.error("Erro ao tocar áudio:", error);
+      }
+    } finally {
+      playPromiseRef.current = null;
     }
   };
 
@@ -88,14 +108,7 @@ const OralArgument: React.FC = () => {
   const toggleTimer = () => {
     if (!isActive) {
       // Warm-up: Toca o áudio mudo rapidamente para o navegador liberar o autoplay
-      if (bellRef.current) {
-        bellRef.current.volume = 0; // Mudo
-        bellRef.current.play().then(() => {
-          bellRef.current.pause();
-          bellRef.current.currentTime = 0;
-          bellRef.current.volume = 1; // Restaura volume
-        }).catch(e => console.log("Warm-up de áudio falhou:", e));
-      }
+      playBell(); // Agora playBell já é robusto
       setIsActive(true);
       setStatus('running');
     } else {

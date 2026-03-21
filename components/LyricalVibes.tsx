@@ -286,6 +286,12 @@ const LyricalVibes: React.FC<LyricalVibesProps> = ({ userId }) => {
 
   // Input Refs for Navigation
   const inputRefs = useRef<Record<number, HTMLInputElement | null>>({});
+  const sfxAudioRef = useRef<HTMLAudioElement | null>(null);
+  const sfxPromiseRef = useRef<Promise<void> | null>(null);
+
+  useEffect(() => {
+    sfxAudioRef.current = new Audio();
+  }, []);
 
   // Calculations
   const totalBlanks = useMemo(() => {
@@ -295,10 +301,28 @@ const LyricalVibes: React.FC<LyricalVibesProps> = ({ userId }) => {
   const progressPercent = totalBlanks > 0 ? (correctCount / totalBlanks) * 100 : 0;
 
   // Sound Helper
-  const playSound = (type: 'correct' | 'wrong' | 'win' | 'reveal') => {
-      const audio = new Audio(SFX[type]);
-      audio.volume = 0.4;
-      audio.play().catch(() => {});
+  const playSound = async (type: 'correct' | 'wrong' | 'win' | 'reveal') => {
+      const audio = sfxAudioRef.current;
+      if (!audio) return;
+
+      if (sfxPromiseRef.current) {
+        try {
+          await sfxPromiseRef.current;
+        } catch (e) {}
+      }
+
+      try {
+        audio.src = SFX[type];
+        audio.volume = 0.4;
+        sfxPromiseRef.current = audio.play();
+        await sfxPromiseRef.current;
+      } catch (error: any) {
+        if (error.name !== 'AbortError' && error.name !== 'NotAllowedError') {
+          console.error("Erro SFX:", error);
+        }
+      } finally {
+        sfxPromiseRef.current = null;
+      }
   };
 
   const handleSelectSong = (song: EnhancedSong) => {

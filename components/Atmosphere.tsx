@@ -32,6 +32,8 @@ const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus, isSidebarOpen, 
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const playPromiseRef = useRef<Promise<void> | null>(null);
+  const activeRequestIdRef = useRef<number>(0);
 
   // Efeito para controlar o Volume
   useEffect(() => {
@@ -45,25 +47,60 @@ const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus, isSidebarOpen, 
     const audio = audioRef.current;
     if (!audio) return;
 
+    const requestId = ++activeRequestIdRef.current;
+
     const handlePlay = async () => {
+      // Se houver uma promessa de play pendente, esperamos ela terminar
+      if (playPromiseRef.current) {
+        try {
+          await playPromiseRef.current;
+        } catch (e) {
+          // Ignora erros de interrupção prévios
+        }
+      }
+
+      // Se esta requisição não for mais a ativa, interrompemos
+      if (requestId !== activeRequestIdRef.current) return;
+
       if (isPlaying && currentTrackId) {
         const track = tracks.find(t => t.id === currentTrackId);
         if (track && audio.src !== track.url) {
           setIsLoading(true);
           audio.src = track.url;
-          audio.load();
+          try {
+            audio.load();
+          } catch (e) {
+            // load() pode falhar se o src for inválido ou interrompido
+          }
         }
         
         try {
-          await audio.play();
-          setIsLoading(false);
-        } catch (error) {
-          console.error("Falha na reprodução:", error);
-          setIsPlaying(false);
-          setIsLoading(false);
+          playPromiseRef.current = audio.play();
+          await playPromiseRef.current;
+          if (requestId === activeRequestIdRef.current) {
+            setIsLoading(false);
+          }
+        } catch (error: any) {
+          // Se esta ainda for a requisição ativa, tratamos o erro
+          if (requestId === activeRequestIdRef.current) {
+            // Erros de interrupção (AbortError) são comuns e esperados em trocas rápidas
+            if (error.name !== 'AbortError' && error.name !== 'NotAllowedError') {
+              console.error("Falha na reprodução:", error);
+              setIsPlaying(false);
+            }
+            setIsLoading(false);
+          }
+        } finally {
+          if (requestId === activeRequestIdRef.current) {
+            playPromiseRef.current = null;
+          }
         }
       } else {
-        audio.pause();
+        try {
+          audio.pause();
+        } catch (e) {
+          // pause() raramente falha, mas tratamos por segurança
+        }
       }
     };
 

@@ -157,11 +157,38 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
   
   const [isLoading, setIsLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
+  const sfxAudioRef = useRef<HTMLAudioElement | null>(null);
+  const sfxPromiseRef = useRef<Promise<void> | null>(null);
 
   // --- INIT ---
   useEffect(() => {
     fetchProgress();
+    // Initialize SFX audio element
+    sfxAudioRef.current = new Audio();
   }, [userId]);
+
+  const playSFX = async (url: string) => {
+    const audio = sfxAudioRef.current;
+    if (!audio) return;
+
+    if (sfxPromiseRef.current) {
+      try {
+        await sfxPromiseRef.current;
+      } catch (e) {}
+    }
+
+    try {
+      audio.src = url;
+      sfxPromiseRef.current = audio.play();
+      await sfxPromiseRef.current;
+    } catch (error: any) {
+      if (error.name !== 'AbortError' && error.name !== 'NotAllowedError') {
+        console.error("Erro SFX:", error);
+      }
+    } finally {
+      sfxPromiseRef.current = null;
+    }
+  };
 
   const fetchProgress = async () => {
     setIsLoading(true);
@@ -282,15 +309,11 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
 
   const handleWrongAnswer = () => {
      setSessionLives(prev => prev - 1);
-     const audio = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-wrong-answer-fail-notification-946.mp3');
-     audio.volume = 0.3;
-     audio.play().catch(() => {});
+     playSFX('https://assets.mixkit.co/sfx/preview/mixkit-wrong-answer-fail-notification-946.mp3');
   };
 
   const playSuccessSound = () => {
-     const audio = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-correct-answer-tone-2870.mp3');
-     audio.volume = 0.3;
-     audio.play().catch(() => {});
+     playSFX('https://assets.mixkit.co/sfx/preview/mixkit-correct-answer-tone-2870.mp3');
   }
 
   const playAudio = (text: string) => {

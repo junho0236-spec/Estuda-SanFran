@@ -95,6 +95,8 @@ const SanFranLanguages = React.lazy(() => import('./components/SanFranLanguages'
 const SanFranLife = React.lazy(() => import('./components/SanFranLife'));
 const SanFranGames = React.lazy(() => import('./components/SanFranGames'));
 const SanFranHelp = React.lazy(() => import('./components/SanFranHelp'));
+const FAQ = React.lazy(() => import('./components/FAQ'));
+const Settings = React.lazy(() => import('./components/Settings'));
 const SanFranOAB = React.lazy(() => import('./components/SanFranOAB'));
 const LegalCinema = React.lazy(() => import('./components/LegalCinema'));
 const GeneralLanguages = React.lazy(() => import('./components/GeneralLanguages')); 
@@ -1084,31 +1086,13 @@ const App: React.FC = () => {
           })}
         </nav>
 
-        <div className={`p-4 space-y-3 bg-slate-50 dark:bg-black/20 border-t border-slate-100 dark:border-sanfran-rubi/10 ${isSidebarMinimized ? 'px-2 items-center flex flex-col' : ''}`}>
+        <div className={`p-4 bg-slate-50 dark:bg-black/20 border-t border-slate-100 dark:border-sanfran-rubi/10 ${isSidebarMinimized ? 'px-2 items-center flex flex-col' : ''}`}>
           <button 
             onClick={() => setIsSidebarMinimized(!isSidebarMinimized)} 
             className={`hidden lg:flex items-center justify-center bg-white dark:bg-sanfran-rubiDark border border-slate-200 dark:border-sanfran-rubi/30 text-slate-900 dark:text-white shadow-sm hover:shadow-md transition-all rounded-xl ${isSidebarMinimized ? 'w-10 h-10' : 'w-full py-2 gap-2 text-[9px] font-black uppercase tracking-widest'}`}
             title={isSidebarMinimized ? "Expandir Barra Lateral" : "Minimizar Barra Lateral"}
           >
             {isSidebarMinimized ? <ChevronRight className="w-4 h-4" /> : <><ChevronLeft className="w-4 h-4" /> Minimizar</>}
-          </button>
-
-          <button 
-            onClick={() => setIsDarkMode(!isDarkMode)} 
-            className={`flex items-center bg-white dark:bg-sanfran-rubiDark border border-slate-200 dark:border-sanfran-rubi/30 text-slate-900 dark:text-white shadow-sm hover:shadow-md transition-all rounded-2xl ${isSidebarMinimized ? 'w-10 h-10 justify-center' : 'w-full px-4 py-3 justify-between text-[9px] font-black uppercase tracking-widest'}`}
-            title={isSidebarMinimized ? (isDarkMode ? 'Modo Claro' : 'Modo Escuro') : ""}
-          >
-            {!isSidebarMinimized && (isDarkMode ? 'Modo Escuro' : 'Modo Claro')}
-            {isDarkMode ? <Moon className="w-4 h-4 text-usp-blue" /> : <Sun className="w-4 h-4 text-usp-gold" />}
-          </button>
-          
-          <button 
-            onClick={handleLogout} 
-            className={`flex items-center justify-center text-slate-400 hover:text-red-500 font-black uppercase tracking-widest transition-colors hover:bg-red-50 dark:hover:bg-red-900/10 rounded-2xl ${isSidebarMinimized ? 'w-10 h-10' : 'w-full gap-2 px-4 py-3 text-[10px]'}`}
-            title={isSidebarMinimized ? "Encerrar Sessão" : ""}
-          >
-            <LogOut className="w-4 h-4" /> 
-            {!isSidebarMinimized && "Encerrar Sessão"}
           </button>
         </div>
       </aside>
@@ -1131,8 +1115,13 @@ const App: React.FC = () => {
               <HeaderActions 
                 notifications={notifications} 
                 userId={session?.user?.id || ''}
+                userProfile={userProfile}
+                isDarkMode={isDarkMode}
+                onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
                 onNotificationClick={handleNotificationClick}
                 onMarkAllRead={() => setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))}
+                onViewChange={setCurrentView}
+                onLogout={handleLogout}
               />
             </div>
           )}
@@ -1172,6 +1161,8 @@ const App: React.FC = () => {
                 <Route path={getPathFromView(View.SanFranLife)} element={<SanFranLife onNavigate={setCurrentView} />} />
                 <Route path={getPathFromView(View.SanFranGames)} element={<SanFranGames onNavigate={setCurrentView} />} />
                 <Route path={getPathFromView(View.SanFranHelp)} element={<SanFranHelp onNavigate={setCurrentView} />} />
+                <Route path={getPathFromView(View.FAQ)} element={<FAQ onNavigate={setCurrentView} />} />
+                <Route path={getPathFromView(View.Settings)} element={<Settings />} />
                 <Route path={getPathFromView(View.SanFranOAB)} element={<SanFranOAB onNavigate={setCurrentView} />} />
 
                 <Route path={getPathFromView(View.Profile)} element={<Profile />} />
