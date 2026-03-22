@@ -105,17 +105,28 @@ ALTER TABLE chat_participants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
 
 -- Políticas para Chat
+-- Função para evitar recursão infinita no RLS
+CREATE OR REPLACE FUNCTION check_is_room_participant(p_room_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM chat_participants 
+    WHERE room_id = p_room_id AND user_id = auth.uid()
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 CREATE POLICY "Participantes podem ver suas salas" ON chat_rooms
-  FOR SELECT USING (EXISTS (SELECT 1 FROM chat_participants WHERE room_id = chat_rooms.id AND user_id = auth.uid()));
+  FOR SELECT USING (check_is_room_participant(id));
 
 CREATE POLICY "Qualquer usuário autenticado pode criar salas" ON chat_rooms
   FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
 CREATE POLICY "Participantes podem atualizar suas salas" ON chat_rooms
-  FOR UPDATE USING (EXISTS (SELECT 1 FROM chat_participants WHERE room_id = chat_rooms.id AND user_id = auth.uid()));
+  FOR UPDATE USING (check_is_room_participant(id));
 
 CREATE POLICY "Participantes podem ver outros participantes" ON chat_participants
-  FOR SELECT USING (EXISTS (SELECT 1 FROM chat_participants p WHERE p.room_id = chat_participants.room_id AND p.user_id = auth.uid()));
+  FOR SELECT USING (check_is_room_participant(room_id));
 
 CREATE POLICY "Participantes podem ser adicionados a salas" ON chat_participants
   FOR INSERT WITH CHECK (auth.role() = 'authenticated');
@@ -124,13 +135,13 @@ CREATE POLICY "Participantes podem gerenciar seu status" ON chat_participants
   FOR UPDATE USING (user_id = auth.uid());
 
 CREATE POLICY "Participantes podem ver mensagens" ON chat_messages
-  FOR SELECT USING (EXISTS (SELECT 1 FROM chat_participants WHERE room_id = chat_messages.room_id AND user_id = auth.uid()));
+  FOR SELECT USING (check_is_room_participant(room_id));
 
 CREATE POLICY "Participantes podem enviar mensagens" ON chat_messages
-  FOR INSERT WITH CHECK (auth.uid() = sender_id AND EXISTS (SELECT 1 FROM chat_participants WHERE room_id = chat_messages.room_id AND user_id = auth.uid()));
+  FOR INSERT WITH CHECK (auth.uid() = sender_id AND check_is_room_participant(room_id));
 
 CREATE POLICY "Participantes podem atualizar status das mensagens" ON chat_messages
-  FOR UPDATE USING (EXISTS (SELECT 1 FROM chat_participants WHERE room_id = chat_messages.room_id AND user_id = auth.uid()));
+  FOR UPDATE USING (check_is_room_participant(room_id));
 
 -- Funções Auxiliares
 CREATE OR REPLACE FUNCTION find_common_room(user1 UUID, user2 UUID)
