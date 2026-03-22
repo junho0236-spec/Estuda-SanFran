@@ -11,6 +11,8 @@ import { dataService } from '../services/dataService';
 import { Friendship, UserProfile, View } from '../types';
 import { toast } from 'sonner';
 
+import UserProfileModal from './UserProfileModal';
+
 interface FriendsProps {
   userId: string;
   userName: string;
@@ -24,7 +26,7 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
   const [friendships, setFriendships] = useState<Friendship[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
-  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -340,7 +342,7 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
                       )}
                       
                       <button 
-                        onClick={() => setSelectedUser(user)}
+                        onClick={() => setSelectedUserId(user.id)}
                         className="w-full py-3 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-200 dark:hover:bg-white/10 transition-all"
                       >
                         Ver Perfil
@@ -356,115 +358,17 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
 
       {/* PROFILE MODAL */}
       <AnimatePresence>
-        {selectedUser && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="bg-white dark:bg-[#1a1a1a] w-full max-w-2xl rounded-[3rem] border border-slate-200 dark:border-white/5 shadow-2xl overflow-hidden"
-            >
-              <div className="relative h-40 bg-gradient-to-r from-blue-600 to-indigo-700">
-                <button 
-                  onClick={() => setSelectedUser(null)}
-                  className="absolute top-6 right-6 p-2 bg-black/20 hover:bg-black/40 text-white rounded-full transition-all"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-              
-              <div className="px-10 pb-10 -mt-16 relative">
-                <div className="w-32 h-32 rounded-[2.5rem] bg-white dark:bg-[#1a1a1a] p-1.5 shadow-xl mb-6">
-                  <div className="w-full h-full rounded-[2.2rem] overflow-hidden bg-slate-200 dark:bg-white/5 flex items-center justify-center">
-                    {selectedUser.avatar_url || selectedUser.persona_data?.avatar_url ? (
-                      <img src={selectedUser.avatar_url || selectedUser.persona_data.avatar_url} alt={selectedUser.full_name || selectedUser.persona_data?.nome} className="w-full h-full object-cover" />
-                    ) : (
-                      <User className="text-slate-400" size={48} />
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                  <div>
-                    <h3 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">
-                      {selectedUser.full_name || selectedUser.persona_data?.nome || 'Usuário'}
-                    </h3>
-                    <p className="text-blue-600 font-black uppercase tracking-widest text-xs mt-1">
-                      {selectedUser.turma_ano || 'Direito'} • Turma {selectedUser.turma || '2024'}
-                    </p>
-                  </div>
-                  
-                  <div className="flex gap-3">
-                    {getFriendshipStatus(selectedUser.id) === 'accepted' ? (
-                      <button 
-                        onClick={() => { setSelectedUser(null); onNavigate(View.Connect); }}
-                        className="px-8 py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-blue-600/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
-                      >
-                        <MessageSquare size={16} />
-                        Enviar Mensagem
-                      </button>
-                    ) : getFriendshipStatus(selectedUser.id) === 'pending' ? (
-                      <button disabled className="px-8 py-4 bg-slate-100 dark:bg-white/5 text-slate-400 rounded-2xl font-black uppercase text-[10px] tracking-widest cursor-not-allowed">
-                        Solicitação Pendente
-                      </button>
-                    ) : (
-                      <button 
-                        onClick={() => sendFriendRequest(selectedUser.id, selectedUser.full_name || selectedUser.persona_data?.nome || 'Usuário')}
-                        className="px-8 py-4 bg-slate-900 dark:text-black dark:bg-white text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
-                      >
-                        <UserPlus size={16} />
-                        Adicionar Amigo
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-6">
-                    <div>
-                      <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Sobre</h5>
-                      <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                        {selectedUser.bio || selectedUser.persona_data?.bio || 'Nenhuma biografia disponível.'}
-                      </p>
-                    </div>
-                    <div>
-                      <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Interesses</h5>
-                      <div className="flex flex-wrap gap-2">
-                        {(selectedUser.persona_data?.interests || selectedUser.persona_data?.interesses || ['Direito Civil', 'Processo Penal', 'Filosofia']).map((tag: string) => (
-                          <span key={tag} className="px-3 py-1.5 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 rounded-lg text-[10px] font-bold">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-slate-50 dark:bg-black/20 rounded-3xl p-6 border border-slate-100 dark:border-white/5">
-                    <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Estatísticas Acadêmicas</h5>
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-slate-500">Progresso Total</span>
-                        <span className="text-sm font-black text-slate-900 dark:text-white">{selectedUser.progresso_total || 0}%</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-slate-500">Média Geral</span>
-                        <span className="text-sm font-black text-slate-900 dark:text-white">{selectedUser.media || 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-slate-500">Horas de Extensão</span>
-                        <span className="text-sm font-black text-slate-900 dark:text-white">{selectedUser.horas_extensao || 0}h</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
+        {selectedUserId && (
+          <UserProfileModal 
+            userId={selectedUserId}
+            onClose={() => setSelectedUserId(null)}
+            friendshipStatus={getFriendshipStatus(selectedUserId)}
+            onSendFriendRequest={sendFriendRequest}
+            onNavigateToChat={() => {
+              setSelectedUserId(null);
+              onNavigate(View.Connect);
+            }}
+          />
         )}
       </AnimatePresence>
 
