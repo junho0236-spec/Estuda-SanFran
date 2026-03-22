@@ -536,8 +536,7 @@ export const dataService = {
     const { data, error } = await supabase
       .from('friendships')
       .update({ 
-        status,
-        updated_at: new Date().toISOString()
+        status
       })
       .eq('id', friendshipId)
       .select()
@@ -571,7 +570,12 @@ export const dataService = {
   },
 
   async markAllNotificationsAsRead(userId: string) {
-    const { error } = await supabase.from('notifications').update({ is_read: true }).eq('user_id', userId).eq('is_read', false);
+    const { error } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('user_id', userId)
+      .eq('is_read', false)
+      .neq('type', 'friend_request');
     if (error) {
       console.error("[dataService] Error marking all notifications as read:", error);
     }

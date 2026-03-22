@@ -939,16 +939,35 @@ const App: React.FC = () => {
     // Set up real-time subscription for notifications
     if (session?.user?.id) {
       const channel = supabase
-        .channel('public:notifications')
+        .channel('notifications_realtime')
         .on('postgres_changes', { 
           event: 'INSERT', 
           schema: 'public', 
           table: 'notifications',
           filter: `user_id=eq.${session.user.id}`
         }, (payload) => {
-          setNotifications(prev => [payload.new as Notification, ...prev]);
+          console.log("[App] New notification received:", payload.new);
+          const newNotif = payload.new as Notification;
+          setNotifications(prev => {
+            // Avoid duplicates
+            if (prev.some(n => n.id === newNotif.id)) return prev;
+            return [newNotif, ...prev];
+          });
+          
+          // Show a toast for new notifications if they are not read
+          if (!newNotif.is_read) {
+            toast(newNotif.message, {
+              icon: <Bell className="text-sanfran-rubi" size={16} />,
+              action: newNotif.type === 'friend_request' ? {
+                label: 'Ver',
+                onClick: () => setCurrentView(View.Friends)
+              } : undefined
+            });
+          }
         })
-        .subscribe();
+        .subscribe((status) => {
+          console.log("[App] Notifications subscription status:", status);
+        });
       
       return () => {
         supabase.removeChannel(channel);
@@ -978,21 +997,39 @@ const App: React.FC = () => {
       console.log("[App] Accepting friend request for notification:", notification.id);
       
       // Find the friendship record
-      const { data: friendship, error: fError } = await supabase
-        .from('friendships')
-        .select('id, user_id')
-        .eq('friend_id', session.user.id)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      let friendshipId = notification.link_task;
+      let requesterId = '';
 
-      if (fError) {
-        console.error("[App] Error finding friendship:", fError);
-        throw fError;
+      if (!friendshipId) {
+        const { data: friendship, error: fError } = await supabase
+          .from('friendships')
+          .select('id, user_id')
+          .eq('friend_id', session.user.id)
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (fError) {
+          console.error("[App] Error finding friendship:", fError);
+          throw fError;
+        }
+        
+        if (friendship) {
+          friendshipId = friendship.id;
+          requesterId = friendship.user_id;
+        }
+      } else {
+        // If we have the ID, just get the requester ID for the notification
+        const { data: friendship } = await supabase
+          .from('friendships')
+          .select('user_id')
+          .eq('id', friendshipId)
+          .maybeSingle();
+        if (friendship) requesterId = friendship.user_id;
       }
 
-      if (!friendship) {
+      if (!friendshipId) {
         toast.error("Solicitação não encontrada ou já processada.");
         // Mark notification as read anyway since it's stale
         await dataService.markNotificationAsRead(notification.id);
@@ -1000,18 +1037,23 @@ const App: React.FC = () => {
         return;
       }
 
-      await dataService.handleFriendRequest(friendship.id, 'accepted');
+      await dataService.handleFriendRequest(friendshipId, 'accepted');
+      
+      // Update local friends state
+      setFriends(prev => prev.map(f => f.id === friendshipId ? { ...f, status: 'accepted' } : f));
       
       // Notify the requester
-      try {
-        await dataService.createNotification(
-          friendship.user_id,
-          `${userProfile?.full_name || 'Alguém'} aceitou sua solicitação de amizade!`,
-          undefined,
-          'friend_accepted'
-        );
-      } catch (notifErr) {
-        console.warn("[App] Could not send notification, but friendship was accepted:", notifErr);
+      if (requesterId) {
+        try {
+          await dataService.createNotification(
+            requesterId,
+            `${userProfile?.full_name || 'Alguém'} aceitou sua solicitação de amizade!`,
+            undefined,
+            'friend_accepted'
+          );
+        } catch (notifErr) {
+          console.warn("[App] Could not send notification, but friendship was accepted:", notifErr);
+        }
       }
 
       toast.success("Amizade aceita!");
@@ -1035,22 +1077,30 @@ const App: React.FC = () => {
     try {
       console.log("[App] Declining friend request for notification:", notification.id);
 
-      const { data: friendship, error: fError } = await supabase
-        .from('friendships')
-        .select('id')
-        .eq('friend_id', session.user.id)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      // Find the friendship record
+      let friendshipId = notification.link_task;
 
-      if (fError) {
-        console.error("[App] Error finding friendship:", fError);
-        throw fError;
+      if (!friendshipId) {
+        const { data: friendship, error: fError } = await supabase
+          .from('friendships')
+          .select('id')
+          .eq('friend_id', session.user.id)
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (fError) {
+          console.error("[App] Error finding friendship:", fError);
+          throw fError;
+        }
+        if (friendship) friendshipId = friendship.id;
       }
 
-      if (friendship) {
-        await dataService.handleFriendRequest(friendship.id, 'declined');
+      if (friendshipId) {
+        await dataService.handleFriendRequest(friendshipId, 'declined');
+        // Update local friends state
+        setFriends(prev => prev.map(f => f.id === friendshipId ? { ...f, status: 'declined' } : f));
         toast.info("Solicitação recusada.");
       } else {
         toast.info("Solicitação já processada.");
@@ -1283,7 +1333,7 @@ const App: React.FC = () => {
                 onNotificationClick={handleNotificationClick}
                 onAcceptFriendRequest={handleAcceptFriendRequest}
                 onDeclineFriendRequest={handleDeclineFriendRequest}
-                onMarkAllRead={() => setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))}
+                onMarkAllRead={() => setNotifications(prev => prev.map(n => n.type === 'friend_request' ? n : { ...n, is_read: true }))}
                 onViewChange={setCurrentView}
                 onLogout={handleLogout}
               />

@@ -117,13 +117,15 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
         return;
       }
 
-      const { error } = await supabase
+      const { data: newFriendship, error } = await supabase
         .from('friendships')
         .insert({
           user_id: userId,
           friend_id: targetUserId,
           status: 'pending'
-        });
+        })
+        .select()
+        .single();
 
       if (error) {
         console.error('Supabase Friendship Insert Error:', error);
@@ -132,11 +134,12 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
 
       // Create notification for the target user
       try {
-        await supabase.from('notifications').insert({
-          user_id: targetUserId,
-          message: `${userName} enviou uma solicitação de amizade.`,
-          type: 'friend_request'
-        });
+        await dataService.createNotification(
+          targetUserId,
+          `${userName} enviou uma solicitação de amizade.`,
+          newFriendship.id, // Use link_task to store friendship ID
+          'friend_request'
+        );
       } catch (notifErr) {
         console.warn('Could not send notification, but friendship was created:', notifErr);
       }

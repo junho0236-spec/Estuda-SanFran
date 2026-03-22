@@ -927,7 +927,7 @@ export interface Friendship {
   friend_id: string;
   status: 'pending' | 'accepted' | 'declined';
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
   friend_name?: string;
   friend_avatar?: string;
 }
