@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../services/supabaseClient';
+import { dataService } from '../services/dataService';
 import { Friendship, UserProfile, View } from '../types';
 import { toast } from 'sonner';
 
@@ -149,29 +150,32 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
 
   const handleFriendRequest = async (friendshipId: string, status: 'accepted' | 'declined', requesterId: string) => {
     try {
-      const { error } = await supabase
-        .from('friendships')
-        .update({ status, updated_at: new Date().toISOString() })
-        .eq('id', friendshipId);
-
-      if (error) throw error;
+      console.log(`[Friends] Handling friend request: ${friendshipId}, status: ${status}, requester: ${requesterId}`);
+      
+      await dataService.handleFriendRequest(friendshipId, status);
 
       if (status === 'accepted') {
         // Notify the requester
-        await supabase.from('notifications').insert({
-          user_id: requesterId,
-          message: `${userName} aceitou sua solicitação de amizade!`,
-          type: 'friend_accepted'
-        });
+        try {
+          await dataService.createNotification(
+            requesterId,
+            `${userName} aceitou sua solicitação de amizade!`,
+            undefined,
+            'friend_accepted'
+          );
+        } catch (notifErr) {
+          console.warn('[Friends] Could not send notification, but friendship was accepted:', notifErr);
+        }
         toast.success('Amizade aceita!');
       } else {
         toast.info('Solicitação recusada');
       }
 
       fetchData();
-    } catch (error) {
-      console.error('Error handling friend request:', error);
-      toast.error('Erro ao processar solicitação');
+    } catch (error: any) {
+      console.error('[Friends] Error handling friend request:', error);
+      const message = error.message || 'Erro ao processar solicitação';
+      toast.error(`Erro: ${message}`);
     }
   };
 

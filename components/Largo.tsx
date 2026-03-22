@@ -4,6 +4,7 @@ import { Users, User, Zap, BookOpen, BrainCircuit, Coffee, Clock, ShieldCheck, M
 import { PresenceUser, View, DuelQuestion } from '../types';
 import { supabase } from '../services/supabaseClient';
 import { getViewLabel } from '../utils';
+import { toast } from 'sonner';
 
 interface LargoProps {
   presenceUsers: PresenceUser[];
@@ -47,14 +48,14 @@ const Largo: React.FC<LargoProps> = ({ presenceUsers, currentUserId }) => {
       const { error } = await supabase.from('friendships').insert({
         user_id: currentUserId,
         friend_id: friend.user_id,
-        status: 'pendente'
+        status: 'pending'
       });
 
       if (error) throw error;
-      alert(`Pedido de conexão enviado para ${friend.name}!`);
-    } catch (e) {
+      toast.success(`Pedido de conexão enviado para ${friend.name}!`);
+    } catch (e: any) {
       console.error(e);
-      alert("Falha ao enviar pedido de conexão.");
+      toast.error(`Falha ao enviar pedido: ${e.message || 'Erro desconhecido'}`);
     }
   };
 

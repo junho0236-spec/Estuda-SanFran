@@ -969,7 +969,14 @@ const App: React.FC = () => {
   };
 
   const handleAcceptFriendRequest = async (notification: Notification) => {
+    if (!session?.user?.id) {
+      toast.error("Você precisa estar logado.");
+      return;
+    }
+
     try {
+      console.log("[App] Accepting friend request for notification:", notification.id);
+      
       // Find the friendship record
       const { data: friendship, error: fError } = await supabase
         .from('friendships')
@@ -980,39 +987,54 @@ const App: React.FC = () => {
         .limit(1)
         .maybeSingle();
 
-      if (fError || !friendship) {
+      if (fError) {
+        console.error("[App] Error finding friendship:", fError);
+        throw fError;
+      }
+
+      if (!friendship) {
         toast.error("Solicitação não encontrada ou já processada.");
+        // Mark notification as read anyway since it's stale
+        await dataService.markNotificationAsRead(notification.id);
+        setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n));
         return;
       }
 
       await dataService.handleFriendRequest(friendship.id, 'accepted');
       
       // Notify the requester
-      await dataService.createNotification(
-        friendship.user_id,
-        `${userProfile?.full_name || 'Alguém'} aceitou sua solicitação de amizade!`,
-        undefined,
-        'friend_accepted'
-      );
+      try {
+        await dataService.createNotification(
+          friendship.user_id,
+          `${userProfile?.full_name || 'Alguém'} aceitou sua solicitação de amizade!`,
+          undefined,
+          'friend_accepted'
+        );
+      } catch (notifErr) {
+        console.warn("[App] Could not send notification, but friendship was accepted:", notifErr);
+      }
 
       toast.success("Amizade aceita!");
       
       // Mark notification as read
       await dataService.markNotificationAsRead(notification.id);
       setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n));
-      
-      // Refresh friends list if in friends view
-      if (currentView === View.Friends) {
-        // This will be handled by the realtime listener in Friends component
-      }
-    } catch (error) {
-      console.error("Error accepting friend request:", error);
-      toast.error("Erro ao aceitar solicitação.");
+    } catch (error: any) {
+      console.error("[App] Error accepting friend request:", error);
+      const message = error.message || "Erro ao aceitar solicitação.";
+      toast.error(`Erro: ${message}`);
     }
   };
 
   const handleDeclineFriendRequest = async (notification: Notification) => {
+    if (!session?.user?.id) {
+      toast.error("Você precisa estar logado.");
+      return;
+    }
+
     try {
+      console.log("[App] Declining friend request for notification:", notification.id);
+
       const { data: friendship, error: fError } = await supabase
         .from('friendships')
         .select('id')
@@ -1022,20 +1044,25 @@ const App: React.FC = () => {
         .limit(1)
         .maybeSingle();
 
-      if (fError || !friendship) {
-        toast.error("Solicitação não encontrada.");
-        return;
+      if (fError) {
+        console.error("[App] Error finding friendship:", fError);
+        throw fError;
       }
 
-      await dataService.handleFriendRequest(friendship.id, 'declined');
-      toast.info("Solicitação recusada.");
+      if (friendship) {
+        await dataService.handleFriendRequest(friendship.id, 'declined');
+        toast.info("Solicitação recusada.");
+      } else {
+        toast.info("Solicitação já processada.");
+      }
       
       // Mark notification as read
       await dataService.markNotificationAsRead(notification.id);
       setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n));
-    } catch (error) {
-      console.error("Error declining friend request:", error);
-      toast.error("Erro ao recusar solicitação.");
+    } catch (error: any) {
+      console.error("[App] Error declining friend request:", error);
+      const message = error.message || "Erro ao recusar solicitação.";
+      toast.error(`Erro: ${message}`);
     }
   };
 

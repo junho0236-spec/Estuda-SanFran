@@ -543,7 +543,10 @@ export const dataService = {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("[dataService] Error updating friendship:", error);
+      throw error;
+    }
     return data as Friendship;
   },
 
@@ -553,24 +556,38 @@ export const dataService = {
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
+    if (error) {
+      console.error("[dataService] Error fetching notifications:", error);
+      return [];
+    }
     return data || [];
   },
 
   async markNotificationAsRead(id: string) {
-    await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+    const { error } = await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+    if (error) {
+      console.error("[dataService] Error marking notification as read:", error);
+    }
   },
 
   async markAllNotificationsAsRead(userId: string) {
-    await supabase.from('notifications').update({ is_read: true }).eq('user_id', userId).eq('is_read', false);
+    const { error } = await supabase.from('notifications').update({ is_read: true }).eq('user_id', userId).eq('is_read', false);
+    if (error) {
+      console.error("[dataService] Error marking all notifications as read:", error);
+    }
   },
 
   async createNotification(userId: string, message: string, linkTask?: string, type?: string) {
-    await supabase.from('notifications').insert({
+    const { error } = await supabase.from('notifications').insert({
       user_id: userId,
       message,
       link_task: linkTask,
       type
     });
+    if (error) {
+      console.error("[dataService] Error creating notification:", error);
+      throw error;
+    }
   },
 
   async archiveTasks(userId: string, isOnline: boolean) {
