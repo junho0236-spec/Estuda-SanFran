@@ -288,12 +288,41 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName }) => {
         user2: targetUser.id
       });
 
+      if (checkError) {
+        console.warn('RPC find_common_room failed, proceeding to check rooms manually or create new one', checkError);
+      }
+
       if (existingRooms && existingRooms.length > 0) {
-        const room = rooms.find(r => r.id === existingRooms[0].room_id);
-        if (room) {
-          setActiveRoom(room);
+        const roomId = existingRooms[0].room_id;
+        const existingRoom = rooms.find(r => r.id === roomId);
+        
+        if (existingRoom) {
+          setActiveRoom(existingRoom);
           setShowNewChatModal(false);
           return;
+        } else {
+          // Room exists in DB but not in local state, fetch it
+          const { data: fetchedRoom, error: fetchError } = await supabase
+            .from('chat_rooms')
+            .select('*')
+            .eq('id', roomId)
+            .single();
+          
+          if (!fetchError && fetchedRoom) {
+            setRooms(prev => [fetchedRoom, ...prev]);
+            setActiveRoom(fetchedRoom);
+            setShowNewChatModal(false);
+            // Fetch participants for this room specifically
+            const { data: pData } = await supabase
+              .from('chat_participants')
+              .select('*')
+              .eq('room_id', roomId);
+            
+            if (pData) {
+              setParticipants(prev => ({ ...prev, [roomId]: pData }));
+            }
+            return;
+          }
         }
       }
 
@@ -307,10 +336,12 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName }) => {
       if (roomError) throw roomError;
 
       // Add participants
-      await supabase.from('chat_participants').insert([
+      const { error: pError } = await supabase.from('chat_participants').insert([
         { room_id: newRoom.id, user_id: userId, user_name: userName },
         { room_id: newRoom.id, user_id: targetUser.id, user_name: targetUser.persona_data?.nome || 'Usuário' }
       ]);
+
+      if (pError) throw pError;
 
       setRooms(prev => [newRoom, ...prev]);
       setActiveRoom(newRoom);
@@ -318,7 +349,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName }) => {
       fetchRooms();
     } catch (error) {
       console.error('Error starting chat:', error);
-      toast.error('Erro ao iniciar conversa');
+      toast.error('Erro ao iniciar conversa. Verifique se as tabelas e políticas do Supabase foram criadas.');
     }
   };
 
