@@ -483,7 +483,18 @@ const App: React.FC = () => {
 
   // --- Auth & Data Loading ---
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.warn("[Auth] Failed to get initial session:", error.message);
+        // If refresh token is invalid or not found, force a logout to clear the stale state
+        if (error.message.includes("Refresh Token Not Found") || error.message.includes("Invalid Refresh Token")) {
+          supabase.auth.signOut();
+          setSession(null);
+          setIsAuthenticated(false);
+        }
+        return;
+      }
+      
       setSession(session);
       setIsAuthenticated(!!session);
       if (session?.user) {
@@ -491,15 +502,21 @@ const App: React.FC = () => {
         clearOldLocalStorage(session.user.id);
       }
     }).catch(err => {
-      console.warn("Failed to get session:", err);
+      console.warn("[Auth] Unexpected error getting session:", err);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("[Auth] State changed:", event);
       setSession(session);
       setIsAuthenticated(!!session);
+      
       if (session?.user) {
         syncProfile(session.user);
         clearOldLocalStorage(session.user.id);
+      } else if (event === 'SIGNED_OUT') {
+        // Clear any local state if needed
+        setSession(null);
+        setIsAuthenticated(false);
       }
     });
 
@@ -526,6 +543,7 @@ const App: React.FC = () => {
 
   const syncProfile = async (user: any) => {
     const name = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuário';
+    const avatar = user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`;
     
     try {
       // Sync to profiles table
@@ -540,23 +558,33 @@ const App: React.FC = () => {
       // Also ensure user_persona exists so they appear in community
       const { data: existingPersona, error: checkError } = await supabase
         .from('user_persona')
-        .select('id')
+        .select('id, full_name, avatar_url')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (checkError || !existingPersona) {
         const { error: personaError } = await supabase.from('user_persona').upsert({
           id: user.id,
           full_name: name,
+          avatar_url: avatar,
           persona_data: {
             nome: name,
             email: user.email,
-            avatar_url: user.user_metadata?.avatar_url || null
+            avatar_url: avatar
           },
           profile_completion: 10
         }, { onConflict: 'id' });
         
         if (personaError) console.warn("Sincronização de 'user_persona' falhou.", personaError);
+      } else {
+        // Only update if missing critical fields
+        const updates: any = {};
+        if (!existingPersona.full_name) updates.full_name = name;
+        if (!existingPersona.avatar_url) updates.avatar_url = avatar;
+        
+        if (Object.keys(updates).length > 0) {
+          await supabase.from('user_persona').update(updates).eq('id', user.id);
+        }
       }
     } catch (e) {
       console.warn("Sincronização de perfil falhou.", e);
@@ -928,12 +956,86 @@ const App: React.FC = () => {
     }
   }, [session?.user?.id]);
 
-  const handleNotificationClick = (notification: Notification) => {
-    if (notification.link_task) {
-      // Navigate to tasks and select the task
+  const handleNotificationClick = async (notification: Notification) => {
+    if (notification.type === 'friend_request') {
+      setCurrentView(View.Friends);
+    } else if (notification.link_task) {
       setCurrentView(View.Tasks);
-      // We might need a way to tell TaskMasterDetail to select this task
-      // For now, let's just navigate.
+    }
+    
+    // Mark as read
+    await dataService.markNotificationAsRead(notification.id);
+    setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n));
+  };
+
+  const handleAcceptFriendRequest = async (notification: Notification) => {
+    try {
+      // Find the friendship record
+      const { data: friendship, error: fError } = await supabase
+        .from('friendships')
+        .select('id, user_id')
+        .eq('friend_id', session.user.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (fError || !friendship) {
+        toast.error("Solicitação não encontrada ou já processada.");
+        return;
+      }
+
+      await dataService.handleFriendRequest(friendship.id, 'accepted');
+      
+      // Notify the requester
+      await dataService.createNotification(
+        friendship.user_id,
+        `${userProfile?.full_name || 'Alguém'} aceitou sua solicitação de amizade!`,
+        undefined,
+        'friend_accepted'
+      );
+
+      toast.success("Amizade aceita!");
+      
+      // Mark notification as read
+      await dataService.markNotificationAsRead(notification.id);
+      setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n));
+      
+      // Refresh friends list if in friends view
+      if (currentView === View.Friends) {
+        // This will be handled by the realtime listener in Friends component
+      }
+    } catch (error) {
+      console.error("Error accepting friend request:", error);
+      toast.error("Erro ao aceitar solicitação.");
+    }
+  };
+
+  const handleDeclineFriendRequest = async (notification: Notification) => {
+    try {
+      const { data: friendship, error: fError } = await supabase
+        .from('friendships')
+        .select('id')
+        .eq('friend_id', session.user.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (fError || !friendship) {
+        toast.error("Solicitação não encontrada.");
+        return;
+      }
+
+      await dataService.handleFriendRequest(friendship.id, 'declined');
+      toast.info("Solicitação recusada.");
+      
+      // Mark notification as read
+      await dataService.markNotificationAsRead(notification.id);
+      setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n));
+    } catch (error) {
+      console.error("Error declining friend request:", error);
+      toast.error("Erro ao recusar solicitação.");
     }
   };
 
@@ -1152,6 +1254,8 @@ const App: React.FC = () => {
                 isDarkMode={isDarkMode}
                 onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
                 onNotificationClick={handleNotificationClick}
+                onAcceptFriendRequest={handleAcceptFriendRequest}
+                onDeclineFriendRequest={handleDeclineFriendRequest}
                 onMarkAllRead={() => setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))}
                 onViewChange={setCurrentView}
                 onLogout={handleLogout}

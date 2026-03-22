@@ -10,6 +10,8 @@ interface HeaderActionsProps {
   isDarkMode: boolean;
   onToggleDarkMode: () => void;
   onNotificationClick: (notification: Notification) => void;
+  onAcceptFriendRequest: (notification: Notification) => void;
+  onDeclineFriendRequest: (notification: Notification) => void;
   onMarkAllRead: () => void;
   onViewChange: (view: View) => void;
   onLogout: () => void;
@@ -22,6 +24,8 @@ const HeaderActions: React.FC<HeaderActionsProps> = ({
   isDarkMode,
   onToggleDarkMode,
   onNotificationClick,
+  onAcceptFriendRequest,
+  onDeclineFriendRequest,
   onMarkAllRead,
   onViewChange,
   onLogout
@@ -130,10 +134,34 @@ const HeaderActions: React.FC<HeaderActionsProps> = ({
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${!notif.is_read ? 'bg-red-50' : 'bg-slate-100'}`}>
                       {getIcon(notif.type)}
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <p className={`text-sm ${!notif.is_read ? 'font-bold text-slate-900' : 'font-medium text-slate-600'}`}>
                         {notif.message}
                       </p>
+                      
+                      {notif.type === 'friend_request' && !notif.is_read && (
+                        <div className="flex gap-2 mt-2">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onAcceptFriendRequest(notif);
+                            }}
+                            className="px-3 py-1 bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-emerald-700 transition-colors"
+                          >
+                            Aceitar
+                          </button>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeclineFriendRequest(notif);
+                            }}
+                            className="px-3 py-1 bg-slate-200 text-slate-600 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-slate-300 transition-colors"
+                          >
+                            Recusar
+                          </button>
+                        </div>
+                      )}
+
                       <p className="text-[10px] text-slate-400 mt-0.5">
                         {new Date(notif.created_at).toLocaleString()}
                       </p>

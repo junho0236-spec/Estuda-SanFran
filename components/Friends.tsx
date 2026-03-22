@@ -40,8 +40,21 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
       })
       .subscribe();
 
+    // Set up Realtime listener for user_persona to update names/profiles
+    const personaChannel = supabase
+      .channel('persona_realtime')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'user_persona'
+      }, () => {
+        fetchData();
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(friendshipsChannel);
+      supabase.removeChannel(personaChannel);
     };
   }, [userId]);
 
@@ -267,8 +280,8 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
                   <div className="flex flex-col items-center text-center">
                     <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-black/40 p-1 mb-4 border-2 border-transparent group-hover:border-blue-500 transition-all duration-500">
                       <div className="w-full h-full rounded-full overflow-hidden bg-slate-200 dark:bg-white/5 flex items-center justify-center">
-                        {user.persona_data?.avatar_url ? (
-                          <img src={user.persona_data.avatar_url} alt={user.persona_data.nome} className="w-full h-full object-cover" />
+                        {user.avatar_url || user.persona_data?.avatar_url ? (
+                          <img src={user.avatar_url || user.persona_data.avatar_url} alt={user.full_name || user.persona_data?.nome} className="w-full h-full object-cover" />
                         ) : (
                           <User className="text-slate-400" size={40} />
                         )}
@@ -276,10 +289,10 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
                     </div>
 
                     <h4 className="font-black text-slate-900 dark:text-white text-lg truncate w-full px-2">
-                      {user.persona_data?.nome || 'Usuário'}
+                      {user.full_name || user.persona_data?.nome || 'Usuário'}
                     </h4>
                     <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mt-1">
-                      {user.persona_data?.curso || 'Direito'}
+                      {user.turma_ano || user.persona_data?.curso || 'Direito'}
                     </p>
                     
                     <div className="mt-6 flex flex-col gap-2 w-full">
@@ -364,8 +377,8 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
               <div className="px-10 pb-10 -mt-16 relative">
                 <div className="w-32 h-32 rounded-[2.5rem] bg-white dark:bg-[#1a1a1a] p-1.5 shadow-xl mb-6">
                   <div className="w-full h-full rounded-[2.2rem] overflow-hidden bg-slate-200 dark:bg-white/5 flex items-center justify-center">
-                    {selectedUser.persona_data?.avatar_url ? (
-                      <img src={selectedUser.persona_data.avatar_url} alt={selectedUser.persona_data.nome} className="w-full h-full object-cover" />
+                    {selectedUser.avatar_url || selectedUser.persona_data?.avatar_url ? (
+                      <img src={selectedUser.avatar_url || selectedUser.persona_data.avatar_url} alt={selectedUser.full_name || selectedUser.persona_data?.nome} className="w-full h-full object-cover" />
                     ) : (
                       <User className="text-slate-400" size={48} />
                     )}
@@ -375,10 +388,10 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                   <div>
                     <h3 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">
-                      {selectedUser.persona_data?.nome || 'Usuário'}
+                      {selectedUser.full_name || selectedUser.persona_data?.nome || 'Usuário'}
                     </h3>
                     <p className="text-blue-600 font-black uppercase tracking-widest text-xs mt-1">
-                      {selectedUser.persona_data?.curso || 'Direito'} • Turma {selectedUser.persona_data?.turma || '2024'}
+                      {selectedUser.turma_ano || 'Direito'} • Turma {selectedUser.turma || '2024'}
                     </p>
                   </div>
                   
@@ -397,7 +410,7 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
                       </button>
                     ) : (
                       <button 
-                        onClick={() => sendFriendRequest(selectedUser.id, selectedUser.persona_data?.nome || 'Usuário')}
+                        onClick={() => sendFriendRequest(selectedUser.id, selectedUser.full_name || selectedUser.persona_data?.nome || 'Usuário')}
                         className="px-8 py-4 bg-slate-900 dark:text-black dark:bg-white text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
                       >
                         <UserPlus size={16} />
@@ -412,13 +425,13 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
                     <div>
                       <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Sobre</h5>
                       <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                        {selectedUser.persona_data?.bio || 'Nenhuma biografia disponível.'}
+                        {selectedUser.bio || selectedUser.persona_data?.bio || 'Nenhuma biografia disponível.'}
                       </p>
                     </div>
                     <div>
                       <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Interesses</h5>
                       <div className="flex flex-wrap gap-2">
-                        {(selectedUser.persona_data?.interesses || ['Direito Civil', 'Processo Penal', 'Filosofia']).map((tag: string) => (
+                        {(selectedUser.persona_data?.interests || selectedUser.persona_data?.interesses || ['Direito Civil', 'Processo Penal', 'Filosofia']).map((tag: string) => (
                           <span key={tag} className="px-3 py-1.5 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 rounded-lg text-[10px] font-bold">
                             {tag}
                           </span>
@@ -431,16 +444,16 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
                     <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Estatísticas Acadêmicas</h5>
                     <div className="space-y-4">
                       <div className="flex justify-between items-center">
-                        <span className="text-xs text-slate-500">Flashcards Estudados</span>
-                        <span className="text-sm font-black text-slate-900 dark:text-white">1.240</span>
+                        <span className="text-xs text-slate-500">Progresso Total</span>
+                        <span className="text-sm font-black text-slate-900 dark:text-white">{selectedUser.progresso_total || 0}%</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-xs text-slate-500">Horas de Foco</span>
-                        <span className="text-sm font-black text-slate-900 dark:text-white">342h</span>
+                        <span className="text-xs text-slate-500">Média Geral</span>
+                        <span className="text-sm font-black text-slate-900 dark:text-white">{selectedUser.media || 'N/A'}</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-xs text-slate-500">Duelos Ganhos</span>
-                        <span className="text-sm font-black text-slate-900 dark:text-white">15</span>
+                        <span className="text-xs text-slate-500">Horas de Extensão</span>
+                        <span className="text-sm font-black text-slate-900 dark:text-white">{selectedUser.horas_extensao || 0}h</span>
                       </div>
                     </div>
                   </div>
