@@ -104,7 +104,7 @@ const SanFranLife: React.FC<SanFranLifeProps> = ({ onNavigate }) => {
           </div>
 
           {/* CARD 3: COMING SOON (Placeholder) */}
-          <div className="relative col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg flex flex-col items-center justify-center gap-4 cursor-default overflow-hidden">
+          <div className="relative col-span-1 row-span-2 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg flex flex-col items-center justify-center gap-4 cursor-default overflow-hidden">
              <LockedOverlay />
              <div className="p-3 bg-slate-100 dark:bg-white/10 text-slate-400 rounded-full">
                 <Coffee className="w-6 h-6" />

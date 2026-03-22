@@ -262,7 +262,7 @@ const SanFranLanguages: React.FC<SanFranLanguagesProps> = ({ onNavigate }) => {
           </div>
 
           {/* CARD 9: LEGAL CINEMA */}
-          <div className="group relative col-span-1 bg-slate-900 text-white rounded-[2.5rem] p-6 border border-slate-700 shadow-xl flex flex-col justify-between overflow-hidden cursor-default">
+          <div className="group relative col-span-1 md:col-span-2 bg-slate-900 text-white rounded-[2.5rem] p-6 border border-slate-700 shadow-xl flex flex-col justify-between overflow-hidden cursor-default">
              <LockedOverlay />
              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/film.png')] opacity-10"></div>
              <div className="flex justify-between items-start relative z-10">

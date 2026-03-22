@@ -105,7 +105,7 @@ const SanFranOAB: React.FC<SanFranOABProps> = ({ onNavigate }) => {
           </button>
 
           {/* CARD: ANKI OAB - NOVO */}
-          <div className="group relative col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg transition-all flex flex-col justify-between h-full cursor-default overflow-hidden">
+          <div className="group relative col-span-1 row-span-2 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg transition-all flex flex-col justify-between h-full cursor-default overflow-hidden">
              <LockedOverlay />
              <div className="flex justify-between items-start">
                 <div className="p-3 bg-red-50 dark:bg-red-900/20 text-sanfran-rubi rounded-2xl">

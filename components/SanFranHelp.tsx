@@ -246,7 +246,7 @@ const SanFranHelp: React.FC<SanFranHelpProps> = ({ onNavigate }) => {
           </div>
 
           {/* CARD 10: CITADOR ABNT (LOCKED) */}
-          <div className="relative col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg flex flex-col justify-center items-center gap-2 cursor-default overflow-hidden">
+          <div className="relative col-span-1 md:col-span-2 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg flex flex-col justify-center items-center gap-2 cursor-default overflow-hidden">
              <LockedOverlay />
              <div className="p-3 bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 rounded-full">
                 <Quote className="w-5 h-5" />
@@ -258,7 +258,7 @@ const SanFranHelp: React.FC<SanFranHelpProps> = ({ onNavigate }) => {
           </div>
 
           {/* CARD 11: REPOSITÓRIO DE MODELOS (LOCKED) */}
-          <div className="relative col-span-1 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg flex flex-col justify-between cursor-default overflow-hidden">
+          <div className="relative col-span-1 md:col-span-2 bg-white dark:bg-white/5 rounded-[2.5rem] p-6 border border-slate-200 dark:border-white/10 shadow-lg flex flex-col justify-between cursor-default overflow-hidden">
              <LockedOverlay />
              <div className="flex justify-between items-start">
                 <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-2xl">

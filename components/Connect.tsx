@@ -453,6 +453,8 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName }) => {
       console.error('Error uploading file:', error);
       toast.error(`Erro ao enviar arquivo: ${error.message || 'Verifique as permissões de Storage'}`);
     } finally {
+      setUploading(false);
+    }
   };
 
   const getChatName = (room: ChatRoom) => {
