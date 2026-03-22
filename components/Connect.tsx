@@ -97,9 +97,9 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName }) => {
           setParticipants(grouped);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching rooms:', error);
-      toast.error('Erro ao carregar conversas');
+      toast.error(`Erro ao carregar conversas: ${error.message || 'Verifique o console'}`);
     } finally {
       setLoading(false);
     }
@@ -347,9 +347,9 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName }) => {
       setActiveRoom(newRoom);
       setShowNewChatModal(false);
       fetchRooms();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error starting chat:', error);
-      toast.error('Erro ao iniciar conversa. Verifique se as tabelas e políticas do Supabase foram criadas.');
+      toast.error(`Erro ao iniciar conversa: ${error.message || 'Verifique as tabelas do Supabase'}`);
     }
   };
 
