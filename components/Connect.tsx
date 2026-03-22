@@ -35,13 +35,46 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName }) => {
   useEffect(() => {
     fetchRooms();
     fetchUserProfile();
+    const unsubscribe = subscribeToAllRooms();
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [userId]);
+
+  const subscribeToAllRooms = () => {
+    const channel = supabase
+      .channel('global-chat-updates')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'chat_rooms' 
+      }, () => {
+        fetchRooms();
+      })
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'chat_participants',
+        filter: `user_id=eq.${userId}`
+      }, () => {
+        fetchRooms();
+      })
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  };
 
   useEffect(() => {
     if (activeRoom) {
       fetchMessages(activeRoom.id);
-      subscribeToMessages(activeRoom.id);
+      const unsubscribe = subscribeToMessages(activeRoom.id);
       markAsRead(activeRoom.id);
+      
+      return () => {
+        if (unsubscribe) unsubscribe();
+      };
     }
   }, [activeRoom]);
 
@@ -126,8 +159,12 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName }) => {
         table: 'chat_messages',
         filter: `room_id=eq.${roomId}`
       }, (payload) => {
-        setMessages(prev => [...prev, payload.new as ChatMessage]);
-        if (payload.new.sender_id !== userId) {
+        const newMsg = payload.new as ChatMessage;
+        setMessages(prev => {
+          if (prev.some(m => m.id === newMsg.id)) return prev;
+          return [...prev, newMsg];
+        });
+        if (newMsg.sender_id !== userId) {
           markAsRead(roomId);
         }
       })
@@ -181,7 +218,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName }) => {
     setNewMessage('');
 
     try {
-      const { data, error } = await supabase
+      const { data: insertedMsg, error } = await supabase
         .from('chat_messages')
         .insert({
           room_id: activeRoom.id,
@@ -194,6 +231,14 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName }) => {
         .single();
 
       if (error) throw error;
+
+      // Update local state immediately
+      if (insertedMsg) {
+        setMessages(prev => {
+          if (prev.some(m => m.id === insertedMsg.id)) return prev;
+          return [...prev, insertedMsg];
+        });
+      }
 
       // Update room last message
       await supabase
@@ -373,7 +418,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName }) => {
         .from('chat_attachments')
         .getPublicUrl(filePath);
 
-      await supabase.from('chat_messages').insert({
+      const { data: insertedMsg, error: insertError } = await supabase.from('chat_messages').insert({
         room_id: activeRoom.id,
         sender_id: userId,
         sender_name: userName,
@@ -382,7 +427,26 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName }) => {
         attachment_name: file.name,
         attachment_type: file.type,
         status: 'sent'
-      });
+      }).select().single();
+
+      if (insertError) throw insertError;
+
+      // Update local state immediately
+      if (insertedMsg) {
+        setMessages(prev => {
+          if (prev.some(m => m.id === insertedMsg.id)) return prev;
+          return [...prev, insertedMsg];
+        });
+      }
+
+      // Update room last message
+      await supabase
+        .from('chat_rooms')
+        .update({ 
+          last_message: `Arquivo: ${file.name}`, 
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', activeRoom.id);
 
       toast.success('Arquivo enviado!');
     } catch (error: any) {
