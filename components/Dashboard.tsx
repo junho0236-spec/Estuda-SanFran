@@ -2,7 +2,7 @@
 import { Brain, CheckCircle2, Clock, Zap, TrendingUp, Medal, Gavel, Award, Scale, Briefcase, GraduationCap, Quote, Sun, Book, Shield, Zap as ZapIcon, Trophy, BookOpen, Layout, MousePointerClick, Calculator, Target, Calendar } from 'lucide-react';
 import React, { useMemo, useState, useEffect } from 'react';
 import { View, Subject, Flashcard, Task, StudySession, Reading } from '../types';
-import { getBrasiliaDate } from '../App';
+import { getBrasiliaDate } from '../utils';
 import BadgeGallery, { BadgeData } from './BadgeGallery';
 import CompetenceRadar from './CompetenceRadar';
 import { supabase } from '../services/supabaseClient';

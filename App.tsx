@@ -11,7 +11,7 @@ import { db } from './services/offlineService';
 import { dataService } from './services/dataService';
 import { Toaster, toast } from 'sonner';
 import ErrorBoundary from './components/ErrorBoundary';
-import { getViewLabel } from './utils';
+import { getViewLabel, getBrasiliaDate, getBrasiliaISOString } from './utils';
 
 // Lazy Load dos Componentes para Performance (Code Splitting)
 const Dashboard = React.lazy(() => import('./components/Dashboard'));
@@ -129,19 +129,6 @@ const PageLoader = () => (
   </div>
 );
 
-export const getBrasiliaDate = () => {
-  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
-};
-
-export const getBrasiliaISOString = () => {
-  const now = new Date();
-  const formatter = new Intl.DateTimeFormat('sv-SE', { 
-    timeZone: 'America/Sao_Paulo',
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit'
-  });
-  return formatter.format(now).replace(' ', 'T');
-};
 
 const BrasiliaClock: React.FC = () => {
   const [time, setTime] = useState(new Date());

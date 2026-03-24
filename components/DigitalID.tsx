@@ -3,7 +3,7 @@ import React, { useRef, useState, useMemo } from 'react';
 import html2canvas from 'html2canvas';
 import { Download, Share2, Crown, Award, BookOpen, Shield, Gavel, Scale, QrCode } from 'lucide-react';
 import { StudySession, Task } from '../types';
-import { getBrasiliaDate } from '../App';
+import { getBrasiliaDate } from '../utils';
 
 interface DigitalIDProps {
   userId: string;

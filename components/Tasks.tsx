@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { Task, Subject, TaskPriority, TaskCategory } from '../types';
 import { dataService } from '../services/dataService';
-import { getBrasiliaDate, getBrasiliaISOString } from '../App';
+import { getBrasiliaDate, getBrasiliaISOString } from '../utils';
 import { updateQuestProgress } from '../services/questService';
 
 interface TasksProps {

@@ -1647,6 +1647,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
             <AnimatePresence>
               {showInternalSearch && (
                 <motion.div 
+                  key="internal-search"
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: 'auto', opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
@@ -1722,6 +1723,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
                         <AnimatePresence>
                           {showReactionPicker === msg.id && (
                             <motion.div 
+                              key="reaction-picker"
                               initial={{ scale: 0.8, opacity: 0 }}
                               animate={{ scale: 1, opacity: 1 }}
                               exit={{ scale: 0.8, opacity: 0 }}
@@ -1947,6 +1949,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
               <AnimatePresence>
                 {(replyingTo || editingMessage) && (
                   <motion.div 
+                    key="reply-edit-indicator"
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
@@ -2084,6 +2087,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
       <AnimatePresence>
         {showNewChatModal && (
           <motion.div 
+            key="new-chat-modal"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -2135,6 +2139,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
         <AnimatePresence>
           {showMediaGallery && activeRoom && (
             <motion.div 
+              key="media-gallery-modal"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -2214,6 +2219,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
       <AnimatePresence>
         {showGroupInfoModal && activeRoom && (
           <motion.div 
+            key="group-info-modal"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -2350,6 +2356,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
       <AnimatePresence>
         {showForwardModal && forwardingMessage && (
           <motion.div 
+            key="forward-modal"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -2411,7 +2418,13 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
       {/* POLL MODAL */}
       <AnimatePresence>
         {showPollModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <motion.div 
+            key="poll-modal"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+          >
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -2491,12 +2504,14 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
                 </button>
               </div>
             </motion.div>
-          </div>
+          </motion.div>
         )}
+      </AnimatePresence>
         {/* CREATE STORY MODAL */}
         <AnimatePresence>
           {showCreateStoryModal && (
             <motion.div 
+              key="create-story-modal"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -2537,6 +2552,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
         <AnimatePresence>
           {showStoryModal && activeStory && (
             <motion.div 
+              key="view-story-modal"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -2597,6 +2613,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
         <AnimatePresence>
           {showShareProfileModal && (
             <motion.div 
+              key="share-profile-modal"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -2647,9 +2664,8 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
             </motion.div>
           )}
         </AnimatePresence>
-      </AnimatePresence>
-    </div>
-  );
-};
+      </div>
+    );
+  };
 
 export default Connect;
