@@ -2,16 +2,39 @@ import { GoogleGenAI, Type } from "@google/genai";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
-export const GEMINI_MODEL = "gemini-3.1-pro-preview";
-const FLASH_MODEL = "gemini-3-flash-preview";
+export const GEMINI_MODEL = "gemini-3.1-flash-lite-preview";
+const FLASH_MODEL = "gemini-3.1-flash-lite-preview";
 
 const cleanJsonResponse = (text: string) => {
   console.log("Raw Gemini Response:", text);
   // Remove markdown code blocks
   let cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
-  // Find the first '{' and last '}'
-  const start = cleaned.indexOf('{');
-  const end = cleaned.lastIndexOf('}');
+  
+  // Find the first '{' or '[' and last '}' or ']'
+  const firstBrace = cleaned.indexOf('{');
+  const firstBracket = cleaned.indexOf('[');
+  const lastBrace = cleaned.lastIndexOf('}');
+  const lastBracket = cleaned.lastIndexOf(']');
+  
+  let start = -1;
+  let end = -1;
+  
+  if (firstBrace !== -1 && firstBracket !== -1) {
+    start = Math.min(firstBrace, firstBracket);
+  } else if (firstBrace !== -1) {
+    start = firstBrace;
+  } else if (firstBracket !== -1) {
+    start = firstBracket;
+  }
+  
+  if (lastBrace !== -1 && lastBracket !== -1) {
+    end = Math.max(lastBrace, lastBracket);
+  } else if (lastBrace !== -1) {
+    end = lastBrace;
+  } else if (lastBracket !== -1) {
+    end = lastBracket;
+  }
+  
   if (start !== -1 && end !== -1) {
     cleaned = cleaned.substring(start, end + 1);
   }

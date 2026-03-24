@@ -1187,7 +1187,7 @@ ${selectedText}
 Forneça a explicação de forma concisa e didática.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-3.1-flash-lite-preview",
         contents: prompt,
         config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
       });
@@ -1227,7 +1227,7 @@ Forneça a explicação de forma concisa e didática.`;
 
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
-      const chat = ai.chats.create({ model: "gemini-3-flash-preview" });
+      const chat = ai.chats.create({ model: "gemini-3.1-flash-lite-preview" });
       
       // Context for the chat
       const context = `Você é um professor de Direito especialista em concursos. Estamos discutindo a seguinte questão: ${questionStatement}.`;
@@ -1252,6 +1252,7 @@ Forneça a explicação de forma concisa e didática.`;
     if (aiCommentary[question.id]) return;
 
     try {
+      console.log('generateIntelligentCorrection called for question:', question.id);
       setLoadingAiCommentary(prev => ({ ...prev, [question.id]: true }));
 
       // 2. Check-First Pattern: SELECT from database
@@ -1260,6 +1261,8 @@ Forneça a explicação de forma concisa e didática.`;
         .select('texto_gabarito_ia, ai_correction')
         .eq('id', question.id)
         .single();
+        
+      console.log('dbQuestion:', dbQuestion, 'fetchError:', fetchError);
         
       // Se a coluna texto_gabarito_ia não existir, tenta buscar apenas ai_correction
       if (fetchError && fetchError.code === '42703') {
@@ -1293,6 +1296,7 @@ Forneça a explicação de forma concisa e didática.`;
       }
 
       // Cenário B (Primeira Geração)
+      console.log('Generating new AI commentary...');
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
       
       const prompt = `Como um professor de Direito especialista em concursos, forneça uma correção técnica e didática para esta questão:
@@ -1316,16 +1320,34 @@ Forneça a explicação de forma concisa e didática.`;
       }`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-3.1-flash-lite-preview",
         contents: prompt,
         config: {
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-          responseMimeType: "application/json"
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
         }
       });
 
+      console.log('AI response received:', response.text);
+
       if (response.text) {
-        const data = JSON.parse(response.text);
+        let data;
+        try {
+          // Remove potential markdown code blocks
+          const cleanedText = response.text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+          const firstBrace = cleanedText.indexOf('{');
+          const lastBrace = cleanedText.lastIndexOf('}');
+          const jsonStr = (firstBrace !== -1 && lastBrace !== -1)
+            ? cleanedText.substring(firstBrace, lastBrace + 1)
+            : cleanedText;
+          data = JSON.parse(jsonStr);
+        } catch (e) {
+          console.error('Failed to parse AI response as JSON:', e, response.text);
+          // Fallback to string if parsing fails completely
+          setAiCommentary(prev => ({ ...prev, [question.id]: response.text }));
+          return;
+        }
+        
+        console.log('Parsed AI data:', data);
         setAiCommentary(prev => ({ ...prev, [question.id]: data }));
         
         // Imediatamente faça um UPDATE no banco de dados
@@ -1622,11 +1644,23 @@ Forneça a explicação de forma concisa e didática.`;
         model: GEMINI_MODEL,
         contents: prompt,
         config: {
-          responseMimeType: "application/json",
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
         },
       });
 
-      const newQuestions = JSON.parse(response.text || '[]');
+      let newQuestions = [];
+      try {
+        const cleanedText = (response.text || '').replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        const firstBracket = cleanedText.indexOf('[');
+        const lastBracket = cleanedText.lastIndexOf(']');
+        const jsonStr = (firstBracket !== -1 && lastBracket !== -1) 
+          ? cleanedText.substring(firstBracket, lastBracket + 1) 
+          : cleanedText;
+        newQuestions = JSON.parse(jsonStr || '[]');
+      } catch (e) {
+        console.error('Failed to parse AI response as JSON:', e, response.text);
+        throw new Error('Falha ao gerar questões. Tente novamente.');
+      }
       
       // 3. Save new questions with is_reinforcement: true
       const questionsToSave = newQuestions.map((q: any) => ({
@@ -1883,7 +1917,7 @@ Forneça a explicação de forma concisa e didática.`;
       Use uma linguagem clara, direta e motivadora. Formate em Markdown.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-3.1-flash-lite-preview",
         contents: prompt,
         config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
       });
