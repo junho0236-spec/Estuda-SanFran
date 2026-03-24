@@ -235,6 +235,7 @@ export interface Task {
   };
   created_at?: string;
   updated_at?: string;
+  comments?: { id: string; userId: string; text: string; createdAt: string }[];
 }
 
 export interface StudySession {
@@ -547,6 +548,7 @@ export interface UserProfile {
     urgenciaVsPlanejamento: number; // -5 (Urgência) to +5 (Planejamento)
   };
   tags: string[];
+  prestigePoints?: number;
   arcadia_score: number;
   full_name?: string;
   bio?: string;

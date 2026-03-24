@@ -29,6 +29,10 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { toast } from 'sonner';
+import { GoogleGenAI } from '@google/genai';
+import { CommentsSection } from './CommentsSection';
+import ical from 'ical-generator';
+import { saveAs } from 'file-saver';
 import { dataService } from '../services/dataService';
 import { supabase } from '../services/supabaseClient';
 
@@ -490,6 +494,49 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     });
     setShowTemplatesMenu(false);
     toast.success(`Template "${template.name}" aplicado!`);
+  };
+
+  const handleBreakDownTask = async () => {
+    if (!selectedTask) return;
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Quebre a tarefa "${selectedTask.title}" em 5 subtarefas lógicas. Retorne apenas uma lista numerada.`
+    });
+    const subtasksTitles = response.text?.split('\n').filter(t => t.trim()).slice(0, 5) || [];
+    const newSubtasks: SubTask[] = subtasksTitles.map(title => ({
+      id: crypto.randomUUID(),
+      title: title.replace(/^\d+\.\s*/, ''),
+      completed: false
+    }));
+    handleUpdateTask({ subtasks: [...(selectedTask.subtasks || []), ...newSubtasks] });
+    toast.success("Tarefa quebrada em subtarefas!");
+  };
+
+  const handleExportToICal = () => {
+    if (!selectedTask || !selectedTask.dueDate) return;
+    const cal = ical({ name: 'Minhas Tarefas' });
+    cal.createEvent({
+      start: new Date(selectedTask.dueDate),
+      end: new Date(selectedTask.dueDate),
+      summary: selectedTask.title,
+      description: selectedTask.notes
+    });
+    const blob = new Blob([cal.toString()], { type: 'text/calendar;charset=utf-8' });
+    saveAs(blob, `${selectedTask.title}.ics`);
+  };
+
+  const awardPrestigePoints = async (task: Task) => {
+    if (!task.completed || !task.dueDate) return;
+    const dueDate = new Date(task.dueDate);
+    const now = new Date();
+    if (now < dueDate && task.priority === 'urgente') {
+      const newPoints = (userProfile?.prestigePoints || 0) + 10;
+      const updatedProfile = { ...userProfile!, prestigePoints: newPoints };
+      setUserProfile(updatedProfile);
+      await dataService.saveUserProfile(updatedProfile, userId, isOnline);
+      toast.success("Você ganhou 10 Pontos de Prestígio por concluir uma tarefa urgente antes do prazo!");
+    }
   };
 
   const isTaskBlocked = (task: Task) => {
@@ -1331,6 +1378,8 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
+                          <button onClick={handleBreakDownTask} className="p-2 text-slate-400 hover:text-[#800000]"><Zap size={20} /></button>
+                          <button onClick={handleExportToICal} className="p-2 text-slate-400 hover:text-[#800000]"><Calendar size={20} /></button>
                           {isTaskBlocked(selectedTask) && (
                             <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 text-amber-600 rounded-lg text-[10px] font-bold border border-amber-100">
                               <AlertCircle size={12} />
@@ -1338,12 +1387,14 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                             </div>
                           )}
                           <button 
-                            onClick={() => {
+                            onClick={async () => {
                               if (isTaskBlocked(selectedTask)) {
                                 toast.error("Esta tarefa está bloqueada por dependências não concluídas.");
                                 return;
                               }
-                              handleUpdateTask({ completed: !selectedTask.completed });
+                              const updatedTask = { ...selectedTask, completed: !selectedTask.completed };
+                              handleUpdateTask({ completed: updatedTask.completed });
+                              if (updatedTask.completed) await awardPrestigePoints(updatedTask);
                             }}
                             disabled={isTaskBlocked(selectedTask)}
                             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${selectedTask.completed ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-emerald-50'} ${isTaskBlocked(selectedTask) ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -1413,6 +1464,11 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                               ))}
                             </div>
                           </div>
+                        </section>
+
+                        {/* Comments Section */}
+                        <section>
+                          <CommentsSection task={selectedTask} userId={userId} onUpdateTask={handleUpdateTask} />
                         </section>
 
                         {/* Notes Section */}
