@@ -191,15 +191,23 @@ CREATE POLICY "Usuários podem ver seus favoritos" ON chat_favorites FOR SELECT 
 CREATE POLICY "Usuários podem gerenciar seus favoritos" ON chat_favorites FOR ALL USING (auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "Participantes podem ver enquetes" ON chat_polls;
+DROP POLICY IF EXISTS "Participantes podem criar enquetes" ON chat_polls;
 CREATE POLICY "Participantes podem ver enquetes" ON chat_polls FOR SELECT USING (
   EXISTS (
     SELECT 1 FROM chat_messages m
     WHERE m.id = chat_polls.message_id AND check_is_room_participant(m.room_id)
   )
 );
+CREATE POLICY "Participantes podem criar enquetes" ON chat_polls FOR INSERT WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM chat_messages m
+    WHERE m.id = message_id AND auth.uid() = m.sender_id AND check_is_room_participant(m.room_id)
+  )
+);
 
 DROP POLICY IF EXISTS "Participantes podem ver votos" ON chat_poll_votes;
 DROP POLICY IF EXISTS "Participantes podem votar" ON chat_poll_votes;
+DROP POLICY IF EXISTS "Participantes podem atualizar seus votos" ON chat_poll_votes;
 CREATE POLICY "Participantes podem ver votos" ON chat_poll_votes FOR SELECT USING (
   EXISTS (
     SELECT 1 FROM chat_polls poll
@@ -207,7 +215,22 @@ CREATE POLICY "Participantes podem ver votos" ON chat_poll_votes FOR SELECT USIN
     WHERE poll.id = chat_poll_votes.poll_id AND check_is_room_participant(m.room_id)
   )
 );
-CREATE POLICY "Participantes podem votar" ON chat_poll_votes FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Participantes podem votar" ON chat_poll_votes FOR INSERT WITH CHECK (
+  auth.uid() = user_id AND
+  EXISTS (
+    SELECT 1 FROM chat_polls poll
+    JOIN chat_messages m ON poll.message_id = m.id
+    WHERE poll.id = poll_id AND check_is_room_participant(m.room_id)
+  )
+);
+CREATE POLICY "Participantes podem atualizar seus votos" ON chat_poll_votes FOR UPDATE USING (
+  auth.uid() = user_id AND
+  EXISTS (
+    SELECT 1 FROM chat_polls poll
+    JOIN chat_messages m ON poll.message_id = m.id
+    WHERE poll.id = poll_id AND check_is_room_participant(m.room_id)
+  )
+);
 
 DROP POLICY IF EXISTS "Participantes podem ver reações" ON chat_reactions;
 DROP POLICY IF EXISTS "Participantes podem reagir a mensagens" ON chat_reactions;

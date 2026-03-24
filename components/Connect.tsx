@@ -6,12 +6,15 @@ import {
   FileText, X, ChevronLeft, Loader2, MessageSquare,
   Edit2, Trash2, Reply, CornerUpLeft, Mic, Pin, PinOff,
   Link, File, Play, Pause, Trash, Bell, BellOff,
-  Smile, Forward, Star, BarChart2, VolumeX, Volume2
+  Smile, Forward, Star, BarChart2, VolumeX, Volume2,
+  Clock, Share2, Folder, History, UserPlus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../services/supabaseClient';
-import { ChatRoom, ChatMessage, ChatParticipant, UserProfile, PresenceUser } from '../types';
+import { ChatRoom, ChatMessage, ChatParticipant, UserProfile, PresenceUser, ChatStory } from '../types';
 import { toast } from 'sonner';
+import { GoogleGenAI, Type } from "@google/genai";
+import Markdown from 'react-markdown';
 
 interface ConnectProps {
   userId: string;
@@ -59,6 +62,14 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState(['', '']);
   const [polls, setPolls] = useState<Record<string, any>>({});
+  const [stories, setStories] = useState<ChatStory[]>([]);
+  const [showStoryModal, setShowStoryModal] = useState(false);
+  const [activeStory, setActiveStory] = useState<ChatStory | null>(null);
+  const [newStoryContent, setNewStoryContent] = useState('');
+  const [showCreateStoryModal, setShowCreateStoryModal] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<'Estudos' | 'Estágio' | 'Social' | 'Privadas' | 'Tudo'>('Tudo');
+  const [showShareProfileModal, setShowShareProfileModal] = useState(false);
+  const [sharingToRoomId, setSharingToRoomId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<any>(null);
@@ -82,11 +93,15 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
 
     fetchRooms();
     fetchUserProfile();
+    fetchStarredMessages();
+    fetchStories();
     const unsubscribeRooms = subscribeToAllRooms();
     const unsubscribePresence = subscribeToPresence();
+    const unsubscribeStories = subscribeToStories();
     return () => {
       if (unsubscribeRooms) unsubscribeRooms();
       if (unsubscribePresence) unsubscribePresence();
+      if (unsubscribeStories) unsubscribeStories();
     };
   }, [userId]);
 
@@ -185,6 +200,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
       return () => {
         if (unsubscribe) unsubscribe();
         if (unsubscribeReactions) unsubscribeReactions();
+        if (unsubscribePolls) unsubscribePolls();
       };
     }
   }, [activeRoom, participants]);
@@ -327,14 +343,21 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
     }
   };
 
+  const [starredRoomIds, setStarredRoomIds] = useState<Set<string>>(new Set());
+
   const fetchStarredMessages = async () => {
     try {
       const { data, error } = await supabase
         .from('chat_favorites')
-        .select('message_id')
+        .select('message_id, chat_messages(room_id)')
         .eq('user_id', userId);
       if (error) throw error;
-      setStarredMessages(data.map(f => f.message_id));
+      
+      const msgIds = data.map(f => f.message_id);
+      const roomIds = new Set(data.map(f => (f.chat_messages as any)?.room_id).filter(Boolean) as string[]);
+      
+      setStarredMessages(msgIds);
+      setStarredRoomIds(roomIds);
     } catch (error: any) {
       console.error('Erro ao buscar favoritos:', error);
     }
@@ -358,6 +381,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
         setStarredMessages(prev => [...prev, messageId]);
         toast.success('Adicionado aos favoritos');
       }
+      fetchStarredMessages();
     } catch (error: any) {
       toast.error('Erro ao favoritar mensagem');
     }
@@ -391,7 +415,8 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
     try {
       const { data, error } = await supabase
         .from('chat_polls')
-        .select('*, chat_poll_votes(*)')
+        .select('*, chat_messages!inner(room_id), chat_poll_votes(*)')
+        .eq('chat_messages.room_id', roomId)
         .order('created_at', { ascending: true });
       if (error) throw error;
       
@@ -422,6 +447,100 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
       })
       .subscribe();
     return () => supabase.removeChannel(channel);
+  };
+
+  const fetchStories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('chat_stories')
+        .select('*')
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setStories(data || []);
+    } catch (error: any) {
+      console.error('Erro ao buscar stories:', error);
+    }
+  };
+
+  const subscribeToStories = () => {
+    const channel = supabase
+      .channel('chat_stories_channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_stories' }, () => {
+        fetchStories();
+      })
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  };
+
+  const createStory = async () => {
+    if (!newStoryContent.trim()) return;
+    try {
+      const { error } = await supabase
+        .from('chat_stories')
+        .insert({
+          user_id: userId,
+          user_name: userName,
+          user_avatar: userProfile?.avatar_url || null,
+          content: newStoryContent.trim(),
+          type: 'text'
+        });
+
+      if (error) throw error;
+      setNewStoryContent('');
+      setShowCreateStoryModal(false);
+      toast.success('Status publicado!');
+      fetchStories();
+    } catch (error: any) {
+      toast.error('Erro ao publicar status');
+    }
+  };
+
+  const updateChatCategory = async (roomId: string, category: 'Estudos' | 'Estágio' | 'Social' | 'Privadas') => {
+    try {
+      const { error } = await supabase
+        .from('chat_participants')
+        .update({ category })
+        .eq('room_id', roomId)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+      toast.success(`Conversa movida para ${category}`);
+      fetchRooms();
+    } catch (error: any) {
+      toast.error('Erro ao categorizar conversa');
+    }
+  };
+
+  const shareProfile = async (targetUserId: string) => {
+    if (!activeRoom) return;
+    try {
+      const { data: targetProfile, error: profileError } = await supabase
+        .from('user_persona')
+        .select('*')
+        .eq('id', targetUserId)
+        .single();
+
+      if (profileError) throw profileError;
+
+      const { error } = await supabase
+        .from('chat_messages')
+        .insert({
+          room_id: activeRoom.id,
+          sender_id: userId,
+          sender_name: userName,
+          content: `Compartilhou o contato de ${targetProfile.full_name || 'Colega'}`,
+          shared_profile_id: targetUserId,
+          status: 'sent'
+        });
+
+      if (error) throw error;
+      setShowShareProfileModal(false);
+      toast.success('Contato compartilhado!');
+    } catch (error: any) {
+      toast.error('Erro ao compartilhar contato');
+    }
   };
 
   const createPoll = async () => {
@@ -753,16 +872,65 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const generateLinkPreview = async (url: string) => {
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: `Extraia metadados para este link: ${url}. Retorne um JSON com title, description e image (URL da imagem). Se for um site jurídico brasileiro (STF, Jusbrasil, etc), forneça uma descrição técnica e formal.`,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING },
+              description: { type: Type.STRING },
+              image: { type: Type.STRING }
+            },
+            required: ["title", "description"]
+          }
+        }
+      });
+      
+      const metadata = JSON.parse(response.text || '{}');
+      metadata.url = url;
+      
+      // Special handling for YouTube
+      if (url.includes('youtube.com') || url.includes('youtu.be')) {
+        const videoId = url.includes('v=') ? url.split('v=')[1]?.split('&')[0] : url.split('/').pop();
+        if (videoId) {
+          metadata.image = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+        }
+      }
+      
+      return metadata;
+    } catch (error) {
+      console.error('Erro ao gerar preview do link:', error);
+      return null;
+    }
+  };
+
   const sendMessage = async () => {
     if (!newMessage.trim() || !activeRoom) return;
 
     const messageContent = newMessage.trim();
     
+    // Detect URL for preview
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const urls = messageContent.match(urlRegex);
+    let linkPreview = null;
+    if (urls && urls.length > 0) {
+      linkPreview = await generateLinkPreview(urls[0]);
+    }
+    
     if (editingMessage) {
       try {
         const { error } = await supabase
           .from('chat_messages')
-          .update({ content: messageContent })
+          .update({ 
+            content: messageContent,
+            link_preview: linkPreview
+          })
           .eq('id', editingMessage.id);
         
         if (error) throw error;
@@ -791,7 +959,8 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
           status: 'sent',
           reply_to_id: currentReply?.id || null,
           reply_to_content: currentReply?.content || null,
-          reply_to_sender_name: currentReply?.sender_name || null
+          reply_to_sender_name: currentReply?.sender_name || null,
+          link_preview: linkPreview
         })
         .select()
         .single();
@@ -1127,9 +1296,13 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
     return otherParticipant?.user_avatar;
   };
 
-  const filteredRooms = rooms.filter(room => 
-    getChatName(room).toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredRooms = rooms.filter(room => {
+    const matchesSearch = getChatName(room).toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStarred = !showStarredOnly || starredRoomIds.has(room.id);
+    const participant = participants[room.id]?.find(p => p.user_id === userId);
+    const matchesCategory = activeCategory === 'Tudo' || participant?.category === activeCategory;
+    return matchesSearch && matchesStarred && matchesCategory;
+  });
 
   return (
     <div className="flex h-[calc(100vh-120px)] bg-white dark:bg-[#0a0a0a] md:rounded-[2rem] border-0 md:border border-slate-200 dark:border-white/5 overflow-hidden shadow-2xl relative">
@@ -1170,7 +1343,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
         </div>
 
         {/* SEARCH BAR */}
-        <div className="p-4">
+        <div className="px-4 pt-4 pb-2">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input 
@@ -1181,6 +1354,50 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
               className="w-full pl-10 pr-4 py-2 bg-white dark:bg-black/40 border border-slate-200 dark:border-white/5 rounded-xl outline-none focus:border-blue-500 transition-all text-sm"
             />
           </div>
+        </div>
+
+        {/* STORIES BAR */}
+        <div className="px-4 py-2 overflow-x-auto flex gap-3 no-scrollbar border-b border-slate-200 dark:border-white/5">
+          <button 
+            onClick={() => setShowCreateStoryModal(true)}
+            className="flex flex-col items-center gap-1 shrink-0"
+          >
+            <div className="w-12 h-12 rounded-full border-2 border-dashed border-slate-300 dark:border-white/20 flex items-center justify-center text-slate-400 hover:border-blue-500 hover:text-blue-500 transition-all">
+              <Plus size={20} />
+            </div>
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Status</span>
+          </button>
+          {stories.map(story => (
+            <button 
+              key={story.id} 
+              onClick={() => { setActiveStory(story); setShowStoryModal(true); }}
+              className="flex flex-col items-center gap-1 shrink-0"
+            >
+              <div className="w-12 h-12 rounded-full border-2 border-blue-500 p-0.5 shadow-sm">
+                <div className="w-full h-full rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center overflow-hidden">
+                  {story.user_avatar ? (
+                    <img src={story.user_avatar} alt={story.user_name} className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="text-slate-400" size={20} />
+                  )}
+                </div>
+              </div>
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter truncate w-12 text-center">{story.user_name.split(' ')[0]}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* CATEGORY TABS */}
+        <div className="px-4 py-2 flex gap-1 overflow-x-auto no-scrollbar border-b border-slate-200 dark:border-white/5 bg-white/50 dark:bg-black/10">
+          {['Tudo', 'Estudos', 'Estágio', 'Social', 'Privadas'].map((cat: any) => (
+            <button
+              key={cat}
+              onClick={() => setActiveCategory(cat)}
+              className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeCategory === cat ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'}`}
+            >
+              {cat}
+            </button>
+          ))}
         </div>
 
         {/* CHAT LIST */}
@@ -1257,6 +1474,26 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
                             {unreadCount}
                           </span>
                         )}
+                        <div className="relative group/cat">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); }}
+                            className="p-1 opacity-0 group-hover:opacity-100 hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg transition-all text-slate-400"
+                            title="Mover para categoria"
+                          >
+                            <Folder size={14} />
+                          </button>
+                          <div className="absolute right-0 bottom-full mb-2 w-32 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/5 rounded-xl shadow-2xl opacity-0 invisible group-hover/cat:opacity-100 group-hover/cat:visible transition-all z-50 overflow-hidden">
+                            {['Estudos', 'Estágio', 'Social', 'Privadas'].map(cat => (
+                              <button
+                                key={cat}
+                                onClick={(e) => { e.stopPropagation(); updateChatCategory(room.id, cat as any); }}
+                                className="w-full text-left px-3 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
+                              >
+                                {cat}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                         <button 
                           onClick={(e) => togglePin(room.id, e)}
                           className="p-1 opacity-0 group-hover:opacity-100 hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg transition-all"
@@ -1543,9 +1780,22 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
                         {/* MESSAGE CONTENT */}
                         <div className="relative">
                           {msg.content && (
-                            <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">
-                              {msg.content}
-                            </p>
+                            <div className={`text-sm leading-relaxed break-words whitespace-pre-wrap markdown-body ${isMe ? 'prose-invert' : ''}`}>
+                              <Markdown>{msg.content}</Markdown>
+                            </div>
+                          )}
+
+                          {/* LINK PREVIEW */}
+                          {msg.link_preview && (
+                            <div className={`mt-3 rounded-xl overflow-hidden border ${isMe ? 'bg-blue-700/30 border-blue-400/30' : 'bg-slate-50 dark:bg-black/20 border-slate-100 dark:border-white/5'} shadow-sm`}>
+                              {msg.link_preview.image && (
+                                <img src={msg.link_preview.image} alt={msg.link_preview.title} className="w-full h-32 object-cover" referrerPolicy="no-referrer" />
+                              )}
+                              <div className="p-3">
+                                <h4 className={`font-bold text-xs mb-1 ${isMe ? 'text-white' : 'text-slate-900 dark:text-white'}`}>{msg.link_preview.title}</h4>
+                                <p className={`text-[10px] line-clamp-2 ${isMe ? 'text-blue-100' : 'text-slate-500 dark:text-slate-400'}`}>{msg.link_preview.description}</p>
+                              </div>
+                            </div>
                           )}
 
                           {/* POLL RENDERING */}
@@ -1583,6 +1833,25 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
                               <p className="text-[10px] text-slate-400 mt-3 font-bold uppercase tracking-widest">
                                 {(Object.values(polls[msg.id].votes) as any[]).reduce((acc: number, v: any) => acc + (v as any[]).length, 0)} votos
                               </p>
+                            </div>
+                          )}
+
+                          {/* SHARED PROFILE RENDERING */}
+                          {msg.shared_profile_id && (
+                            <div className="mt-3 p-4 bg-white dark:bg-black/20 rounded-2xl border border-slate-100 dark:border-white/5 shadow-sm flex items-center gap-4 group/profile">
+                              <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold shadow-lg shrink-0">
+                                <User size={24} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">Perfil Compartilhado</h4>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-black mt-1">Clique para visualizar</p>
+                              </div>
+                              <button 
+                                onClick={() => onNavigate && onNavigate('profile', { userId: msg.shared_profile_id })}
+                                className="p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
+                              >
+                                <Share2 size={16} />
+                              </button>
                             </div>
                           )}
 
@@ -1739,19 +2008,29 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
                   </div>
                 ) : (
                   <>
-                    <div className="relative">
-                      <input 
-                        type="file" 
-                        id="file-upload" 
-                        className="hidden" 
-                        onChange={handleFileUpload}
-                      />
-                      <label 
-                        htmlFor="file-upload"
-                        className="p-3 bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-blue-600 rounded-xl cursor-pointer transition-all block"
+                    <div className="flex items-center gap-2">
+                      <div className="relative">
+                        <input 
+                          type="file" 
+                          id="file-upload" 
+                          className="hidden" 
+                          onChange={handleFileUpload}
+                        />
+                        <label 
+                          htmlFor="file-upload"
+                          className="p-3 bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-blue-600 rounded-xl cursor-pointer transition-all block"
+                        >
+                          {uploading ? <Loader2 className="animate-spin" size={20} /> : <Paperclip size={20} />}
+                        </label>
+                      </div>
+                      
+                      <button 
+                        onClick={() => { fetchUsers(); setShowShareProfileModal(true); }}
+                        className="p-3 bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-blue-600 rounded-xl transition-all"
+                        title="Compartilhar Perfil"
                       >
-                        {uploading ? <Loader2 className="animate-spin" size={20} /> : <Paperclip size={20} />}
-                      </label>
+                        <UserPlus size={20} />
+                      </button>
                     </div>
                     
                     <div className="flex-1 relative">
@@ -2214,6 +2493,160 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
             </motion.div>
           </div>
         )}
+        {/* CREATE STORY MODAL */}
+        <AnimatePresence>
+          {showCreateStoryModal && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-white dark:bg-[#1a1a1a] w-full max-w-md rounded-[2.5rem] border border-slate-200 dark:border-white/5 shadow-2xl overflow-hidden"
+              >
+                <div className="p-6 border-b border-slate-200 dark:border-white/5 flex items-center justify-between">
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Novo Status</h3>
+                  <button onClick={() => setShowCreateStoryModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
+                    <X size={20} />
+                  </button>
+                </div>
+                <div className="p-6 space-y-4">
+                  <textarea 
+                    value={newStoryContent}
+                    onChange={(e) => setNewStoryContent(e.target.value)}
+                    placeholder="O que está acontecendo? (Ex: Estou na biblioteca!)"
+                    className="w-full p-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl outline-none focus:border-blue-500 transition-all text-sm resize-none min-h-[120px]"
+                  />
+                  <button 
+                    onClick={createStory}
+                    className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
+                  >
+                    Publicar Status
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* VIEW STORY MODAL */}
+        <AnimatePresence>
+          {showStoryModal && activeStory && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="w-full max-w-md aspect-[9/16] bg-gradient-to-br from-blue-600 to-indigo-900 rounded-[2.5rem] shadow-2xl overflow-hidden relative flex flex-col items-center justify-center p-8 text-center"
+              >
+                <button 
+                  onClick={() => setShowStoryModal(false)}
+                  className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-all"
+                >
+                  <X size={24} />
+                </button>
+                
+                <div className="absolute top-6 left-6 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center overflow-hidden border-2 border-white/30">
+                    {activeStory.user_avatar ? (
+                      <img src={activeStory.user_avatar} alt={activeStory.user_name} className="w-full h-full object-cover" />
+                    ) : (
+                      <User className="text-white" size={20} />
+                    )}
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-black text-white uppercase tracking-tight">{activeStory.user_name}</p>
+                    <p className="text-[10px] text-white/60 font-bold uppercase tracking-widest">
+                      {new Date(activeStory.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex-1 flex items-center justify-center">
+                  <p className="text-2xl md:text-3xl font-black text-white leading-tight px-4">
+                    "{activeStory.content}"
+                  </p>
+                </div>
+
+                <div className="absolute bottom-10 w-full px-8">
+                  <div className="h-1 w-full bg-white/20 rounded-full overflow-hidden">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: '100%' }}
+                      transition={{ duration: 5, ease: 'linear' }}
+                      onAnimationComplete={() => setShowStoryModal(false)}
+                      className="h-full bg-white"
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* SHARE PROFILE MODAL */}
+        <AnimatePresence>
+          {showShareProfileModal && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-white dark:bg-[#1a1a1a] w-full max-w-md rounded-[2.5rem] border border-slate-200 dark:border-white/5 shadow-2xl overflow-hidden"
+              >
+                <div className="p-6 border-b border-slate-200 dark:border-white/5 flex items-center justify-between">
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Compartilhar Contato</h3>
+                  <button onClick={() => setShowShareProfileModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
+                    <X size={20} />
+                  </button>
+                </div>
+                <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Selecione um colega para compartilhar</p>
+                  {allUsers.length === 0 ? (
+                    <p className="text-center py-8 text-sm text-slate-400">Nenhum colega encontrado</p>
+                  ) : (
+                    allUsers.map(user => (
+                      <button
+                        key={user.id}
+                        onClick={() => shareProfile(user.id)}
+                        className="w-full p-4 flex items-center gap-4 bg-slate-50 dark:bg-black/20 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-2xl border border-slate-200 dark:border-white/5 transition-all group"
+                      >
+                        <div className="w-12 h-12 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center overflow-hidden shrink-0">
+                          {user.persona_data?.avatar_url ? (
+                            <img src={user.persona_data.avatar_url} alt={user.persona_data.nome} className="w-full h-full object-cover" />
+                          ) : (
+                            <User className="text-slate-400" size={24} />
+                          )}
+                        </div>
+                        <div className="flex-1 text-left min-w-0">
+                          <h4 className="font-bold text-slate-900 dark:text-white truncate">{user.persona_data?.nome || 'Colega'}</h4>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-black mt-1">
+                            {user.persona_data?.especialidade || 'Estudante'}
+                          </p>
+                        </div>
+                        <Share2 size={18} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
+                      </button>
+                    ))
+                  )}
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </AnimatePresence>
     </div>
   );

@@ -1032,6 +1032,7 @@ export interface ChatMessage {
   reply_to_sender_name?: string;
   is_forwarded?: boolean;
   forwarded_from_name?: string;
+  shared_profile_id?: string;
   link_preview?: {
     title?: string;
     description?: string;
@@ -1041,6 +1042,18 @@ export interface ChatMessage {
   is_starred?: boolean;
   poll?: ChatPoll;
   updated_at?: string;
+}
+
+export interface ChatStory {
+  id: string;
+  user_id: string;
+  user_name: string;
+  user_avatar?: string;
+  content: string;
+  type: 'text' | 'image';
+  media_url?: string;
+  created_at: string;
+  expires_at: string;
 }
 
 export interface ChatPoll {
@@ -1063,6 +1076,7 @@ export interface ChatParticipant {
   is_typing: boolean;
   is_pinned?: boolean;
   muted_until?: string | null;
+  category?: 'Estudos' | 'Estágio' | 'Social' | 'Privadas';
   last_read_at?: string;
   created_at: string;
 }
