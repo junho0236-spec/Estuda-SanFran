@@ -500,7 +500,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     if (!selectedTask) return;
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-lite-preview',
+      model: 'gemini-2.5-flash',
       contents: `Quebre a tarefa "${selectedTask.title}" em 5 subtarefas lógicas. Retorne apenas uma lista numerada.`
     });
     const subtasksTitles = response.text?.split('\n').filter(t => t.trim()).slice(0, 5) || [];

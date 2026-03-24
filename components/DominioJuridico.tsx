@@ -289,7 +289,7 @@ const DominioJuridico: React.FC<DominioJuridicoProps> = ({ subjects, studySessio
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-flash-lite-preview",
+        model: "gemini-2.5-flash",
         contents: `Gere uma lista de 10 a 15 tópicos principais de estudo para a disciplina de Direito: "${subject.name}". Retorne apenas um array JSON de strings com os títulos dos tópicos.`,
         config: {
           responseMimeType: "application/json",

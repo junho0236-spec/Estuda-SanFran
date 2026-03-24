@@ -1187,9 +1187,8 @@ ${selectedText}
 Forneça a explicação de forma concisa e didática.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-flash-lite-preview",
-        contents: prompt,
-        config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
+        model: "gemini-2.5-flash",
+        contents: prompt
       });
 
       if (response.text) {
@@ -1227,7 +1226,7 @@ Forneça a explicação de forma concisa e didática.`;
 
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
-      const chat = ai.chats.create({ model: "gemini-3.1-flash-lite-preview" });
+      const chat = ai.chats.create({ model: "gemini-2.5-flash" });
       
       // Context for the chat
       const context = `Você é um professor de Direito especialista em concursos. Estamos discutindo a seguinte questão: ${questionStatement}.`;
@@ -1320,11 +1319,8 @@ Forneça a explicação de forma concisa e didática.`;
       }`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-flash-lite-preview",
-        contents: prompt,
-        config: {
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
-        }
+        model: "gemini-2.5-flash",
+        contents: prompt
       });
 
       console.log('AI response received:', response.text);
@@ -1642,10 +1638,7 @@ Forneça a explicação de forma concisa e didática.`;
       
       const response = await ai.models.generateContent({
         model: GEMINI_MODEL,
-        contents: prompt,
-        config: {
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
-        },
+        contents: prompt
       });
 
       let newQuestions = [];
@@ -1758,7 +1751,6 @@ Forneça a explicação de forma concisa e didática.`;
           model: GEMINI_MODEL,
           contents: prompt,
           config: {
-            thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
             responseMimeType: "application/json",
             responseSchema: {
               type: Type.ARRAY,
@@ -1917,9 +1909,8 @@ Forneça a explicação de forma concisa e didática.`;
       Use uma linguagem clara, direta e motivadora. Formate em Markdown.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-flash-lite-preview",
-        contents: prompt,
-        config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
+        model: "gemini-2.5-flash",
+        contents: prompt
       });
 
       setAiLessonContent(response.text);
