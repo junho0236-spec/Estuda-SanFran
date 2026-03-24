@@ -1030,7 +1030,27 @@ export interface ChatMessage {
   reply_to_id?: string;
   reply_to_content?: string;
   reply_to_sender_name?: string;
+  is_forwarded?: boolean;
+  forwarded_from_name?: string;
+  link_preview?: {
+    title?: string;
+    description?: string;
+    image?: string;
+    url: string;
+  };
+  is_starred?: boolean;
+  poll?: ChatPoll;
   updated_at?: string;
+}
+
+export interface ChatPoll {
+  id: string;
+  message_id: string;
+  question: string;
+  options: string[];
+  votes: Record<number, string[]>; // optionIndex -> array of userIds
+  is_closed?: boolean;
+  created_at: string;
 }
 
 export interface ChatParticipant {
@@ -1042,6 +1062,7 @@ export interface ChatParticipant {
   unread_count: number;
   is_typing: boolean;
   is_pinned?: boolean;
+  muted_until?: string | null;
   last_read_at?: string;
   created_at: string;
 }

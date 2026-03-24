@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS chat_participants (
   unread_count INTEGER DEFAULT 0,
   is_typing BOOLEAN DEFAULT false,
   is_pinned BOOLEAN DEFAULT false,
+  muted_until TIMESTAMP WITH TIME ZONE,
   last_read_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(room_id, user_id)
@@ -88,6 +89,9 @@ CREATE TABLE IF NOT EXISTS chat_messages (
   status TEXT CHECK (status IN ('sent', 'delivered', 'read')) DEFAULT 'sent',
   is_edited BOOLEAN DEFAULT FALSE,
   is_deleted BOOLEAN DEFAULT FALSE,
+  is_forwarded BOOLEAN DEFAULT FALSE,
+  forwarded_from_name TEXT,
+  link_preview JSONB,
   reply_to_id UUID REFERENCES chat_messages(id) ON DELETE SET NULL,
   reply_to_content TEXT,
   reply_to_sender_name TEXT,
@@ -134,6 +138,100 @@ CREATE POLICY "Participantes podem gerenciar seu status" ON chat_participants FO
 CREATE POLICY "Participantes podem ver mensagens" ON chat_messages FOR SELECT USING (check_is_room_participant(room_id));
 CREATE POLICY "Participantes podem enviar mensagens" ON chat_messages FOR INSERT WITH CHECK (auth.uid() = sender_id AND check_is_room_participant(room_id));
 CREATE POLICY "Participantes podem atualizar suas mensagens" ON chat_messages FOR UPDATE USING (auth.uid() = sender_id);
+
+-- Chat Reactions
+CREATE TABLE IF NOT EXISTS chat_reactions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  message_id UUID REFERENCES chat_messages(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  emoji TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(message_id, user_id, emoji)
+);
+
+ALTER TABLE chat_reactions ENABLE ROW LEVEL SECURITY;
+
+-- 8. MENSAGENS FAVORITAS (CHAT_FAVORITES)
+CREATE TABLE IF NOT EXISTS chat_favorites (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  message_id UUID REFERENCES chat_messages(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(message_id, user_id)
+);
+
+-- 9. ENQUETES (CHAT_POLLS)
+CREATE TABLE IF NOT EXISTS chat_polls (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  message_id UUID REFERENCES chat_messages(id) ON DELETE CASCADE,
+  question TEXT NOT NULL,
+  options JSONB NOT NULL, -- Array of strings
+  is_closed BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 10. VOTOS DE ENQUETES (CHAT_POLL_VOTES)
+CREATE TABLE IF NOT EXISTS chat_poll_votes (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  poll_id UUID REFERENCES chat_polls(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  option_index INTEGER NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(poll_id, user_id)
+);
+
+ALTER TABLE chat_favorites ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_polls ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_poll_votes ENABLE ROW LEVEL SECURITY;
+
+-- Políticas para novas tabelas
+DROP POLICY IF EXISTS "Usuários podem ver seus favoritos" ON chat_favorites;
+DROP POLICY IF EXISTS "Usuários podem gerenciar seus favoritos" ON chat_favorites;
+CREATE POLICY "Usuários podem ver seus favoritos" ON chat_favorites FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Usuários podem gerenciar seus favoritos" ON chat_favorites FOR ALL USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Participantes podem ver enquetes" ON chat_polls;
+CREATE POLICY "Participantes podem ver enquetes" ON chat_polls FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM chat_messages m
+    WHERE m.id = chat_polls.message_id AND check_is_room_participant(m.room_id)
+  )
+);
+
+DROP POLICY IF EXISTS "Participantes podem ver votos" ON chat_poll_votes;
+DROP POLICY IF EXISTS "Participantes podem votar" ON chat_poll_votes;
+CREATE POLICY "Participantes podem ver votos" ON chat_poll_votes FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM chat_polls poll
+    JOIN chat_messages m ON poll.message_id = m.id
+    WHERE poll.id = chat_poll_votes.poll_id AND check_is_room_participant(m.room_id)
+  )
+);
+CREATE POLICY "Participantes podem votar" ON chat_poll_votes FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Participantes podem ver reações" ON chat_reactions;
+DROP POLICY IF EXISTS "Participantes podem reagir a mensagens" ON chat_reactions;
+DROP POLICY IF EXISTS "Participantes podem remover suas reações" ON chat_reactions;
+
+CREATE POLICY "Participantes podem ver reações" ON chat_reactions 
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM chat_messages m
+      WHERE m.id = message_id AND check_is_room_participant(m.room_id)
+    )
+  );
+
+CREATE POLICY "Participantes podem reagir a mensagens" ON chat_reactions 
+  FOR INSERT WITH CHECK (
+    auth.uid() = user_id AND
+    EXISTS (
+      SELECT 1 FROM chat_messages m
+      WHERE m.id = message_id AND check_is_room_participant(m.room_id)
+    )
+  );
+
+CREATE POLICY "Participantes podem remover suas reações" ON chat_reactions 
+  FOR DELETE USING (auth.uid() = user_id);
 
 -- 4. PUSH NOTIFICATIONS
 CREATE TABLE IF NOT EXISTS push_subscriptions (

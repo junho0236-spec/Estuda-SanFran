@@ -5,7 +5,8 @@ import {
   Check, CheckCheck, User, Image as ImageIcon, 
   FileText, X, ChevronLeft, Loader2, MessageSquare,
   Edit2, Trash2, Reply, CornerUpLeft, Mic, Pin, PinOff,
-  Link, File, Play, Pause, Trash, Bell, BellOff
+  Link, File, Play, Pause, Trash, Bell, BellOff,
+  Smile, Forward, Star, BarChart2, VolumeX, Volume2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../services/supabaseClient';
@@ -47,6 +48,17 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [pinnedRooms, setPinnedRooms] = useState<string[]>([]);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+  const [messageReactions, setMessageReactions] = useState<Record<string, any[]>>({});
+  const [forwardingMessage, setForwardingMessage] = useState<ChatMessage | null>(null);
+  const [showForwardModal, setShowForwardModal] = useState(false);
+  const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
+  const [starredMessages, setStarredMessages] = useState<string[]>([]);
+  const [showStarredOnly, setShowStarredOnly] = useState(false);
+  const [showPollModal, setShowPollModal] = useState(false);
+  const [showMuteOptions, setShowMuteOptions] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState(['', '']);
+  const [polls, setPolls] = useState<Record<string, any>>({});
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<any>(null);
@@ -154,8 +166,15 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
 
   useEffect(() => {
     if (activeRoom) {
+      setInternalSearchQuery('');
+      setShowInternalSearch(false);
       fetchMessages(activeRoom.id);
+      fetchReactions(activeRoom.id);
+      fetchStarredMessages();
+      fetchPolls(activeRoom.id);
       const unsubscribe = subscribeToMessages(activeRoom.id);
+      const unsubscribeReactions = subscribeToReactions(activeRoom.id);
+      const unsubscribePolls = subscribeToPolls(activeRoom.id);
       markAsRead(activeRoom.id);
       
       const otherId = participants[activeRoom.id]?.find(p => p.user_id !== userId)?.user_id;
@@ -165,6 +184,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
       
       return () => {
         if (unsubscribe) unsubscribe();
+        if (unsubscribeReactions) unsubscribeReactions();
       };
     }
   }, [activeRoom, participants]);
@@ -304,6 +324,270 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
 
     if (!error) {
       setMessages(data || []);
+    }
+  };
+
+  const fetchStarredMessages = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('chat_favorites')
+        .select('message_id')
+        .eq('user_id', userId);
+      if (error) throw error;
+      setStarredMessages(data.map(f => f.message_id));
+    } catch (error: any) {
+      console.error('Erro ao buscar favoritos:', error);
+    }
+  };
+
+  const toggleStarMessage = async (messageId: string) => {
+    const isStarred = starredMessages.includes(messageId);
+    try {
+      if (isStarred) {
+        await supabase
+          .from('chat_favorites')
+          .delete()
+          .eq('message_id', messageId)
+          .eq('user_id', userId);
+        setStarredMessages(prev => prev.filter(id => id !== messageId));
+        toast.success('Removido dos favoritos');
+      } else {
+        await supabase
+          .from('chat_favorites')
+          .insert({ message_id: messageId, user_id: userId });
+        setStarredMessages(prev => [...prev, messageId]);
+        toast.success('Adicionado aos favoritos');
+      }
+    } catch (error: any) {
+      toast.error('Erro ao favoritar mensagem');
+    }
+  };
+
+  const muteChat = async (roomId: string, duration: '8h' | '1w' | 'forever' | null) => {
+    let mutedUntil: string | null = null;
+    if (duration === '8h') {
+      mutedUntil = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
+    } else if (duration === '1w') {
+      mutedUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    } else if (duration === 'forever') {
+      mutedUntil = new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString();
+    }
+
+    try {
+      const { error } = await supabase
+        .from('chat_participants')
+        .update({ muted_until: mutedUntil })
+        .eq('room_id', roomId)
+        .eq('user_id', userId);
+      if (error) throw error;
+      toast.success(duration ? `Silenciado por ${duration}` : 'Notificações ativadas');
+      fetchRooms();
+    } catch (error: any) {
+      toast.error('Erro ao silenciar conversa');
+    }
+  };
+
+  const fetchPolls = async (roomId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('chat_polls')
+        .select('*, chat_poll_votes(*)')
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      
+      const pollMap: Record<string, any> = {};
+      data.forEach(poll => {
+        const votes: Record<number, string[]> = {};
+        poll.options.forEach((_: any, idx: number) => {
+          votes[idx] = poll.chat_poll_votes
+            .filter((v: any) => v.option_index === idx)
+            .map((v: any) => v.user_id);
+        });
+        pollMap[poll.message_id] = { ...poll, votes };
+      });
+      setPolls(pollMap);
+    } catch (error: any) {
+      console.error('Erro ao buscar enquetes:', error);
+    }
+  };
+
+  const subscribeToPolls = (roomId: string) => {
+    const channel = supabase
+      .channel(`polls:${roomId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_poll_votes' }, () => {
+        fetchPolls(roomId);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_polls' }, () => {
+        fetchPolls(roomId);
+      })
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  };
+
+  const createPoll = async () => {
+    if (!activeRoom || !pollQuestion || pollOptions.filter(o => o.trim()).length < 2) {
+      toast.error('Preencha a pergunta e pelo menos 2 opções');
+      return;
+    }
+
+    try {
+      // 1. Create message
+      const { data: msgData, error: msgError } = await supabase
+        .from('chat_messages')
+        .insert({
+          room_id: activeRoom.id,
+          sender_id: userId,
+          sender_name: userName,
+          content: `📊 ENQUETE: ${pollQuestion}`,
+          status: 'sent'
+        })
+        .select()
+        .single();
+      
+      if (msgError) throw msgError;
+
+      // 2. Create poll
+      const { error: pollError } = await supabase
+        .from('chat_polls')
+        .insert({
+          message_id: msgData.id,
+          question: pollQuestion,
+          options: pollOptions.filter(o => o.trim())
+        });
+      
+      if (pollError) throw pollError;
+
+      toast.success('Enquete criada!');
+      setShowPollModal(false);
+      setPollQuestion('');
+      setPollOptions(['', '']);
+    } catch (error: any) {
+      toast.error('Erro ao criar enquete');
+    }
+  };
+
+  const votePoll = async (pollId: string, optionIndex: number) => {
+    try {
+      const { error } = await supabase
+        .from('chat_poll_votes')
+        .upsert({
+          poll_id: pollId,
+          user_id: userId,
+          option_index: optionIndex
+        }, { onConflict: 'poll_id,user_id' });
+      
+      if (error) throw error;
+    } catch (error: any) {
+      toast.error('Erro ao votar');
+    }
+  };
+  const fetchReactions = async (roomId: string) => {
+    const { data: messageIds } = await supabase
+      .from('chat_messages')
+      .select('id')
+      .eq('room_id', roomId);
+    
+    if (messageIds && messageIds.length > 0) {
+      const ids = messageIds.map(m => m.id);
+      const { data, error } = await supabase
+        .from('chat_reactions')
+        .select('*')
+        .in('message_id', ids);
+      
+      if (!error && data) {
+        const grouped = data.reduce((acc: any, r) => {
+          if (!acc[r.message_id]) acc[r.message_id] = [];
+          acc[r.message_id].push(r);
+          return acc;
+        }, {});
+        setMessageReactions(grouped);
+      }
+    }
+  };
+
+  const subscribeToReactions = (roomId: string) => {
+    const channel = supabase
+      .channel(`reactions:${roomId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'chat_reactions'
+      }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const newReaction = payload.new;
+          setMessageReactions(prev => {
+            const current = prev[newReaction.message_id] || [];
+            if (current.some(r => r.id === newReaction.id)) return prev;
+            return { ...prev, [newReaction.message_id]: [...current, newReaction] };
+          });
+        } else if (payload.eventType === 'DELETE') {
+          const oldReaction = payload.old;
+          setMessageReactions(prev => {
+            const newMessageReactions = { ...prev };
+            for (const msgId in newMessageReactions) {
+              newMessageReactions[msgId] = newMessageReactions[msgId].filter(r => r.id !== oldReaction.id);
+            }
+            return newMessageReactions;
+          });
+        }
+      })
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  };
+
+  const addReaction = async (messageId: string, emoji: string) => {
+    const { error } = await supabase
+      .from('chat_reactions')
+      .insert([{ message_id: messageId, user_id: userId, emoji }]);
+    
+    if (error) {
+      if (error.code === '23505') {
+        removeReaction(messageId, emoji);
+      } else {
+        toast.error('Erro ao adicionar reação');
+      }
+    }
+    setShowReactionPicker(null);
+  };
+
+  const removeReaction = async (messageId: string, emoji: string) => {
+    const { error } = await supabase
+      .from('chat_reactions')
+      .delete()
+      .eq('message_id', messageId)
+      .eq('user_id', userId)
+      .eq('emoji', emoji);
+    
+    if (error) toast.error('Erro ao remover reação');
+  };
+
+  const forwardMessage = async (targetRoomId: string) => {
+    if (!forwardingMessage) return;
+    
+    try {
+      const { error } = await supabase
+        .from('chat_messages')
+        .insert([{
+          room_id: targetRoomId,
+          sender_id: userId,
+          sender_name: userName,
+          content: forwardingMessage.content,
+          attachment_url: forwardingMessage.attachment_url,
+          attachment_name: forwardingMessage.attachment_name,
+          attachment_type: forwardingMessage.attachment_type,
+          is_forwarded: true,
+          forwarded_from_name: forwardingMessage.sender_name
+        }]);
+
+      if (error) throw error;
+      toast.success('Mensagem encaminhada');
+      setShowForwardModal(false);
+      setForwardingMessage(null);
+    } catch (error) {
+      toast.error('Erro ao encaminhar mensagem');
     }
   };
 
@@ -863,6 +1147,13 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
           </div>
           <div className="flex items-center gap-1">
             <button 
+              onClick={() => setShowStarredOnly(!showStarredOnly)}
+              className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors ${showStarredOnly ? 'text-yellow-500' : 'text-slate-400'}`}
+              title="Mensagens Favoritas"
+            >
+              <Star size={18} fill={showStarredOnly ? "currentColor" : "none"} />
+            </button>
+            <button 
               onClick={requestNotificationPermission}
               className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors ${notificationPermission === 'granted' ? 'text-green-500' : 'text-slate-400'}`}
               title={notificationPermission === 'granted' ? 'Notificações Ativas' : 'Ativar Notificações'}
@@ -915,10 +1206,13 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
               const isPinned = pinnedRooms.includes(room.id);
 
               return (
-                <button
+                <div
                   key={room.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setActiveRoom(room)}
-                  className={`w-full p-4 flex items-center gap-3 hover:bg-white dark:hover:bg-white/5 transition-all border-l-4 group relative ${activeRoom?.id === room.id ? 'bg-white dark:bg-white/5 border-blue-500' : 'border-transparent'}`}
+                  onKeyDown={(e) => e.key === 'Enter' && setActiveRoom(room)}
+                  className={`w-full p-4 flex items-center gap-3 hover:bg-white dark:hover:bg-white/5 transition-all border-l-4 group relative cursor-pointer ${activeRoom?.id === room.id ? 'bg-white dark:bg-white/5 border-blue-500' : 'border-transparent'}`}
                 >
                   <div 
                     className="w-12 h-12 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center overflow-hidden shrink-0 cursor-pointer"
@@ -955,6 +1249,9 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
                         )}
                       </p>
                       <div className="flex items-center gap-2">
+                        {participants[room.id]?.find(p => p.user_id === userId)?.muted_until && (
+                          <VolumeX size={12} className="text-slate-400" />
+                        )}
                         {unreadCount > 0 && (
                           <span className="bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
                             {unreadCount}
@@ -969,7 +1266,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
                       </div>
                     </div>
                   </div>
-                </button>
+                </div>
               );
             })
           )}
@@ -1038,6 +1335,55 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
                 >
                   <Search size={20} />
                 </button>
+
+                <button 
+                  onClick={() => setShowStarredOnly(!showStarredOnly)}
+                  className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors ${showStarredOnly ? 'text-yellow-500 bg-yellow-50 dark:bg-yellow-500/10' : 'text-slate-400'}`}
+                  title="Mensagens Favoritas"
+                >
+                  <Star size={20} fill={showStarredOnly ? "currentColor" : "none"} />
+                </button>
+
+                {/* POLL BUTTON */}
+                {activeRoom.is_group && (
+                  <button 
+                    onClick={() => setShowPollModal(true)}
+                    className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-slate-400"
+                    title="Criar Enquete"
+                  >
+                    <BarChart2 size={20} />
+                  </button>
+                )}
+
+                {/* MUTE BUTTON */}
+                <div className="relative group/mute">
+                  <button 
+                    className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors ${participants[activeRoom.id]?.find(p => p.user_id === userId)?.muted_until ? 'text-red-500 bg-red-50 dark:bg-red-500/10' : 'text-slate-400'}`}
+                    title="Silenciar Notificações"
+                  >
+                    {participants[activeRoom.id]?.find(p => p.user_id === userId)?.muted_until ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                  </button>
+                  <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/5 rounded-2xl shadow-2xl opacity-0 invisible group-hover/mute:opacity-100 group-hover/mute:visible transition-all z-50 overflow-hidden">
+                    <div className="p-2">
+                      <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest p-2">Silenciar por...</p>
+                      {[
+                        { label: '8 Horas', value: '8h' },
+                        { label: '1 Semana', value: '1w' },
+                        { label: 'Sempre', value: 'forever' },
+                        { label: 'Desativar', value: null }
+                      ].map(opt => (
+                        <button
+                          key={opt.label}
+                          onClick={() => muteChat(activeRoom.id, opt.value as any)}
+                          className="w-full text-left p-2 text-sm hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-colors"
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
                 <button 
                   onClick={() => setShowMediaGallery(true)}
                   className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-slate-400"
@@ -1078,6 +1424,11 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
                     className="flex-1 bg-transparent border-none outline-none text-sm text-slate-700 dark:text-slate-200"
                     autoFocus
                   />
+                  {internalSearchQuery && (
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest whitespace-nowrap">
+                      {messages.filter(msg => msg.content.toLowerCase().includes(internalSearchQuery.toLowerCase())).length} resultados
+                    </span>
+                  )}
                   <button onClick={() => { setShowInternalSearch(false); setInternalSearchQuery(''); }} className="p-1 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full">
                     <X size={16} className="text-slate-500" />
                   </button>
@@ -1088,7 +1439,11 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
             {/* MESSAGES AREA */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-slate-50/30 dark:bg-black/40">
               {messages
-                .filter(msg => !internalSearchQuery || msg.content.toLowerCase().includes(internalSearchQuery.toLowerCase()))
+                .filter(msg => {
+                  const matchesSearch = !internalSearchQuery || msg.content.toLowerCase().includes(internalSearchQuery.toLowerCase());
+                  const matchesStarred = showStarredOnly ? starredMessages.includes(msg.id) : true;
+                  return matchesSearch && matchesStarred;
+                })
                 .map((msg, idx) => {
                 const isMe = msg.sender_id === userId;
                 const isDeleted = msg.is_deleted;
@@ -1098,9 +1453,18 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
                       
                       {/* MESSAGE OPTIONS (HOVER) */}
                       {!isDeleted && (
-                        <div className={`absolute top-0 ${isMe ? '-left-20' : '-right-20'} opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10 p-1 bg-white dark:bg-[#1a1a1a] rounded-lg shadow-lg border border-slate-200 dark:border-white/5`}>
+                        <div className={`absolute top-0 ${isMe ? '-left-28' : '-right-28'} opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10 p-1 bg-white dark:bg-[#1a1a1a] rounded-lg shadow-lg border border-slate-200 dark:border-white/5`}>
+                          <button onClick={() => toggleStarMessage(msg.id)} className={`p-1.5 hover:bg-slate-100 dark:hover:bg-white/5 rounded-md ${starredMessages.includes(msg.id) ? 'text-yellow-500' : 'text-slate-500'}`} title="Favoritar">
+                            <Star size={16} fill={starredMessages.includes(msg.id) ? "currentColor" : "none"} />
+                          </button>
+                          <button onClick={() => setShowReactionPicker(showReactionPicker === msg.id ? null : msg.id)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/5 rounded-md text-slate-500" title="Reagir">
+                            <Smile size={14} />
+                          </button>
                           <button onClick={() => startReplying(msg)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/5 rounded-md text-slate-500" title="Responder">
                             <Reply size={14} />
+                          </button>
+                          <button onClick={() => { setForwardingMessage(msg); setShowForwardModal(true); }} className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/5 rounded-md text-slate-500" title="Encaminhar">
+                            <Forward size={14} />
                           </button>
                           {isMe && (
                             <>
@@ -1117,6 +1481,36 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
 
                       <div className={`p-3 rounded-2xl shadow-sm relative ${isMe ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white dark:bg-[#1a1a1a] text-slate-900 dark:text-white border border-slate-200 dark:border-white/5 rounded-tl-none'} ${isDeleted ? 'opacity-50 italic' : ''}`}>
                         
+                        {/* REACTION PICKER POPOVER */}
+                        <AnimatePresence>
+                          {showReactionPicker === msg.id && (
+                            <motion.div 
+                              initial={{ scale: 0.8, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              exit={{ scale: 0.8, opacity: 0 }}
+                              className={`absolute -top-12 ${isMe ? 'right-0' : 'left-0'} flex gap-1 p-1.5 bg-white dark:bg-[#1a1a1a] rounded-full shadow-xl border border-slate-200 dark:border-white/10 z-20`}
+                            >
+                              {['👍', '❤️', '😂', '😮', '😢', '🙏', '⚖️'].map(emoji => (
+                                <button 
+                                  key={emoji} 
+                                  onClick={() => addReaction(msg.id, emoji)}
+                                  className="hover:scale-125 transition-transform p-1"
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+
+                        {/* FORWARDED INDICATOR */}
+                        {msg.is_forwarded && !isDeleted && (
+                          <div className={`flex items-center gap-1 mb-1 text-[10px] ${isMe ? 'text-blue-200' : 'text-slate-400'} italic`}>
+                            <Forward size={10} />
+                            <span>Encaminhada de {msg.forwarded_from_name}</span>
+                          </div>
+                        )}
+
                         {/* REPLY PREVIEW */}
                         {msg.reply_to_id && !isDeleted && (
                           <div className={`mb-2 p-2 rounded-lg border-l-4 text-xs ${isMe ? 'bg-blue-700/50 border-blue-300 text-blue-100' : 'bg-slate-100 dark:bg-white/5 border-blue-500 text-slate-500 dark:text-slate-400'}`}>
@@ -1146,7 +1540,85 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
                             )}
                           </div>
                         )}
-                        <p className="text-sm leading-relaxed">{msg.content}</p>
+                        {/* MESSAGE CONTENT */}
+                        <div className="relative">
+                          {msg.content && (
+                            <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">
+                              {msg.content}
+                            </p>
+                          )}
+
+                          {/* POLL RENDERING */}
+                          {polls[msg.id] && (
+                            <div className="mt-3 p-4 bg-white dark:bg-black/20 rounded-2xl border border-slate-100 dark:border-white/5 shadow-sm">
+                              <div className="flex items-center gap-2 mb-3">
+                                <BarChart2 size={16} className="text-blue-500" />
+                                <p className="font-bold text-sm text-slate-900 dark:text-white">{polls[msg.id].question}</p>
+                              </div>
+                              <div className="space-y-2">
+                                {polls[msg.id].options.map((opt: string, idx: number) => {
+                                  const optionVotes = (polls[msg.id].votes[idx] as any[]) || [];
+                                  const totalVotes = Object.values(polls[msg.id].votes).reduce((acc: number, v: any) => acc + (v as any[]).length, 0);
+                                  const percentage = (totalVotes as number) > 0 ? Math.round(((optionVotes as any[]).length / (totalVotes as number)) * 100) : 0;
+                                  const hasVoted = optionVotes.includes(userId);
+
+                                  return (
+                                    <button
+                                      key={idx}
+                                      onClick={() => votePoll(polls[msg.id].id, idx)}
+                                      className={`w-full p-3 rounded-xl border transition-all text-left relative overflow-hidden group/poll ${hasVoted ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-500/10' : 'border-slate-100 dark:border-white/5 hover:border-blue-200 dark:hover:border-white/20'}`}
+                                    >
+                                      <div 
+                                        className="absolute left-0 top-0 bottom-0 bg-blue-500/10 transition-all duration-500" 
+                                        style={{ width: `${percentage}%` }}
+                                      />
+                                      <div className="relative flex justify-between items-center text-xs">
+                                        <span className={`font-medium ${hasVoted ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'}`}>{opt}</span>
+                                        <span className="text-[10px] font-bold text-slate-400">{percentage}%</span>
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              <p className="text-[10px] text-slate-400 mt-3 font-bold uppercase tracking-widest">
+                                {(Object.values(polls[msg.id].votes) as any[]).reduce((acc: number, v: any) => acc + (v as any[]).length, 0)} votos
+                              </p>
+                            </div>
+                          )}
+
+                          {/* LINK PREVIEW RENDERING */}
+                          {msg.content && msg.content.match(/https?:\/\/[^\s]+/) && (
+                            (() => {
+                              const url = msg.content.match(/https?:\/\/[^\s]+/)?.[0];
+                              if (!url) return null;
+                              
+                              // Mock metadata for common legal sites
+                              let title = "Visualizar Link";
+                              let desc = url;
+                              let domain = "Link Externo";
+                              try { domain = new URL(url).hostname; } catch(e) {}
+
+                              if (url.includes('stf.jus.br')) title = "STF - Supremo Tribunal Federal";
+                              if (url.includes('jusbrasil.com.br')) title = "Jusbrasil - Consulta Processual";
+                              if (url.includes('youtube.com') || url.includes('youtu.be')) title = "YouTube - Vídeo Jurídico";
+
+                              return (
+                                <a 
+                                  href={url} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className={`mt-3 block rounded-2xl border overflow-hidden transition-all group/link ${isMe ? 'bg-blue-700/50 border-blue-400' : 'bg-white dark:bg-black/20 border-slate-100 dark:border-white/5 hover:border-blue-300 dark:hover:border-white/20'}`}
+                                >
+                                  <div className="p-3">
+                                    <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isMe ? 'text-blue-200' : 'text-blue-500'}`}>{domain}</p>
+                                    <p className={`text-sm font-bold group-hover/link:text-blue-500 transition-colors line-clamp-1 ${isMe ? 'text-white' : 'text-slate-900 dark:text-white'}`}>{title}</p>
+                                    <p className={`text-xs line-clamp-2 mt-1 ${isMe ? 'text-blue-100' : 'text-slate-500 dark:text-slate-400'}`}>{desc}</p>
+                                  </div>
+                                </a>
+                              );
+                            })()
+                          )}
+                        </div>
                         <div className={`flex items-center gap-1 mt-1 justify-end ${isMe ? 'text-blue-100' : 'text-slate-400'}`}>
                           {msg.is_edited && !isDeleted && <span className="text-[8px] uppercase font-bold mr-1">Editada</span>}
                           <span className="text-[9px]">
@@ -1162,6 +1634,35 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
                             </span>
                           )}
                         </div>
+
+                        {/* REACTION DISPLAY */}
+                        {messageReactions[msg.id] && messageReactions[msg.id].length > 0 && !isDeleted && (
+                          <div className={`flex flex-wrap gap-1 mt-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                            {Object.entries(
+                              messageReactions[msg.id].reduce((acc: any, r) => {
+                                acc[r.emoji] = (acc[r.emoji] || 0) + 1;
+                                return acc;
+                              }, {})
+                            ).map(([emoji, count]: [string, any]) => (
+                              <button 
+                                key={emoji}
+                                onClick={() => {
+                                  const myReaction = messageReactions[msg.id].find(r => r.user_id === userId && r.emoji === emoji);
+                                  if (myReaction) removeReaction(msg.id, emoji);
+                                  else addReaction(msg.id, emoji);
+                                }}
+                                className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] border transition-all ${
+                                  messageReactions[msg.id].some(r => r.user_id === userId && r.emoji === emoji)
+                                  ? 'bg-blue-50 dark:bg-blue-500/20 border-blue-200 dark:border-blue-500/40 text-blue-600 dark:text-blue-400'
+                                  : 'bg-white dark:bg-[#1a1a1a] border-slate-200 dark:border-white/10 text-slate-500'
+                                }`}
+                              >
+                                <span>{emoji}</span>
+                                {count > 1 && <span>{count}</span>}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1563,6 +2064,155 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* FORWARD MODAL */}
+      <AnimatePresence>
+        {showForwardModal && forwardingMessage && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white dark:bg-[#1a1a1a] w-full max-w-md rounded-[2.5rem] border border-slate-200 dark:border-white/5 shadow-2xl overflow-hidden"
+            >
+              <div className="p-6 border-b border-slate-200 dark:border-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-50 dark:bg-blue-500/10 rounded-xl text-blue-500">
+                    <Forward size={20} />
+                  </div>
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Encaminhar Mensagem</h3>
+                </div>
+                <button onClick={() => { setShowForwardModal(false); setForwardingMessage(null); }} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div className="p-4 bg-slate-50 dark:bg-white/5 mx-6 mt-6 rounded-2xl border border-slate-200 dark:border-white/5">
+                <p className="text-[10px] text-blue-500 font-black uppercase tracking-widest mb-1">Mensagem selecionada</p>
+                <p className="text-sm text-slate-600 dark:text-slate-300 truncate italic">"{forwardingMessage.content}"</p>
+              </div>
+
+              <div className="p-6 max-h-[400px] overflow-y-auto custom-scrollbar">
+                <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-4">Selecione uma conversa</p>
+                <div className="space-y-2">
+                  {rooms.map(room => (
+                    <button
+                      key={room.id}
+                      onClick={() => forwardMessage(room.id)}
+                      className="w-full p-3 flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-white/5 rounded-2xl transition-all border border-transparent hover:border-blue-500/30 group"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center overflow-hidden">
+                        {getChatAvatar(room) ? (
+                          <img src={getChatAvatar(room)} alt={getChatName(room)} className="w-full h-full object-cover" />
+                        ) : (
+                          <User className="text-slate-400" size={20} />
+                        )}
+                      </div>
+                      <div className="text-left flex-1">
+                        <p className="font-bold text-slate-900 dark:text-white text-sm">{getChatName(room)}</p>
+                      </div>
+                      <div className="p-2 bg-blue-600 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Send size={14} />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* POLL MODAL */}
+      <AnimatePresence>
+        {showPollModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white dark:bg-[#1a1a1a] w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-white/5"
+            >
+              <div className="p-6 border-b border-slate-100 dark:border-white/5 flex justify-between items-center bg-slate-50/50 dark:bg-white/5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-blue-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
+                    <BarChart2 size={20} />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Criar Enquete</h2>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Votação em grupo</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowPollModal(false)} className="p-2 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-colors">
+                  <X size={20} className="text-slate-500" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] text-slate-500 font-black uppercase tracking-widest ml-1">Pergunta</label>
+                  <input 
+                    type="text"
+                    value={pollQuestion}
+                    onChange={(e) => setPollQuestion(e.target.value)}
+                    placeholder="O que você quer perguntar?"
+                    className="w-full p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  <label className="text-[10px] text-slate-500 font-black uppercase tracking-widest ml-1">Opções</label>
+                  {pollOptions.map((opt, idx) => (
+                    <div key={idx} className="flex gap-2">
+                      <input 
+                        type="text"
+                        value={opt}
+                        onChange={(e) => {
+                          const newOpts = [...pollOptions];
+                          newOpts[idx] = e.target.value;
+                          setPollOptions(newOpts);
+                        }}
+                        placeholder={`Opção ${idx + 1}`}
+                        className="flex-1 p-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
+                      />
+                      {pollOptions.length > 2 && (
+                        <button 
+                          onClick={() => setPollOptions(pollOptions.filter((_, i) => i !== idx))}
+                          className="p-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {pollOptions.length < 5 && (
+                    <button 
+                      onClick={() => setPollOptions([...pollOptions, ''])}
+                      className="w-full p-3 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-xl text-slate-400 hover:text-blue-500 hover:border-blue-500 transition-all text-xs font-bold uppercase tracking-widest"
+                    >
+                      + Adicionar Opção
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-6 bg-slate-50/50 dark:bg-white/5 border-t border-slate-100 dark:border-white/5">
+                <button 
+                  onClick={createPoll}
+                  disabled={!pollQuestion || pollOptions.some(o => !o)}
+                  className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-blue-600/20 transition-all active:scale-95"
+                >
+                  Criar Enquete
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>
