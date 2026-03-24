@@ -437,7 +437,13 @@ export const dataService = {
           subjectId: task.subjectId,
           delegatedByName: task.delegatedByName,
           delegatedToName: task.delegatedToName,
-          originalPriority: task.priority
+          originalPriority: task.priority,
+          recurrence: task.recurrence,
+          library_attachments: task.library_attachments,
+          total_focus_time: task.total_focus_time,
+          parentTaskId: task.parentTaskId,
+          dependencies: task.dependencies,
+          storyPoints: task.storyPoints
         })
       };
 
@@ -481,7 +487,13 @@ export const dataService = {
             revisionStatus: desc.revisionStatus,
             boardId: desc.boardId,
             columnId: desc.columnId,
-            subjectId: desc.subjectId
+            subjectId: desc.subjectId,
+            recurrence: desc.recurrence,
+            library_attachments: desc.library_attachments,
+            total_focus_time: desc.total_focus_time,
+            parentTaskId: desc.parentTaskId,
+            dependencies: desc.dependencies,
+            storyPoints: desc.storyPoints
           };
         });
         await db.tasks.bulkPut(mappedTasks);

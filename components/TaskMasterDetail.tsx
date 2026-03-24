@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Task, Subject, Board, BoardColumn, SubTask, StudySession, UserProfile, TaskPriority, TaskCategory, Notification, Friendship } from '../types';
+import { Task, Subject, Board, BoardColumn, SubTask, StudySession, UserProfile, TaskPriority, TaskCategory, Notification, Friendship, SubjectFile } from '../types';
 import { 
   Plus, Layout, List, MoreVertical, Trash2, CheckSquare, 
   Clock, Paperclip, ChevronRight, X, Calendar, AlertCircle,
   Play, Pause, RotateCcw, Save, Quote, ThumbsUp, ExternalLink, Link as LinkIcon, Globe, Bell,
-  CheckCircle2, User, Zap, Trello
+  CheckCircle2, User, Zap, Trello, BookOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -30,6 +30,44 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { toast } from 'sonner';
 import { dataService } from '../services/dataService';
+import { supabase } from '../services/supabaseClient';
+
+const STORY_POINTS = [1, 2, 3, 5, 8];
+
+const TASK_TEMPLATES = [
+  {
+    id: 'fichamento',
+    name: 'Fichamento de Acórdão',
+    subtasks: [
+      'Ler o acórdão na íntegra',
+      'Identificar o relatório e o voto condutor',
+      'Extrair a fundamentação jurídica (Ratio Decidendi)',
+      'Anotar a decisão final (Dispositivo)',
+      'Redigir o resumo crítico'
+    ]
+  },
+  {
+    id: 'peticao',
+    name: 'Petição Inicial',
+    subtasks: [
+      'Analisar documentos do cliente',
+      'Pesquisar jurisprudência atualizada',
+      'Redigir os fatos',
+      'Fundamentar o direito',
+      'Elaborar os pedidos e valor da causa'
+    ]
+  },
+  {
+    id: 'recurso',
+    name: 'Recurso de Apelação',
+    subtasks: [
+      'Identificar pontos de reforma na sentença',
+      'Preparar as razões recursais',
+      'Verificar o preparo (custas)',
+      'Protocolar no sistema do tribunal'
+    ]
+  }
+];
 
 interface TaskMasterDetailProps {
   tasks: Task[];
@@ -59,7 +97,6 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   const [splitScreenUrl, setSplitScreenUrl] = useState<string | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [quickEntryInput, setQuickEntryInput] = useState('');
-  const [showTemplatesMenu, setShowTemplatesMenu] = useState(false);
   const [friends, setFriends] = useState<Friendship[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -318,6 +355,9 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   const [syllabusLink, setSyllabusLink] = useState('');
   const [importantCitations, setImportantCitations] = useState('');
   const [saveTimeout, setSaveTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [showLibraryModal, setShowLibraryModal] = useState(false);
+  const [showTemplatesMenu, setShowTemplatesMenu] = useState(false);
+  const [availableFiles, setAvailableFiles] = useState<SubjectFile[]>([]);
 
   const [revisionStatus, setRevisionStatus] = useState({
     firstReading: false,
@@ -390,10 +430,74 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         const newSessions = [session, ...studySessions];
         setStudySessions(newSessions);
         await dataService.saveStudySession(session, userId, isOnline);
+
+        // Update task focus time
+        if (selectedTask) {
+          const focusTimeInSeconds = (25 * 60 - timerSeconds);
+          const currentFocusTime = selectedTask.total_focus_time || 0;
+          handleUpdateTask({ total_focus_time: currentFocusTime + focusTimeInSeconds });
+        }
       }
     }
     setTimerSeconds(25 * 60);
     setTimerActive(false);
+  };
+
+  const handleStartDeepWork = () => {
+    if (!selectedTask) return;
+    setTimerActive(true);
+    toast.info(`Modo Deep Work: Focando em "${selectedTask.title}"`);
+  };
+
+  const fetchLibraryFiles = async () => {
+    if (!selectedTask?.subjectId) {
+      // Fetch all files if no subject
+      const { data } = await supabase.from('subject_files').select('*').eq('user_id', userId);
+      setAvailableFiles(data || []);
+    } else {
+      const files = await dataService.getFilesBySubjectId(selectedTask.subjectId, userId, isOnline);
+      setAvailableFiles(files);
+    }
+    setShowLibraryModal(true);
+  };
+
+  const handleAttachFile = async (file: SubjectFile) => {
+    if (!selectedTask) return;
+    const currentAttachments = selectedTask.library_attachments || [];
+    if (currentAttachments.includes(file.id)) {
+      toast.error("Arquivo já anexado");
+      return;
+    }
+    const updated = [...currentAttachments, file.id];
+    handleUpdateTask({ library_attachments: updated });
+    setShowLibraryModal(false);
+    toast.success("Arquivo vinculado à tarefa");
+  };
+
+  const applyTemplate = (templateId: string) => {
+    const template = TASK_TEMPLATES.find(t => t.id === templateId);
+    if (!template || !selectedTask) return;
+
+    const newSubtasks: SubTask[] = template.subtasks.map(title => ({
+      id: crypto.randomUUID(),
+      title,
+      completed: false
+    }));
+
+    handleUpdateTask({ 
+      subtasks: [...(selectedTask.subtasks || []), ...newSubtasks],
+      title: selectedTask.title === 'Nova Tarefa' ? template.name : selectedTask.title
+    });
+    setShowTemplatesMenu(false);
+    toast.success(`Template "${template.name}" aplicado!`);
+  };
+
+  const isTaskBlocked = (task: Task) => {
+    if (!task.dependencies || task.dependencies.length === 0) return false;
+    return task.dependencies.some(depId => {
+      const depTask = tasks.find(t => t.id === depId);
+      return depTask && !depTask.completed;
+    });
   };
 
   // --- Task Management Logic ---
@@ -467,6 +571,51 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     if (updates.completed === true && !taskToUpdate.completedAt) {
       updates.completedAt = new Date().toISOString();
       
+      // Recurrence Logic
+      if (taskToUpdate.recurrence) {
+        const { frequency, interval = 1, businessDaysOnly } = taskToUpdate.recurrence;
+        let baseDate = new Date(taskToUpdate.dueDate || new Date());
+        
+        const getNextOccurrence = (date: Date) => {
+          let next = new Date(date);
+          if (frequency === 'daily') {
+            next.setDate(next.getDate() + interval);
+          } else if (frequency === 'weekly') {
+            next.setDate(next.getDate() + (7 * interval));
+          } else if (frequency === 'monthly') {
+            next.setMonth(next.getMonth() + interval);
+          }
+          
+          if (businessDaysOnly) {
+            // Skip weekends (0 = Sunday, 6 = Saturday)
+            while (next.getDay() === 0 || next.getDay() === 6) {
+              next.setDate(next.getDate() + 1);
+            }
+          }
+          return next;
+        };
+
+        const nextOccurrenceDate = getNextOccurrence(baseDate);
+        
+        const nextTask: Task = {
+          ...taskToUpdate,
+          id: crypto.randomUUID(),
+          completed: false,
+          completedAt: undefined,
+          dueDate: nextOccurrenceDate.toISOString(),
+          recurrence: {
+            ...taskToUpdate.recurrence,
+            nextOccurrence: nextOccurrenceDate.toISOString()
+          },
+          parentTaskId: taskToUpdate.parentTaskId || taskToUpdate.id,
+          created_at: new Date().toISOString()
+        } as any;
+        
+        await dataService.saveTask(nextTask, userId, isOnline);
+        setTasks(prev => [nextTask, ...prev]);
+        toast.success(`Tarefa recorrente criada para ${nextOccurrenceDate.toLocaleDateString()}`);
+      }
+
       // Notify delegator if this was a delegated task
       if (taskToUpdate.delegatedBy && taskToUpdate.delegatedBy !== userId) {
         await dataService.createNotification(
@@ -1182,9 +1331,22 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
+                          {isTaskBlocked(selectedTask) && (
+                            <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 text-amber-600 rounded-lg text-[10px] font-bold border border-amber-100">
+                              <AlertCircle size={12} />
+                              Bloqueada por dependências
+                            </div>
+                          )}
                           <button 
-                            onClick={() => handleUpdateTask({ completed: !selectedTask.completed })}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${selectedTask.completed ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-emerald-50'}`}
+                            onClick={() => {
+                              if (isTaskBlocked(selectedTask)) {
+                                toast.error("Esta tarefa está bloqueada por dependências não concluídas.");
+                                return;
+                              }
+                              handleUpdateTask({ completed: !selectedTask.completed });
+                            }}
+                            disabled={isTaskBlocked(selectedTask)}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${selectedTask.completed ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-emerald-50'} ${isTaskBlocked(selectedTask) ? 'opacity-50 cursor-not-allowed' : ''}`}
                           >
                             <CheckCircle2 size={16} />
                             {selectedTask.completed ? 'Concluída' : 'Marcar Concluída'}
@@ -1315,6 +1477,81 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                               placeholder="Nome do responsável (ex: SanFran Jr, Moradia...)"
                               className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#800000]/10"
                             />
+                          </section>
+
+                          <section className="grid grid-cols-3 gap-6">
+                            <div>
+                              <div className="flex items-center gap-2 mb-3 text-slate-400 font-bold text-[10px] uppercase tracking-widest">
+                                <Zap size={14} /> Story Points (Esforço)
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {STORY_POINTS.map(points => (
+                                  <button 
+                                    key={points}
+                                    onClick={() => handleUpdateTask({ storyPoints: points })}
+                                    className={`w-8 h-8 rounded-lg text-[10px] font-bold transition-all border flex items-center justify-center ${selectedTask.storyPoints === points ? 'bg-[#800000] text-white border-transparent shadow-md' : 'bg-white border-slate-200 text-slate-400 hover:border-[#800000]/30'}`}
+                                  >
+                                    {points}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="col-span-2">
+                              <div className="flex items-center gap-2 mb-3 text-slate-400 font-bold text-[10px] uppercase tracking-widest">
+                                <LinkIcon size={14} /> Dependências (Bloqueia esta tarefa)
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {tasks.filter(t => t.id !== selectedTask.id && !t.completed).slice(0, 5).map(t => {
+                                  const isDep = selectedTask.dependencies?.includes(t.id);
+                                  return (
+                                    <button 
+                                      key={t.id}
+                                      onClick={() => {
+                                        const current = selectedTask.dependencies || [];
+                                        const updated = isDep ? current.filter(id => id !== t.id) : [...current, t.id];
+                                        handleUpdateTask({ dependencies: updated });
+                                      }}
+                                      className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border max-w-[150px] truncate ${isDep ? 'bg-amber-500 text-white border-transparent shadow-md' : 'bg-white border-slate-200 text-slate-400 hover:border-amber-500/30'}`}
+                                    >
+                                      {t.title}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </section>
+
+                          <section>
+                            <div className="flex items-center gap-2 mb-3 text-slate-400 font-bold text-[10px] uppercase tracking-widest">
+                              <RotateCcw size={14} /> Recorrência Inteligente
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {(['none', 'daily', 'weekly', 'monthly', 'business'] as const).map(freq => (
+                                <button 
+                                  key={freq}
+                                  onClick={() => {
+                                    if (freq === 'none') handleUpdateTask({ recurrence: undefined });
+                                    else handleUpdateTask({ 
+                                      recurrence: { 
+                                        frequency: freq === 'business' ? 'daily' : freq as any, 
+                                        interval: 1,
+                                        businessDaysOnly: freq === 'business'
+                                      } 
+                                    });
+                                  }}
+                                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border capitalize ${
+                                    (!selectedTask.recurrence && freq === 'none') || 
+                                    (selectedTask.recurrence?.frequency === freq && !selectedTask.recurrence?.businessDaysOnly) ||
+                                    (freq === 'business' && selectedTask.recurrence?.businessDaysOnly)
+                                      ? 'bg-[#800000] text-white border-transparent shadow-md' 
+                                      : 'bg-white border-slate-200 text-slate-400 hover:border-[#800000]/30'
+                                  }`}
+                                >
+                                  {freq === 'none' ? 'Nenhuma' : freq === 'business' ? 'Dias Úteis' : freq}
+                                </button>
+                              ))}
+                            </div>
                           </section>
 
                           <section>
@@ -1478,7 +1715,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                         <section className="p-6 bg-[#800000]/5 rounded-3xl border border-[#800000]/10">
                           <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-2 text-[#800000] font-bold text-[10px] uppercase tracking-widest">
-                              <Clock size={14} /> Foco na Atividade
+                              <Zap size={14} className="animate-pulse" /> Modo Deep Work
                             </div>
                             <div className="text-2xl font-mono font-bold text-[#800000]">
                               {Math.floor(timerSeconds / 60)}:{(timerSeconds % 60).toString().padStart(2, '0')}
@@ -1486,31 +1723,98 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                           </div>
                           <div className="flex gap-2">
                             <button 
-                              onClick={() => setTimerActive(!timerActive)}
-                              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all ${timerActive ? 'bg-amber-500 text-white' : 'bg-[#800000] text-white'}`}
+                              onClick={() => timerActive ? setTimerActive(false) : handleStartDeepWork()}
+                              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all ${timerActive ? 'bg-amber-500 text-white shadow-lg' : 'bg-[#800000] text-white hover:shadow-lg hover:scale-[1.02]'}`}
                             >
                               {timerActive ? <Pause size={18} /> : <Play size={18} />}
-                              {timerActive ? 'Pausar' : 'Iniciar Foco'}
+                              {timerActive ? 'Pausar Foco' : 'Iniciar Deep Work'}
                             </button>
                             <button 
                               onClick={handleResetTimer}
-                              className="p-3 bg-white border border-slate-200 text-slate-400 rounded-xl hover:text-[#800000]"
+                              className="p-3 bg-white border border-slate-200 text-slate-400 rounded-xl hover:text-[#800000] transition-all"
                             >
                               <RotateCcw size={18} />
                             </button>
+                          </div>
+                          {timerActive && (
+                            <div className="mt-4 text-[10px] text-[#800000]/60 font-medium text-center italic">
+                              Interface focada em: {selectedTask.title}
+                            </div>
+                          )}
+                        </section>
+
+                        {/* Attachments Section */}
+                        <section>
+                          <div className="flex items-center gap-2 mb-3 text-slate-400 font-bold text-[10px] uppercase tracking-widest">
+                            <List size={14} /> Templates de Procedimento
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            {TASK_TEMPLATES.map(template => (
+                              <button 
+                                key={template.id}
+                                onClick={() => applyTemplate(template.id)}
+                                className="p-3 bg-white border border-slate-200 rounded-xl text-[10px] font-bold text-slate-600 hover:border-[#800000] hover:text-[#800000] transition-all flex flex-col items-center gap-2 text-center"
+                              >
+                                <div className="p-2 bg-slate-50 rounded-lg group-hover:bg-[#800000]/10">
+                                  <CheckSquare size={16} />
+                                </div>
+                                {template.name}
+                              </button>
+                            ))}
                           </div>
                         </section>
 
                         {/* Attachments Section */}
                         <section>
                           <div className="flex items-center gap-2 mb-3 text-slate-400 font-bold text-[10px] uppercase tracking-widest">
-                            <Paperclip size={14} /> Anexos / PDFs
+                            <Paperclip size={14} /> Biblioteca & Anexos
                           </div>
-                          <div className="flex gap-2">
-                            <button className="flex-1 flex items-center justify-center gap-2 py-4 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 hover:border-[#800000] hover:text-[#800000] transition-all">
-                              <Plus size={20} />
-                              <span className="text-sm font-medium">Anexar Documento</span>
+                          <div className="grid grid-cols-1 gap-3">
+                            <button 
+                              onClick={fetchLibraryFiles}
+                              className="flex items-center justify-center gap-2 py-4 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 hover:border-[#800000] hover:text-[#800000] transition-all"
+                            >
+                              <BookOpen size={20} />
+                              <span className="text-sm font-medium">Vincular da Biblioteca (PDF/Juris)</span>
                             </button>
+
+                            {selectedTask.library_attachments?.map(fileId => {
+                              const file = availableFiles.find(f => f.id === fileId);
+                              return (
+                                <div key={fileId} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                  <div className="flex items-center gap-3 overflow-hidden">
+                                    <div className="p-2 bg-white rounded-lg text-[#800000]">
+                                      <Paperclip size={14} />
+                                    </div>
+                                    <div className="truncate">
+                                      <div className="text-xs font-bold text-slate-700 truncate">{file?.name || 'Arquivo vinculado'}</div>
+                                      <div className="text-[10px] text-slate-400">PDF da Biblioteca</div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    {file?.file_url && (
+                                      <a 
+                                        href={file.file_url} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="p-1.5 text-slate-400 hover:text-[#800000] transition-colors"
+                                      >
+                                        <ExternalLink size={14} />
+                                      </a>
+                                    )}
+                                    <button 
+                                      onClick={() => {
+                                        const updated = selectedTask.library_attachments?.filter(id => id !== fileId);
+                                        handleUpdateTask({ library_attachments: updated });
+                                      }}
+                                      className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
+                                    >
+                                      <X size={14} />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </section>
                       </div>
@@ -1697,6 +2001,54 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
           </div>
         ) : null}
       </DragOverlay>
+
+      {/* Library Selection Modal */}
+      <AnimatePresence>
+        {showLibraryModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
+            >
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <BookOpen size={20} className="text-[#800000]" />
+                  Vincular da Biblioteca
+                </h3>
+                <button onClick={() => setShowLibraryModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                {availableFiles.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400 italic text-sm">
+                    Nenhum arquivo encontrado para esta matéria.
+                  </div>
+                ) : (
+                  availableFiles.map(file => (
+                    <button 
+                      key={file.id}
+                      onClick={() => handleAttachFile(file)}
+                      className="w-full flex items-center gap-4 p-4 rounded-2xl hover:bg-slate-50 transition-all border border-transparent hover:border-slate-200 text-left group"
+                    >
+                      <div className="p-3 bg-slate-100 rounded-xl text-slate-400 group-hover:bg-[#800000] group-hover:text-white transition-all">
+                        <Paperclip size={20} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-slate-700 truncate">{file.name}</div>
+                        <div className="text-xs text-slate-400 uppercase tracking-widest font-black">{file.type}</div>
+                      </div>
+                      <Plus size={20} className="text-slate-300 group-hover:text-[#800000]" />
+                    </button>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Split Screen Overlay */}
       <AnimatePresence>

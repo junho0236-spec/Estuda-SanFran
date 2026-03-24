@@ -3,7 +3,7 @@ import React from 'react';
 import { 
   Search, Plus, User, Star, Bell, BellOff, 
   MessageSquare, History, Loader2, Pin, PinOff, 
-  VolumeX, Phone, Video, Settings
+  VolumeX, Phone, Video, Settings, Archive
 } from 'lucide-react';
 import { ChatRoom, ChatParticipant, ChatStory } from '../../types';
 
@@ -11,7 +11,7 @@ interface ChatSidebarProps {
   userId: string;
   userName: string;
   userProfile: any;
-  userPresence: Record<string, { online: boolean, last_seen: string }>;
+  userPresence: Record<string, { is_online: boolean, last_seen: string }>;
   rooms: ChatRoom[];
   activeRoom: ChatRoom | null;
   setActiveRoom: (room: ChatRoom | null) => void;
@@ -20,8 +20,8 @@ interface ChatSidebarProps {
   togglePin: (roomId: string, e: React.MouseEvent) => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
-  viewMode: 'chats' | 'calls';
-  setViewMode: (mode: 'chats' | 'calls') => void;
+  viewMode: 'chats' | 'calls' | 'stories';
+  setViewMode: (mode: 'chats' | 'calls' | 'stories') => void;
   callHistory: any[];
   stories: ChatStory[];
   setActiveStory: (story: ChatStory | null) => void;
@@ -42,6 +42,10 @@ interface ChatSidebarProps {
   getChatName: (room: ChatRoom) => string;
   getChatAvatar: (room: ChatRoom) => string | null;
   startCall: (type: 'audio' | 'video') => void;
+  archivedRooms: string[];
+  toggleArchive: (roomId: string, e: React.MouseEvent) => void;
+  showArchived: boolean;
+  setShowArchived: (show: boolean) => void;
 }
 
 const ChatSidebar: React.FC<ChatSidebarProps> = ({
@@ -52,10 +56,14 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
   loading, showStarredOnly, setShowStarredOnly, notificationPermission,
   requestNotificationPermission, setShowGlobalSearch, setShowProfileSettings,
   fetchAvailableUsers, setShowNewChatModal, onNavigate, getChatName, getChatAvatar,
-  startCall
+  startCall, archivedRooms, toggleArchive, showArchived, setShowArchived
 }) => {
   
   const filteredRooms = rooms.filter(room => {
+    const isArchived = archivedRooms.includes(room.id);
+    if (showArchived) return isArchived;
+    if (isArchived) return false;
+
     const name = getChatName(room).toLowerCase();
     const matchesSearch = name.includes(searchQuery.toLowerCase());
     const matchesCategory = activeCategory === 'Tudo' || room.category === activeCategory;
@@ -185,16 +193,25 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
             </div>
 
             {/* CATEGORY TABS */}
-            <div className="px-4 py-2 flex gap-1 overflow-x-auto no-scrollbar border-b border-slate-200 dark:border-white/5 bg-white/50 dark:bg-black/10">
-              {['Tudo', 'Estudos', 'Estágio', 'Social', 'Privadas'].map((cat: any) => (
-                <button
-                  key={cat}
-                  onClick={() => setActiveCategory(cat)}
-                  className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeCategory === cat ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'}`}
-                >
-                  {cat}
-                </button>
-              ))}
+            <div className="px-4 py-2 flex items-center justify-between border-b border-slate-200 dark:border-white/5 bg-white/50 dark:bg-black/10">
+              <div className="flex gap-1 overflow-x-auto no-scrollbar">
+                {['Tudo', 'Estudos', 'Estágio', 'Social', 'Privadas'].map((cat: any) => (
+                  <button
+                    key={cat}
+                    onClick={() => setActiveCategory(cat)}
+                    className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeCategory === cat ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'}`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setShowArchived(!showArchived)}
+                className={`p-2 rounded-lg transition-all shrink-0 ml-2 ${showArchived ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-white/5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10'}`}
+                title={showArchived ? "Ver conversas ativas" : "Ver arquivadas"}
+              >
+                <Archive size={16} />
+              </button>
             </div>
 
             {/* CHAT LIST */}
@@ -208,7 +225,15 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                 <div className="flex flex-col items-center justify-center h-full opacity-40 p-8 text-center">
                   <MessageSquare size={48} className="mb-4" />
                   <p className="text-sm font-bold uppercase tracking-widest">Nenhuma conversa encontrada</p>
-                  <p className="text-xs mt-2">Inicie uma nova conversa clicando no botão +</p>
+                  <p className="text-xs mt-2 mb-4">Inicie uma nova conversa clicando no botão +</p>
+                  {searchQuery && (
+                    <button 
+                      onClick={() => setShowGlobalSearch(true)}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all opacity-100"
+                    >
+                      Pesquisar em mensagens
+                    </button>
+                  )}
                 </div>
               ) : (
                 filteredRooms.map(room => {
@@ -273,8 +298,16 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                             <button 
                               onClick={(e) => togglePin(room.id, e)}
                               className="p-1 opacity-0 group-hover:opacity-100 hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg transition-all"
+                              title={isPinned ? "Desafixar" : "Fixar"}
                             >
                               {isPinned ? <PinOff size={14} className="text-slate-400" /> : <Pin size={14} className="text-slate-400" />}
+                            </button>
+                            <button 
+                              onClick={(e) => toggleArchive(room.id, e)}
+                              className="p-1 opacity-0 group-hover:opacity-100 hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg transition-all"
+                              title={archivedRooms.includes(room.id) ? "Desarquivar" : "Arquivar"}
+                            >
+                              <Archive size={14} className="text-slate-400" />
                             </button>
                           </div>
                         </div>

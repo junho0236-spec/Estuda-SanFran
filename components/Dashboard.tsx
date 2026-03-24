@@ -54,6 +54,9 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
 
   const cardsToReview = flashcards.filter(f => f.nextReview <= Date.now()).length;
   const pendingTasks = tasks.filter(t => !t.completed).length;
+  const totalWorkload = useMemo(() => {
+    return tasks.filter(t => !t.completed).reduce((acc, t) => acc + (t.storyPoints || 0), 0);
+  }, [tasks]);
   const totalSeconds = studySessions.reduce((acc, s) => acc + (Number(s.duration) || 0), 0);
   const totalHours = totalSeconds / 3600;
   
@@ -295,7 +298,7 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
           icon={<CheckCircle2 className="text-usp-blue dark:text-white" />} 
           label="Tarefas" 
           value={pendingTasks} 
-          subtext="Processos em pauta"
+          subtext={`${totalWorkload} Story Points (Carga)`}
           bgColor="bg-cyan-50 dark:bg-usp-blue"
           onClick={() => onNavigate(View.Tasks)}
         />

@@ -208,7 +208,19 @@ export interface Task {
   notes?: string;
   subtasks?: SubTask[];
   attachments?: string[];
+  library_attachments?: string[]; // IDs of SubjectFile
   links?: { url: string; title?: string; icon?: string }[];
+  recurrence?: {
+    frequency: 'daily' | 'weekly' | 'monthly' | 'custom';
+    interval: number;
+    daysOfWeek?: number[]; // 0-6 (Sunday-Saturday)
+    businessDaysOnly?: boolean;
+    nextOccurrence?: string;
+  };
+  total_focus_time?: number; // in seconds
+  parentTaskId?: string;
+  dependencies?: string[]; // IDs of tasks that must be completed first
+  storyPoints?: number; // Effort estimation (1, 2, 3, 5, 8, etc.)
   syllabusLink?: string;
   importantCitations?: string;
   waitingOn?: string;
@@ -302,6 +314,7 @@ export interface PresenceUser {
   subject_name?: string;
   is_timer_active: boolean;
   last_seen: string;
+  is_online?: boolean;
   // New fields for Study Rooms
   study_room_id?: string;
   study_start_time?: number; // timestamp
@@ -1079,6 +1092,7 @@ export interface ChatParticipant {
   unread_count: number;
   is_typing: boolean;
   is_pinned?: boolean;
+  is_archived?: boolean;
   muted_until?: string | null;
   category?: 'Estudos' | 'Estágio' | 'Social' | 'Privadas';
   last_read_at?: string;
