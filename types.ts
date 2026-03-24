@@ -1012,6 +1012,7 @@ export interface ChatRoom {
   updated_at: string;
   created_by?: string;
   avatar_url?: string;
+  category?: 'Estudos' | 'Estágio' | 'Social' | 'Privadas' | 'Tudo';
 }
 
 export interface ChatMessage {
