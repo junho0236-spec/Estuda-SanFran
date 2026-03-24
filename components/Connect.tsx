@@ -7,7 +7,8 @@ import {
   Edit2, Trash2, Reply, CornerUpLeft, Mic, Pin, PinOff,
   Link, File, Play, Pause, Trash, Bell, BellOff,
   Smile, Forward, Star, BarChart2, VolumeX, Volume2,
-  Clock, Share2, Folder, History, UserPlus, Phone, Video, PhoneOff, VideoOff, Ghost, Eye, EyeOff, MicOff, Palette
+  Clock, Share2, Folder, History, UserPlus, Phone, Video, PhoneOff, VideoOff, Ghost, Eye, EyeOff, MicOff, Palette, Users,
+  Settings, LogOut, Shield, ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../services/supabaseClient';
@@ -53,7 +54,22 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const [messageReactions, setMessageReactions] = useState<Record<string, any[]>>({});
   const [forwardingMessage, setForwardingMessage] = useState<ChatMessage | null>(null);
+  const [availableUsers, setAvailableUsers] = useState<UserProfile[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
+  const [page, setPage] = useState(0);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const isInitialLoad = useRef(true);
+  const MESSAGES_PER_PAGE = 30;
+
   const [showForwardModal, setShowForwardModal] = useState(false);
+  const [showGlobalSearch, setShowGlobalSearch] = useState(false);
+  const [showProfileSettings, setShowProfileSettings] = useState(false);
+  const [showUserProfileModal, setShowUserProfileModal] = useState<any>(null);
+  const [globalSearchQuery, setGlobalSearchQuery] = useState('');
+  const [globalSearchResults, setGlobalSearchResults] = useState<any[]>([]);
+  const [searchingGlobal, setSearchingGlobal] = useState(false);
   const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
   const [starredMessages, setStarredMessages] = useState<string[]>([]);
   const [showStarredOnly, setShowStarredOnly] = useState(false);
@@ -394,8 +410,20 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
     }
   };
 
+  const lastMessageId = useRef<string | null>(null);
+
   useEffect(() => {
-    scrollToBottom();
+    if (messages.length > 0) {
+      const lastMsg = messages[messages.length - 1];
+      const isNewMessage = lastMsg.id !== lastMessageId.current;
+      
+      if (isInitialLoad.current || (isNewMessage && lastMsg.sender_id === userId)) {
+        scrollToBottom();
+        isInitialLoad.current = false;
+      }
+      
+      lastMessageId.current = lastMsg.id;
+    }
   }, [messages]);
 
   const fetchUserProfile = async () => {
@@ -406,6 +434,71 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
       .single();
     if (!error && data) {
       setUserProfile(data);
+    }
+  };
+
+  const openUserProfile = async (targetUserId: string) => {
+    if (!targetUserId) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('user_persona')
+        .select('*')
+        .eq('id', targetUserId)
+        .single();
+      
+      if (error) throw error;
+      setShowUserProfileModal(data);
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      toast.error('Erro ao carregar perfil');
+    }
+  };
+
+  const updateProfile = async (newBio: string) => {
+    if (!userId) return;
+
+    try {
+      const { error } = await supabase
+        .from('user_persona')
+        .update({ bio: newBio })
+        .eq('id', userId);
+
+      if (error) throw error;
+      toast.success('Perfil atualizado!');
+      fetchUserProfile();
+      setShowProfileSettings(false);
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      toast.error('Erro ao atualizar perfil');
+    }
+  };
+
+  const searchGlobalMessages = async (query: string) => {
+    if (!query.trim() || !userId) {
+      setGlobalSearchResults([]);
+      return;
+    }
+
+    setSearchingGlobal(true);
+    try {
+      // Get all rooms where user is a participant
+      const myRoomIds = rooms.map(r => r.id);
+
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .in('room_id', myRoomIds)
+        .ilike('content', `%${query}%`)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      setGlobalSearchResults(data || []);
+    } catch (error) {
+      console.error('Error searching global messages:', error);
+    } finally {
+      setSearchingGlobal(false);
     }
   };
 
@@ -500,16 +593,115 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
     }
   };
 
-  const fetchMessages = async (roomId: string) => {
+  const fetchAvailableUsers = async () => {
+    if (!userId) return;
+    setLoadingUsers(true);
+    try {
+      let query = supabase
+        .from('user_persona')
+        .select('*')
+        .neq('id', userId);
+      
+      if (userSearchQuery) {
+        query = query.ilike('full_name', `%${userSearchQuery}%`);
+      } else {
+        query = query.order('full_name');
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      setAvailableUsers(data || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      toast.error('Erro ao carregar lista de contatos');
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  useEffect(() => {
+    if (showNewChatModal) {
+      fetchAvailableUsers();
+    }
+  }, [userSearchQuery, showNewChatModal]);
+
+  const startDirectChat = async (targetUserId: string) => {
+    if (!userId) return;
+    
+    try {
+      // 1. Check if a direct chat already exists
+      const { data: existingRooms, error: findError } = await supabase
+        .rpc('find_direct_chat', { user1: userId, user2: targetUserId });
+
+      if (findError) throw findError;
+
+      if (existingRooms && existingRooms.length > 0) {
+        const room = existingRooms[0];
+        setActiveRoom(room);
+        setShowNewChatModal(false);
+        return;
+      }
+
+      // 2. Create new room if not exists
+      const { data: newRoom, error: roomError } = await supabase
+        .from('chat_rooms')
+        .insert({ is_group: false })
+        .select()
+        .single();
+
+      if (roomError) throw roomError;
+
+      // 3. Add participants
+      const { error: partError } = await supabase
+        .from('chat_participants')
+        .insert([
+          { room_id: newRoom.id, user_id: userId },
+          { room_id: newRoom.id, user_id: targetUserId }
+        ]);
+
+      if (partError) throw partError;
+
+      setActiveRoom(newRoom);
+      setShowNewChatModal(false);
+      fetchRooms(); // Refresh sidebar
+    } catch (error) {
+      console.error('Error starting chat:', error);
+      toast.error('Erro ao iniciar conversa');
+    }
+  };
+
+  const fetchMessages = async (roomId: string, loadMore = false) => {
+    if (loadMore) setIsLoadingMore(true);
+    const currentPage = loadMore ? page : 0;
+    const start = currentPage * MESSAGES_PER_PAGE;
+    const end = start + MESSAGES_PER_PAGE - 1;
+
     const { data, error } = await supabase
       .from('chat_messages')
       .select('*')
       .eq('room_id', roomId)
-      .order('created_at', { ascending: true });
-
-    if (!error) {
-      setMessages(data || []);
+      .order('created_at', { ascending: false })
+      .range(start, end);
+    
+    if (error) {
+      console.error('Error fetching messages:', error);
+      setIsLoadingMore(false);
+      return;
     }
+
+    const fetchedMessages = [...data].reverse();
+    
+    if (loadMore) {
+      setMessages(prev => [...fetchedMessages, ...prev]);
+      setPage(prev => prev + 1);
+    } else {
+      setMessages(fetchedMessages);
+      setPage(1);
+      isInitialLoad.current = true;
+    }
+
+    setHasMoreMessages(data.length === MESSAGES_PER_PAGE);
+    setIsLoadingMore(false);
   };
 
   const [starredRoomIds, setStarredRoomIds] = useState<Set<string>>(new Set());
@@ -1179,6 +1371,26 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
       }
     }
 
+    // OPTIMISTIC UPDATE
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMsg: ChatMessage = {
+      id: tempId,
+      room_id: activeRoom.id,
+      sender_id: userId,
+      sender_name: userName,
+      content: messageContent,
+      message_type: 'text',
+      status: 'sending' as any,
+      created_at: new Date().toISOString(),
+      reply_to_id: replyingTo?.id || null,
+      reply_to_content: replyingTo?.content || null,
+      reply_to_sender_name: replyingTo?.sender_name || null,
+      link_preview: linkPreview,
+      is_vanish: isVanishMode,
+      expires_at: isVanishMode ? new Date(Date.now() + 60000).toISOString() : null
+    } as any;
+
+    setMessages(prev => [...prev, optimisticMsg]);
     setNewMessage('');
     const currentReply = replyingTo;
     setReplyingTo(null);
@@ -1191,6 +1403,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
           sender_id: userId,
           sender_name: userName,
           content: messageContent,
+          message_type: 'text',
           status: 'sent',
           reply_to_id: currentReply?.id || null,
           reply_to_content: currentReply?.content || null,
@@ -1204,12 +1417,9 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
 
       if (error) throw error;
 
-      // Update local state immediately
+      // Replace optimistic message with real one
       if (insertedMsg) {
-        setMessages(prev => {
-          if (prev.some(m => m.id === insertedMsg.id)) return prev;
-          return [...prev, insertedMsg];
-        });
+        setMessages(prev => prev.map(m => m.id === tempId ? insertedMsg : m));
       }
 
       // Update room last message
@@ -1231,6 +1441,8 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
       }
 
     } catch (error) {
+      // Rollback optimistic update
+      setMessages(prev => prev.filter(m => m.id !== tempId));
       console.error('Error sending message:', error);
       toast.error('Erro ao enviar mensagem');
     }
@@ -1715,6 +1927,51 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
     }
   };
 
+  const leaveGroup = async () => {
+    if (!activeRoom || !userId) return;
+
+    try {
+      const { error } = await supabase
+        .from('chat_participants')
+        .delete()
+        .eq('room_id', activeRoom.id)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+      
+      toast.success('Você saiu do grupo');
+      setActiveRoom(null);
+      setShowGroupInfoModal(false);
+      fetchRooms();
+    } catch (error) {
+      console.error('Error leaving group:', error);
+      toast.error('Erro ao sair do grupo');
+    }
+  };
+
+  const deleteGroup = async () => {
+    if (!activeRoom || activeRoom.created_by !== userId) return;
+
+    if (!confirm('Tem certeza que deseja excluir este grupo permanentemente?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('chat_rooms')
+        .delete()
+        .eq('id', activeRoom.id);
+
+      if (error) throw error;
+
+      toast.success('Grupo excluído com sucesso');
+      setActiveRoom(null);
+      setShowGroupInfoModal(false);
+      fetchRooms();
+    } catch (error) {
+      console.error('Error deleting group:', error);
+      toast.error('Erro ao excluir grupo');
+    }
+  };
+
   const removeParticipant = async (pUserId: string) => {
     if (!activeRoom) return;
     try {
@@ -1778,12 +2035,31 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
         <div className="p-3 md:p-4 flex flex-col gap-4 bg-white dark:bg-[#1a1a1a] border-b border-slate-200 dark:border-white/5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow-lg text-sm md:text-base">
-                {userProfile?.persona_data?.nome?.[0] || userName[0]}
-              </div>
+              <button 
+                onClick={() => setShowProfileSettings(true)}
+                className="relative group"
+              >
+                <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow-lg text-sm md:text-base overflow-hidden group-hover:scale-105 transition-all">
+                  {userProfile?.persona_data?.avatar_url ? (
+                    <img src={userProfile.persona_data.avatar_url} alt={userName} className="w-full h-full object-cover" />
+                  ) : (
+                    userProfile?.persona_data?.nome?.[0] || userName[0]
+                  )}
+                </div>
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-white dark:bg-[#1a1a1a] rounded-full flex items-center justify-center shadow-sm border border-slate-100 dark:border-white/5">
+                  <Settings size={10} className="text-slate-400" />
+                </div>
+              </button>
               <h2 className="font-black text-slate-900 dark:text-white uppercase tracking-tight text-sm md:text-base">Connect</h2>
             </div>
             <div className="flex items-center gap-1">
+              <button 
+                onClick={() => setShowGlobalSearch(true)}
+                className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-slate-400"
+                title="Pesquisa Global"
+              >
+                <Search size={18} />
+              </button>
               <button 
                 onClick={() => setShowStarredOnly(!showStarredOnly)}
                 className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors ${showStarredOnly ? 'text-yellow-500' : 'text-slate-400'}`}
@@ -1799,7 +2075,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
                 {notificationPermission === 'granted' ? <Bell size={18} /> : <BellOff size={18} />}
               </button>
               <button 
-                onClick={() => { fetchUsers(); setShowNewChatModal(true); }}
+                onClick={() => { fetchAvailableUsers(); setShowNewChatModal(true); }}
                 className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-blue-600"
               >
                 <Plus size={20} className="md:w-6 md:h-6" />
@@ -2039,15 +2315,15 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
                   <ChevronLeft size={24} />
                 </button>
                 <div 
-                  className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center overflow-hidden cursor-pointer shrink-0"
+                  className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center overflow-hidden cursor-pointer shrink-0 border-2 border-transparent hover:border-blue-500 transition-all"
                   onClick={() => {
                     if (activeRoom.is_group) {
                       setEditingGroupName(activeRoom.name || '');
                       setEditingGroupAvatar(activeRoom.avatar_url || '');
                       setShowGroupInfoModal(true);
-                    } else if (onNavigate) {
+                    } else {
                       const otherId = participants[activeRoom.id]?.find(p => p.user_id !== userId)?.user_id;
-                      if (otherId) onNavigate('profile', { userId: otherId });
+                      if (otherId) openUserProfile(otherId);
                     }
                   }}
                 >
@@ -2057,7 +2333,19 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
                     <User className="text-slate-400" size={20} />
                   )}
                 </div>
-                <div className="flex flex-col min-w-0">
+                <div 
+                  className="flex flex-col min-w-0 cursor-pointer"
+                  onClick={() => {
+                    if (activeRoom.is_group) {
+                      setEditingGroupName(activeRoom.name || '');
+                      setEditingGroupAvatar(activeRoom.avatar_url || '');
+                      setShowGroupInfoModal(true);
+                    } else {
+                      const otherId = participants[activeRoom.id]?.find(p => p.user_id !== userId)?.user_id;
+                      if (otherId) openUserProfile(otherId);
+                    }
+                  }}
+                >
                   <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-tight text-xs md:text-sm truncate">
                     {getChatName(activeRoom)}
                   </h3>
@@ -2234,6 +2522,17 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
               )}
               
               <div className="relative z-10 space-y-4">
+                {hasMoreMessages && (
+                  <div className="flex justify-center py-2">
+                    <button 
+                      onClick={() => fetchMessages(activeRoom.id, true)}
+                      disabled={isLoadingMore}
+                      className="text-[10px] font-black uppercase tracking-widest text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 px-4 py-2 rounded-full transition-all disabled:opacity-50"
+                    >
+                      {isLoadingMore ? 'Carregando...' : 'Ver mensagens anteriores'}
+                    </button>
+                  </div>
+                )}
                 {messages
                   .filter(msg => {
                   const matchesSearch = !internalSearchQuery || msg.content.toLowerCase().includes(internalSearchQuery.toLowerCase());
@@ -2300,6 +2599,16 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
                             </motion.div>
                           )}
                         </AnimatePresence>
+
+                        {/* SENDER NAME (GROUP CHAT) */}
+                        {activeRoom.is_group && !isMe && !isDeleted && (
+                          <button 
+                            onClick={() => openUserProfile(msg.sender_id)}
+                            className="text-[10px] font-black uppercase tracking-widest text-blue-500 mb-1 hover:underline text-left block"
+                          >
+                            {msg.sender_name}
+                          </button>
+                        )}
 
                         {/* FORWARDED INDICATOR */}
                         {msg.is_forwarded && !isDeleted && (
@@ -2459,7 +2768,9 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
                           </span>
                           {isMe && (
                             <span>
-                              {msg.status === 'read' ? (
+                              {msg.id.startsWith('temp-') ? (
+                                <Clock size={12} className="text-blue-200 animate-pulse" />
+                              ) : msg.status === 'read' ? (
                                 <CheckCheck size={12} className="text-blue-400" />
                               ) : (
                                 <Check size={12} className="text-blue-100" />
@@ -3083,6 +3394,26 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
                     </div>
                   </div>
                 )}
+
+                {/* ACTIONS */}
+                <div className="pt-6 border-t border-slate-200 dark:border-white/5 space-y-3">
+                  <button 
+                    onClick={leaveGroup}
+                    className="w-full py-3 bg-red-50 dark:bg-red-500/10 text-red-600 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-red-100 transition-all flex items-center justify-center gap-2"
+                  >
+                    <LogOut size={14} />
+                    Sair do Grupo
+                  </button>
+                  {activeRoom.created_by === userId && (
+                    <button 
+                      onClick={deleteGroup}
+                      className="w-full py-3 bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 flex items-center justify-center gap-2"
+                    >
+                      <Trash2 size={14} />
+                      Excluir Grupo
+                    </button>
+                  )}
+                </div>
               </div>
             </motion.div>
           </motion.div>
@@ -3519,6 +3850,318 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
                   </h3>
                 </div>
               </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* GLOBAL SEARCH MODAL */}
+        <AnimatePresence>
+          {showGlobalSearch && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                className="bg-white dark:bg-[#1a1a1a] w-full max-w-2xl rounded-[2.5rem] border border-slate-200 dark:border-white/5 shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
+              >
+                <div className="p-6 border-b border-slate-200 dark:border-white/5 flex items-center gap-4">
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                    <input 
+                      type="text"
+                      placeholder="Pesquisar em todas as mensagens..."
+                      value={globalSearchQuery}
+                      onChange={(e) => {
+                        setGlobalSearchQuery(e.target.value);
+                        searchGlobalMessages(e.target.value);
+                      }}
+                      className="w-full pl-12 pr-4 py-3 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/5 rounded-2xl outline-none focus:border-blue-500 transition-all font-bold"
+                      autoFocus
+                    />
+                  </div>
+                  <button 
+                    onClick={() => { setShowGlobalSearch(false); setGlobalSearchQuery(''); setGlobalSearchResults([]); }}
+                    className="p-3 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                  {searchingGlobal ? (
+                    <div className="flex flex-col items-center justify-center py-12 opacity-40">
+                      <Loader2 className="animate-spin mb-2" />
+                      <p className="text-xs font-black uppercase tracking-widest">Pesquisando...</p>
+                    </div>
+                  ) : globalSearchResults.length > 0 ? (
+                    <div className="space-y-4">
+                      {globalSearchResults.map(msg => {
+                        const room = rooms.find(r => r.id === msg.room_id);
+                        return (
+                          <button 
+                            key={msg.id}
+                            onClick={() => {
+                              if (room) {
+                                setActiveRoom(room);
+                                setShowGlobalSearch(false);
+                                setGlobalSearchQuery('');
+                                setGlobalSearchResults([]);
+                              }
+                            }}
+                            className="w-full p-4 bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-2xl hover:border-blue-500 transition-all text-left group"
+                          >
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-blue-500">
+                                {room ? getChatName(room) : 'Conversa desconhecida'}
+                              </span>
+                              <span className="text-[10px] text-slate-400">
+                                {new Date(msg.created_at).toLocaleDateString()} {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <p className="text-sm font-bold text-slate-900 dark:text-white mb-1">{msg.sender_name}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{msg.content}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : globalSearchQuery ? (
+                    <div className="flex flex-col items-center justify-center py-12 opacity-40 text-center">
+                      <Search size={48} className="mb-4" />
+                      <p className="text-sm font-black uppercase tracking-widest">Nenhum resultado encontrado</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-12 opacity-40 text-center">
+                      <MessageSquare size={48} className="mb-4" />
+                      <p className="text-sm font-black uppercase tracking-widest">Digite algo para pesquisar</p>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* PROFILE SETTINGS MODAL */}
+        <AnimatePresence>
+          {showProfileSettings && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                className="bg-white dark:bg-[#1a1a1a] w-full max-w-md rounded-[2.5rem] border border-slate-200 dark:border-white/5 shadow-2xl overflow-hidden flex flex-col"
+              >
+                <div className="p-6 border-b border-slate-200 dark:border-white/5 flex items-center justify-between">
+                  <h3 className="text-lg font-black uppercase tracking-tight">Meu Perfil</h3>
+                  <button 
+                    onClick={() => setShowProfileSettings(false)}
+                    className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+
+                <div className="p-8 flex flex-col items-center text-center">
+                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow-2xl text-3xl mb-4 overflow-hidden">
+                    {userProfile?.persona_data?.avatar_url ? (
+                      <img src={userProfile.persona_data.avatar_url} alt={userName} className="w-full h-full object-cover" />
+                    ) : (
+                      userProfile?.persona_data?.nome?.[0] || userName[0]
+                    )}
+                  </div>
+                  <h4 className="text-xl font-black text-slate-900 dark:text-white mb-1">{userProfile?.persona_data?.nome || userName}</h4>
+                  <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-8">{userProfile?.persona_data?.email || 'Usuário Connect'}</p>
+
+                  <div className="w-full space-y-6">
+                    <div className="text-left">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">Recado / Bio</label>
+                      <textarea 
+                        defaultValue={userProfile?.bio || ''}
+                        onBlur={(e) => updateProfile(e.target.value)}
+                        placeholder="Escreva algo sobre você..."
+                        className="w-full p-4 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/5 rounded-2xl outline-none focus:border-blue-500 transition-all font-bold text-sm resize-none h-32"
+                      />
+                      <p className="text-[10px] text-slate-400 mt-2 italic">O recado será salvo automaticamente ao sair do campo.</p>
+                    </div>
+
+                    <div className="pt-4 border-t border-slate-200 dark:border-white/5">
+                      <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-white/5 rounded-2xl">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-blue-500/10 rounded-lg text-blue-500">
+                            <Shield size={18} />
+                          </div>
+                          <span className="text-xs font-bold">Privacidade</span>
+                        </div>
+                        <ChevronRight size={16} className="text-slate-400" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* USER PROFILE MODAL (FOR OTHERS) */}
+        <AnimatePresence>
+          {showUserProfileModal && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                className="bg-white dark:bg-[#1a1a1a] w-full max-w-md rounded-[2.5rem] border border-slate-200 dark:border-white/5 shadow-2xl overflow-hidden flex flex-col"
+              >
+                <div className="p-6 border-b border-slate-200 dark:border-white/5 flex items-center justify-between">
+                  <h3 className="text-lg font-black uppercase tracking-tight">Perfil</h3>
+                  <button 
+                    onClick={() => setShowUserProfileModal(null)}
+                    className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+
+                <div className="p-8 flex flex-col items-center text-center">
+                  <div className="w-24 h-24 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center text-slate-400 font-bold shadow-2xl text-3xl mb-4 overflow-hidden">
+                    {showUserProfileModal.avatar_url ? (
+                      <img src={showUserProfileModal.avatar_url} alt={showUserProfileModal.nome} className="w-full h-full object-cover" />
+                    ) : (
+                      <User size={48} />
+                    )}
+                  </div>
+                  <h4 className="text-xl font-black text-slate-900 dark:text-white mb-1">{showUserProfileModal.nome || 'Usuário'}</h4>
+                  <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-8">{showUserProfileModal.email || 'Connect User'}</p>
+
+                  <div className="w-full space-y-6">
+                    <div className="text-left">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">Recado / Bio</label>
+                      <div className="w-full p-4 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/5 rounded-2xl font-bold text-sm min-h-[80px]">
+                        {showUserProfileModal.bio || 'Sem recado disponível.'}
+                      </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-slate-200 dark:border-white/5 flex gap-3">
+                      <button 
+                        onClick={() => {
+                          // Logic to start a direct chat if not already in one
+                          // For now, just close modal
+                          setShowUserProfileModal(null);
+                        }}
+                        className="flex-1 py-3 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2"
+                      >
+                        <MessageSquare size={14} />
+                        Mensagem
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setShowUserProfileModal(null);
+                          startCall('audio');
+                        }}
+                        className="p-3 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 rounded-2xl hover:bg-slate-200 transition-all"
+                      >
+                        <Phone size={18} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* NEW CHAT MODAL (USER DISCOVERY) */}
+        <AnimatePresence>
+          {showNewChatModal && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                className="bg-white dark:bg-[#1a1a1a] w-full max-w-md rounded-[2.5rem] border border-slate-200 dark:border-white/5 shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
+              >
+                <div className="p-6 border-b border-slate-200 dark:border-white/5 flex items-center justify-between">
+                  <h3 className="text-lg font-black uppercase tracking-tight">Nova Conversa</h3>
+                  <button 
+                    onClick={() => setShowNewChatModal(false)}
+                    className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+
+                <div className="p-4 border-b border-slate-200 dark:border-white/5">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input 
+                      type="text"
+                      placeholder="Buscar por nome ou email..."
+                      value={userSearchQuery}
+                      onChange={(e) => setUserSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/5 rounded-2xl outline-none focus:border-blue-500 transition-all text-sm font-bold"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
+                  {loadingUsers ? (
+                    <div className="flex flex-col items-center justify-center py-12 gap-4">
+                      <Loader2 className="animate-spin text-blue-500" size={32} />
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Carregando contatos...</p>
+                    </div>
+                  ) : availableUsers.length > 0 ? (
+                    <div className="space-y-1">
+                      {availableUsers.map(user => (
+                        <button
+                          key={user.id}
+                          onClick={() => startDirectChat(user.id)}
+                          className="w-full p-3 flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-white/5 rounded-2xl transition-all group"
+                        >
+                          <div className="w-12 h-12 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center overflow-hidden shrink-0 border-2 border-transparent group-hover:border-blue-500 transition-all">
+                            {user.avatar_url ? (
+                              <img src={user.avatar_url} alt={user.full_name} className="w-full h-full object-cover" />
+                            ) : (
+                              <User size={24} className="text-slate-400" />
+                            )}
+                          </div>
+                          <div className="flex-1 text-left min-w-0">
+                            <h4 className="font-black text-slate-900 dark:text-white uppercase tracking-tight text-sm truncate">{user.full_name}</h4>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 truncate">{user.bio || 'Usuário'}</p>
+                          </div>
+                          <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-600 opacity-0 group-hover:opacity-100 transition-all">
+                            <Plus size={16} />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-12 text-center px-6">
+                      <Users size={48} className="text-slate-200 dark:text-white/5 mb-4" />
+                      <p className="text-sm font-bold text-slate-500">Nenhum usuário encontrado.</p>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
