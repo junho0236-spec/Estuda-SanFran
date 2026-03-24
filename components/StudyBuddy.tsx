@@ -136,7 +136,6 @@ Podemos começar? Me conte: em qual ano da faculdade você está e qual seu prin
           { role: 'user', parts: [{ text: input }] }
         ],
         config: {
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
           systemInstruction: systemInstruction
         }
       });

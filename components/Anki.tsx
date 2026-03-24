@@ -1735,7 +1735,6 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         model: GEMINI_MODEL,
         contents: chatContext,
         config: {
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
           systemInstruction: "Você é um mentor de estudos especializado. O usuário está revisando um flashcard e teve uma dúvida sobre a avaliação ou o conteúdo. Responda de forma clara e didática, usando formatação Markdown (negrito, listas, títulos) para organizar sua resposta e torná-la visualmente agradável. Se o assunto for jurídico, seja técnico; se for de outra área, adapte sua linguagem."
         }
       });

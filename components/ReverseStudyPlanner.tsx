@@ -142,7 +142,6 @@ Seja realista e distribua bem o conteúdo. Foque nos tópicos principais.`;
         model: GEMINI_MODEL,
         contents: prompt,
         config: {
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.ARRAY,

@@ -1187,7 +1187,7 @@ ${selectedText}
 Forneça a explicação de forma concisa e didática.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.1-flash-lite-preview",
         contents: prompt
       });
 
@@ -1226,7 +1226,7 @@ Forneça a explicação de forma concisa e didática.`;
 
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
-      const chat = ai.chats.create({ model: "gemini-2.5-flash" });
+      const chat = ai.chats.create({ model: "gemini-3.1-flash-lite-preview" });
       
       // Context for the chat
       const context = `Você é um professor de Direito especialista em concursos. Estamos discutindo a seguinte questão: ${questionStatement}.`;
@@ -1319,7 +1319,7 @@ Forneça a explicação de forma concisa e didática.`;
       }`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.1-flash-lite-preview",
         contents: prompt
       });
 
@@ -1909,7 +1909,7 @@ Forneça a explicação de forma concisa e didática.`;
       Use uma linguagem clara, direta e motivadora. Formate em Markdown.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.1-flash-lite-preview",
         contents: prompt
       });
 

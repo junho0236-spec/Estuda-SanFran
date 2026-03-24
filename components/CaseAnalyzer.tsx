@@ -53,7 +53,6 @@ const CaseAnalyzer: React.FC<CaseAnalyzerProps> = ({ onBack }) => {
         model: GEMINI_MODEL,
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         config: {
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
           systemInstruction: "Você é um Analista Jurídico Sênior especializado em Direito Brasileiro. Sua função é auxiliar estudantes a identificar teses e fundamentos em casos práticos."
         }
       });
