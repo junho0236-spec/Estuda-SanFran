@@ -7,33 +7,7 @@
 -- 1. EXTENSÕES
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 2. LIMPEZA DE POLÍTICAS ANTIGAS (IDEMPOTÊNCIA)
--- Executamos os DROPs antes de criar qualquer coisa para evitar erros de "already exists"
-DROP POLICY IF EXISTS "Perfis são visíveis para todos os autenticados" ON profiles;
-DROP POLICY IF EXISTS "Usuários podem atualizar seu próprio perfil" ON profiles;
-DROP POLICY IF EXISTS "Participantes podem ver suas salas" ON chat_rooms;
-DROP POLICY IF EXISTS "Qualquer usuário autenticado pode criar salas" ON chat_rooms;
-DROP POLICY IF EXISTS "Participantes podem atualizar suas salas" ON chat_rooms;
-DROP POLICY IF EXISTS "Participantes podem ver outros participantes" ON chat_participants;
-DROP POLICY IF EXISTS "Participantes podem ser adicionados a salas" ON chat_participants;
-DROP POLICY IF EXISTS "Participantes podem gerenciar seu status" ON chat_participants;
-DROP POLICY IF EXISTS "Participantes podem ver mensagens" ON chat_messages;
-DROP POLICY IF EXISTS "Participantes podem enviar mensagens" ON chat_messages;
-DROP POLICY IF EXISTS "Participantes podem atualizar suas mensagens" ON chat_messages;
-DROP POLICY IF EXISTS "Usuários gerenciam suas próprias inscrições" ON push_subscriptions;
-DROP POLICY IF EXISTS "Users can manage their own subscriptions" ON push_subscriptions;
-DROP POLICY IF EXISTS "Leitura pública de editais" ON editais;
-DROP POLICY IF EXISTS "Escrita para autenticados" ON editais;
-DROP POLICY IF EXISTS "Usuários veem suas próprias trilhas" ON user_trails;
-DROP POLICY IF EXISTS "Usuários veem suas amizades" ON friendships;
-DROP POLICY IF EXISTS "Usuários enviam solicitações" ON friendships;
-DROP POLICY IF EXISTS "Usuários respondem solicitações" ON friendships;
-DROP POLICY IF EXISTS "Usuários veem suas notificações" ON notifications;
-DROP POLICY IF EXISTS "Permitir upload para autenticados" ON storage.objects;
-DROP POLICY IF EXISTS "Permitir leitura para autenticados" ON storage.objects;
-DROP POLICY IF EXISTS "Permitir delete pelo dono" ON storage.objects;
-
--- 3. PERFIS DE USUÁRIO (PROFILES)
+-- 2. PERFIS DE USUÁRIO (PROFILES)
 -- Esta tabela espelha os usuários do auth.users para permitir metadados públicos
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -46,6 +20,10 @@ CREATE TABLE IF NOT EXISTS profiles (
 
 -- Habilitar RLS para Perfis
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+
+-- Limpeza de políticas antigas
+DROP POLICY IF EXISTS "Perfis são visíveis para todos os autenticados" ON profiles;
+DROP POLICY IF EXISTS "Usuários podem atualizar seu próprio perfil" ON profiles;
 
 CREATE POLICY "Perfis são visíveis para todos os autenticados" ON profiles
   FOR SELECT USING (auth.role() = 'authenticated');
@@ -117,74 +95,21 @@ CREATE TABLE IF NOT EXISTS chat_messages (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 3. PUSH NOTIFICATIONS
-CREATE TABLE IF NOT EXISTS push_subscriptions (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  subscription JSONB NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(user_id, subscription)
-);
-
--- 4. OUTRAS TABELAS (EDITAIS, TRILHAS, AMIZADES)
--- Editais
-CREATE TABLE IF NOT EXISTS editais (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  title TEXT NOT NULL,
-  institution TEXT,
-  status TEXT CHECK (status IN ('Aberto', 'Previsto', 'Inscrições Abertas', 'Encerrado')),
-  category TEXT CHECK (category IN ('Magistratura', 'MP', 'Defensoria', 'Procuradoria', 'Outros')),
-  salary TEXT,
-  deadline TIMESTAMP WITH TIME ZONE,
-  region TEXT,
-  link TEXT,
-  description TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- User Trails
-CREATE TABLE IF NOT EXISTS user_trails (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  goal TEXT NOT NULL,
-  current_step_id TEXT,
-  completed_steps TEXT[],
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(user_id, goal)
-);
-
--- Friendships
-CREATE TABLE IF NOT EXISTS friendships (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  friend_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  status TEXT CHECK (status IN ('pending', 'accepted', 'declined')) DEFAULT 'pending',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(user_id, friend_id)
-);
-
--- Notifications
-CREATE TABLE IF NOT EXISTS notifications (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  message TEXT NOT NULL,
-  is_read BOOLEAN DEFAULT false,
-  link_task TEXT,
-  type TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 5. SEGURANÇA (RLS)
+-- Habilitar RLS para Chat
 ALTER TABLE chat_rooms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chat_participants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
-ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE editais ENABLE ROW LEVEL SECURITY;
-ALTER TABLE user_trails ENABLE ROW LEVEL SECURITY;
-ALTER TABLE friendships ENABLE ROW LEVEL SECURITY;
-ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+
+-- Limpeza de políticas antigas
+DROP POLICY IF EXISTS "Participantes podem ver suas salas" ON chat_rooms;
+DROP POLICY IF EXISTS "Qualquer usuário autenticado pode criar salas" ON chat_rooms;
+DROP POLICY IF EXISTS "Participantes podem atualizar suas salas" ON chat_rooms;
+DROP POLICY IF EXISTS "Participantes podem ver outros participantes" ON chat_participants;
+DROP POLICY IF EXISTS "Participantes podem ser adicionados a salas" ON chat_participants;
+DROP POLICY IF EXISTS "Participantes podem gerenciar seu status" ON chat_participants;
+DROP POLICY IF EXISTS "Participantes podem ver mensagens" ON chat_messages;
+DROP POLICY IF EXISTS "Participantes podem enviar mensagens" ON chat_messages;
+DROP POLICY IF EXISTS "Participantes podem atualizar suas mensagens" ON chat_messages;
 
 -- Função auxiliar para verificar participação
 CREATE OR REPLACE FUNCTION check_is_room_participant(p_room_id UUID)
@@ -210,22 +135,92 @@ CREATE POLICY "Participantes podem ver mensagens" ON chat_messages FOR SELECT US
 CREATE POLICY "Participantes podem enviar mensagens" ON chat_messages FOR INSERT WITH CHECK (auth.uid() = sender_id AND check_is_room_participant(room_id));
 CREATE POLICY "Participantes podem atualizar suas mensagens" ON chat_messages FOR UPDATE USING (auth.uid() = sender_id);
 
--- Políticas Push
+-- 4. PUSH NOTIFICATIONS
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  subscription JSONB NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, subscription)
+);
+
+ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Usuários gerenciam suas próprias inscrições" ON push_subscriptions;
+DROP POLICY IF EXISTS "Users can manage their own subscriptions" ON push_subscriptions;
+
 CREATE POLICY "Usuários gerenciam suas próprias inscrições" ON push_subscriptions FOR ALL USING (auth.uid() = user_id);
 
--- Políticas Editais
+-- 5. OUTRAS TABELAS (EDITAIS, TRILHAS, AMIZADES)
+-- Editais
+CREATE TABLE IF NOT EXISTS editais (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  title TEXT NOT NULL,
+  institution TEXT,
+  status TEXT CHECK (status IN ('Aberto', 'Previsto', 'Inscrições Abertas', 'Encerrado')),
+  category TEXT CHECK (category IN ('Magistratura', 'MP', 'Defensoria', 'Procuradoria', 'Outros')),
+  salary TEXT,
+  deadline TIMESTAMP WITH TIME ZONE,
+  region TEXT,
+  link TEXT,
+  description TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE editais ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Leitura pública de editais" ON editais;
+DROP POLICY IF EXISTS "Escrita para autenticados" ON editais;
 CREATE POLICY "Leitura pública de editais" ON editais FOR SELECT USING (true);
 CREATE POLICY "Escrita para autenticados" ON editais FOR ALL USING (auth.role() = 'authenticated');
 
--- Políticas Trilhas
+-- User Trails
+CREATE TABLE IF NOT EXISTS user_trails (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  goal TEXT NOT NULL,
+  current_step_id TEXT,
+  completed_steps TEXT[],
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, goal)
+);
+
+ALTER TABLE user_trails ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Usuários veem suas próprias trilhas" ON user_trails;
 CREATE POLICY "Usuários veem suas próprias trilhas" ON user_trails FOR ALL USING (auth.uid() = user_id);
 
--- Políticas Amizades
+-- Friendships
+CREATE TABLE IF NOT EXISTS friendships (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  friend_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  status TEXT CHECK (status IN ('pending', 'accepted', 'declined')) DEFAULT 'pending',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, friend_id)
+);
+
+ALTER TABLE friendships ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Usuários veem suas amizades" ON friendships;
+DROP POLICY IF EXISTS "Usuários enviam solicitações" ON friendships;
+DROP POLICY IF EXISTS "Usuários respondem solicitações" ON friendships;
 CREATE POLICY "Usuários veem suas amizades" ON friendships FOR SELECT USING (auth.uid() = user_id OR auth.uid() = friend_id);
 CREATE POLICY "Usuários enviam solicitações" ON friendships FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Usuários respondem solicitações" ON friendships FOR UPDATE USING (auth.uid() = friend_id OR auth.uid() = user_id);
 
--- Políticas Notificações
+-- Notifications
+CREATE TABLE IF NOT EXISTS notifications (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  message TEXT NOT NULL,
+  is_read BOOLEAN DEFAULT false,
+  link_task TEXT,
+  type TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Usuários veem suas notificações" ON notifications;
 CREATE POLICY "Usuários veem suas notificações" ON notifications FOR ALL USING (auth.uid() = user_id);
 
 -- 6. STORAGE (BUCKET: chat-attachments)
@@ -235,6 +230,10 @@ VALUES ('chat-attachments', 'chat-attachments', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- Políticas Storage
+DROP POLICY IF EXISTS "Permitir upload para autenticados" ON storage.objects;
+DROP POLICY IF EXISTS "Permitir leitura para autenticados" ON storage.objects;
+DROP POLICY IF EXISTS "Permitir delete pelo dono" ON storage.objects;
+
 CREATE POLICY "Permitir upload para autenticados" ON storage.objects
   FOR INSERT WITH CHECK (bucket_id = 'chat-attachments' AND auth.role() = 'authenticated');
 
