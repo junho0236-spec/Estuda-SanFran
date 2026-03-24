@@ -7,7 +7,7 @@ import {
   Edit2, Trash2, Reply, CornerUpLeft, Mic, Pin, PinOff,
   Link, File, Play, Pause, Trash, Bell, BellOff,
   Smile, Forward, Star, BarChart2, VolumeX, Volume2,
-  Clock, Share2, Folder, History, UserPlus
+  Clock, Share2, Folder, History, UserPlus, Phone, Video, PhoneOff, VideoOff, Ghost, Eye, EyeOff, MicOff, Palette
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../services/supabaseClient';
@@ -70,12 +70,38 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
   const [activeCategory, setActiveCategory] = useState<'Estudos' | 'Estágio' | 'Social' | 'Privadas' | 'Tudo'>('Tudo');
   const [showShareProfileModal, setShowShareProfileModal] = useState(false);
   const [sharingToRoomId, setSharingToRoomId] = useState<string | null>(null);
+  const [isVanishMode, setIsVanishMode] = useState(false);
+  const [activeCall, setActiveCall] = useState<any>(null);
+  const [incomingCall, setIncomingCall] = useState<any>(null);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isVideoOff, setIsVideoOff] = useState(false);
+  const [showCallModal, setShowCallModal] = useState(false);
+  const [callStatus, setCallStatus] = useState<'idle' | 'calling' | 'incoming' | 'connected' | 'ended'>('idle');
+  const [viewMode, setViewMode] = useState<'chats' | 'calls'>('chats');
+  const [callHistory, setCallHistory] = useState<any[]>([]);
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  const [gifSearch, setGifSearch] = useState('');
+  const [gifType, setGifType] = useState<'gifs' | 'stickers'>('gifs');
+  const [gifs, setGifs] = useState<any[]>([]);
+  const [roomSettings, setRoomSettings] = useState<Record<string, any>>({});
+  const [showWallpaperModal, setShowWallpaperModal] = useState(false);
+  const [selectedWallpaper, setSelectedWallpaper] = useState<string | null>(null);
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [giphyApiKey] = useState('dc6zaTOxFJmzC'); // Public beta key for demo, should be replaced with real key
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<any>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingIntervalRef = useRef<any>(null);
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     if ('Notification' in window) {
@@ -95,15 +121,158 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
     fetchUserProfile();
     fetchStarredMessages();
     fetchStories();
+    fetchCallHistory();
     const unsubscribeRooms = subscribeToAllRooms();
     const unsubscribePresence = subscribeToPresence();
     const unsubscribeStories = subscribeToStories();
+    const unsubscribeCalls = subscribeToCalls();
     return () => {
       if (unsubscribeRooms) unsubscribeRooms();
       if (unsubscribePresence) unsubscribePresence();
       if (unsubscribeStories) unsubscribeStories();
+      if (unsubscribeCalls) unsubscribeCalls();
     };
   }, [userId]);
+
+  const fetchCallHistory = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('chat_calls')
+        .select('*')
+        .or(`caller_id.eq.${userId},receiver_id.eq.${userId}`)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      // Enrich with participant names
+      const enrichedCalls = await Promise.all((data || []).map(async (call) => {
+        const otherId = call.caller_id === userId ? call.receiver_id : call.caller_id;
+        const { data: userData } = await supabase
+          .from('user_persona')
+          .select('nome, avatar_url')
+          .eq('id', otherId)
+          .single();
+        
+        return {
+          ...call,
+          other_name: userData?.nome || 'Colega',
+          other_avatar: userData?.avatar_url
+        };
+      }));
+
+      setCallHistory(enrichedCalls);
+    } catch (error) {
+      console.error('Error fetching call history:', error);
+    }
+  };
+
+  const subscribeToCalls = () => {
+    const channel = supabase
+      .channel('chat_calls_history')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'chat_calls' 
+      }, () => {
+        fetchCallHistory();
+      })
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  };
+
+  const fetchRoomSettings = async (roomId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('chat_room_settings')
+        .select('*')
+        .eq('room_id', roomId)
+        .eq('user_id', userId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      
+      if (data) {
+        setRoomSettings(prev => ({ ...prev, [roomId]: data }));
+      }
+    } catch (error) {
+      console.error('Error fetching room settings:', error);
+    }
+  };
+
+  const updateWallpaper = async (roomId: string, url: string | null, color: string | null) => {
+    try {
+      const { error } = await supabase
+        .from('chat_room_settings')
+        .upsert({
+          user_id: userId,
+          room_id: roomId,
+          wallpaper_url: url,
+          wallpaper_color: color,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id,room_id' });
+
+      if (error) throw error;
+      
+      setRoomSettings(prev => ({
+        ...prev,
+        [roomId]: { ...prev[roomId], wallpaper_url: url, wallpaper_color: color }
+      }));
+      setShowWallpaperModal(false);
+      toast.success('Papel de parede atualizado!');
+    } catch (error) {
+      console.error('Error updating wallpaper:', error);
+      toast.error('Erro ao atualizar papel de parede');
+    }
+  };
+
+  const searchGifs = async (query: string) => {
+    const endpoint = gifType === 'gifs' ? 'gifs' : 'stickers';
+    if (!query.trim()) {
+      // Fetch trending
+      try {
+        const resp = await fetch(`https://api.giphy.com/v1/${endpoint}/trending?api_key=${giphyApiKey}&limit=20`);
+        const data = await resp.json();
+        setGifs(data.data || []);
+      } catch (e) {
+        console.error(`Error fetching trending ${gifType}:`, e);
+      }
+      return;
+    }
+
+    try {
+      const resp = await fetch(`https://api.giphy.com/v1/${endpoint}/search?api_key=${giphyApiKey}&q=${encodeURIComponent(query)}&limit=20`);
+      const data = await resp.json();
+      setGifs(data.data || []);
+    } catch (e) {
+      console.error(`Error searching ${gifType}:`, e);
+    }
+  };
+
+  const sendGif = async (gifUrl: string, type: 'gif' | 'sticker' = 'gif') => {
+    if (!activeRoom) return;
+    
+    try {
+      const { error } = await supabase
+        .from('chat_messages')
+        .insert({
+          room_id: activeRoom.id,
+          sender_id: userId,
+          sender_name: userName,
+          attachment_url: gifUrl,
+          message_type: type,
+          status: 'sent'
+        });
+
+      if (error) throw error;
+      setShowGifPicker(false);
+    } catch (error) {
+      console.error(`Error sending ${type}:`, error);
+      toast.error(`Erro ao enviar ${type === 'gif' ? 'GIF' : 'Figurinha'}`);
+    }
+  };
 
   const requestNotificationPermission = async () => {
     if (!('Notification' in window)) {
@@ -775,6 +944,68 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      // Visualizer setup
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      analyserRef.current = analyser;
+
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      const draw = () => {
+        if (!canvasRef.current || !analyserRef.current) return;
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        animationFrameRef.current = requestAnimationFrame(draw);
+        analyserRef.current.getByteFrequencyData(dataArray);
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const barWidth = (canvas.width / bufferLength) * 2.5;
+        let x = 0;
+
+        ctx.beginPath();
+        ctx.moveTo(0, canvas.height / 2);
+        
+        for (let i = 0; i < bufferLength; i++) {
+          const barHeight = (dataArray[i] / 255) * canvas.height;
+          const y = (canvas.height / 2) - (barHeight / 2);
+          
+          if (i === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+          
+          x += barWidth + 1;
+        }
+        
+        ctx.strokeStyle = `rgb(59, 130, 246)`; // blue-500
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+
+        // Mirror the wave
+        x = 0;
+        ctx.beginPath();
+        ctx.moveTo(0, canvas.height / 2);
+        for (let i = 0; i < bufferLength; i++) {
+          const barHeight = (dataArray[i] / 255) * canvas.height;
+          const y = (canvas.height / 2) + (barHeight / 2);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+          x += barWidth + 1;
+        }
+        ctx.stroke();
+      };
+      draw();
+
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
@@ -790,6 +1021,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
         const url = URL.createObjectURL(audioBlob);
         setAudioUrl(url);
         stream.getTracks().forEach(track => track.stop());
+        if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
       };
 
       mediaRecorder.start();
@@ -819,6 +1051,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
       clearInterval(recordingIntervalRef.current);
       setAudioUrl(null);
       audioChunksRef.current = [];
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     }
   };
 
@@ -851,7 +1084,9 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
           attachment_url: publicUrl,
           attachment_name: 'audio_message.webm',
           attachment_type: 'audio',
-          status: 'sent'
+          status: 'sent',
+          is_vanish: isVanishMode,
+          expires_at: isVanishMode ? new Date(Date.now() + 60000).toISOString() : null
         }]);
 
       if (msgError) throw msgError;
@@ -960,7 +1195,9 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
           reply_to_id: currentReply?.id || null,
           reply_to_content: currentReply?.content || null,
           reply_to_sender_name: currentReply?.sender_name || null,
-          link_preview: linkPreview
+          link_preview: linkPreview,
+          is_vanish: isVanishMode,
+          expires_at: isVanishMode ? new Date(Date.now() + 60000).toISOString() : null
         })
         .select()
         .single();
@@ -996,6 +1233,233 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
     } catch (error) {
       console.error('Error sending message:', error);
       toast.error('Erro ao enviar mensagem');
+    }
+  };
+
+  const setupPeerConnection = async (stream: MediaStream, callId: string) => {
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    });
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        supabase
+          .from('chat_calls')
+          .update({
+            signaling_data: {
+              type: 'candidate',
+              candidate: event.candidate,
+              from: userId
+            }
+          })
+          .eq('id', callId)
+          .then();
+      }
+    };
+
+    pc.ontrack = (event) => {
+      setRemoteStream(event.streams[0]);
+      if (remoteVideoRef.current) remoteVideoRef.current.srcObject = event.streams[0];
+    };
+
+    stream.getTracks().forEach(track => pc.addTrack(track, stream));
+    peerConnectionRef.current = pc;
+
+    return pc;
+  };
+
+  const startCall = async (type: 'audio' | 'video') => {
+    if (!activeRoom || !userId) return;
+
+    const receiverId = participants[activeRoom.id]?.find(p => p.user_id !== userId)?.user_id;
+    if (!receiverId) {
+      toast.error('Nenhum participante encontrado para a chamada');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: type === 'video'
+      });
+      setLocalStream(stream);
+      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+
+      const { data: call, error } = await supabase
+        .from('chat_calls')
+        .insert([{
+          room_id: activeRoom.id,
+          caller_id: userId,
+          receiver_id: receiverId,
+          type,
+          status: 'ringing'
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      setActiveCall(call);
+      setShowCallModal(true);
+      setCallStatus('calling');
+
+      const pc = await setupPeerConnection(stream, call.id);
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      await supabase
+        .from('chat_calls')
+        .update({
+          signaling_data: { type: 'offer', sdp: offer, from: userId }
+        })
+        .eq('id', call.id);
+
+    } catch (error) {
+      console.error('Error starting call:', error);
+      toast.error('Erro ao iniciar chamada');
+    }
+  };
+
+  const acceptCall = async () => {
+    if (!incomingCall || !userId) return;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: incomingCall.type === 'video'
+      });
+      setLocalStream(stream);
+      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+
+      await supabase
+        .from('chat_calls')
+        .update({ status: 'ongoing' })
+        .eq('id', incomingCall.id);
+
+      const pc = await setupPeerConnection(stream, incomingCall.id);
+      
+      if (incomingCall.signaling_data?.type === 'offer') {
+        await pc.setRemoteDescription(new RTCSessionDescription(incomingCall.signaling_data.sdp));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+
+        await supabase
+          .from('chat_calls')
+          .update({
+            signaling_data: { type: 'answer', sdp: answer, from: userId }
+          })
+          .eq('id', incomingCall.id);
+      }
+
+      setActiveCall(incomingCall);
+      setIncomingCall(null);
+      setShowCallModal(true);
+      setCallStatus('connected');
+    } catch (error) {
+      console.error('Error accepting call:', error);
+      toast.error('Erro ao aceitar chamada');
+    }
+  };
+
+  const rejectCall = async () => {
+    if (!incomingCall) return;
+    await supabase
+      .from('chat_calls')
+      .update({ status: 'ended' })
+      .eq('id', incomingCall.id);
+    setIncomingCall(null);
+  };
+
+  const endCall = async () => {
+    const callId = activeCall?.id || incomingCall?.id;
+    if (callId) {
+      await supabase
+        .from('chat_calls')
+        .update({ status: 'ended' })
+        .eq('id', callId);
+    }
+
+    if (localStream) {
+      localStream.getTracks().forEach(track => track.stop());
+      setLocalStream(null);
+    }
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close();
+      peerConnectionRef.current = null;
+    }
+    setActiveCall(null);
+    setIncomingCall(null);
+    setShowCallModal(false);
+    setCallStatus('idle');
+    setRemoteStream(null);
+  };
+
+  // Listen for calls
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel('chat_calls')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'chat_calls'
+      }, async (payload) => {
+        const call = payload.new as any;
+        
+        // Handle incoming call for me
+        if (payload.eventType === 'INSERT' && call.receiver_id === userId && call.status === 'ringing') {
+          // Fetch caller profile
+          const { data: callerProfile } = await supabase
+            .from('user_persona')
+            .select('nome, avatar_url')
+            .eq('id', call.caller_id)
+            .single();
+          
+          setIncomingCall({ ...call, caller_name: callerProfile?.nome || 'Colega', caller_avatar: callerProfile?.avatar_url });
+        } 
+        
+        // Handle updates for calls I'm part of
+        if (payload.eventType === 'UPDATE' && (call.caller_id === userId || call.receiver_id === userId)) {
+          if (call.status === 'ended') {
+            endCall();
+          } else if (call.status === 'ongoing' && call.caller_id === userId) {
+            setCallStatus('connected');
+          }
+          
+          if (call.signaling_data && call.signaling_data.from !== userId) {
+            const pc = peerConnectionRef.current;
+            if (pc) {
+              if (call.signaling_data.type === 'answer') {
+                await pc.setRemoteDescription(new RTCSessionDescription(call.signaling_data.sdp));
+              } else if (call.signaling_data.type === 'candidate') {
+                await pc.addIceCandidate(new RTCIceCandidate(call.signaling_data.candidate));
+              }
+            }
+          }
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
+
+  const toggleMute = () => {
+    if (localStream) {
+      localStream.getAudioTracks().forEach(track => {
+        track.enabled = !track.enabled;
+      });
+      setIsMuted(!isMuted);
+    }
+  };
+
+  const toggleVideo = () => {
+    if (localStream) {
+      localStream.getVideoTracks().forEach(track => {
+        track.enabled = !track.enabled;
+      });
+      setIsVideoOff(!isVideoOff);
     }
   };
 
@@ -1311,201 +1775,255 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
       <div className={`w-full md:w-[350px] border-r border-slate-200 dark:border-white/5 flex flex-col bg-slate-50/50 dark:bg-black/20 ${activeRoom ? 'hidden md:flex' : 'flex'}`}>
         
         {/* SIDEBAR HEADER */}
-        <div className="p-3 md:p-4 flex items-center justify-between bg-white dark:bg-[#1a1a1a] border-b border-slate-200 dark:border-white/5">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow-lg text-sm md:text-base">
-              {userProfile?.persona_data?.nome?.[0] || userName[0]}
+        <div className="p-3 md:p-4 flex flex-col gap-4 bg-white dark:bg-[#1a1a1a] border-b border-slate-200 dark:border-white/5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow-lg text-sm md:text-base">
+                {userProfile?.persona_data?.nome?.[0] || userName[0]}
+              </div>
+              <h2 className="font-black text-slate-900 dark:text-white uppercase tracking-tight text-sm md:text-base">Connect</h2>
             </div>
-            <h2 className="font-black text-slate-900 dark:text-white uppercase tracking-tight text-sm md:text-base">Connect</h2>
+            <div className="flex items-center gap-1">
+              <button 
+                onClick={() => setShowStarredOnly(!showStarredOnly)}
+                className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors ${showStarredOnly ? 'text-yellow-500' : 'text-slate-400'}`}
+                title="Mensagens Favoritas"
+              >
+                <Star size={18} fill={showStarredOnly ? "currentColor" : "none"} />
+              </button>
+              <button 
+                onClick={requestNotificationPermission}
+                className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors ${notificationPermission === 'granted' ? 'text-green-500' : 'text-slate-400'}`}
+                title={notificationPermission === 'granted' ? 'Notificações Ativas' : 'Ativar Notificações'}
+              >
+                {notificationPermission === 'granted' ? <Bell size={18} /> : <BellOff size={18} />}
+              </button>
+              <button 
+                onClick={() => { fetchUsers(); setShowNewChatModal(true); }}
+                className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-blue-600"
+              >
+                <Plus size={20} className="md:w-6 md:h-6" />
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-1">
+
+          <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-2xl">
             <button 
-              onClick={() => setShowStarredOnly(!showStarredOnly)}
-              className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors ${showStarredOnly ? 'text-yellow-500' : 'text-slate-400'}`}
-              title="Mensagens Favoritas"
+              onClick={() => setViewMode('chats')}
+              className={`flex-1 py-2 rounded-xl transition-all flex items-center justify-center gap-2 ${viewMode === 'chats' ? 'bg-white dark:bg-white/10 text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
             >
-              <Star size={18} fill={showStarredOnly ? "currentColor" : "none"} />
+              <MessageSquare size={16} />
+              <span className="text-[10px] font-black uppercase tracking-widest">Conversas</span>
             </button>
             <button 
-              onClick={requestNotificationPermission}
-              className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors ${notificationPermission === 'granted' ? 'text-green-500' : 'text-slate-400'}`}
-              title={notificationPermission === 'granted' ? 'Notificações Ativas' : 'Ativar Notificações'}
+              onClick={() => setViewMode('calls')}
+              className={`flex-1 py-2 rounded-xl transition-all flex items-center justify-center gap-2 ${viewMode === 'calls' ? 'bg-white dark:bg-white/10 text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
             >
-              {notificationPermission === 'granted' ? <Bell size={18} /> : <BellOff size={18} />}
-            </button>
-            <button 
-              onClick={() => { fetchUsers(); setShowNewChatModal(true); }}
-              className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-blue-600"
-            >
-              <Plus size={20} className="md:w-6 md:h-6" />
+              <History size={16} />
+              <span className="text-[10px] font-black uppercase tracking-widest">Chamadas</span>
             </button>
           </div>
         </div>
 
-        {/* SEARCH BAR */}
-        <div className="px-4 pt-4 pb-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input 
-              type="text"
-              placeholder="Pesquisar conversas..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white dark:bg-black/40 border border-slate-200 dark:border-white/5 rounded-xl outline-none focus:border-blue-500 transition-all text-sm"
-            />
-          </div>
-        </div>
-
-        {/* STORIES BAR */}
-        <div className="px-4 py-2 overflow-x-auto flex gap-3 no-scrollbar border-b border-slate-200 dark:border-white/5">
-          <button 
-            onClick={() => setShowCreateStoryModal(true)}
-            className="flex flex-col items-center gap-1 shrink-0"
-          >
-            <div className="w-12 h-12 rounded-full border-2 border-dashed border-slate-300 dark:border-white/20 flex items-center justify-center text-slate-400 hover:border-blue-500 hover:text-blue-500 transition-all">
-              <Plus size={20} />
-            </div>
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Status</span>
-          </button>
-          {stories.map(story => (
-            <button 
-              key={story.id} 
-              onClick={() => { setActiveStory(story); setShowStoryModal(true); }}
-              className="flex flex-col items-center gap-1 shrink-0"
-            >
-              <div className="w-12 h-12 rounded-full border-2 border-blue-500 p-0.5 shadow-sm">
-                <div className="w-full h-full rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center overflow-hidden">
-                  {story.user_avatar ? (
-                    <img src={story.user_avatar} alt={story.user_name} className="w-full h-full object-cover" />
-                  ) : (
-                    <User className="text-slate-400" size={20} />
-                  )}
+        {/* SIDEBAR CONTENT */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col">
+          {viewMode === 'chats' ? (
+            <>
+              {/* SEARCH BAR */}
+              <div className="px-4 pt-4 pb-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input 
+                    type="text"
+                    placeholder="Pesquisar conversas..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 bg-white dark:bg-black/40 border border-slate-200 dark:border-white/5 rounded-xl outline-none focus:border-blue-500 transition-all text-sm"
+                  />
                 </div>
               </div>
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter truncate w-12 text-center">{story.user_name.split(' ')[0]}</span>
-            </button>
-          ))}
-        </div>
 
-        {/* CATEGORY TABS */}
-        <div className="px-4 py-2 flex gap-1 overflow-x-auto no-scrollbar border-b border-slate-200 dark:border-white/5 bg-white/50 dark:bg-black/10">
-          {['Tudo', 'Estudos', 'Estágio', 'Social', 'Privadas'].map((cat: any) => (
-            <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
-              className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeCategory === cat ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'}`}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-
-        {/* CHAT LIST */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center h-full opacity-40">
-              <Loader2 className="animate-spin mb-2" />
-              <p className="text-xs font-bold uppercase tracking-widest">Carregando...</p>
-            </div>
-          ) : filteredRooms.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full opacity-40 p-8 text-center">
-              <MessageSquare size={48} className="mb-4" />
-              <p className="text-sm font-bold uppercase tracking-widest">Nenhuma conversa encontrada</p>
-              <p className="text-xs mt-2">Inicie uma nova conversa clicando no botão +</p>
-            </div>
-          ) : (
-            filteredRooms.map(room => {
-              const chatName = getChatName(room);
-              const avatar = getChatAvatar(room);
-              const unreadCount = participants[room.id]?.find(p => p.user_id === userId)?.unread_count || 0;
-              const typingUser = participants[room.id]?.find(p => p.user_id !== userId && p.is_typing);
-
-              const isPinned = pinnedRooms.includes(room.id);
-
-              return (
-                <div
-                  key={room.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setActiveRoom(room)}
-                  onKeyDown={(e) => e.key === 'Enter' && setActiveRoom(room)}
-                  className={`w-full p-4 flex items-center gap-3 hover:bg-white dark:hover:bg-white/5 transition-all border-l-4 group relative cursor-pointer ${activeRoom?.id === room.id ? 'bg-white dark:bg-white/5 border-blue-500' : 'border-transparent'}`}
+              {/* STORIES BAR */}
+              <div className="px-4 py-2 overflow-x-auto flex gap-3 no-scrollbar border-b border-slate-200 dark:border-white/5">
+                <button 
+                  onClick={() => setShowCreateStoryModal(true)}
+                  className="flex flex-col items-center gap-1 shrink-0"
                 >
-                  <div 
-                    className="w-12 h-12 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center overflow-hidden shrink-0 cursor-pointer"
-                    onClick={(e) => {
-                      if (!room.is_group && onNavigate) {
-                        e.stopPropagation();
-                        const otherId = participants[room.id]?.find(p => p.user_id !== userId)?.user_id;
-                        if (otherId) onNavigate('profile', { userId: otherId });
-                      }
-                    }}
-                  >
-                    {avatar ? (
-                      <img src={avatar} alt={chatName} className="w-full h-full object-cover" />
-                    ) : (
-                      <User className="text-slate-400" size={24} />
-                    )}
+                  <div className="w-12 h-12 rounded-full border-2 border-dashed border-slate-300 dark:border-white/20 flex items-center justify-center text-slate-400 hover:border-blue-500 hover:text-blue-500 transition-all">
+                    <Plus size={20} />
                   </div>
-                  <div className="flex-1 text-left min-w-0">
-                    <div className="flex justify-between items-center mb-1">
-                      <div className="flex items-center gap-2 truncate">
-                        <h4 className="font-bold text-slate-900 dark:text-white truncate">{chatName}</h4>
-                        {isPinned && <Pin size={12} className="text-blue-500 shrink-0" />}
-                      </div>
-                      <span className="text-[10px] text-slate-400">
-                        {room.last_message_at ? new Date(room.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                        {typingUser ? (
-                          <span className="text-blue-500 italic">digitando...</span>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Status</span>
+                </button>
+                {stories.map(story => (
+                  <button 
+                    key={story.id} 
+                    onClick={() => { setActiveStory(story); setShowStoryModal(true); }}
+                    className="flex flex-col items-center gap-1 shrink-0"
+                  >
+                    <div className="w-12 h-12 rounded-full border-2 border-blue-500 p-0.5 shadow-sm">
+                      <div className="w-full h-full rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center overflow-hidden">
+                        {story.user_avatar ? (
+                          <img src={story.user_avatar} alt={story.user_name} className="w-full h-full object-cover" />
                         ) : (
-                          room.last_message || 'Inicie uma conversa'
+                          <User className="text-slate-400" size={20} />
                         )}
-                      </p>
-                      <div className="flex items-center gap-2">
-                        {participants[room.id]?.find(p => p.user_id === userId)?.muted_until && (
-                          <VolumeX size={12} className="text-slate-400" />
-                        )}
-                        {unreadCount > 0 && (
-                          <span className="bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
-                            {unreadCount}
-                          </span>
-                        )}
-                        <div className="relative group/cat">
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); }}
-                            className="p-1 opacity-0 group-hover:opacity-100 hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg transition-all text-slate-400"
-                            title="Mover para categoria"
-                          >
-                            <Folder size={14} />
-                          </button>
-                          <div className="absolute right-0 bottom-full mb-2 w-32 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/5 rounded-xl shadow-2xl opacity-0 invisible group-hover/cat:opacity-100 group-hover/cat:visible transition-all z-50 overflow-hidden">
-                            {['Estudos', 'Estágio', 'Social', 'Privadas'].map(cat => (
-                              <button
-                                key={cat}
-                                onClick={(e) => { e.stopPropagation(); updateChatCategory(room.id, cat as any); }}
-                                className="w-full text-left px-3 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter truncate w-12 text-center">{story.user_name.split(' ')[0]}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* CATEGORY TABS */}
+              <div className="px-4 py-2 flex gap-1 overflow-x-auto no-scrollbar border-b border-slate-200 dark:border-white/5 bg-white/50 dark:bg-black/10">
+                {['Tudo', 'Estudos', 'Estágio', 'Social', 'Privadas'].map((cat: any) => (
+                  <button
+                    key={cat}
+                    onClick={() => setActiveCategory(cat)}
+                    className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeCategory === cat ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'}`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              {/* CHAT LIST */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar">
+                {loading ? (
+                  <div className="flex flex-col items-center justify-center h-full opacity-40">
+                    <Loader2 className="animate-spin mb-2" />
+                    <p className="text-xs font-bold uppercase tracking-widest">Carregando...</p>
+                  </div>
+                ) : filteredRooms.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full opacity-40 p-8 text-center">
+                    <MessageSquare size={48} className="mb-4" />
+                    <p className="text-sm font-bold uppercase tracking-widest">Nenhuma conversa encontrada</p>
+                    <p className="text-xs mt-2">Inicie uma nova conversa clicando no botão +</p>
+                  </div>
+                ) : (
+                  filteredRooms.map(room => {
+                    const chatName = getChatName(room);
+                    const avatar = getChatAvatar(room);
+                    const unreadCount = participants[room.id]?.find(p => p.user_id === userId)?.unread_count || 0;
+                    const typingUser = participants[room.id]?.find(p => p.user_id !== userId && p.is_typing);
+                    const isPinned = pinnedRooms.includes(room.id);
+
+                    return (
+                      <div
+                        key={room.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setActiveRoom(room)}
+                        onKeyDown={(e) => e.key === 'Enter' && setActiveRoom(room)}
+                        className={`w-full p-4 flex items-center gap-3 hover:bg-white dark:hover:bg-white/5 transition-all border-l-4 group relative cursor-pointer ${activeRoom?.id === room.id ? 'bg-white dark:bg-white/5 border-blue-500' : 'border-transparent'}`}
+                      >
+                        <div 
+                          className="w-12 h-12 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center overflow-hidden shrink-0 cursor-pointer"
+                          onClick={(e) => {
+                            if (!room.is_group && onNavigate) {
+                              e.stopPropagation();
+                              const otherId = participants[room.id]?.find(p => p.user_id !== userId)?.user_id;
+                              if (otherId) onNavigate('profile', { userId: otherId });
+                            }
+                          }}
+                        >
+                          {avatar ? (
+                            <img src={avatar} alt={chatName} className="w-full h-full object-cover" />
+                          ) : (
+                            <User className="text-slate-400" size={24} />
+                          )}
+                        </div>
+                        <div className="flex-1 text-left min-w-0">
+                          <div className="flex justify-between items-center mb-1">
+                            <div className="flex items-center gap-2 truncate">
+                              <h4 className="font-bold text-slate-900 dark:text-white truncate">{chatName}</h4>
+                              {isPinned && <Pin size={12} className="text-blue-500 shrink-0" />}
+                            </div>
+                            <span className="text-[10px] text-slate-400">
+                              {room.last_message_at ? new Date(room.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                              {typingUser ? (
+                                <span className="text-blue-500 italic">digitando...</span>
+                              ) : (
+                                room.last_message || 'Inicie uma conversa'
+                              )}
+                            </p>
+                            <div className="flex items-center gap-2">
+                              {participants[room.id]?.find(p => p.user_id === userId)?.muted_until && (
+                                <VolumeX size={12} className="text-slate-400" />
+                              )}
+                              {unreadCount > 0 && (
+                                <span className="bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                                  {unreadCount}
+                                </span>
+                              )}
+                              <button 
+                                onClick={(e) => togglePin(room.id, e)}
+                                className="p-1 opacity-0 group-hover:opacity-100 hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg transition-all"
                               >
-                                {cat}
+                                {isPinned ? <PinOff size={14} className="text-slate-400" /> : <Pin size={14} className="text-slate-400" />}
                               </button>
-                            ))}
+                            </div>
                           </div>
                         </div>
-                        <button 
-                          onClick={(e) => togglePin(room.id, e)}
-                          className="p-1 opacity-0 group-hover:opacity-100 hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg transition-all"
-                        >
-                          {isPinned ? <PinOff size={14} className="text-slate-400" /> : <Pin size={14} className="text-slate-400" />}
-                        </button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="p-4 space-y-4">
+              <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">Chamadas Recentes</h3>
+              {callHistory.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 opacity-40 text-center">
+                  <History size={48} className="mb-4" />
+                  <p className="text-sm font-bold uppercase tracking-widest">Nenhuma chamada</p>
+                </div>
+              ) : (
+                callHistory.map(call => (
+                  <div key={call.id} className="flex items-center justify-between p-3 bg-white dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/5 hover:border-blue-200 transition-all group">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center overflow-hidden shrink-0">
+                        {call.other_avatar ? (
+                          <img src={call.other_avatar} alt={call.other_name} className="w-full h-full object-cover" />
+                        ) : (
+                          <User className="text-slate-400" size={20} />
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-sm text-slate-900 dark:text-white">{call.other_name}</h4>
+                        <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                          {call.caller_id === userId ? (
+                            <Phone size={10} className="text-blue-500" />
+                          ) : (
+                            <Phone size={10} className={call.status === 'ended' ? 'text-green-500' : 'text-red-500'} />
+                          )}
+                          <span>{call.type === 'video' ? 'Vídeo' : 'Áudio'}</span>
+                          <span>•</span>
+                          <span>{new Date(call.created_at).toLocaleDateString()} {new Date(call.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
                       </div>
                     </div>
+                    <button 
+                      onClick={() => {
+                        const room = rooms.find(r => r.id === call.room_id);
+                        if (room) {
+                          setActiveRoom(room);
+                          startCall(call.type as 'audio' | 'video');
+                        }
+                      }}
+                      className="p-2 bg-blue-50 dark:bg-blue-500/10 text-blue-600 rounded-full opacity-0 group-hover:opacity-100 transition-all hover:bg-blue-100"
+                    >
+                      {call.type === 'video' ? <Video size={16} /> : <Phone size={16} />}
+                    </button>
                   </div>
-                </div>
-              );
-            })
+                ))
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -1565,6 +2083,24 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
                 </div>
               </div>
               <div className="flex items-center gap-1">
+                {!activeRoom.is_group && (
+                  <>
+                    <button 
+                      onClick={() => startCall('audio')}
+                      className="p-2 text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-all"
+                      title="Chamada de Áudio"
+                    >
+                      <Phone size={20} />
+                    </button>
+                    <button 
+                      onClick={() => startCall('video')}
+                      className="p-2 text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-all"
+                      title="Chamada de Vídeo"
+                    >
+                      <Video size={20} />
+                    </button>
+                  </>
+                )}
                 <button 
                   onClick={() => setShowInternalSearch(!showInternalSearch)}
                   className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors ${showInternalSearch ? 'text-blue-500 bg-blue-50 dark:bg-blue-500/10' : 'text-slate-400'}`}
@@ -1629,6 +2165,13 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
                   <ImageIcon size={20} />
                 </button>
                 <button 
+                  onClick={() => setShowWallpaperModal(true)}
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-slate-400"
+                  title="Papel de Parede"
+                >
+                  <Palette size={20} />
+                </button>
+                <button 
                   onClick={() => {
                     if (activeRoom.is_group) {
                       setEditingGroupName(activeRoom.name || '');
@@ -1675,18 +2218,34 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
             </AnimatePresence>
 
             {/* MESSAGES AREA */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-slate-50/30 dark:bg-black/40">
-              {messages
-                .filter(msg => {
+            <div 
+              className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar relative"
+              style={{
+                backgroundColor: roomSettings[activeRoom.id]?.background_color || undefined,
+                backgroundImage: roomSettings[activeRoom.id]?.wallpaper_url ? `url(${roomSettings[activeRoom.id].wallpaper_url})` : undefined,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundBlendMode: 'overlay'
+              }}
+            >
+              {/* Overlay for better readability if wallpaper is set */}
+              {roomSettings[activeRoom.id]?.wallpaper_url && (
+                <div className="absolute inset-0 bg-white/30 dark:bg-black/40 pointer-events-none" />
+              )}
+              
+              <div className="relative z-10 space-y-4">
+                {messages
+                  .filter(msg => {
                   const matchesSearch = !internalSearchQuery || msg.content.toLowerCase().includes(internalSearchQuery.toLowerCase());
                   const matchesStarred = showStarredOnly ? starredMessages.includes(msg.id) : true;
-                  return matchesSearch && matchesStarred;
+                  const isExpired = msg.is_vanish && msg.expires_at && new Date(msg.expires_at) < new Date();
+                  return matchesSearch && matchesStarred && !isExpired;
                 })
                 .map((msg, idx) => {
                 const isMe = msg.sender_id === userId;
                 const isDeleted = msg.is_deleted;
                 return (
-                  <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                  <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} relative z-10`}>
                     <div className={`max-w-[70%] group relative ${isMe ? 'items-end' : 'items-start'}`}>
                       
                       {/* MESSAGE OPTIONS (HOVER) */}
@@ -1760,7 +2319,9 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
 
                         {msg.attachment_url && !isDeleted && (
                           <div className="mb-2">
-                            {msg.attachment_type?.startsWith('image/') ? (
+                            {(msg.message_type === 'gif' || msg.message_type === 'sticker') ? (
+                              <img src={msg.attachment_url} alt={msg.message_type === 'gif' ? "GIF" : "Figurinha"} className={`${msg.message_type === 'sticker' ? 'w-32 h-32' : 'max-w-full h-auto'} rounded-lg cursor-pointer hover:opacity-90 transition-opacity`} />
+                            ) : msg.attachment_type?.startsWith('image/') ? (
                               <img src={msg.attachment_url} alt="Anexo" className="rounded-lg max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity" />
                             ) : msg.attachment_type === 'audio' ? (
                               <div className={`p-2 rounded-xl flex items-center gap-3 ${isMe ? 'bg-blue-700/50' : 'bg-slate-100 dark:bg-white/5'}`}>
@@ -1891,6 +2452,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
                           )}
                         </div>
                         <div className={`flex items-center gap-1 mt-1 justify-end ${isMe ? 'text-blue-100' : 'text-slate-400'}`}>
+                          {msg.is_vanish && <Ghost size={10} className="text-blue-400 animate-pulse" />}
                           {msg.is_edited && !isDeleted && <span className="text-[8px] uppercase font-bold mr-1">Editada</span>}
                           <span className="text-[9px]">
                             {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -1941,6 +2503,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
               })}
               <div ref={messagesEndRef} />
             </div>
+          </div>
 
             {/* INPUT AREA */}
             <div className="p-3 md:p-4 bg-white dark:bg-[#1a1a1a] border-t border-slate-200 dark:border-white/5">
@@ -1980,12 +2543,15 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
 
               <div className="flex items-end gap-3 max-w-4xl mx-auto">
                 {isRecording ? (
-                  <div className="flex-1 flex items-center justify-between bg-red-50 dark:bg-red-500/10 p-3 rounded-2xl border border-red-200 dark:border-red-500/20">
-                    <div className="flex items-center gap-3">
+                  <div className="flex-1 flex items-center gap-4 bg-red-50 dark:bg-red-500/10 p-3 rounded-2xl border border-red-200 dark:border-red-500/20">
+                    <div className="flex items-center gap-3 shrink-0">
                       <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                      <span className="text-red-500 font-black text-xs uppercase tracking-widest tabular-nums">Gravando: {formatTime(recordingTime)}</span>
+                      <span className="text-red-500 font-black text-[10px] uppercase tracking-widest tabular-nums">{formatTime(recordingTime)}</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex-1 h-8 bg-black/5 dark:bg-white/5 rounded-lg overflow-hidden">
+                      <canvas ref={canvasRef} width={300} height={32} className="w-full h-full" />
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
                       <button onClick={cancelRecording} className="p-2 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-all">
                         <Trash size={18} />
                       </button>
@@ -1999,6 +2565,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
                     <div className="flex items-center gap-3">
                       <Mic size={18} className="text-blue-500" />
                       <span className="text-blue-500 font-black text-xs uppercase tracking-widest">Áudio Gravado</span>
+                      <audio src={audioUrl} controls className="h-8 max-w-[150px]" />
                     </div>
                     <div className="flex items-center gap-2">
                       <button onClick={() => setAudioUrl(null)} className="p-2 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-all">
@@ -2012,6 +2579,23 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
                 ) : (
                   <>
                     <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => setIsVanishMode(!isVanishMode)}
+                        className={`p-3 rounded-xl transition-all ${isVanishMode ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-indigo-500'}`}
+                        title="Modo Vanish"
+                      >
+                        <Ghost size={20} />
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setShowGifPicker(!showGifPicker);
+                          if (!showGifPicker && gifs.length === 0) searchGifs('');
+                        }}
+                        className={`p-3 rounded-xl transition-all ${showGifPicker ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-blue-600'}`}
+                        title="GIFs"
+                      >
+                        <ImageIcon size={20} />
+                      </button>
                       <div className="relative">
                         <input 
                           type="file" 
@@ -2037,6 +2621,59 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
                     </div>
                     
                     <div className="flex-1 relative">
+                      {/* GIF PICKER POPOVER */}
+                      <AnimatePresence>
+                        {showGifPicker && (
+                          <motion.div 
+                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                            className="absolute bottom-full left-0 mb-4 w-80 h-96 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-[2rem] shadow-2xl z-50 flex flex-col overflow-hidden"
+                          >
+                            <div className="p-4 border-b border-slate-100 dark:border-white/5">
+                              <div className="flex gap-2 mb-3">
+                                <button 
+                                  onClick={() => setGifType('gifs')}
+                                  className={`flex-1 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${gifType === 'gifs' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10'}`}
+                                >
+                                  GIFs
+                                </button>
+                                <button 
+                                  onClick={() => setGifType('stickers')}
+                                  className={`flex-1 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${gifType === 'stickers' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10'}`}
+                                >
+                                  Stickers
+                                </button>
+                              </div>
+                              <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                <input 
+                                  type="text"
+                                  placeholder={`Buscar ${gifType === 'gifs' ? 'GIFs' : 'Stickers'}...`}
+                                  value={gifSearch}
+                                  onChange={(e) => {
+                                    setGifSearch(e.target.value);
+                                    searchGifs(e.target.value);
+                                  }}
+                                  className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/5 rounded-xl outline-none focus:border-blue-500 transition-all text-xs"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-2 grid grid-cols-2 gap-2 custom-scrollbar">
+                              {gifs.map(gif => (
+                                <button 
+                                  key={gif.id}
+                                  onClick={() => sendGif(gif.images.fixed_height.url, gifType === 'gifs' ? 'gif' : 'sticker')}
+                                  className="rounded-lg overflow-hidden hover:scale-105 transition-transform"
+                                >
+                                  <img src={gif.images.fixed_height.url} alt="Media" className="w-full h-24 object-cover" />
+                                </button>
+                              ))}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
                       <textarea 
                         value={newMessage}
                         onChange={(e) => { setNewMessage(e.target.value); handleTyping(); }}
@@ -2082,6 +2719,106 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
           </div>
         )}
       </div>
+
+      {/* WALLPAPER MODAL */}
+      <AnimatePresence>
+        {showWallpaperModal && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white dark:bg-[#1a1a1a] w-full max-w-2xl rounded-[2.5rem] border border-slate-200 dark:border-white/5 shadow-2xl overflow-hidden"
+            >
+              <div className="p-6 border-b border-slate-200 dark:border-white/5 flex items-center justify-between">
+                <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Papel de Parede</h3>
+                <button onClick={() => setShowWallpaperModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-6 overflow-y-auto max-h-[70vh] custom-scrollbar">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* COLORS */}
+                  <div>
+                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">Cores Sólidas</h4>
+                    <div className="grid grid-cols-4 gap-3">
+                      {[
+                        '#f8fafc', '#f1f5f9', '#e2e8f0', '#cbd5e1',
+                        '#fee2e2', '#ffedd5', '#fef9c3', '#dcfce7',
+                        '#d1fae5', '#ccfbf1', '#e0f2fe', '#e0e7ff',
+                        '#f5f3ff', '#fae8ff', '#fce7f3', '#fef2f2'
+                      ].map(color => (
+                        <button
+                          key={color}
+                          onClick={() => {
+                            setSelectedColor(color);
+                            setSelectedWallpaper(null);
+                          }}
+                          className={`w-full aspect-square rounded-xl border-2 transition-all ${selectedColor === color ? 'border-blue-500 scale-110 shadow-lg' : 'border-transparent hover:scale-105'}`}
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* IMAGES */}
+                  <div>
+                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">Imagens de Fundo</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&h=600&fit=crop',
+                        'https://images.unsplash.com/photo-1511497584788-876760111969?w=400&h=600&fit=crop',
+                        'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400&h=600&fit=crop',
+                        'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=400&h=600&fit=crop',
+                        'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=400&h=600&fit=crop',
+                        'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=600&fit=crop'
+                      ].map(url => (
+                        <button
+                          key={url}
+                          onClick={() => {
+                            setSelectedWallpaper(url);
+                            setSelectedColor(null);
+                          }}
+                          className={`w-full aspect-[2/3] rounded-xl overflow-hidden border-2 transition-all ${selectedWallpaper === url ? 'border-blue-500 scale-105 shadow-lg' : 'border-transparent hover:scale-105'}`}
+                        >
+                          <img src={url} alt="Wallpaper" className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="p-6 border-t border-slate-200 dark:border-white/5 flex gap-3">
+                <button 
+                  onClick={() => {
+                    setSelectedColor(null);
+                    setSelectedWallpaper(null);
+                    if (activeRoom) updateWallpaper(activeRoom.id, null, null);
+                    setShowWallpaperModal(false);
+                  }}
+                  className="flex-1 py-3 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-200"
+                >
+                  Remover
+                </button>
+                <button 
+                  onClick={() => {
+                    if (activeRoom) updateWallpaper(activeRoom.id, selectedWallpaper, selectedColor);
+                    setShowWallpaperModal(false);
+                  }}
+                  className="flex-1 py-3 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-blue-600/20 hover:bg-blue-700"
+                >
+                  Aplicar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* NEW CHAT MODAL */}
       <AnimatePresence>
@@ -2661,6 +3398,127 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
                   )}
                 </div>
               </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        {/* INCOMING CALL NOTIFICATION */}
+        <AnimatePresence>
+          {incomingCall && !showCallModal && (
+            <motion.div
+              initial={{ y: -100, opacity: 0 }}
+              animate={{ y: 20, opacity: 1 }}
+              exit={{ y: -100, opacity: 0 }}
+              className="fixed top-0 left-1/2 -translate-x-1/2 z-[100] w-full max-w-sm px-4"
+            >
+              <div className="bg-white dark:bg-[#1a1a1a] p-4 rounded-3xl shadow-2xl border border-slate-200 dark:border-white/5 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center overflow-hidden shrink-0 animate-pulse border-2 border-blue-500/30">
+                  {incomingCall.caller_avatar ? (
+                    <img src={incomingCall.caller_avatar} alt={incomingCall.caller_name} className="w-full h-full object-cover" />
+                  ) : (
+                    incomingCall.type === 'video' ? <Video className="text-blue-600" /> : <Phone className="text-blue-600" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Chamada de {incomingCall.type === 'video' ? 'Vídeo' : 'Áudio'}</p>
+                  <p className="font-bold text-slate-900 dark:text-white truncate">{incomingCall.caller_name}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={rejectCall}
+                    className="p-3 bg-red-100 dark:bg-red-500/20 text-red-600 rounded-full hover:bg-red-200 transition-colors"
+                  >
+                    <PhoneOff size={20} />
+                  </button>
+                  <button 
+                    onClick={acceptCall}
+                    className="p-3 bg-green-100 dark:bg-green-500/20 text-green-600 rounded-full hover:bg-green-200 transition-colors"
+                  >
+                    <Phone size={20} />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* CALL MODAL */}
+        <AnimatePresence>
+          {showCallModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-4 md:p-8"
+            >
+              <div className="relative w-full max-w-4xl aspect-video bg-slate-900 rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10">
+                {/* REMOTE VIDEO */}
+                {remoteStream ? (
+                  <video 
+                    ref={remoteVideoRef}
+                    autoPlay 
+                    playsInline 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-white gap-4">
+                    <div className="w-24 h-24 rounded-full bg-white/10 flex items-center justify-center animate-pulse">
+                      <User size={48} className="text-white/40" />
+                    </div>
+                    <p className="text-sm font-black uppercase tracking-widest text-white/60">
+                      {callStatus === 'calling' ? 'Chamando...' : 'Conectando...'}
+                    </p>
+                  </div>
+                )}
+
+                {/* LOCAL VIDEO (PIP) */}
+                <div className="absolute bottom-6 right-6 w-32 md:w-48 aspect-video bg-black rounded-2xl overflow-hidden border-2 border-white/20 shadow-xl z-10">
+                  {isVideoOff ? (
+                    <div className="w-full h-full flex items-center justify-center bg-slate-800">
+                      <VideoOff size={24} className="text-white/40" />
+                    </div>
+                  ) : (
+                    <video 
+                      ref={localVideoRef}
+                      autoPlay 
+                      muted 
+                      playsInline 
+                      className="w-full h-full object-cover"
+                    />
+                  )}
+                </div>
+
+                {/* CALL CONTROLS */}
+                <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-4 md:gap-6 z-20">
+                  <button 
+                    onClick={toggleMute}
+                    className={`p-4 md:p-5 rounded-full transition-all ${isMuted ? 'bg-red-600 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
+                  >
+                    {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
+                  </button>
+                  
+                  <button 
+                    onClick={endCall}
+                    className="p-5 md:p-6 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-xl shadow-red-600/40 transition-all active:scale-90"
+                  >
+                    <PhoneOff size={32} />
+                  </button>
+
+                  <button 
+                    onClick={toggleVideo}
+                    className={`p-4 md:p-5 rounded-full transition-all ${isVideoOff ? 'bg-red-600 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
+                  >
+                    {isVideoOff ? <VideoOff size={24} /> : <Video size={24} />}
+                  </button>
+                </div>
+
+                {/* CALL INFO */}
+                <div className="absolute top-10 left-10 text-white z-20">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60 mb-1">Chamada em tempo real</p>
+                  <h3 className="text-xl font-black uppercase tracking-tight">
+                    {activeRoom?.name || 'Conversa'}
+                  </h3>
+                </div>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

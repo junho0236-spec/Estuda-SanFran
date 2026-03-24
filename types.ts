@@ -1032,6 +1032,7 @@ export interface ChatMessage {
   reply_to_sender_name?: string;
   is_forwarded?: boolean;
   forwarded_from_name?: string;
+  message_type?: 'text' | 'gif' | 'sticker' | 'audio' | 'file';
   shared_profile_id?: string;
   link_preview?: {
     title?: string;
@@ -1042,6 +1043,8 @@ export interface ChatMessage {
   is_starred?: boolean;
   poll?: ChatPoll;
   updated_at?: string;
+  is_vanish?: boolean;
+  expires_at?: string;
 }
 
 export interface ChatStory {
