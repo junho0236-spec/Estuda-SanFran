@@ -1010,6 +1010,8 @@ export interface ChatRoom {
   last_message_at?: string;
   created_at: string;
   updated_at: string;
+  created_by?: string;
+  avatar_url?: string;
 }
 
 export interface ChatMessage {
@@ -1023,6 +1025,12 @@ export interface ChatMessage {
   attachment_type?: string;
   status: 'sent' | 'delivered' | 'read';
   created_at: string;
+  is_edited?: boolean;
+  is_deleted?: boolean;
+  reply_to_id?: string;
+  reply_to_content?: string;
+  reply_to_sender_name?: string;
+  updated_at?: string;
 }
 
 export interface ChatParticipant {
@@ -1033,6 +1041,7 @@ export interface ChatParticipant {
   user_avatar?: string;
   unread_count: number;
   is_typing: boolean;
+  is_pinned?: boolean;
   last_read_at?: string;
   created_at: string;
 }

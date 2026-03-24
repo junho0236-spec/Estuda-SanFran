@@ -1463,7 +1463,7 @@ const App: React.FC = () => {
                 <Route path={getPathFromView(View.CodeTracker)} element={<CodeTracker userId={session.user.id} />} />
                 <Route path={getPathFromView(View.IracMethod)} element={<IracMethod userId={session.user.id} />} />
                 <Route path={getPathFromView(View.SpacedRepetition)} element={<SpacedRepetition userId={session.user.id} />} />
-                <Route path={getPathFromView(View.Connect)} element={<Connect userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} />} />
+                <Route path={getPathFromView(View.Connect)} element={<Connect userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} onNavigate={setCurrentView} />} />
                 <Route path={getPathFromView(View.Friends)} element={<Friends userId={session.user.id} userName={userProfile?.full_name || session.user.email || 'Usuário'} onNavigate={setCurrentView} />} />
                 <Route path={getPathFromView(View.AttendanceCalculator)} element={<AttendanceCalculator userId={session.user.id} />} />
                 <Route path={getPathFromView(View.SyllabusTracker)} element={<SyllabusTracker userId={session.user.id} />} />
