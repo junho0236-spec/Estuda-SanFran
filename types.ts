@@ -152,6 +152,10 @@ export interface Flashcard {
   source?: string;
   image?: string; // Base64 image data
   total_errors?: number;
+  occlusion_data?: {
+    rects: { x: number; y: number; width: number; height: number; id: string }[];
+    activeRectId?: string;
+  };
 }
 
 export interface Subject {
@@ -224,6 +228,8 @@ export interface Task {
   syllabusLink?: string;
   importantCitations?: string;
   waitingOn?: string;
+  deckId?: string; // Link to a Flashcard Folder/Deck
+  last_activity_at?: string; // For sustainability tracking
   delegatedTo?: string;
   delegatedBy?: string;
   delegatedByName?: string;
@@ -248,6 +254,7 @@ export interface StudySession {
   reading_id?: string;
   task_id?: string;
   rating?: number;
+  cards_reviewed?: number;
 }
 
 export interface Reading {
@@ -275,6 +282,9 @@ export interface RankingEntry {
   total_seconds: number;
   rank_name: string;
   prestigePoints?: number;
+  league_division?: 'Bronze' | 'Prata' | 'Ouro' | 'Diamante';
+  weekly_cards_reviewed?: number;
+  mascot_level?: number;
 }
 
 export interface Note {
@@ -589,6 +599,12 @@ export interface UserProfile {
     completedYesterday: number;
     streak: number;
   };
+  streak_days?: number;
+  last_review_date?: string;
+  league_division?: 'Bronze' | 'Prata' | 'Ouro' | 'Diamante';
+  weekly_cards_reviewed?: number;
+  mascot_level?: number;
+  mascot_xp?: number;
   creditos_aula?: number;
   creditos_trabalho?: number;
   media?: number;

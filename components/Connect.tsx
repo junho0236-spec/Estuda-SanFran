@@ -238,6 +238,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
         priority: 'pendente' as const,
         category: 'geral' as const,
         createdAt: new Date().toISOString(),
+        last_activity_at: new Date().toISOString(),
         userId: userId,
         subtasks: [],
         comments: []

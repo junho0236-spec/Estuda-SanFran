@@ -606,6 +606,132 @@ export const geminiService = {
     });
 
     return JSON.parse(response.text || '{"suggestions": []}');
+  },
+
+  generatePracticalCase: async (subject: string, topic: string) => {
+    const prompt = `
+      Gere um mini-caso prático de Direito (máximo 2-3 linhas) sobre o tema "${topic}" na matéria "${subject}".
+      O caso deve apresentar uma situação fática e perguntar qual seria a decisão fundamentada.
+      
+      Retorne um JSON com:
+      - case: O texto do caso prático
+      - question: A pergunta sobre a decisão
+      - answer: A resposta fundamentada (gabarito)
+    `;
+    const response = await ai.models.generateContent({
+      model: GEMINI_MODEL,
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            case: { type: Type.STRING },
+            question: { type: Type.STRING },
+            answer: { type: Type.STRING }
+          },
+          required: ["case", "question", "answer"]
+        }
+      }
+    });
+    return JSON.parse(response.text || '{}');
+  },
+
+  generateFlashcardFromHighlight: async (text: string) => {
+    const prompt = `
+      Transforme o seguinte trecho de uma nota de estudo em um flashcard (frente e verso):
+      "${text}"
+      
+      O flashcard deve ser conciso e focado no conceito principal.
+      Retorne um JSON com:
+      - front: A pergunta ou conceito
+      - back: A resposta ou explicação
+    `;
+    const response = await ai.models.generateContent({
+      model: FLASH_MODEL,
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            front: { type: Type.STRING },
+            back: { type: Type.STRING }
+          },
+          required: ["front", "back"]
+        }
+      }
+    });
+    return JSON.parse(response.text || '{}');
+  },
+
+  generateClozeCards: async (text: string, count: number = 5) => {
+    const prompt = `
+      Gere ${count} flashcards de preenchimento de lacunas (Cloze) baseados no seguinte texto de lei ou doutrina:
+      "${text}"
+      
+      Para cada card, omita uma palavra ou expressão fundamental usando "[...]".
+      Retorne um JSON com um array de objetos contendo:
+      - front: O texto com a lacuna "[...]"
+      - back: A palavra ou expressão omitida
+      - tags: ["Cloze", "Lei"]
+    `;
+    const response = await ai.models.generateContent({
+      model: GEMINI_MODEL,
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              front: { type: Type.STRING },
+              back: { type: Type.STRING },
+              tags: { type: Type.ARRAY, items: { type: Type.STRING } }
+            },
+            required: ["front", "back", "tags"]
+          }
+        }
+      }
+    });
+    return JSON.parse(response.text || '[]');
+  },
+
+  checkJurisprudence: async (question: string, answer: string) => {
+    const prompt = `
+      Verifique se o seguinte entendimento jurídico ainda é válido de acordo com a jurisprudência atual do STF e STJ:
+      Questão: ${question}
+      Entendimento/Gabarito: ${answer}
+      
+      Pesquise por alterações legislativas recentes ou novos precedentes que possam ter revogado ou modificado este entendimento.
+      Retorne um JSON com:
+      - isValid: boolean
+      - status: "atualizado" | "desatualizado" | "divergente"
+      - explanation: Breve explicação em Markdown citando a fonte (Lei, Informativo, Súmula)
+      - sources: Array de URLs encontradas
+    `;
+    
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            isValid: { type: Type.BOOLEAN },
+            status: { type: Type.STRING },
+            explanation: { type: Type.STRING },
+            sources: { type: Type.ARRAY, items: { type: Type.STRING } }
+          },
+          required: ["isValid", "status", "explanation"]
+        }
+      }
+    });
+    
+    return JSON.parse(response.text || '{}');
   }
 };
 
@@ -621,3 +747,7 @@ export const explainLegalTerm = geminiService.explainLegalTerm;
 export const generateMnemonic = geminiService.generateMnemonic;
 export const extractPrecedent = geminiService.extractPrecedent;
 export const fetchLegalReference = geminiService.fetchLegalReference;
+export const generatePracticalCase = geminiService.generatePracticalCase;
+export const generateFlashcardFromHighlight = geminiService.generateFlashcardFromHighlight;
+export const generateClozeCards = geminiService.generateClozeCards;
+export const checkJurisprudence = geminiService.checkJurisprudence;

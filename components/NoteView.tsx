@@ -4,7 +4,7 @@ import 'quill/dist/quill.snow.css'; // Import Quill styles
 import { ArrowLeft, Save, Loader2, FileText, BrainCircuit, Sparkles, Tag, Split, Download, Gavel, Plus, Trash2, Edit3, Pencil, Archive, Maximize2, Minimize2, Star } from 'lucide-react';
 import { Note, Subject, SubjectFile } from '../types';
 import { dataService } from '../services/dataService';
-import { summarizeText } from '../services/geminiService';
+import { summarizeText, generateFlashcardFromHighlight } from '../services/geminiService';
 import html2pdf from 'html2pdf.js';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { SmartText } from './SmartVadeMecum';
@@ -100,6 +100,13 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   const [isHandwritingOpen, setIsHandwritingOpen] = useState(false);
   const [handwritingData, setHandwritingData] = useState<string | undefined>(undefined);
   const [isOfflineAvailable, setIsOfflineAvailable] = useState(true);
+  
+  // Highlight to Card States
+  const [selectionRange, setSelectionRange] = useState<{ index: number, length: number } | null>(null);
+  const [floatingMenuPos, setFloatingMenuPos] = useState<{ top: number, left: number } | null>(null);
+  const [isGeneratingFlashcard, setIsGeneratingFlashcard] = useState(false);
+  const [showFlashcardModal, setShowFlashcardModal] = useState(false);
+  const [newFlashcardData, setNewFlashcardData] = useState<{ front: string, back: string } | null>(null);
   
   // View Menu States
   const [editMode, setEditMode] = useState<'editing' | 'suggesting' | 'viewing'>('editing');
@@ -233,6 +240,22 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
         quillRef.current.on('text-change', () => {
           const html = node.querySelector('.ql-editor')?.innerHTML || '';
           setNoteContent(html);
+        });
+
+        quillRef.current.on('selection-change', (range: any) => {
+          if (range && range.length > 0) {
+            const bounds = quillRef.current?.getBounds(range.index, range.length);
+            if (bounds) {
+              setSelectionRange(range);
+              setFloatingMenuPos({
+                top: bounds.top - 40,
+                left: bounds.left + bounds.width / 2
+              });
+            }
+          } else {
+            setFloatingMenuPos(null);
+            setSelectionRange(null);
+          }
         });
 
         // Inicializa o conteúdo se já tivermos uma nota selecionada
@@ -695,6 +718,54 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     }
   };
 
+  const handleTransformToFlashcard = async () => {
+    if (!selectionRange || !quillRef.current) return;
+    const selectedText = quillRef.current.getText(selectionRange.index, selectionRange.length);
+    if (!selectedText.trim()) return;
+
+    setIsGeneratingFlashcard(true);
+    try {
+      const card = await generateFlashcardFromHighlight(selectedText);
+      setNewFlashcardData(card);
+      setShowFlashcardModal(true);
+    } catch (error) {
+      console.error("Error generating flashcard from highlight:", error);
+      toast.error("Erro ao gerar flashcard com IA.");
+    } finally {
+      setIsGeneratingFlashcard(false);
+      setFloatingMenuPos(null);
+    }
+  };
+
+  const handleSaveGeneratedFlashcard = async () => {
+    if (!newFlashcardData) return;
+    
+    try {
+      const flashcard = {
+        id: crypto.randomUUID(),
+        user_id: userId,
+        subjectId: selectedSubjectId,
+        front: newFlashcardData.front,
+        back: newFlashcardData.back,
+        status: 'new',
+        nextReview: Date.now(),
+        interval: 0,
+        learningStep: 0,
+        easeFactor: 2.5,
+        tags: ['IA', 'Notas'],
+        created_at: new Date().toISOString()
+      };
+      
+      await dataService.saveFlashcard(flashcard as any, userId, isOnline);
+      toast.success("Flashcard criado e salvo no Anki!");
+      setShowFlashcardModal(false);
+      setNewFlashcardData(null);
+    } catch (error) {
+      console.error("Error saving generated flashcard:", error);
+      toast.error("Erro ao salvar flashcard.");
+    }
+  };
+
   // Color palette for cards
   const cardColors = [
     'bg-rose-50 dark:bg-rose-900/10 border-rose-100 dark:border-rose-900/20 text-rose-600',
@@ -728,6 +799,85 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   return (
     <div className={`flex flex-col animate-in slide-in-from-right-4 duration-500 transition-all duration-500 ${isMaximized ? 'is-maximized fixed inset-0 z-[100] bg-white dark:bg-[#0d0303] h-full' : 'w-full min-h-[calc(100vh-10rem)]'}`}>
       
+      {/* Floating Selection Menu */}
+      {floatingMenuPos && (
+        <div 
+          className="fixed z-[200] flex items-center gap-1 p-1 bg-slate-900 text-white rounded-xl shadow-2xl animate-in zoom-in-95 duration-200"
+          style={{ 
+            top: `${floatingMenuPos.top}px`, 
+            left: `${floatingMenuPos.left}px`,
+            transform: 'translateX(-50%)'
+          }}
+        >
+          <button 
+            onClick={handleTransformToFlashcard}
+            disabled={isGeneratingFlashcard}
+            className="flex items-center gap-2 px-3 py-1.5 hover:bg-white/10 rounded-lg transition-colors disabled:opacity-50"
+          >
+            {isGeneratingFlashcard ? <Loader2 size={14} className="animate-spin" /> : <BrainCircuit size={14} />}
+            <span className="text-[10px] font-bold whitespace-nowrap">Transformar em Flashcard</span>
+          </button>
+        </div>
+      )}
+
+      {/* Flashcard Confirmation Modal */}
+      {showFlashcardModal && newFlashcardData && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10 animate-in slide-in-from-bottom-8 duration-500">
+            <div className="p-8 space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-2xl flex items-center justify-center">
+                    <Sparkles className="text-purple-600" size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Flashcard Gerado</h3>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Confira e salve no seu Anki</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowFlashcardModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
+                  <X size={20} className="text-slate-400" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Frente (Pergunta)</label>
+                  <textarea 
+                    value={newFlashcardData.front}
+                    onChange={(e) => setNewFlashcardData({...newFlashcardData, front: e.target.value})}
+                    className="w-full p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-purple-500 transition-all min-h-[80px]"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Verso (Resposta)</label>
+                  <textarea 
+                    value={newFlashcardData.back}
+                    onChange={(e) => setNewFlashcardData({...newFlashcardData, back: e.target.value})}
+                    className="w-full p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-purple-500 transition-all min-h-[120px]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button 
+                  onClick={handleSaveGeneratedFlashcard}
+                  className="flex-1 py-4 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-purple-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  Salvar no Anki
+                </button>
+                <button 
+                  onClick={() => setShowFlashcardModal(false)}
+                  className="px-8 py-4 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 rounded-2xl font-black uppercase tracking-widest transition-all hover:bg-slate-200"
+                >
+                  Descartar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Editorial Header */}
       <header className={`relative border-b border-slate-100 dark:border-white/5 transition-all ${isMaximized ? 'py-2 px-4 mb-0 bg-slate-50 dark:bg-white/5' : 'py-4 px-6 mb-6 bg-white dark:bg-white/2'}`}>
         <div className={`flex flex-col lg:flex-row lg:items-center justify-between ${isMaximized ? 'gap-2' : 'gap-4'}`}>

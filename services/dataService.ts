@@ -108,12 +108,24 @@ export const dataService = {
         interests: sanitized.interests || [],
         academic_background: sanitized.academic_background || [],
         visible_modules: sanitized.visible_modules || ['jornada', 'grade', 'evolucao', 'mural', 'lideranca', 'conexoes'],
-        prestigePoints: sanitized.prestigePoints || 0
+        prestigePoints: sanitized.prestigePoints || 0,
+        streak_days: sanitized.streak_days || 0,
+        last_review_date: sanitized.last_review_date || null,
+        league_division: sanitized.league_division || 'Bronze',
+        weekly_cards_reviewed: sanitized.weekly_cards_reviewed || 0,
+        mascot_level: sanitized.mascot_level || 1,
+        mascot_xp: sanitized.mascot_xp || 0
       },
       profile_completion: sanitized.arcadia_score || 0,
       full_name: sanitized.full_name || null,
       bio: sanitized.bio || null,
       avatar_url: sanitized.avatar_url || null,
+      streak_days: sanitized.streak_days || 0,
+      last_review_date: sanitized.last_review_date || null,
+      league_division: sanitized.league_division || 'Bronze',
+      weekly_cards_reviewed: sanitized.weekly_cards_reviewed || 0,
+      mascot_level: sanitized.mascot_level || 1,
+      mascot_xp: sanitized.mascot_xp || 0,
       turma_ano: sanitized.turma_ano || null,
       turma: Number(sanitized.turma) || null,
       sala: sanitized.sala || null,
@@ -446,7 +458,8 @@ export const dataService = {
           parentTaskId: task.parentTaskId,
           dependencies: task.dependencies,
           storyPoints: task.storyPoints,
-          comments: task.comments
+          comments: task.comments,
+          last_activity_at: task.last_activity_at
         })
       };
 
@@ -497,7 +510,8 @@ export const dataService = {
             parentTaskId: desc.parentTaskId,
             dependencies: desc.dependencies,
             storyPoints: desc.storyPoints,
-            comments: desc.comments || []
+            comments: desc.comments || [],
+            last_activity_at: desc.last_activity_at
           };
         });
         await db.tasks.bulkPut(mappedTasks);
@@ -698,6 +712,7 @@ export const dataService = {
     if (isOnline) {
       const { error } = await supabase.from('study_sessions').insert({
         ...session,
+        cards_reviewed: session.cards_reviewed || 0,
         user_id: userId
       });
       if (error) {

@@ -10,9 +10,20 @@ interface DuelArenaProps {
   userId: string;
   onFinished: () => void;
   onCorrectAnswer?: () => void;
+  userProfile?: UserProfile | null;
+  setUserProfile?: React.Dispatch<React.SetStateAction<UserProfile | null>>;
+  isOnline?: boolean;
 }
 
-const DuelArena: React.FC<DuelArenaProps> = ({ duel: initialDuel, userId, onFinished, onCorrectAnswer }) => {
+const DuelArena: React.FC<DuelArenaProps> = ({ 
+  duel: initialDuel, 
+  userId, 
+  onFinished, 
+  onCorrectAnswer,
+  userProfile,
+  setUserProfile,
+  isOnline = true
+}) => {
   const [duel, setDuel] = useState<Duel>(initialDuel);
   const [timeLeft, setTimeLeft] = useState(15);
   const [answered, setAnswered] = useState(false);
@@ -90,8 +101,41 @@ const DuelArena: React.FC<DuelArenaProps> = ({ duel: initialDuel, userId, onFini
   };
 
   useEffect(() => {
-    if (duel.status === 'finished' && duel.winner_id === userId) {
-      confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+    if (duel.status === 'finished') {
+      const amIWinner = duel.winner_id === userId;
+      const isDraw = !duel.winner_id;
+      
+      if (amIWinner) {
+        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+      }
+
+      // Update User Profile (Gamification)
+      if (userProfile && setUserProfile) {
+        const xpGain = amIWinner ? 50 : (isDraw ? 25 : 10);
+        const prestigeGain = amIWinner ? 10 : (isDraw ? 5 : 2);
+        
+        const newXp = (userProfile.mascot_xp || 0) + xpGain;
+        const newPrestige = (userProfile.prestigePoints || 0) + prestigeGain;
+
+        // Mascot Level Logic
+        let newLevel = userProfile.mascot_level || 1;
+        if (newXp >= 4000) newLevel = 5;
+        else if (newXp >= 1500) newLevel = 4;
+        else if (newXp >= 500) newLevel = 3;
+        else if (newXp >= 100) newLevel = 2;
+
+        const updatedProfile = {
+          ...userProfile,
+          mascot_xp: newXp,
+          mascot_level: newLevel,
+          prestigePoints: newPrestige
+        };
+
+        setUserProfile(updatedProfile);
+        import('../services/dataService').then(m => {
+          m.dataService.saveUserProfile(updatedProfile, userId, isOnline);
+        });
+      }
     }
   }, [duel.status, duel.winner_id, userId]);
 

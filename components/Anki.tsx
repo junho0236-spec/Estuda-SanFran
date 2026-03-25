@@ -48,6 +48,10 @@ import {
   List,
   Play,
   Pause,
+  AlertTriangle,
+  ExternalLink,
+  Edit3,
+  CheckCircle2,
   Settings2,
   Activity,
   Volume2,
@@ -56,7 +60,6 @@ import {
   ShieldCheck,
   Eye,
   AlertCircle,
-  CheckCircle2,
   Info,
   Circle,
   ArrowRight,
@@ -73,16 +76,26 @@ import {
   GraduationCap,
   Landmark,
   Library,
-  Timer
+  Timer,
+  Mic
 } from 'lucide-react';
 import JSZip from 'jszip';
 import { Flashcard, Subject, Folder, DeckRequest, StudySession, GlossaryTerm } from '../types';
 import { supabase } from '../services/supabaseClient';
 import { dataService } from '../services/dataService';
 import { updateQuestProgress } from '../services/questService';
-import { generateFlashcards, generateFlashcardsStream, evaluateDissertativeAnswer, fetchTermDefinition } from '../services/geminiService';
+import { 
+  generateFlashcards, 
+  generateFlashcardsStream, 
+  evaluateDissertativeAnswer, 
+  fetchTermDefinition, 
+  generateMnemonic,
+  generatePracticalCase,
+  generateFlashcardFromHighlight,
+  generateClozeCards,
+  checkJurisprudence
+} from '../services/geminiService';
 import { SmartText } from './SmartVadeMecum';
-import { GlossaryText } from './GlossaryText.tsx';
 import { GlossaryPopover } from './GlossaryPopover.tsx';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
@@ -108,6 +121,8 @@ interface AnkiProps {
   setInitialText: React.Dispatch<React.SetStateAction<string | null>>;
   setStudySessions?: React.Dispatch<React.SetStateAction<any[]>>;
   isLoadingFlashcards?: boolean;
+  userProfile?: UserProfile | null;
+  setUserProfile?: React.Dispatch<React.SetStateAction<UserProfile | null>>;
 }
 
 const FOLDER_COLORS = [
@@ -135,7 +150,105 @@ const FOLDER_ICONS = [
   { name: 'Documento', value: 'document', icon: FileText }
 ];
 
-const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folders, setFolders, userId, isOnline, initialText, setInitialText, setStudySessions, isLoadingFlashcards }) => {
+const MascotEvolution = ({ level, xp }: { level: number, xp: number }) => {
+  const mascotStates = [
+    { title: 'Estagiário', icon: '👶', description: 'Começando a jornada jurídica.', range: '0-100 XP' },
+    { title: 'Advogado', icon: '⚖️', description: 'Já domina os prazos e petições.', range: '100-500 XP' },
+    { title: 'Procurador', icon: '🏛️', description: 'Defendendo o interesse público.', range: '500-1500 XP' },
+    { title: 'Juiz', icon: '👨‍⚖️', description: 'Decidindo o destino das lides.', range: '1500-4000 XP' },
+    { title: 'Ministro', icon: '👑', description: 'O ápice da carreira jurídica.', range: '4000+ XP' }
+  ];
+
+  const currentMascot = mascotStates[level - 1] || mascotStates[0];
+  const nextXp = level === 1 ? 100 : (level === 2 ? 500 : (level === 3 ? 1500 : 4000));
+  const progress = Math.min(100, (xp / nextXp) * 100);
+
+  return (
+    <div className="bg-white dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4">
+      <div className="w-16 h-16 bg-sanfran-rubi/10 rounded-full flex items-center justify-center text-3xl animate-bounce">
+        {currentMascot.icon}
+      </div>
+      <div className="flex-1">
+        <div className="flex items-center justify-between mb-1">
+          <h4 className="font-black text-slate-800 dark:text-white uppercase text-xs tracking-widest">{currentMascot.title}</h4>
+          <span className="text-[10px] font-bold text-sanfran-rubi">{xp} XP</span>
+        </div>
+        <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+          <motion.div 
+            initial={{ width: 0 }}
+            animate={{ width: `${progress}%` }}
+            className="h-full bg-sanfran-rubi"
+          />
+        </div>
+        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 italic">{currentMascot.description}</p>
+      </div>
+    </div>
+  );
+};
+
+const LeagueProgress = ({ division, weeklyCards }: { division: string, weeklyCards: number }) => {
+  const divisions = [
+    { name: 'Bronze', color: 'text-orange-600', bg: 'bg-orange-100', min: 0 },
+    { name: 'Prata', color: 'text-slate-400', bg: 'bg-slate-100', min: 100 },
+    { name: 'Ouro', color: 'text-usp-gold', bg: 'bg-yellow-100', min: 300 },
+    { name: 'Diamante', color: 'text-blue-500', bg: 'bg-blue-100', min: 700 }
+  ];
+
+  const currentDiv = divisions.find(d => d.name === division) || divisions[0];
+  const nextDiv = divisions[divisions.indexOf(currentDiv) + 1];
+  const progress = nextDiv ? Math.min(100, (weeklyCards / nextDiv.min) * 100) : 100;
+
+  return (
+    <div className="bg-white dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className={`p-2 ${currentDiv.bg} rounded-lg ${currentDiv.color}`}>
+            <Trophy className="w-4 h-4" />
+          </div>
+          <div>
+            <h4 className="font-black text-slate-800 dark:text-white uppercase text-[10px] tracking-widest">Liga Semanal</h4>
+            <span className={`text-xs font-bold ${currentDiv.color}`}>{currentDiv.name}</span>
+          </div>
+        </div>
+        <div className="text-right">
+          <span className="text-lg font-black text-slate-800 dark:text-white">{weeklyCards}</span>
+          <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">Cards Revisados</p>
+        </div>
+      </div>
+      {nextDiv && (
+        <div className="space-y-1">
+          <div className="flex justify-between text-[8px] font-bold text-slate-400 uppercase">
+            <span>Progresso para {nextDiv.name}</span>
+            <span>{Math.round(progress)}%</span>
+          </div>
+          <div className="h-1 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+            <motion.div 
+              initial={{ width: 0 }}
+              animate={{ width: `${progress}%` }}
+              className={`h-full ${currentDiv.color.replace('text', 'bg')}`}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const Anki: React.FC<AnkiProps> = ({ 
+  subjects, 
+  flashcards, 
+  setFlashcards, 
+  folders, 
+  setFolders, 
+  userId, 
+  isOnline, 
+  initialText, 
+  setInitialText, 
+  setStudySessions, 
+  isLoadingFlashcards,
+  userProfile,
+  setUserProfile
+}) => {
   const location = useLocation();
   const { state } = location;
 
@@ -152,13 +265,87 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [bulkInput, setBulkInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Glossary States
+  // White Noise Audio Handler
+  useEffect(() => {
+    if (whiteNoiseType !== 'none' && mode === 'study') {
+      const audioUrls = {
+        rain: 'https://www.soundjay.com/nature/rain-01.mp3',
+        waves: 'https://www.soundjay.com/nature/ocean-waves-1.mp3',
+        static: 'https://www.soundjay.com/misc/white-noise-01.mp3'
+      };
+      
+      if (!audioRef.current) {
+        audioRef.current = new Audio(audioUrls[whiteNoiseType as keyof typeof audioUrls]);
+        audioRef.current.loop = true;
+      } else {
+        audioRef.current.src = audioUrls[whiteNoiseType as keyof typeof audioUrls];
+      }
+      
+      audioRef.current.play().catch(e => console.error("Audio play failed:", e));
+    } else {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+    }
+    
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+    };
+  }, [whiteNoiseType, mode]);
   const [activeGlossaryTerm, setActiveGlossaryTerm] = useState<string | null>(null);
   const [glossaryData, setGlossaryData] = useState<GlossaryTerm | null>(null);
   const [glossaryPosition, setGlossaryPosition] = useState({ x: 0, y: 0 });
   const [isLoadingGlossary, setIsLoadingGlossary] = useState(false);
 
-  const handleTermClick = async (term: string, position: { x: number; y: number }) => {
+  const handleSemanticSearch = async () => {
+    if (!semanticSearchQuery.trim()) return;
+    
+    setIsSemanticSearching(true);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const prompt = `Você é um especialista em Direito. O usuário está pesquisando por: "${semanticSearchQuery}". 
+      Retorne uma lista de 5 a 10 termos jurídicos estritamente relacionados, sinônimos ou conceitos que abrangem essa pesquisa (ex: se pesquisar "prisão preventiva", inclua "medidas cautelares", "periculum libertatis", "prisão cautelar").
+      Retorne APENAS os termos separados por vírgula, sem explicações.`;
+      
+      const response = await ai.models.generateContent({
+        model: GEMINI_MODEL,
+        contents: prompt
+      });
+      
+      const relatedTerms = response.text?.split(',').map(t => t.trim().toLowerCase()) || [];
+      setSearchQuery(semanticSearchQuery + ' ' + relatedTerms.join(' '));
+      showToast("Busca semântica concluída! Termos relacionados incluídos.", "success");
+    } catch (error) {
+      console.error("Semantic search failed:", error);
+      showToast("Erro na busca semântica. Tente novamente.", "error");
+    } finally {
+      setIsSemanticSearching(false);
+    }
+  };
+
+  const insertTableTemplate = () => {
+    const template = `
+| Conceito A | Conceito B |
+| :--- | :--- |
+| Diferença 1 | Diferença 1 |
+| Diferença 2 | Diferença 2 |
+`;
+    setManualBack(prev => prev + template);
+  };
+
+  const insertDiagramTemplate = () => {
+    const template = `
+\`\`\`mermaid
+graph TD
+    A[Início] --> B{Condição}
+    B -- Sim --> C[Resultado 1]
+    B -- Não --> D[Resultado 2]
+\`\`\`
+`;
+    setManualBack(prev => prev + template);
+  };
     setActiveGlossaryTerm(term);
     setGlossaryPosition(position);
     setIsLoadingGlossary(true);
@@ -174,6 +361,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     }
   };
   const [isFlipped, setIsFlipped] = useState(false);
+  const [sessionCardsReviewed, setSessionCardsReviewed] = useState(0);
   const [manualFront, setManualFront] = useState('');
   const [manualBack, setManualBack] = useState('');
   const [manualNotes, setManualNotes] = useState('');
@@ -282,9 +470,56 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [isCramMode, setIsCramMode] = useState(false);
   const [isAdvanceMode, setIsAdvanceMode] = useState(false);
   const [isAudioMode, setIsAudioMode] = useState(false);
+  const [isPodcastMode, setIsPodcastMode] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+
+  // Podcast Mode Voice Commands
+  useEffect(() => {
+    if (!isPodcastMode) return;
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      showToast("Seu navegador não suporta comandos de voz.", "error");
+      setIsPodcastMode(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'pt-BR';
+    recognition.continuous = true;
+    recognition.interimResults = false;
+
+    recognition.onresult = (event: any) => {
+      const last = event.results.length - 1;
+      const command = event.results[last][0].transcript.toLowerCase().trim();
+      
+      console.log("Voice Command:", command);
+      
+      if (command.includes('mostrar') || command.includes('virar') || command.includes('ver')) {
+        setIsFlipped(true);
+      } else if (isFlipped) {
+        if (command.includes('fácil') || command.includes('facil')) handleReview(5);
+        else if (command.includes('bom') || command.includes('boa')) handleReview(3);
+        else if (command.includes('difícil') || command.includes('dificil')) handleReview(2);
+        else if (command.includes('errei') || command.includes('novamente')) handleReview(0);
+      }
+    };
+
+    recognition.start();
+    return () => recognition.stop();
+  }, [isPodcastMode, isFlipped]);
   const [audioSpeed, setAudioSpeed] = useState(1);
+  const [isImageOcclusionMode, setIsImageOcclusionMode] = useState(false);
+  const [occlusionRects, setOcclusionRects] = useState<{ x: number; y: number; width: number; height: number; id: string }[]>([]);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [startPos, setStartPos] = useState({ x: 0, y: 0 });
+  const imageRef = useRef<HTMLImageElement>(null);
   const [isFocusMode, setIsFocusMode] = useState(false);
+  const [isExtremeFocus, setIsExtremeFocus] = useState(false);
+  const [whiteNoiseType, setWhiteNoiseType] = useState<'none' | 'rain' | 'waves' | 'static'>('none');
+  const [semanticSearchQuery, setSemanticSearchQuery] = useState('');
+  const [isSemanticSearching, setIsSemanticSearching] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [cardTimer, setCardTimer] = useState(0);
   const [cardStartTime, setCardStartTime] = useState(Date.now());
 
@@ -296,6 +531,105 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [followUpInput, setFollowUpInput] = useState('');
   const [isFollowUpLoading, setIsFollowUpLoading] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
+  const [isHeatMode, setIsHeatMode] = useState(false);
+  const [ankiGoal, setAnkiGoal] = useState<'retention' | 'balanced' | 'economy'>('balanced');
+  const [isJurisprudenceLoading, setIsJurisprudenceLoading] = useState(false);
+  const [jurisprudenceResult, setJurisprudenceResult] = useState<any>(null);
+  const [showJurisprudenceModal, setShowJurisprudenceModal] = useState(false);
+  const [isGeneratingCloze, setIsGeneratingCloze] = useState(false);
+  const [isGeneratingMnemonic, setIsGeneratingMnemonic] = useState(false);
+  const [generatedMnemonic, setGeneratedMnemonic] = useState<any>(null);
+  const [showMnemonicModal, setShowMnemonicModal] = useState(false);
+
+  // Practical Case Mode States
+  const [isPracticalCaseMode, setIsPracticalCaseMode] = useState(false);
+  const [isGeneratingPracticalCase, setIsGeneratingPracticalCase] = useState(false);
+  const [practicalCaseData, setPracticalCaseData] = useState<{ case: string, question: string, answer: string } | null>(null);
+  const [showPracticalCaseModal, setShowPracticalCaseModal] = useState(false);
+
+  const handleGenerateMnemonic = async () => {
+    if (!currentCard) return;
+    setIsGeneratingMnemonic(true);
+    setShowMnemonicModal(true);
+    try {
+      const requirements = `Crie um mnemônico para este conteúdo jurídico: Pergunta: ${currentCard.front} | Resposta: ${currentCard.back}. O mnemônico deve ser engraçado ou marcante para facilitar a memorização.`;
+      const mnemonic = await generateMnemonic(requirements);
+      setGeneratedMnemonic(mnemonic);
+    } catch (err) {
+      console.error("Erro ao gerar mnemônico:", err);
+      showToast("Erro ao gerar mnemônico. Tente novamente.", "error");
+    } finally {
+      setIsGeneratingMnemonic(false);
+    }
+  };
+
+  const handleGeneratePracticalCase = async () => {
+    if (!currentCard) return;
+    setIsGeneratingPracticalCase(true);
+    setShowPracticalCaseModal(true);
+    try {
+      const subject = subjects.find(s => s.id === currentCard.subjectId)?.name || 'Direito';
+      const topic = currentCard.front;
+      const caseData = await generatePracticalCase(subject, topic);
+      setPracticalCaseData(caseData);
+    } catch (err) {
+      console.error("Erro ao gerar caso prático:", err);
+      showToast("Erro ao gerar caso prático. Tente novamente.", "error");
+    } finally {
+      setIsGeneratingPracticalCase(false);
+    }
+  };
+
+  const handleCheckJurisprudence = async () => {
+    if (!currentCard) return;
+    setIsJurisprudenceLoading(true);
+    setShowJurisprudenceModal(true);
+    try {
+      const result = await checkJurisprudence(currentCard.front, currentCard.back);
+      setJurisprudenceResult(result);
+    } catch (err) {
+      console.error("Erro ao verificar jurisprudência:", err);
+      showToast("Erro ao verificar jurisprudência. Tente novamente.", "error");
+    } finally {
+      setIsJurisprudenceLoading(false);
+    }
+  };
+
+  const handleGenerateCloze = async (text: string) => {
+    if (!text.trim()) return;
+    setIsGeneratingCloze(true);
+    try {
+      const cards = await generateClozeCards(text, 5);
+      const newCards = cards.map((c: any) => ({
+        id: crypto.randomUUID(),
+        user_id: userId,
+        subjectId: selectedSubjectId,
+        folderId: currentFolderId,
+        front: c.front,
+        back: c.back,
+        status: 'new',
+        nextReview: Date.now(),
+        interval: 0,
+        learningStep: 0,
+        easeFactor: 2.5,
+        tags: c.tags || ['Cloze', 'IA'],
+        created_at: new Date().toISOString()
+      }));
+      
+      for (const card of newCards) {
+        await dataService.saveFlashcard(card, userId, isOnline);
+      }
+      
+      setFlashcards(prev => [...newCards, ...prev]);
+      showToast("5 cards de lacuna gerados com sucesso!", "success");
+      setMode('browse');
+    } catch (err) {
+      console.error("Erro ao gerar cards de lacuna:", err);
+      showToast("Erro ao gerar cards de lacuna.", "error");
+    } finally {
+      setIsGeneratingCloze(false);
+    }
+  };
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
   
   const dragX = useMotionValue(0);
@@ -396,6 +730,13 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         if (e.key === '2') handleReview(2);
         if (e.key === '3') handleReview(3);
         if (e.key === '4') handleReview(5);
+      }
+
+      // Podcast Mode Toggle
+      if (e.code === 'KeyP') {
+        e.preventDefault();
+        setIsPodcastMode(prev => !prev);
+        showToast(isPodcastMode ? "Modo Podcast Desativado" : "Modo Podcast Ativado", "info");
       }
 
       // Enter for next in Cram Mode (if flipped)
@@ -1255,6 +1596,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setManualBack(''); 
       setManualNotes('');
       setManualImage(null);
+      setOcclusionRects([]);
+      setIsImageOcclusionMode(false);
     } catch (err: any) { 
       console.error("Erro ao criar flashcard:", err);
       showToast(`Erro ao protocolar card: ${err.message || "Tente novamente."}`, "error");
@@ -1401,7 +1744,10 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     const mastery = folderCards.length > 0 ? Math.round((matureCards / folderCards.length) * 100) : 0;
     const totalCount = folderCards.length;
     
-    return { newCount, learningCount, reviewCount, mastery, totalCount };
+    // Heat score: percentage of cards that are due for review
+    const heatScore = totalCount > 0 ? (reviewCount / totalCount) : 0;
+    
+    return { newCount, learningCount, reviewCount, mastery, totalCount, heatScore };
   };
 
   useEffect(() => {
@@ -1427,11 +1773,32 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     fetchStudyHistory();
   }, [userId]);
 
-  const currentFolders = (folders || []).filter(f => f.parentId === currentFolderId);
+  const currentFolders = useMemo(() => {
+    let list = (folders || []).filter(f => f.parentId === currentFolderId);
+    
+    if (isHeatMode) {
+      // Sort by heat score (descending)
+      return [...list].sort((a, b) => {
+        const statsA = getFolderStats(a.id);
+        const statsB = getFolderStats(b.id);
+        return statsB.heatScore - statsA.heatScore;
+      });
+    }
+    
+    return list;
+  }, [folders, currentFolderId, isHeatMode, activeFlashcards]);
+
   const currentContextIds = useMemo(() => getSubfolderIds(currentFolderId), [currentFolderId, folders]);
   
   const reviewQueue = useMemo(() => {
     return studyableFlashcards.filter(f => {
+      // Heat Mode: prioritize cards with errors in the last 7 days
+      // Since we don't have a precise 'last_error_at', we filter by total_errors > 0
+      // and ignore the normal due date if in Heat Mode to prioritize them.
+      if (isHeatMode) {
+        return f.total_errors > 0;
+      }
+
       const isDue = f.nextReview <= currentTime;
       const tomorrowEnd = currentTime + 24 * 60 * 60 * 1000;
       const isDueTomorrow = f.nextReview <= tomorrowEnd;
@@ -1455,6 +1822,10 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       // Otherwise, use the current folder context
       return (currentFolderId === null ? true : currentContextIds.includes(f.folderId as string));
     }).sort((a, b) => {
+      if (isHeatMode) {
+        // Sort by total_errors descending
+        return (b.total_errors || 0) - (a.total_errors || 0);
+      }
       if (isCramMode) return Math.random() - 0.5; // Randomize in cram mode
       
       const getPriority = (card: Flashcard) => {
@@ -1474,7 +1845,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       // Within same priority, sort by nextReview (oldest first)
       return a.nextReview - b.nextReview;
     });
-  }, [studyableFlashcards, currentTime, isCramMode, selectedFolderIdsForSession, currentFolderId, currentContextIds, folders]);
+  }, [studyableFlashcards, currentTime, isCramMode, selectedFolderIdsForSession, currentFolderId, currentContextIds, folders, isHeatMode, isAdvanceMode]);
 
   const stats = useMemo(() => {
     const dates = Object.keys(studyHistory).sort();
@@ -1818,7 +2189,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
           correct: prev[statusGroup].correct + (isCorrect ? 1 : 0),
           totalTimeMs: prev[statusGroup].totalTimeMs + timeMs
         },
-        cardTimes: [...prev.cardTimes, { card, timeMs }]
+        cardTimes: [...prev.cardTimes, { card, timeMs }],
+        total_reviews: (prev as any).total_reviews ? (prev as any).total_reviews + 1 : 1
       };
       
       if (isError) {
@@ -1837,6 +2209,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     let newEaseFactor = card.easeFactor || 2.5;
     let offsetMinutes = 0;
     let offsetDays = 0;
+
+    const goalMultiplier = ankiGoal === 'retention' ? 0.8 : ankiGoal === 'economy' ? 1.5 : 1.0;
 
     let newTotalErrors = card.total_errors || 0;
     if (quality === 0) {
@@ -1862,14 +2236,14 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
           newStatus = 'learning';
           offsetMinutes = 10;
         } else {
-          newInterval = 1; // days
+          newInterval = Math.max(1, Math.ceil(1 * goalMultiplier)); // days
           newStatus = 'review';
-          offsetDays = 1;
+          offsetDays = newInterval;
         }
       } else if (quality === 5) { // Easy
-        newInterval = 4; // days
+        newInterval = Math.max(1, Math.ceil(4 * goalMultiplier)); // days
         newStatus = 'review';
-        offsetDays = 4;
+        offsetDays = newInterval;
       }
     } else if (newStatus === 'review') {
       if (quality === 0) { // Again
@@ -1879,14 +2253,14 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         offsetMinutes = 10;
       } else if (quality === 2) { // Hard
         newEaseFactor = Math.max(1.3, newEaseFactor - 0.15);
-        newInterval = Math.max(1, Math.ceil(newInterval * 1.2)); // days
+        newInterval = Math.max(1, Math.ceil(newInterval * 1.2 * goalMultiplier)); // days
         offsetDays = newInterval;
       } else if (quality === 3) { // Good
-        newInterval = Math.max(1, Math.ceil(newInterval * newEaseFactor)); // days
+        newInterval = Math.max(1, Math.ceil(newInterval * newEaseFactor * goalMultiplier)); // days
         offsetDays = newInterval;
       } else if (quality === 5) { // Easy
         newEaseFactor = newEaseFactor + 0.15;
-        newInterval = Math.max(1, Math.ceil(newInterval * newEaseFactor * 1.3)); // days
+        newInterval = Math.max(1, Math.ceil(newInterval * newEaseFactor * 1.3 * goalMultiplier)); // days
         offsetDays = newInterval;
       }
     } else if (newStatus === 'relearning') {
@@ -1944,6 +2318,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       return { new: newCount, pending: pendingCount, completed: completedCount };
     });
 
+    setSessionCardsReviewed(prev => prev + 1);
+
     try {
       const updatedCard = { 
         ...card, 
@@ -1968,9 +2344,64 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         duration: cardTimer,
         subject_id: card.subjectId,
         folder_id: card.folderId,
-        rating: quality
+        rating: quality,
+        cards_reviewed: 1
       };
       await dataService.saveStudySession(sessionData, userId, isOnline);
+
+      // Update User Profile (Gamification)
+      if (userProfile && setUserProfile) {
+        const xpGain = quality === 0 ? 1 : (quality === 2 ? 3 : (quality === 3 ? 5 : 8));
+        const newXp = (userProfile.mascot_xp || 0) + xpGain;
+        const newWeeklyCards = (userProfile.weekly_cards_reviewed || 0) + 1;
+        
+        // Mascot Level Logic
+        let newLevel = userProfile.mascot_level || 1;
+        if (newXp >= 4000) newLevel = 5;
+        else if (newXp >= 1500) newLevel = 4;
+        else if (newXp >= 500) newLevel = 3;
+        else if (newXp >= 100) newLevel = 2;
+
+        // League Division Logic
+        let newDivision = userProfile.league_division || 'Bronze';
+        if (newWeeklyCards >= 700) newDivision = 'Diamante';
+        else if (newWeeklyCards >= 300) newDivision = 'Ouro';
+        else if (newWeeklyCards >= 100) newDivision = 'Prata';
+
+        // Streak Logic
+        let newStreak = userProfile.streak_days || 0;
+        const lastReview = userProfile.last_review_date ? new Date(userProfile.last_review_date) : null;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        if (!lastReview) {
+          newStreak = 1;
+        } else {
+          const lastReviewDay = new Date(lastReview);
+          lastReviewDay.setHours(0, 0, 0, 0);
+          const diffDays = Math.floor((today.getTime() - lastReviewDay.getTime()) / (1000 * 60 * 60 * 24));
+          
+          if (diffDays === 1) {
+            newStreak += 1;
+          } else if (diffDays > 1) {
+            newStreak = 1;
+          }
+        }
+
+        const updatedProfile = {
+          ...userProfile,
+          mascot_xp: newXp,
+          mascot_level: newLevel,
+          weekly_cards_reviewed: newWeeklyCards,
+          league_division: newDivision as any,
+          streak_days: newStreak,
+          last_review_date: new Date().toISOString(),
+          prestigePoints: (userProfile.prestigePoints || 0) + (quality >= 3 ? 2 : 1)
+        };
+
+        setUserProfile(updatedProfile);
+        await dataService.saveUserProfile(updatedProfile, userId, isOnline);
+      }
       
       // Update global study sessions state if provided
       if (setStudySessions) {
@@ -2132,11 +2563,11 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
           
           {sessionStats.isFinished && remaining > 0 ? (
             <p className="text-slate-500 dark:text-slate-400 font-medium">
-              Você estudou {totalStudied} cards. Faltaram {remaining} para limpar o deck, mas sua taxa de acerto foi de {overallAccuracy}%.
+              Você estudou {sessionCardsReviewed} cards nesta sessão. Faltaram {remaining} para limpar o deck, mas sua taxa de acerto foi de {overallAccuracy}%.
             </p>
           ) : (
             <p className="text-slate-500 dark:text-slate-400 font-medium">
-              Você limpou o deck! Estudou {totalStudied} cards com uma taxa de acerto de {overallAccuracy}%.
+              Você limpou o deck! Estudou {sessionCardsReviewed} cards com uma taxa de acerto de {overallAccuracy}%.
             </p>
           )}
           
@@ -2188,6 +2619,40 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 </div>
               ))}
             </div>
+
+            {userProfile && (
+              <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl p-6 text-white shadow-xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                      <Zap className="w-6 h-6 fill-yellow-300 text-yellow-300" />
+                    </div>
+                    <div>
+                      <h3 className="font-black uppercase text-xs tracking-widest opacity-80">Progresso da Sessão</h3>
+                      <p className="text-xl font-black">+{sessionCardsReviewed * 5} XP Acumulado</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Streak Atual</span>
+                    <p className="text-2xl font-black">{userProfile.streak_days || 0} Dias</p>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
+                    <span>Mascote Nível {userProfile.mascot_level || 1}</span>
+                    <span>{userProfile.mascot_xp || 0} XP Total</span>
+                  </div>
+                  <div className="h-2 bg-black/20 rounded-full overflow-hidden">
+                    <motion.div 
+                      className="h-full bg-white"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${Math.min(100, ((userProfile.mascot_xp || 0) % 500) / 5)}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {criticalCards.length > 0 && (
               <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800/50 rounded-2xl p-4 space-y-3">
@@ -2298,8 +2763,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   }
 
   return (
-    <div className={`space-y-10 max-w-5xl mx-auto pb-20 animate-in fade-in duration-500 ${isFocusMode && mode === 'study' ? 'fixed inset-0 z-[200] bg-slate-950 flex flex-col items-center justify-center p-4 space-y-0 max-w-none' : ''}`}>
-      {(!isFocusMode || mode !== 'study') && (
+    <div className={`space-y-10 max-w-5xl mx-auto pb-20 animate-in fade-in duration-500 ${(isFocusMode || isExtremeFocus) && mode === 'study' ? 'fixed inset-0 z-[200] bg-slate-950 flex flex-col items-center justify-center p-4 space-y-0 max-w-none' : ''}`}>
+      {(!isFocusMode && !isExtremeFocus || mode !== 'study') && (
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <div className="flex items-center gap-3">
@@ -2344,23 +2809,61 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 </div>
               ) : (
                 <>
-                  <button 
-                    onClick={() => { 
-                      startStudySession();
-                    }} 
-                    disabled={reviewQueue.length === 0} 
-                    className="flex flex-col items-center justify-center px-8 py-2.5 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest disabled:opacity-50 hover:bg-sanfran-rubiDark shadow-xl"
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <RotateCcw className="w-5 h-5" /> 
-                      Estudar
+                  <div className="flex flex-col gap-2">
+                    <button 
+                      onClick={() => { 
+                        startStudySession();
+                      }} 
+                      disabled={reviewQueue.length === 0} 
+                      className="flex flex-col items-center justify-center px-8 py-2.5 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest disabled:opacity-50 hover:bg-sanfran-rubiDark shadow-xl"
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <RotateCcw className="w-5 h-5" /> 
+                        Estudar
+                      </div>
+                      <div className="flex items-center gap-3 text-[10px]">
+                        <span className="text-blue-200" title="Novos">{reviewQueue.filter(c => c.status === 'new' || !c.status).length}</span>
+                        <span className="text-red-200" title="Aprendizagem">{reviewQueue.filter(c => c.status === 'learning' || c.status === 'relearning').length}</span>
+                        <span className="text-green-200" title="A Revisar">{reviewQueue.filter(c => c.status === 'review').length}</span>
+                      </div>
+                    </button>
+                    
+                    <div className="flex items-center gap-2 bg-slate-100 dark:bg-white/5 p-1 rounded-xl border border-slate-200 dark:border-white/10">
+                      <button 
+                        onClick={() => setAnkiGoal('retention')}
+                        className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${ankiGoal === 'retention' ? 'bg-sanfran-rubi text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                        title="Retenção Máxima (Mais revisões)"
+                      >
+                        Retenção
+                      </button>
+                      <button 
+                        onClick={() => setAnkiGoal('balanced')}
+                        className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${ankiGoal === 'balanced' ? 'bg-sanfran-rubi text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                        title="Equilibrado"
+                      >
+                        Equilíbrio
+                      </button>
+                      <button 
+                        onClick={() => setAnkiGoal('economy')}
+                        className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${ankiGoal === 'economy' ? 'bg-sanfran-rubi text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                        title="Economia de Tempo (Menos revisões)"
+                      >
+                        Tempo
+                      </button>
                     </div>
-                    <div className="flex items-center gap-3 text-[10px]">
-                      <span className="text-blue-200" title="Novos">{reviewQueue.filter(c => c.status === 'new' || !c.status).length}</span>
-                      <span className="text-red-200" title="Aprendizagem">{reviewQueue.filter(c => c.status === 'learning' || c.status === 'relearning').length}</span>
-                      <span className="text-green-200" title="A Revisar">{reviewQueue.filter(c => c.status === 'review').length}</span>
+                  </div>
+
+                  <div className="relative group flex items-center gap-2">
+                    <button 
+                      onClick={() => setIsHeatMode(!isHeatMode)} 
+                      className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all h-full ${isHeatMode ? 'bg-orange-600 text-white shadow-orange-500/30' : 'bg-white dark:bg-sanfran-rubiDark text-orange-600 border-2 border-orange-600 hover:bg-orange-50'}`}
+                    >
+                      <Flame className={`w-5 h-5 ${isHeatMode ? 'animate-pulse' : ''}`} /> {isHeatMode ? 'Calor Ativo' : 'Revisão Calor'}
+                    </button>
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1 bg-slate-900 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
+                      Priorizar cards com erros recentes
                     </div>
-                  </button>
+                  </div>
 
                   <div className="relative group flex items-center gap-2">
                     <button 
@@ -2391,8 +2894,6 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                     </div>
                   </div>
 
-                  {/* HEATMAP / STREAK - Removed from header to be placed in dashboard */}
-                  
                   {/* BOTÃO GERAR COM IA */}
                   <div className="relative group">
                     <button 
@@ -2747,7 +3248,23 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       {mode === 'browse' && (
         <div className="space-y-6">
           {currentFolderId === null && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 animate-in slide-in-from-top-4 duration-500">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 animate-in slide-in-from-top-4 duration-500">
+              {/* Mascot Widget */}
+              {userProfile && (
+                <MascotEvolution 
+                  level={userProfile.mascot_level || 1} 
+                  xp={userProfile.mascot_xp || 0} 
+                />
+              )}
+
+              {/* League Widget */}
+              {userProfile && (
+                <LeagueProgress 
+                  division={userProfile.league_division || 'Bronze'} 
+                  weeklyCards={userProfile.weekly_cards_reviewed || 0} 
+                />
+              )}
+
               {/* Heatmap Widget */}
               <div className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-2 border-slate-200 dark:border-white/10 shadow-xl flex flex-col gap-6">
                 <div className="flex items-center justify-between">
@@ -2998,8 +3515,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
           )}
 
           <div className="flex flex-col md:flex-row items-center gap-4 mb-6 animate-in slide-in-from-left-4">
-            <div className="relative flex-1 w-full">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+            <div className="relative flex-1 w-full group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 group-focus-within:text-sanfran-rubi transition-colors" />
               <input 
                 type="text" 
                 placeholder={isGlobalSearch ? "Busca Global em todo o acervo..." : "Pesquisar cards nesta pasta..."} 
@@ -3008,11 +3525,39 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 className="w-full p-4 pl-12 bg-white dark:bg-white/5 border-2 border-slate-200 dark:border-white/10 rounded-2xl font-bold outline-none focus:border-sanfran-rubi transition-all"
               />
             </div>
+            
+            <div className="relative flex-1 w-full group">
+              <Sparkles className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors ${isSemanticSearching ? 'text-usp-gold animate-pulse' : 'text-slate-400 group-focus-within:text-usp-gold'}`} />
+              <input 
+                type="text" 
+                placeholder="Busca Semântica (IA)..." 
+                value={semanticSearchQuery}
+                onChange={(e) => setSemanticSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSemanticSearch()}
+                className="w-full p-4 pl-12 bg-white dark:bg-white/5 border-2 border-slate-200 dark:border-white/10 rounded-2xl font-bold outline-none focus:border-usp-gold transition-all"
+              />
+              <button 
+                onClick={handleSemanticSearch}
+                disabled={isSemanticSearching || !semanticSearchQuery.trim()}
+                className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-2 bg-usp-gold text-white rounded-xl font-black uppercase text-[10px] tracking-widest disabled:opacity-50"
+              >
+                {isSemanticSearching ? 'Buscando...' : 'Buscar'}
+              </button>
+            </div>
+
             <button 
               onClick={() => setIsGlobalSearch(!isGlobalSearch)}
               className={`px-6 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all border-2 ${isGlobalSearch ? 'bg-sanfran-rubi border-sanfran-rubi text-white shadow-lg' : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500'}`}
             >
               {isGlobalSearch ? 'Busca Global Ativa' : 'Ativar Busca Global'}
+            </button>
+            <button 
+              onClick={() => setIsHeatMode(!isHeatMode)}
+              className={`px-6 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all border-2 flex items-center gap-2 ${isHeatMode ? 'bg-orange-600 border-orange-600 text-white shadow-lg' : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500 hover:border-orange-500/50'}`}
+              title="Priorizar pastas com muitos cards vencidos"
+            >
+              <Flame size={16} className={isHeatMode ? 'fill-white animate-pulse' : ''} />
+              {isHeatMode ? 'Filtro de Calor Ativo' : 'Filtro de Calor'}
             </button>
           </div>
 
@@ -3033,7 +3578,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                     {currentCards.map(card => (
                       <tr key={card.id} className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/5 transition-colors group">
                         <td className="p-6">
-                          <p className="font-bold text-slate-900 dark:text-white text-sm line-clamp-2">{card.front}</p>
+                          <div className="font-bold text-slate-900 dark:text-white text-sm line-clamp-2">
+                            <SmartText text={card.front} />
+                          </div>
                         </td>
                         <td className="p-6">
                           <p className="text-slate-600 dark:text-slate-400 text-sm line-clamp-2">{card.back}</p>
@@ -3107,6 +3654,14 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 {isSelectionMode && (
                   <div className="absolute top-4 right-4 z-30">
                     {isSelected ? <CheckSquare className="w-6 h-6 text-sanfran-rubi" /> : <Square className="w-6 h-6 text-slate-300" />}
+                  </div>
+                )}
+                {isHeatMode && stats.heatScore > 0 && (
+                  <div className="absolute top-4 left-4 z-20">
+                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full shadow-lg border-2 border-white dark:border-slate-900 ${stats.heatScore > 0.5 ? 'bg-red-600 text-white animate-bounce' : 'bg-orange-500 text-white'}`}>
+                      <Flame size={12} className="fill-current" />
+                      <span className="text-[9px] font-black uppercase tracking-widest">{Math.round(stats.heatScore * 100)}% Calor</span>
+                    </div>
                   </div>
                 )}
                 {hasUpdate && !isSelectionMode && (
@@ -3428,7 +3983,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
       {mode === 'study' && reviewQueue.length > 0 && !sessionStats.isFinished && (
         <div className={`flex flex-col items-center animate-in fade-in zoom-in ${isFocusMode ? 'w-full max-w-4xl' : 'py-10'}`}>
-          <div className={`w-full max-w-2xl mb-8 flex items-center justify-between ${isFocusMode ? 'opacity-0 hover:opacity-100 transition-opacity duration-500' : ''}`}>
+          <div className={`w-full max-w-2xl mb-8 flex items-center justify-between ${isFocusMode || isExtremeFocus ? 'opacity-0 hover:opacity-100 transition-opacity duration-500' : ''}`}>
             <div className="flex items-center gap-4">
               <button 
                 onClick={() => setIsFocusMode(!isFocusMode)}
@@ -3437,6 +3992,52 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                 {isFocusMode ? <Minimize2 size={14} /> : <Maximize2 size={14} />} 
                 {isFocusMode ? 'Sair do Foco' : 'Modo Foco'}
                 <span className="px-1.5 py-0.5 bg-black/10 dark:bg-white/10 rounded text-[8px] ml-1">F</span>
+              </button>
+              <button 
+                onClick={() => setIsExtremeFocus(!isExtremeFocus)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all ${isExtremeFocus ? 'bg-red-600 text-white shadow-lg shadow-red-600/30' : 'bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-slate-700'}`}
+                title="Modo Foco Extremo: Esconde tudo, foca apenas na pergunta."
+              >
+                <Zap size={14} fill={isExtremeFocus ? "currentColor" : "none"} />
+                {isExtremeFocus ? 'Foco Extremo Ativo' : 'Foco Extremo'}
+              </button>
+              
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-white/5 p-1 rounded-xl">
+                <button 
+                  onClick={() => setWhiteNoiseType('none')}
+                  className={`p-2 rounded-lg transition-all ${whiteNoiseType === 'none' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-400'}`}
+                  title="Sem Ruído"
+                >
+                  <Volume2 size={14} className="opacity-30" />
+                </button>
+                <button 
+                  onClick={() => setWhiteNoiseType('rain')}
+                  className={`p-2 rounded-lg transition-all ${whiteNoiseType === 'rain' ? 'bg-white dark:bg-slate-800 text-blue-500 shadow-sm' : 'text-slate-400'}`}
+                  title="Chuva"
+                >
+                  <Sparkles size={14} />
+                </button>
+                <button 
+                  onClick={() => setWhiteNoiseType('waves')}
+                  className={`p-2 rounded-lg transition-all ${whiteNoiseType === 'waves' ? 'bg-white dark:bg-slate-800 text-cyan-500 shadow-sm' : 'text-slate-400'}`}
+                  title="Ondas"
+                >
+                  <Activity size={14} />
+                </button>
+              </div>
+              <button 
+                onClick={() => {
+                  setIsPodcastMode(!isPodcastMode);
+                  if (!isPodcastMode) {
+                    showToast("Modo Podcast Ativado: Use comandos de voz 'Bom', 'Fácil', 'Mostrar'", "info");
+                  }
+                }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all ${isPodcastMode ? 'bg-sanfran-rubi text-white shadow-lg shadow-sanfran-rubi/30' : 'bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-slate-700'}`}
+                title="Modo Podcast (Hands-free)"
+              >
+                <Mic size={14} />
+                {isPodcastMode ? 'Podcast Ativo' : 'Modo Podcast'}
+                <span className="px-1.5 py-0.5 bg-black/10 dark:bg-white/10 rounded text-[8px] ml-1">P</span>
               </button>
               <div className="flex items-center gap-3 text-[11px] font-black uppercase tracking-widest">
                 <span className={`text-blue-500 flex items-center gap-1 transition-all ${(!currentCard?.status || currentCard?.status === 'new') ? 'scale-110 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]' : 'opacity-70'}`} title="Novos">
@@ -3470,7 +4071,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   <RotateCcw size={14} />
                 </button>
               </div>
-              <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400 rounded-full text-[9px] font-black uppercase tracking-widest">
+              <div className={`flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400 rounded-full text-[9px] font-black uppercase tracking-widest ${isExtremeFocus ? 'hidden' : ''}`}>
                 Tempo: {Math.floor(cardTimer / 60)}:{(cardTimer % 60).toString().padStart(2, '0')}
               </div>
               {isCramMode && (
@@ -3486,7 +4087,34 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
             )}
           </div>
 
-          <div className="relative w-full max-w-2xl min-h-[550px] preserve-3d group/card">
+            {/* AI Tools Bar */}
+            <div className="flex items-center gap-2 mb-4 w-full max-w-2xl">
+              <button 
+                onClick={handleGenerateMnemonic}
+                className="flex-1 py-2 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-purple-200 transition-all flex items-center justify-center gap-2"
+              >
+                <Sparkles size={14} />
+                Me ajude a decorar
+              </button>
+              <button 
+                onClick={handleGeneratePracticalCase}
+                className="flex-1 py-2 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-200 transition-all flex items-center justify-center gap-2"
+              >
+                <Gavel size={14} />
+                Gerar Caso Prático
+              </button>
+              {isFlipped && (
+                <button 
+                  onClick={handleCheckJurisprudence}
+                  className="flex-1 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-200 transition-all flex items-center justify-center gap-2"
+                >
+                  <Search size={14} />
+                  Jurisprudência Viva
+                </button>
+              )}
+            </div>
+
+            <div className="relative w-full max-w-2xl min-h-[550px] preserve-3d group/card">
             <AnimatePresence mode="wait">
               {currentCard && (
                 <motion.div
@@ -3545,7 +4173,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                       <span className="text-xs font-black text-sanfran-rubi uppercase tracking-[0.3em] mb-8">Questão</span>
                       <div className="text-2xl font-black text-slate-950 dark:text-white leading-tight">
                         <div className="text-slate-800 dark:text-slate-200 leading-relaxed text-center">
-                          <GlossaryText text={currentCard.front} onTermClick={handleTermClick} />
+                          <SmartText text={currentCard.front} />
                         </div>
                       </div>
                       
@@ -3687,8 +4315,19 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                           )}
                           
                           {currentCard.image && (
-                            <div className="w-full mb-6">
-                              <img src={currentCard.image} alt="Flashcard" className="max-w-full h-auto rounded-2xl border border-slate-200 dark:border-white/10 mx-auto shadow-lg" />
+                            <div className="w-full mb-6 relative inline-block mx-auto">
+                              <img src={currentCard.image} alt="Flashcard" className="max-w-full h-auto rounded-2xl border border-slate-200 dark:border-white/10 shadow-lg" />
+                              {currentCard.occlusion_data?.rects.map((r: any) => (
+                                <div 
+                                  key={r.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (!isFlipped) setIsFlipped(true);
+                                  }}
+                                  className={`absolute border-2 transition-all duration-500 ${isFlipped ? 'bg-transparent border-sanfran-rubi/30' : 'bg-slate-900 border-sanfran-rubi'}`}
+                                  style={{ left: r.x, top: r.y, width: r.width, height: r.height }}
+                                />
+                              ))}
                             </div>
                           )}
                           
@@ -3696,7 +4335,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Gabarito Oficial</span>
                             <div className="text-2xl font-black text-slate-900 dark:text-white leading-tight mb-6">
                               <div className="text-slate-800 dark:text-slate-200 leading-relaxed text-center">
-                                <GlossaryText text={currentCard.back} onTermClick={handleTermClick} />
+                                <SmartText text={currentCard.back} />
                               </div>
                             </div>
                           </div>
@@ -3793,6 +4432,231 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               setSessionStats(prev => ({ ...prev, isFinished: true }));
             }} className="mt-12 text-slate-400 font-black text-xs uppercase underline hover:text-red-500 transition-colors">Sair da Audiência</button>
           )}
+        </div>
+      )}
+
+      {/* Mnemonic Modal */}
+      {showMnemonicModal && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10 animate-in slide-in-from-bottom-8 duration-500">
+            <div className="p-8 space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-2xl flex items-center justify-center">
+                    <Sparkles className="text-purple-600" size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Mnemônico IA</h3>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Memorização Facilitada</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowMnemonicModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
+                  <X size={20} className="text-slate-400" />
+                </button>
+              </div>
+
+              {isGeneratingMnemonic ? (
+                <div className="py-12 flex flex-col items-center justify-center gap-4">
+                  <Loader2 className="w-12 h-12 animate-spin text-purple-500" />
+                  <p className="text-sm font-bold text-slate-500 animate-pulse">A IA está criando algo criativo para você...</p>
+                </div>
+              ) : generatedMnemonic ? (
+                <div className="space-y-6">
+                  <div className="p-6 bg-purple-50 dark:bg-purple-900/10 rounded-3xl border border-purple-100 dark:border-purple-900/20">
+                    <h4 className="text-[10px] font-black text-purple-600 uppercase tracking-widest mb-3">O Mnemônico</h4>
+                    <p className="text-2xl font-black text-slate-900 dark:text-white tracking-tight text-center">{generatedMnemonic.phrase}</p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Significado</h4>
+                    <div className="grid gap-2">
+                      {generatedMnemonic.explanation.map((item: any, idx: number) => (
+                        <div key={idx} className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-100 dark:border-white/10">
+                          <span className="w-8 h-8 flex items-center justify-center bg-white dark:bg-slate-800 rounded-lg text-sm font-black text-purple-600 shadow-sm">{item.letter}</span>
+                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{item.meaning}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="flex gap-3 pt-2">
+                <button 
+                  onClick={() => setShowMnemonicModal(false)}
+                  className="flex-1 py-4 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-purple-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  Entendi!
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Practical Case Modal */}
+      {showPracticalCaseModal && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10 animate-in slide-in-from-bottom-8 duration-500">
+            <div className="p-8 space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center">
+                    <Gavel className="text-amber-600" size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Caso Prático IA</h3>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Aplicação real do conceito</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowPracticalCaseModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
+                  <X size={20} className="text-slate-400" />
+                </button>
+              </div>
+
+              {isGeneratingPracticalCase ? (
+                <div className="py-12 flex flex-col items-center justify-center gap-4">
+                  <Loader2 className="w-12 h-12 animate-spin text-amber-500" />
+                  <p className="text-sm font-bold text-slate-500 animate-pulse">A IA está redigindo um caso jurídico para você...</p>
+                </div>
+              ) : practicalCaseData ? (
+                <div className="space-y-6">
+                  <div className="p-6 bg-slate-50 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10">
+                    <h4 className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-3">O Cenário</h4>
+                    <p className="text-slate-700 dark:text-slate-200 font-medium leading-relaxed italic">"{practicalCaseData.case}"</p>
+                  </div>
+
+                  <div className="p-6 bg-blue-50 dark:bg-blue-900/10 rounded-3xl border border-blue-100 dark:border-blue-900/20">
+                    <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-3">A Pergunta</h4>
+                    <p className="text-slate-900 dark:text-white font-black text-lg tracking-tight">{practicalCaseData.question}</p>
+                  </div>
+
+                  <div className="relative group">
+                    <div className={`p-6 bg-emerald-50 dark:bg-emerald-900/10 rounded-3xl border border-emerald-100 dark:border-emerald-900/20 transition-all duration-500 ${!isFlipped ? 'blur-md select-none' : ''}`}>
+                      <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-3">Decisão Fundamentada</h4>
+                      <p className="text-slate-700 dark:text-slate-200 font-medium leading-relaxed">{practicalCaseData.answer}</p>
+                    </div>
+                    {!isFlipped && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <button 
+                          onClick={() => setIsFlipped(true)}
+                          className="px-6 py-3 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl hover:scale-105 transition-all"
+                        >
+                          Revelar Resposta
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="flex gap-3 pt-2">
+                {isFlipped && (
+                  <button 
+                    onClick={() => {
+                      setShowPracticalCaseModal(false);
+                      setIsFlipped(false);
+                      setPracticalCaseData(null);
+                    }}
+                    className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  >
+                    Próximo Card
+                  </button>
+                )}
+                {!isFlipped && !isGeneratingPracticalCase && (
+                  <button 
+                    onClick={() => setShowPracticalCaseModal(false)}
+                    className="flex-1 py-4 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 rounded-2xl font-black uppercase tracking-widest transition-all hover:bg-slate-200"
+                  >
+                    Fechar
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Jurisprudence Modal */}
+      {showJurisprudenceModal && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10 animate-in slide-in-from-bottom-8 duration-500">
+            <div className="p-8 space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center">
+                    <Search className="text-blue-600" size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Jurisprudência Viva</h3>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Verificação em tempo real (STF/STJ)</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowJurisprudenceModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
+                  <X size={20} className="text-slate-400" />
+                </button>
+              </div>
+
+              {isJurisprudenceLoading ? (
+                <div className="py-12 flex flex-col items-center justify-center gap-4">
+                  <Loader2 className="w-12 h-12 animate-spin text-blue-500" />
+                  <p className="text-sm font-bold text-slate-500 animate-pulse">Consultando bases de dados jurídicas...</p>
+                </div>
+              ) : jurisprudenceResult ? (
+                <div className="space-y-6">
+                  <div className={`p-6 rounded-3xl border-2 flex items-center gap-4 ${
+                    jurisprudenceResult.status === 'atualizado' 
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                      : jurisprudenceResult.status === 'desatualizado'
+                      ? 'bg-red-50 border-red-200 text-red-700'
+                      : 'bg-amber-50 border-amber-200 text-amber-700'
+                  }`}>
+                    {jurisprudenceResult.isValid ? <CheckCircle2 size={32} /> : <AlertTriangle size={32} />}
+                    <div>
+                      <h4 className="font-black uppercase text-sm tracking-tight">Status: {jurisprudenceResult.status.toUpperCase()}</h4>
+                      <p className="text-xs font-bold opacity-80">{jurisprudenceResult.isValid ? 'Este entendimento permanece sólido.' : 'Atenção: Houve mudanças recentes.'}</p>
+                    </div>
+                  </div>
+
+                  <div className="p-6 bg-slate-50 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Fundamentação Atualizada</h4>
+                    <div className="prose prose-sm dark:prose-invert max-w-none text-slate-700 dark:text-slate-200 leading-relaxed font-bold">
+                      <ReactMarkdown>{jurisprudenceResult.explanation}</ReactMarkdown>
+                    </div>
+                  </div>
+
+                  {jurisprudenceResult.sources && jurisprudenceResult.sources.length > 0 && (
+                    <div className="space-y-3">
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Fontes Consultadas</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {jurisprudenceResult.sources.map((url: string, i: number) => (
+                          <a 
+                            key={i} 
+                            href={url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl text-[10px] font-bold text-blue-600 hover:text-blue-700 transition-colors"
+                          >
+                            <ExternalLink size={12} />
+                            Fonte {i + 1}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+
+              <div className="flex gap-3 pt-2">
+                <button 
+                  onClick={() => setShowJurisprudenceModal(false)}
+                  className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  Continuar Revisão
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -4101,13 +4965,23 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                       </div>
                    </div>
 
-                   <button 
-                     onClick={handleAIGenerate} 
-                     disabled={isLoading} 
-                     className="w-full py-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-[2rem] font-black uppercase text-lg shadow-xl hover:scale-105 transition-transform flex items-center justify-center gap-2 disabled:opacity-50"
-                   >
-                     {isLoading ? <div className="animate-spin w-6 h-6 border-4 border-white/30 border-t-white rounded-full"></div> : <><Zap size={24} fill="currentColor" /> Gerar Preview</>}
-                   </button>
+                   <div className="flex gap-4">
+                     <button 
+                       onClick={handleAIGenerate} 
+                       disabled={isLoading} 
+                       className="flex-1 py-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-[2rem] font-black uppercase text-lg shadow-xl hover:scale-105 transition-transform flex items-center justify-center gap-2 disabled:opacity-50"
+                     >
+                       {isLoading ? <div className="animate-spin w-6 h-6 border-4 border-white/30 border-t-white rounded-full"></div> : <><Zap size={24} fill="currentColor" /> Gerar Preview</>}
+                     </button>
+                     
+                     <button 
+                       onClick={() => handleGenerateCloze(aiSourceText)}
+                       disabled={isGeneratingCloze || !aiSourceText.trim()}
+                       className="flex-1 py-6 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-[2rem] font-black uppercase text-lg shadow-xl hover:scale-105 transition-transform flex items-center justify-center gap-2 disabled:opacity-50"
+                     >
+                       {isGeneratingCloze ? <div className="animate-spin w-6 h-6 border-4 border-white/30 border-t-white rounded-full"></div> : <><Edit3 size={24} /> Gerar 5 Clozes</>}
+                     </button>
+                   </div>
                    
                    <div className="bg-purple-50 dark:bg-purple-900/10 p-4 rounded-2xl border border-purple-100 dark:border-purple-800/30">
                       <p className="text-[9px] font-bold text-purple-700 dark:text-purple-300 uppercase leading-relaxed">
@@ -4286,11 +5160,115 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
             </div>
             <input value={manualFront} onChange={(e) => setManualFront(e.target.value)} placeholder="Enunciado / Pergunta" className="w-full p-6 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-2xl font-bold outline-none" />
             <div className="relative">
+              <div className="flex items-center gap-2 mb-2">
+                <button 
+                  onClick={insertTableTemplate}
+                  className="px-3 py-1.5 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-sanfran-rubi hover:text-white transition-all flex items-center gap-2"
+                >
+                  <Table size={12} /> Tabela Comparativa
+                </button>
+                <button 
+                  onClick={insertDiagramTemplate}
+                  className="px-3 py-1.5 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-sanfran-rubi hover:text-white transition-all flex items-center gap-2"
+                >
+                  <Activity size={12} /> Diagrama (Mermaid)
+                </button>
+              </div>
               <textarea value={manualBack} onChange={(e) => setManualBack(e.target.value)} placeholder="Doutrina / Resposta, Fluxograma, Tabela..." className="w-full h-32 p-6 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-3xl font-bold resize-none outline-none" />
               <div className="absolute bottom-4 right-4 text-[9px] font-black text-slate-400 uppercase tracking-widest pointer-events-none">
                 Dica: Você pode colar (Ctrl+V) uma imagem aqui
               </div>
             </div>
+
+            {/* Image Occlusion Drawing UI */}
+            {manualImage && (
+              <div className="mt-4 p-4 bg-slate-100 dark:bg-white/5 rounded-2xl border-2 border-dashed border-slate-300 dark:border-white/10">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <CheckSquare className={`w-5 h-5 ${isImageOcclusionMode ? 'text-sanfran-rubi' : 'text-slate-400'}`} />
+                    <span className="text-xs font-black uppercase tracking-widest text-slate-700 dark:text-slate-300">Image Occlusion Jurídico</span>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setIsImageOcclusionMode(!isImageOcclusionMode);
+                      if (!isImageOcclusionMode) setOcclusionRects([]);
+                    }}
+                    className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${isImageOcclusionMode ? 'bg-sanfran-rubi text-white' : 'bg-slate-200 dark:bg-white/10 text-slate-500'}`}
+                  >
+                    {isImageOcclusionMode ? 'Desativar' : 'Ativar'}
+                  </button>
+                </div>
+
+                {isImageOcclusionMode && (
+                  <div className="space-y-4">
+                    <p className="text-[10px] text-slate-500 font-bold italic">Arraste sobre a imagem para criar as máscaras (tampas).</p>
+                    <div 
+                      className="relative inline-block cursor-crosshair overflow-hidden rounded-xl border border-slate-200 dark:border-white/10"
+                      onMouseDown={(e) => {
+                        if (!imageRef.current) return;
+                        const rect = imageRef.current.getBoundingClientRect();
+                        setIsDrawing(true);
+                        setStartPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+                      }}
+                      onMouseMove={(e) => {
+                        if (!isDrawing || !imageRef.current) return;
+                        // Visual feedback could be added here
+                      }}
+                      onMouseUp={(e) => {
+                        if (!isDrawing || !imageRef.current) return;
+                        const rect = imageRef.current.getBoundingClientRect();
+                        const endX = e.clientX - rect.left;
+                        const endY = e.clientY - rect.top;
+                        
+                        const newRect = {
+                          id: crypto.randomUUID(),
+                          x: Math.min(startPos.x, endX),
+                          y: Math.min(startPos.y, endY),
+                          width: Math.abs(startPos.x - endX),
+                          height: Math.abs(startPos.y - endY)
+                        };
+
+                        if (newRect.width > 5 && newRect.height > 5) {
+                          setOcclusionRects(prev => [...prev, newRect]);
+                        }
+                        setIsDrawing(false);
+                      }}
+                    >
+                      <img 
+                        ref={imageRef}
+                        src={manualImage} 
+                        alt="Occlusion Preview" 
+                        className="max-w-full h-auto rounded-lg"
+                        referrerPolicy="no-referrer"
+                      />
+                      <svg className="absolute inset-0 pointer-events-none w-full h-full">
+                        {occlusionRects.map(rect => (
+                          <rect 
+                            key={rect.id}
+                            x={rect.x}
+                            y={rect.y}
+                            width={rect.width}
+                            height={rect.height}
+                            fill="#800000"
+                            fillOpacity="0.8"
+                            stroke="#fff"
+                            strokeWidth="1"
+                          />
+                        ))}
+                      </svg>
+                    </div>
+                    <div className="flex justify-end">
+                      <button 
+                        onClick={() => setOcclusionRects([])}
+                        className="text-[10px] font-black text-red-500 uppercase tracking-widest hover:underline"
+                      >
+                        Limpar Máscaras
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             {manualImage && (
               <div className="relative mt-4">
                 <img src={manualImage} alt="Uploaded" className="max-w-full h-auto rounded-xl border border-slate-200 dark:border-white/10" />

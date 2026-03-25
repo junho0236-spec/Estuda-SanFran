@@ -21,9 +21,9 @@ const GuerraTurmas: React.FC<GuerraTurmasProps> = ({ userId }) => {
   const fetchData = async () => {
     setLoading(true);
     // 1. Get user's class year
-    const { data: profile } = await supabase.from('profiles').select('class_year').eq('id', userId).single();
-    if (profile?.class_year) {
-      setMyClassYear(profile.class_year);
+    const { data: profile } = await supabase.from('user_persona').select('turma').eq('id', userId).single();
+    if (profile?.turma) {
+      setMyClassYear(profile.turma);
     } else {
       setSelectingYear(true);
     }
@@ -40,7 +40,7 @@ const GuerraTurmas: React.FC<GuerraTurmasProps> = ({ userId }) => {
 
   const handleSelectYear = async (year: number) => {
     try {
-      await supabase.from('profiles').update({ class_year: year }).eq('id', userId);
+      await supabase.from('user_persona').update({ turma: year }).eq('id', userId);
       setMyClassYear(year);
       setSelectingYear(false);
       fetchData(); // Refresh to include user in new stats

@@ -1,19 +1,21 @@
 
 import React, { useState, useEffect } from 'react';
 import { Trophy, Medal, Gavel, Award, Scale, Briefcase, GraduationCap, Crown, User, TrendingUp, Clock, RefreshCw, AlertTriangle, Zap, Star } from 'lucide-react';
-import { RankingEntry } from '../types';
+import { Flashcard, RankingEntry } from '../types';
 import { supabase } from '../services/supabaseClient';
+import { toast } from 'sonner';
 
 interface RankingProps {
   userId: string;
   session: any;
+  flashcards: Flashcard[];
 }
 
-const Ranking: React.FC<RankingProps> = ({ userId, session }) => {
+const Ranking: React.FC<RankingProps> = ({ userId, session, flashcards }) => {
   const [ranking, setRanking] = useState<RankingEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [view, setView] = useState<'hours' | 'prestige'>('hours');
+  const [view, setView] = useState<'hours' | 'prestige' | 'leagues'>('hours');
 
   const ranksInfo = [
     { name: 'Bacharel', hours: 0, icon: GraduationCap, color: 'text-slate-400', bg: 'bg-slate-100' },
@@ -24,8 +26,38 @@ const Ranking: React.FC<RankingProps> = ({ userId, session }) => {
     { name: 'Magistrado', hours: 1500, icon: Gavel, color: 'text-purple-600', bg: 'bg-purple-50' },
   ];
 
-  const getRankName = (hours: number) => {
-    return [...ranksInfo].reverse().find(r => hours >= r.hours)?.name || 'Bacharel';
+  const handleChallenge = async (opponentId: string, opponentName: string) => {
+    if (opponentId === userId) return;
+    
+    const availableCards = flashcards.filter(f => f.front && f.back);
+    if (availableCards.length < 10) {
+      toast.error("Você precisa de pelo menos 10 cards para um duelo.");
+      return;
+    }
+
+    // Pick 10 random cards
+    const selectedCards = [...availableCards]
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 10)
+      .map(f => ({ id: f.id, front: f.front, back: f.back }));
+
+    const { error } = await supabase
+      .from('duels')
+      .insert({
+        challenger_id: userId,
+        opponent_id: opponentId,
+        challenger_name: session.user.user_metadata?.full_name || 'Desafiante',
+        opponent_name: opponentName,
+        cards: selectedCards,
+        status: 'pending'
+      });
+
+    if (error) {
+      toast.error("Erro ao enviar desafio.");
+      console.error(error);
+    } else {
+      toast.success(`Desafio enviado para ${opponentName}!`);
+    }
   };
 
   const fetchRankingData = async () => {
@@ -39,13 +71,16 @@ const Ranking: React.FC<RankingProps> = ({ userId, session }) => {
       if (sessionErr) throw sessionErr;
 
       // 2. Busca nomes e pontos de prestígio da tabela 'user_persona'
-      let profileMap: Record<string, { name: string, prestige: number }> = {};
+      let profileMap: Record<string, { name: string, prestige: number, league: any, weeklyCards: number, mascotLevel: number }> = {};
       try {
         const { data: personaData } = await supabase.from('user_persona').select('user_id, full_name, persona_data');
         personaData?.forEach(p => { 
           profileMap[p.user_id] = { 
             name: p.full_name, 
-            prestige: p.persona_data?.prestigePoints || 0 
+            prestige: p.persona_data?.prestigePoints || 0,
+            league: p.persona_data?.league_division || 'Bronze',
+            weeklyCards: p.persona_data?.weekly_cards_reviewed || 0,
+            mascotLevel: p.persona_data?.mascot_level || 1
           }; 
         });
       } catch (e) {
@@ -76,12 +111,16 @@ const Ranking: React.FC<RankingProps> = ({ userId, session }) => {
             name: displayName,
             total_seconds: total,
             rank_name: getRankName(hours),
-            prestigePoints: profile?.prestige || 0
+            prestigePoints: profile?.prestige || 0,
+            league_division: profile?.league || 'Bronze',
+            weekly_cards_reviewed: profile?.weeklyCards || 0,
+            mascot_level: profile?.mascotLevel || 1
           };
         })
         .sort((a, b) => {
           if (view === 'hours') return b.total_seconds - a.total_seconds;
-          return (b.prestigePoints || 0) - (a.prestigePoints || 0);
+          if (view === 'prestige') return (b.prestigePoints || 0) - (a.prestigePoints || 0);
+          return (b.weekly_cards_reviewed || 0) - (a.weekly_cards_reviewed || 0);
         });
 
       setRanking(sorted);
@@ -152,6 +191,12 @@ const Ranking: React.FC<RankingProps> = ({ userId, session }) => {
           >
             <Zap size={14} /> Pontos de Prestígio
           </button>
+          <button 
+            onClick={() => setView('leagues')}
+            className={`flex items-center gap-2 px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${view === 'leagues' ? 'bg-[#800000] text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-100 hover:bg-slate-50'}`}
+          >
+            <Trophy size={14} /> Ligas Semanais
+          </button>
         </div>
 
         <button 
@@ -180,7 +225,7 @@ const Ranking: React.FC<RankingProps> = ({ userId, session }) => {
               </div>
               <div className="w-24 md:w-32 h-24 md:h-32 bg-slate-100 dark:bg-white/5 rounded-t-3xl border-x-2 border-t-2 border-slate-200 dark:border-white/10 flex flex-col items-center justify-center">
                 <span className="text-lg md:text-2xl font-black text-slate-500">
-                  {view === 'hours' ? `${formatHours(topThree[1].total_seconds)}h` : `${topThree[1].prestigePoints} pts`}
+                  {view === 'hours' ? `${formatHours(topThree[1].total_seconds)}h` : view === 'prestige' ? `${topThree[1].prestigePoints} pts` : `${topThree[1].weekly_cards_reviewed} cards`}
                 </span>
               </div>
             </div>
@@ -201,7 +246,7 @@ const Ranking: React.FC<RankingProps> = ({ userId, session }) => {
               </div>
               <div className="w-32 md:w-40 h-32 md:h-48 bg-white dark:bg-sanfran-rubi/10 rounded-t-[2.5rem] border-x-4 border-t-4 border-usp-gold flex flex-col items-center justify-center shadow-2xl">
                 <span className="text-2xl md:text-4xl font-black text-usp-gold">
-                  {view === 'hours' ? `${formatHours(topThree[0].total_seconds)}h` : `${topThree[0].prestigePoints} pts`}
+                  {view === 'hours' ? `${formatHours(topThree[0].total_seconds)}h` : view === 'prestige' ? `${topThree[0].prestigePoints} pts` : `${topThree[0].weekly_cards_reviewed} cards`}
                 </span>
               </div>
             </div>
@@ -221,7 +266,7 @@ const Ranking: React.FC<RankingProps> = ({ userId, session }) => {
               </div>
               <div className="w-20 md:w-28 h-16 md:h-24 bg-orange-50 dark:bg-white/5 rounded-t-2xl border-x-2 border-t-2 border-orange-200 dark:border-white/10 flex flex-col items-center justify-center">
                 <span className="text-base md:text-xl font-black text-orange-500">
-                  {view === 'hours' ? `${formatHours(topThree[2].total_seconds)}h` : `${topThree[2].prestigePoints} pts`}
+                  {view === 'hours' ? `${formatHours(topThree[2].total_seconds)}h` : view === 'prestige' ? `${topThree[2].prestigePoints} pts` : `${topThree[2].weekly_cards_reviewed} cards`}
                 </span>
               </div>
             </div>
@@ -252,10 +297,15 @@ const Ranking: React.FC<RankingProps> = ({ userId, session }) => {
                              <TrendingUp size={10} className={entry.user_id === userId ? 'text-white' : 'text-sanfran-rubi'} />
                              <span className={`text-[9px] font-bold uppercase tracking-widest ${entry.user_id === userId ? 'text-white/80' : 'text-slate-400'}`}>Em Ascensão</span>
                            </>
-                         ) : (
+                         ) : view === 'prestige' ? (
                            <>
                              <Star size={10} className={entry.user_id === userId ? 'text-white' : 'text-usp-gold'} />
                              <span className={`text-[9px] font-bold uppercase tracking-widest ${entry.user_id === userId ? 'text-white/80' : 'text-slate-400'}`}>Prestígio Acadêmico</span>
+                           </>
+                         ) : (
+                           <>
+                             <Trophy size={10} className={entry.user_id === userId ? 'text-white' : 'text-blue-500'} />
+                             <span className={`text-[9px] font-bold uppercase tracking-widest ${entry.user_id === userId ? 'text-white/80' : 'text-slate-400'}`}>Liga {entry.league_division}</span>
                            </>
                          )}
                       </div>
@@ -265,10 +315,22 @@ const Ranking: React.FC<RankingProps> = ({ userId, session }) => {
               <div className={`w-24 text-right font-black tabular-nums text-sm md:text-lg ${entry.user_id === userId ? 'text-white' : 'text-sanfran-rubi'}`}>
                 {view === 'hours' ? (
                   <>{formatHours(entry.total_seconds)}<span className="text-[10px] font-bold ml-1">h</span></>
-                ) : (
+                ) : view === 'prestige' ? (
                   <>{entry.prestigePoints}<span className="text-[10px] font-bold ml-1">pts</span></>
+                ) : (
+                  <>{entry.weekly_cards_reviewed}<span className="text-[10px] font-bold ml-1">cards</span></>
                 )}
               </div>
+              
+              {entry.user_id !== userId && (
+                <button 
+                  onClick={() => handleChallenge(entry.user_id, entry.name)}
+                  className={`ml-4 p-2 rounded-xl transition-all ${entry.user_id === userId ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-400 hover:bg-sanfran-rubi hover:text-white'}`}
+                  title="Desafiar para Duelo"
+                >
+                  <Zap size={16} fill="currentColor" />
+                </button>
+              )}
             </div>
           ))}
         </div>

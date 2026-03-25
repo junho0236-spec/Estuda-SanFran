@@ -1411,6 +1411,8 @@ const App: React.FC = () => {
                     isOnline={isOnline}
                     setStudySessions={setStudySessions}
                     isLoadingFlashcards={isLoadingFlashcards}
+                    userProfile={userProfile}
+                    setUserProfile={setUserProfile}
                   />
                 } />
                 <Route path={getPathFromView(View.Library)} element={<Library readings={readings} setReadings={setReadings} subjects={subjects} userId={session.user.id} />} />
@@ -1482,6 +1484,9 @@ const App: React.FC = () => {
                     userId={session.user.id} 
                     onFinished={() => { setActiveDuel(null); setCurrentView(View.Largo); }} 
                     onCorrectAnswer={incrementCorrectQuestions}
+                    userProfile={userProfile}
+                    setUserProfile={setUserProfile}
+                    isOnline={isOnline}
                   />
                  : null} />
                 
@@ -1525,7 +1530,7 @@ const App: React.FC = () => {
 
                 <Route path={getPathFromView(View.OralArgument)} element={<OralArgument />} />
                 <Route path={getPathFromView(View.Calendar)} element={<CalendarView subjects={subjects} tasks={tasks} userId={session.user.id} studySessions={studySessions} />} />
-                <Route path={getPathFromView(View.Ranking)} element={<Ranking userId={session.user.id} session={session} />} />
+                <Route path={getPathFromView(View.Ranking)} element={<Ranking userId={session.user.id} session={session} flashcards={flashcards} />} />
                 <Route path={getPathFromView(View.Subjects)} element={
                   <Subjects 
                     subjects={subjects} 
@@ -1559,6 +1564,7 @@ const App: React.FC = () => {
                     isOnline={isOnline} 
                     userProfile={userProfile}
                     setUserProfile={setUserProfile}
+                    folders={folders}
                   />
                 } />
 
