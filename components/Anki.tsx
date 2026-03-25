@@ -1,7 +1,7 @@
 // Anki.tsx - Community Features and Card Rating
 // Anki.tsx - Community Features and Card Rating
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLocation } from 'react-router-dom';
 import { 
@@ -74,6 +74,10 @@ import {
   Timer,
   Mic
 } from 'lucide-react';
+import { GoogleGenAI } from "@google/genai";
+import { toast } from "sonner";
+import { MarkdownWithLegalLinks } from "./MarkdownWithLegalLinks";
+import { SmartText } from "./SmartText";
 import { Flashcard, Subject, Folder, StudySession, UserProfile } from '../types';
 import { dataService } from '../services/dataService';
 import { useAnkiLogic } from '../hooks/useAnkiLogic';
@@ -82,7 +86,7 @@ import { AnkiStudy } from './Anki/AnkiStudy';
 import { AnkiCommunity } from './Anki/AnkiCommunity';
 import { AnkiCreate } from './Anki/AnkiCreate';
 import { MascotEvolution, LeagueProgress } from './AnkiStats';
-import { FOLDER_COLORS, FOLDER_ICONS } from '../constants';
+import { FOLDER_COLORS, FOLDER_ICONS } from '../src/constants';
 
 interface AnkiProps {
   subjects: Subject[];
@@ -165,6 +169,8 @@ const Anki: React.FC<AnkiProps> = ({
   const [glossaryPosition, setGlossaryPosition] = useState({ x: 0, y: 0 });
   const [isLoadingGlossary, setIsLoadingGlossary] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [semanticSearchQuery, setSemanticSearchQuery] = useState('');
+  const [isSemanticSearching, setIsSemanticSearching] = useState(false);
 
   const handleSemanticSearch = async () => {
     if (!semanticSearchQuery.trim()) return;
@@ -257,35 +263,44 @@ João, servidor público, [situação]...
   };
 
 
-  const currentContextIds = useMemo(() => getSubfolderIds(currentFolderId), h-4" /> Arquivar ({selectedCardIds.size})
-                  </button>
-                  <button onClick={() => {setIsSelectionMode(false); setSelectedCardIds(new Set()); setSelectedFolderIds(new Set());}} className="p-3 text-slate-500"><X className="w-5 h-5" /></button>
-                </div>
-              <input 
-                type="text"
-                placeholder="Buscar decks (ex: STF, OAB, Filosofia...)"
-                value={communitySearch}
-                onChange={(e) => setCommunitySearch(e.target.value)}
-                className="w-full p-4 pl-12 bg-white dark:bg-white/5 border-2 border-slate-200 dark:border-white/10 rounded-2xl font-bold outline-none focus:border-purple-500 transition-all"
-              />
-              <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black uppercase text-slate-400">Ordenar por:</span>
-              <select className="bg-transparent font-black text-xs uppercase outline-none text-slate-600 dark:text-slate-300">
-                <option>Mais Baixados</option>
-                <option>Mais Recentes</option>
-              </select>
-            </div>
-          </div>
+  const getSubfolderIds = useCallback((folderId: string | null): string[] => {
+    let ids: string[] = folderId ? [folderId] : [];
+    const children = (initialFolders || []).filter(f => f.parentId === folderId);
+    children.forEach(child => {
+      ids = [...ids, ...getSubfolderIds(child.id)];
+    });
+    return ids;
+  }, [initialFolders]);
 
-          {isFetchingCommunity ? (
-            <div className="flex flex-col items-center justify-center py-20">
-              <Loader2 className="w-12 h-12 animate-spin text-purple-500 mb-4" />
-              <p className="font-black text-slate-400 uppercase tracking-widest">Sincronizando com a nuvem...</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+  const currentContextIds = useMemo(() => getSubfolderIds(currentFolderId), [currentFolderId, getSubfolderIds]);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="relative">
+        <input 
+          type="text"
+          placeholder="Buscar decks (ex: STF, OAB, Filosofia...)"
+          value={communitySearch}
+          onChange={(e) => setCommunitySearch(e.target.value)}
+          className="w-full p-4 pl-12 bg-white dark:bg-white/5 border-2 border-slate-200 dark:border-white/10 rounded-2xl font-bold outline-none focus:border-purple-500 transition-all"
+        />
+        <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-black uppercase text-slate-400">Ordenar por:</span>
+        <select className="bg-transparent font-black text-xs uppercase outline-none text-slate-600 dark:text-slate-300">
+          <option>Mais Baixados</option>
+          <option>Mais Recentes</option>
+        </select>
+      </div>
+
+      {isFetchingCommunity ? (
+        <div className="flex flex-col items-center justify-center py-20">
+          <Loader2 className="w-12 h-12 animate-spin text-purple-500 mb-4" />
+          <p className="font-black text-slate-400 uppercase tracking-widest">Sincronizando com a nuvem...</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {publicDecks
                 .filter(d => d.name.toLowerCase().includes(communitySearch.toLowerCase()))
                 .map(deck => (
@@ -357,8 +372,6 @@ João, servidor público, [situação]...
               )}
             </div>
           )}
-        </div>
-      )}
 
       {mode === 'browse' && (
         <div className="space-y-6">
