@@ -5,6 +5,7 @@ import { View, Subject, Flashcard, Task, StudySession, Reading } from '../types'
 import { getBrasiliaDate } from '../utils';
 import BadgeGallery, { BadgeData } from './BadgeGallery';
 import CompetenceRadar from './CompetenceRadar';
+import TaskSummaryWidget from './Tasks';
 import { supabase } from '../services/supabaseClient';
 
 interface DashboardProps {
@@ -284,6 +285,8 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
           </div>
         </div>
       </div>
+
+      <TaskSummaryWidget subjects={subjects} tasks={tasks} onNavigate={onNavigate} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         <StatCard 

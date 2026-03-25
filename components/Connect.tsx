@@ -20,6 +20,7 @@ import NewChatModal from './connect/NewChatModal';
 import GroupInfoModal from './connect/GroupInfoModal';
 import { useChatStore } from '../src/store/useChatStore';
 import { ChatRoom, ChatMessage, ChatParticipant, UserProfile, PresenceUser, ChatStory } from '../types';
+import { dataService } from '../services/dataService';
 import { toast } from 'sonner';
 import { GoogleGenAI, Type } from "@google/genai";
 import Markdown from 'react-markdown';
@@ -28,9 +29,10 @@ interface ConnectProps {
   userId: string;
   userName: string;
   onNavigate?: (view: any, params?: any) => void;
+  setTasks?: React.Dispatch<React.SetStateAction<any[]>>;
 }
 
-const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
+const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTasks }) => {
   const {
     activeRoomId,
     setActiveRoomId,
@@ -224,6 +226,32 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [showCallModal, setShowCallModal] = useState(false);
   const [callStatus, setCallStatus] = useState<'idle' | 'calling' | 'incoming' | 'connected' | 'ended'>('idle');
+  const handleCreateTaskFromMessage = async (msg: ChatMessage) => {
+    if (!setTasks) return;
+    
+    try {
+      const newTask = {
+        id: crypto.randomUUID(),
+        title: msg.content.slice(0, 50) + (msg.content.length > 50 ? '...' : ''),
+        description: `Capturado do chat (${msg.sender_name}):\n\n${msg.content}`,
+        completed: false,
+        priority: 'pendente' as const,
+        category: 'geral' as const,
+        createdAt: new Date().toISOString(),
+        userId: userId,
+        subtasks: [],
+        comments: []
+      };
+
+      await dataService.saveTask(newTask as any, userId, true);
+      setTasks(prev => [newTask as any, ...prev]);
+      toast.success('Mensagem autuada como tarefa!');
+    } catch (error) {
+      console.error('Error creating task from message:', error);
+      toast.error('Erro ao criar tarefa');
+    }
+  };
+
   const setActiveRoom = (room: ChatRoom | null) => {
     setActiveRoomId(room?.id || null);
   };
@@ -2605,6 +2633,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate }) => {
               polls={polls}
               votePoll={votePoll}
               typingUsers={typingStatus[activeRoom.id] || []}
+              createTaskFromMessage={handleCreateTaskFromMessage}
             />
 
             {/* INPUT AREA */}

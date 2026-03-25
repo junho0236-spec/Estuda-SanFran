@@ -107,7 +107,8 @@ export const dataService = {
         skills: sanitized.skills || [],
         interests: sanitized.interests || [],
         academic_background: sanitized.academic_background || [],
-        visible_modules: sanitized.visible_modules || ['jornada', 'grade', 'evolucao', 'mural', 'lideranca', 'conexoes']
+        visible_modules: sanitized.visible_modules || ['jornada', 'grade', 'evolucao', 'mural', 'lideranca', 'conexoes'],
+        prestigePoints: sanitized.prestigePoints || 0
       },
       profile_completion: sanitized.arcadia_score || 0,
       full_name: sanitized.full_name || null,
@@ -224,6 +225,7 @@ export const dataService = {
           interests: data.persona_data?.interests || [],
           academic_background: data.persona_data?.academic_background || [],
           visible_modules: data.persona_data?.visible_modules || ['jornada', 'grade', 'evolucao', 'mural', 'lideranca', 'conexoes'],
+          prestigePoints: data.persona_data?.prestigePoints || 0,
           creditos_aula: data.creditos_aula,
           creditos_trabalho: data.creditos_trabalho,
           media: data.media,
@@ -443,7 +445,8 @@ export const dataService = {
           total_focus_time: task.total_focus_time,
           parentTaskId: task.parentTaskId,
           dependencies: task.dependencies,
-          storyPoints: task.storyPoints
+          storyPoints: task.storyPoints,
+          comments: task.comments
         })
       };
 
@@ -493,7 +496,8 @@ export const dataService = {
             total_focus_time: desc.total_focus_time,
             parentTaskId: desc.parentTaskId,
             dependencies: desc.dependencies,
-            storyPoints: desc.storyPoints
+            storyPoints: desc.storyPoints,
+            comments: desc.comments || []
           };
         });
         await db.tasks.bulkPut(mappedTasks);

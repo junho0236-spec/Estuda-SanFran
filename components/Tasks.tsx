@@ -1,100 +1,185 @@
 
-import React, { useState } from 'react';
+import React, { useMemo } from 'react';
 import { 
-  Plus, 
-  Trash2, 
   CheckCircle2, 
   Calendar, 
   Gavel, 
   AlertTriangle, 
-  BookOpen, 
-  Stamp,
-  Scale
+  TrendingUp,
+  ArrowRight,
+  Trash2
 } from 'lucide-react';
-import { Task, Subject, TaskPriority, TaskCategory } from '../types';
-import { dataService } from '../services/dataService';
-import { getBrasiliaDate, getBrasiliaISOString } from '../utils';
-import { updateQuestProgress } from '../services/questService';
+import { Task, Subject, View } from '../types';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
-interface TasksProps {
+interface TaskSummaryWidgetProps {
   subjects: Subject[];
   tasks: Task[];
-  setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
-  userId: string;
-  isOnline: boolean;
+  onNavigate: (view: View) => void;
 }
 
-const Tasks: React.FC<TasksProps> = ({ subjects, tasks, setTasks, userId, isOnline }) => {
-  const [filter, setFilter] = useState<'urgente' | 'pendente' | 'concluido' | 'todos'>('todos');
+const TaskSummaryWidget: React.FC<TaskSummaryWidgetProps> = ({ subjects, tasks, onNavigate }) => {
+  const pendingTasks = tasks.filter(t => !t.completed);
+  const urgentTasks = pendingTasks.filter(t => t.priority === 'urgente');
+  
+  // Burndown Data: Created vs Completed over the last 7 days
+  const burndownData = useMemo(() => {
+    const data = [];
+    const now = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      const created = tasks.filter(t => (t as any).created_at?.startsWith(dateStr)).length;
+      const completed = tasks.filter(t => t.completed && t.completedAt?.startsWith(dateStr)).length;
+      
+      data.push({
+        name: date.toLocaleDateString('pt-BR', { weekday: 'short' }),
+        criadas: created,
+        concluidas: completed,
+      });
+    }
+    return data;
+  }, [tasks]);
 
-  const filteredTasks = tasks.filter(t => {
-    if (filter === 'urgente') return t.priority === 'urgente' && !t.completed;
-    if (filter === 'pendente') return !t.completed;
-    if (filter === 'concluido') return t.completed;
-    return true;
-  });
+  // Suggest "Cleanup Day" if creation > completion trend
+  const totalCreated = burndownData.reduce((acc, d) => acc + d.criadas, 0);
+  const totalCompleted = burndownData.reduce((acc, d) => acc + d.concluidas, 0);
+  const needsCleanup = totalCreated > totalCompleted && pendingTasks.length > 10;
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] p-6 md:p-10">
-      <header className="mb-8">
-        <h1 className="text-4xl font-bold text-slate-900 mb-6">Minha Pauta de Julgamento</h1>
-        <div className="flex gap-3">
-          {[
-            { id: 'urgente', label: '🔴 URGENTE', color: 'bg-red-100 text-red-700' },
-            { id: 'pendente', label: '🟡 PENDENTE', color: 'bg-yellow-100 text-yellow-700' },
-            { id: 'concluido', label: '🟢 CONCLUÍDO', color: 'bg-emerald-100 text-emerald-700' },
-            { id: 'todos', label: 'TODOS', color: 'bg-slate-200 text-slate-700' },
-          ].map(f => (
-            <button 
-              key={f.id}
-              onClick={() => setFilter(f.id as any)}
-              className={`px-5 py-2 rounded-full text-sm font-semibold transition-all ${filter === f.id ? f.color : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
-            >
-              {f.label}
-            </button>
-          ))}
+    <div className="bg-white dark:bg-sanfran-rubiDark/30 rounded-[2.5rem] p-6 md:p-10 border border-slate-200 dark:border-sanfran-rubi/30 shadow-2xl flex flex-col gap-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-xl md:text-3xl font-black text-slate-950 dark:text-white uppercase tracking-tight flex items-center gap-3">
+            <Gavel className="text-sanfran-rubi" />
+            Pauta de Julgamento
+          </h3>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Resumo de Produtividade</p>
         </div>
-      </header>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredTasks.map(task => {
-          const subject = subjects.find(s => s.id === task.subjectId);
-          return (
-            <div key={task.id} className="bg-white p-6 rounded-[20px] shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
-              <div>
-                <div className="text-sm font-bold text-slate-500 mb-2">{subject?.name || 'Geral'}</div>
-                <h3 className="text-lg font-bold text-slate-900 mb-4">{task.title}</h3>
-              </div>
-              <div className="flex items-center justify-between mt-4 border-t pt-4">
-                <div className="flex items-center gap-2 text-sm text-slate-500">
-                  <Calendar size={16} />
-                  {task.dueDate || 'Sem prazo'}
-                </div>
-                {task.completed ? (
-                  <div className="text-amber-500 font-bold flex items-center gap-1">
-                    <Stamp size={20} />
-                    <span className="text-xs">Transitado em Julgado</span>
-                  </div>
-                ) : (
-                  <div className={`px-3 py-1 rounded-full text-xs font-bold ${task.priority === 'urgente' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                    {task.priority === 'urgente' ? 'URGENTE' : 'SENTENCIADO'}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        <button 
+          onClick={() => onNavigate(View.Tasks)}
+          className="p-3 bg-slate-100 dark:bg-white/5 rounded-2xl hover:bg-sanfran-rubi hover:text-white transition-all group"
+        >
+          <ArrowRight className="group-hover:translate-x-1 transition-transform" />
+        </button>
       </div>
 
-      {/* FAB */}
-      <button className="fixed bottom-8 right-8 w-16 h-16 rounded-full bg-gradient-to-r from-purple-600 to-blue-600 flex items-center justify-center text-white shadow-xl hover:scale-105 transition-all group">
-        <Gavel size={32} />
-        <span className="absolute bottom-20 right-0 bg-slate-900 text-white text-xs px-3 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-          Autuar Nova Tarefa
-        </span>
-      </button>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Burndown Chart */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
+              <TrendingUp size={16} className="text-emerald-500" />
+              Fluxo de Trabalho
+            </h4>
+            {needsCleanup && (
+              <div className="flex items-center gap-2 px-3 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full text-[10px] font-black animate-pulse">
+                <AlertTriangle size={12} />
+                SUGESTÃO: DIA DE FAXINA
+              </div>
+            )}
+          </div>
+          
+          <div className="h-[200px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={burndownData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis 
+                  dataKey="name" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }}
+                />
+                <YAxis hide />
+                <Tooltip 
+                  contentStyle={{ 
+                    borderRadius: '1rem', 
+                    border: 'none', 
+                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                    fontSize: '12px',
+                    fontWeight: 'bold'
+                  }}
+                />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.1em' }} />
+                <Line 
+                  type="monotone" 
+                  dataKey="criadas" 
+                  stroke="#ef4444" 
+                  strokeWidth={4} 
+                  dot={{ r: 4, fill: '#ef4444', strokeWidth: 2, stroke: '#fff' }}
+                  activeDot={{ r: 6 }}
+                  name="Criadas"
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="concluidas" 
+                  stroke="#10b981" 
+                  strokeWidth={4} 
+                  dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }}
+                  activeDot={{ r: 6 }}
+                  name="Concluídas"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Quick List */}
+        <div className="space-y-4">
+          <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
+            <CheckCircle2 size={16} className="text-sanfran-rubi" />
+            Próximas Sentenças
+          </h4>
+          
+          <div className="space-y-3">
+            {pendingTasks.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-slate-400 italic">
+                <CheckCircle2 size={40} className="mb-2 opacity-20" />
+                <p className="text-xs font-bold uppercase">Nada pendente na pauta</p>
+              </div>
+            ) : (
+              pendingTasks.slice(0, 3).map(task => {
+                const subject = subjects.find(s => s.id === task.subjectId);
+                return (
+                  <div 
+                    key={task.id} 
+                    onClick={() => onNavigate(View.Tasks)}
+                    className="flex items-center gap-4 p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/10 hover:border-sanfran-rubi/30 transition-all cursor-pointer group"
+                  >
+                    <div className={`w-2 h-10 rounded-full ${task.priority === 'urgente' ? 'bg-red-500' : 'bg-usp-blue'}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest truncate">
+                        {subject?.name || 'Geral'}
+                      </p>
+                      <h5 className="text-sm font-bold text-slate-900 dark:text-white truncate group-hover:text-sanfran-rubi transition-colors">
+                        {task.title}
+                      </h5>
+                    </div>
+                    <div className="text-right">
+                      <div className="flex items-center gap-1 text-[10px] font-black text-slate-400 uppercase">
+                        <Calendar size={10} />
+                        {task.dueDate || 'S/P'}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            {pendingTasks.length > 3 && (
+              <button 
+                onClick={() => onNavigate(View.Tasks)}
+                className="w-full py-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] hover:text-sanfran-rubi transition-colors"
+              >
+                + {pendingTasks.length - 3} outras tarefas na pauta
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
 
-export default Tasks;
+export default TaskSummaryWidget;

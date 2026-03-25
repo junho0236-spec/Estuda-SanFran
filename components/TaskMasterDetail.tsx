@@ -4,7 +4,7 @@ import {
   Plus, Layout, List, MoreVertical, Trash2, CheckSquare, 
   Clock, Paperclip, ChevronRight, X, Calendar, AlertCircle,
   Play, Pause, RotateCcw, Save, Quote, ThumbsUp, ExternalLink, Link as LinkIcon, Globe, Bell,
-  CheckCircle2, User, Zap, Trello, BookOpen
+  CheckCircle2, User, Zap, Trello, BookOpen, Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -362,6 +362,8 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   const [showLibraryModal, setShowLibraryModal] = useState(false);
   const [showTemplatesMenu, setShowTemplatesMenu] = useState(false);
   const [availableFiles, setAvailableFiles] = useState<SubjectFile[]>([]);
+  const [isBreakingDown, setIsBreakingDown] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   const [revisionStatus, setRevisionStatus] = useState({
     firstReading: false,
@@ -498,44 +500,119 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
 
   const handleBreakDownTask = async () => {
     if (!selectedTask) return;
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-lite-preview',
-      contents: `Quebre a tarefa "${selectedTask.title}" em 5 subtarefas lógicas. Retorne apenas uma lista numerada.`
-    });
-    const subtasksTitles = response.text?.split('\n').filter(t => t.trim()).slice(0, 5) || [];
-    const newSubtasks: SubTask[] = subtasksTitles.map(title => ({
-      id: crypto.randomUUID(),
-      title: title.replace(/^\d+\.\s*/, ''),
-      completed: false
-    }));
-    handleUpdateTask({ subtasks: [...(selectedTask.subtasks || []), ...newSubtasks] });
-    toast.success("Tarefa quebrada em subtarefas!");
+    setIsBreakingDown(true);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.1-flash-lite-preview',
+        contents: `Você é um assistente de produtividade. Quebre a tarefa "${selectedTask.title}" em exatamente 5 subtarefas lógicas e acionáveis. 
+        Retorne apenas os títulos das subtarefas, um por linha, sem números ou marcadores.`
+      });
+      
+      const subtasksTitles = response.text?.split('\n')
+        .map(t => t.trim())
+        .filter(t => t.length > 0)
+        .slice(0, 5) || [];
+
+      const newSubtasks: SubTask[] = subtasksTitles.map(title => ({
+        id: crypto.randomUUID(),
+        title: title.replace(/^\d+[\.\s-]*|[*•-]\s*/, ''),
+        completed: false
+      }));
+
+      handleUpdateTask({ subtasks: [...(selectedTask.subtasks || []), ...newSubtasks] });
+      toast.success("IA quebrou a tarefa em 5 passos lógicos!");
+    } catch (error) {
+      console.error("AI Breakdown error:", error);
+      toast.error("Erro ao processar com IA");
+    } finally {
+      setIsBreakingDown(false);
+    }
   };
 
-  const handleExportToICal = () => {
-    if (!selectedTask || !selectedTask.dueDate) return;
-    const cal = ical({ name: 'Minhas Tarefas' });
+  const handleExportToICal = (task?: Task) => {
+    const taskToExport = task || selectedTask;
+    if (!taskToExport || !taskToExport.dueDate) {
+      toast.error("Tarefa sem data de entrega");
+      return;
+    }
+    
+    const cal = ical({ name: 'SanFran Tasks' });
     cal.createEvent({
-      start: new Date(selectedTask.dueDate),
-      end: new Date(selectedTask.dueDate),
-      summary: selectedTask.title,
-      description: selectedTask.notes
+      start: new Date(taskToExport.dueDate),
+      end: new Date(taskToExport.dueDate),
+      summary: `[SanFran] ${taskToExport.title}`,
+      description: taskToExport.notes || 'Sem notas adicionais.',
+      location: 'SanFran App'
     });
+    
     const blob = new Blob([cal.toString()], { type: 'text/calendar;charset=utf-8' });
-    saveAs(blob, `${selectedTask.title}.ics`);
+    saveAs(blob, `task_${taskToExport.id.slice(0, 8)}.ics`);
+    toast.success("Arquivo iCal gerado!");
+  };
+
+  const handleExportAllDeadlines = () => {
+    const tasksWithDates = tasks.filter(t => t.dueDate && !t.completed);
+    if (tasksWithDates.length === 0) {
+      toast.info("Nenhuma tarefa pendente com data encontrada.");
+      return;
+    }
+
+    const cal = ical({ name: 'SanFran Deadlines' });
+    tasksWithDates.forEach(t => {
+      cal.createEvent({
+        start: new Date(t.dueDate!),
+        end: new Date(t.dueDate!),
+        summary: `[SanFran] ${t.title}`,
+        description: t.notes || '',
+      });
+    });
+
+    const blob = new Blob([cal.toString()], { type: 'text/calendar;charset=utf-8' });
+    saveAs(blob, `sanfran_deadlines_${new Date().toISOString().split('T')[0]}.ics`);
+    toast.success(`${tasksWithDates.length} prazos exportados!`);
   };
 
   const awardPrestigePoints = async (task: Task) => {
-    if (!task.completed || !task.dueDate) return;
+    if (!task.completed || !task.dueDate || !userProfile) return;
+    
     const dueDate = new Date(task.dueDate);
     const now = new Date();
-    if (now < dueDate && task.priority === 'urgente') {
-      const newPoints = (userProfile?.prestigePoints || 0) + 10;
-      const updatedProfile = { ...userProfile!, prestigePoints: newPoints };
+    
+    // Award points for completing before deadline
+    if (now < dueDate) {
+      let pointsToAdd = 0;
+      let badgeEarned = '';
+
+      if (task.priority === 'urgente') {
+        pointsToAdd = 20;
+        badgeEarned = 'Relâmpago Rubi';
+      } else if (task.priority === 'alta') {
+        pointsToAdd = 10;
+        badgeEarned = 'Eficiência de Ouro';
+      } else {
+        pointsToAdd = 5;
+      }
+
+      const currentBadges = userProfile.badges || [];
+      const updatedBadges = badgeEarned && !currentBadges.includes(badgeEarned) 
+        ? [...currentBadges, badgeEarned] 
+        : currentBadges;
+
+      const newPoints = (userProfile.prestigePoints || 0) + pointsToAdd;
+      const updatedProfile = { 
+        ...userProfile, 
+        prestigePoints: newPoints,
+        badges: updatedBadges
+      };
+
       setUserProfile(updatedProfile);
       await dataService.saveUserProfile(updatedProfile, userId, isOnline);
-      toast.success("Você ganhou 10 Pontos de Prestígio por concluir uma tarefa urgente antes do prazo!");
+      
+      if (badgeEarned && !currentBadges.includes(badgeEarned)) {
+        toast.success(`Incrível! Você conquistou o Badge: ${badgeEarned}`);
+      }
+      toast.success(`+${pointsToAdd} Pontos de Prestígio conquistados!`);
     }
   };
 
@@ -1116,7 +1193,40 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
             </button>
           </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <button 
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              className="p-2 rounded-full text-slate-400 hover:text-[#800000] hover:bg-slate-50 transition-all"
+              title="Sincronização Externa"
+            >
+              <Calendar size={20} />
+            </button>
+            <AnimatePresence>
+              {showExportMenu && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 z-50"
+                >
+                  <button 
+                    onClick={() => { handleExportAllDeadlines(); setShowExportMenu(false); }}
+                    className="w-full text-left px-4 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 rounded-xl flex items-center gap-3"
+                  >
+                    <Download size={14} className="text-[#800000]" />
+                    Exportar Todos os Prazos
+                  </button>
+                  <div className="h-px bg-slate-50 my-1" />
+                  <p className="px-4 py-2 text-[9px] text-slate-400 font-bold uppercase tracking-widest">Dica</p>
+                  <p className="px-4 pb-2 text-[10px] text-slate-500 leading-relaxed">
+                    Importe o arquivo .ics no Google Calendar ou Apple Calendar.
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
           <div className="flex items-center bg-slate-100 p-1 rounded-lg">
             <button 
               onClick={() => handleToggleViewMode('list')}
@@ -1378,8 +1488,15 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <button onClick={handleBreakDownTask} className="p-2 text-slate-400 hover:text-[#800000]"><Zap size={20} /></button>
-                          <button onClick={handleExportToICal} className="p-2 text-slate-400 hover:text-[#800000]"><Calendar size={20} /></button>
+                          <button 
+                            onClick={handleBreakDownTask} 
+                            disabled={isBreakingDown}
+                            className={`p-2 transition-all ${isBreakingDown ? 'animate-pulse text-[#800000]' : 'text-slate-400 hover:text-[#800000]'}`}
+                            title="Quebrar em Subtarefas (IA)"
+                          >
+                            <Zap size={20} />
+                          </button>
+                          <button onClick={() => handleExportToICal()} className="p-2 text-slate-400 hover:text-[#800000]" title="Exportar iCal"><Calendar size={20} /></button>
                           {isTaskBlocked(selectedTask) && (
                             <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 text-amber-600 rounded-lg text-[10px] font-bold border border-amber-100">
                               <AlertCircle size={12} />

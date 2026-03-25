@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Trophy, Medal, Gavel, Award, Scale, Briefcase, GraduationCap, Crown, User, TrendingUp, Clock, Info, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Trophy, Medal, Gavel, Award, Scale, Briefcase, GraduationCap, Crown, User, TrendingUp, Clock, RefreshCw, AlertTriangle, Zap, Star } from 'lucide-react';
 import { RankingEntry } from '../types';
 import { supabase } from '../services/supabaseClient';
 
@@ -13,6 +13,7 @@ const Ranking: React.FC<RankingProps> = ({ userId, session }) => {
   const [ranking, setRanking] = useState<RankingEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [view, setView] = useState<'hours' | 'prestige'>('hours');
 
   const ranksInfo = [
     { name: 'Bacharel', hours: 0, icon: GraduationCap, color: 'text-slate-400', bg: 'bg-slate-100' },
@@ -37,13 +38,18 @@ const Ranking: React.FC<RankingProps> = ({ userId, session }) => {
 
       if (sessionErr) throw sessionErr;
 
-      // 2. Busca nomes da tabela pública 'profiles'
-      let profileMap: Record<string, string> = {};
+      // 2. Busca nomes e pontos de prestígio da tabela 'user_persona'
+      let profileMap: Record<string, { name: string, prestige: number }> = {};
       try {
-        const { data: profileData } = await supabase.from('profiles').select('id, full_name');
-        profileData?.forEach(p => { profileMap[p.id] = p.full_name; });
+        const { data: personaData } = await supabase.from('user_persona').select('user_id, full_name, persona_data');
+        personaData?.forEach(p => { 
+          profileMap[p.user_id] = { 
+            name: p.full_name, 
+            prestige: p.persona_data?.prestigePoints || 0 
+          }; 
+        });
       } catch (e) {
-        console.warn("Tabela 'profiles' inacessível ou vazia.");
+        console.warn("Tabela 'user_persona' inacessível ou vazia.");
       }
 
       // 3. Agrupamento por usuário
@@ -55,20 +61,28 @@ const Ranking: React.FC<RankingProps> = ({ userId, session }) => {
       // 4. Montagem do array de ranking
       const myNameFromSession = session?.user?.user_metadata?.full_name || 'Doutor(a)';
       
-      const sorted = Object.entries(userTotals)
-        .map(([id, total]) => {
+      const allUserIds = Array.from(new Set([...Object.keys(userTotals), ...Object.keys(profileMap)]));
+
+      const sorted = allUserIds
+        .map(id => {
+          const total = userTotals[id] || 0;
           const hours = total / 3600;
-          // Prioridade de nome: 1. Tabela profiles, 2. Metadados se for EU, 3. Nome genérico
-          let displayName = profileMap[id] || (id === userId ? myNameFromSession : null) || `Acadêmico ${id.slice(0, 4)}`;
+          const profile = profileMap[id];
+          
+          let displayName = profile?.name || (id === userId ? myNameFromSession : null) || `Acadêmico ${id.slice(0, 4)}`;
           
           return {
             user_id: id,
             name: displayName,
             total_seconds: total,
-            rank_name: getRankName(hours)
+            rank_name: getRankName(hours),
+            prestigePoints: profile?.prestige || 0
           };
         })
-        .sort((a, b) => b.total_seconds - a.total_seconds);
+        .sort((a, b) => {
+          if (view === 'hours') return b.total_seconds - a.total_seconds;
+          return (b.prestigePoints || 0) - (a.prestigePoints || 0);
+        });
 
       setRanking(sorted);
     } catch (e) {
@@ -82,23 +96,24 @@ const Ranking: React.FC<RankingProps> = ({ userId, session }) => {
   useEffect(() => {
     fetchRankingData();
 
-    // Inscrição em Tempo Real para atualizações automáticas
     const channel = supabase
       .channel('ranking_updates')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'study_sessions' },
-        () => {
-          console.log('Nova sessão detectada, atualizando ranking...');
-          fetchRankingData();
-        }
+        () => fetchRankingData()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_persona' },
+        () => fetchRankingData()
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, session]);
+  }, [userId, session, view]);
 
   const topThree = ranking.slice(0, 3);
 
@@ -123,8 +138,22 @@ const Ranking: React.FC<RankingProps> = ({ userId, session }) => {
            <span className="text-[10px] font-black uppercase tracking-widest text-usp-gold">Hall da Excelência Acadêmica</span>
         </div>
         <h2 className="text-4xl md:text-6xl font-black text-slate-950 dark:text-white uppercase tracking-tighter">Ranking SanFran</h2>
-        <p className="text-slate-500 font-bold italic">"Scientia Vinces" - Pela ciência, vencerás.</p>
         
+        <div className="flex items-center justify-center gap-4 mt-6">
+          <button 
+            onClick={() => setView('hours')}
+            className={`flex items-center gap-2 px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${view === 'hours' ? 'bg-[#800000] text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-100 hover:bg-slate-50'}`}
+          >
+            <Clock size={14} /> Horas de Estudo
+          </button>
+          <button 
+            onClick={() => setView('prestige')}
+            className={`flex items-center gap-2 px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${view === 'prestige' ? 'bg-[#800000] text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-100 hover:bg-slate-50'}`}
+          >
+            <Zap size={14} /> Pontos de Prestígio
+          </button>
+        </div>
+
         <button 
           onClick={fetchRankingData}
           disabled={isRefreshing}
@@ -133,23 +162,6 @@ const Ranking: React.FC<RankingProps> = ({ userId, session }) => {
           <RefreshCw className="w-5 h-5" />
         </button>
       </header>
-
-      {/* Alerta de RLS / Pioneirismo */}
-      {ranking.length <= 1 && (
-        <div className="max-w-xl mx-auto bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-900/30 p-6 rounded-3xl flex items-start gap-4 animate-in slide-in-from-bottom-4">
-           <AlertTriangle className="text-orange-500 w-6 h-6 flex-shrink-0 mt-1" />
-           <div>
-             <p className="text-[11px] font-black uppercase tracking-widest text-orange-600 dark:text-orange-400 mb-1">
-               Aviso de Competição
-             </p>
-             <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 leading-relaxed">
-               Apenas você aparece no ranking? Isso geralmente ocorre se as regras de privacidade do banco de dados (RLS) estiverem restritas. 
-               <br/><br/>
-               Se você for o administrador, acesse o Supabase e libere a leitura pública na tabela <code>study_sessions</code> para ver seus colegas.
-             </p>
-           </div>
-        </div>
-      )}
 
       {/* Pódio visual */}
       {ranking.length > 0 && (
@@ -167,7 +179,9 @@ const Ranking: React.FC<RankingProps> = ({ userId, session }) => {
                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{topThree[1].rank_name}</p>
               </div>
               <div className="w-24 md:w-32 h-24 md:h-32 bg-slate-100 dark:bg-white/5 rounded-t-3xl border-x-2 border-t-2 border-slate-200 dark:border-white/10 flex flex-col items-center justify-center">
-                <span className="text-lg md:text-2xl font-black text-slate-500">{formatHours(topThree[1].total_seconds)}h</span>
+                <span className="text-lg md:text-2xl font-black text-slate-500">
+                  {view === 'hours' ? `${formatHours(topThree[1].total_seconds)}h` : `${topThree[1].prestigePoints} pts`}
+                </span>
               </div>
             </div>
           )}
@@ -186,7 +200,9 @@ const Ranking: React.FC<RankingProps> = ({ userId, session }) => {
                 <p className="text-[10px] font-bold text-usp-gold uppercase tracking-widest">{topThree[0].rank_name}</p>
               </div>
               <div className="w-32 md:w-40 h-32 md:h-48 bg-white dark:bg-sanfran-rubi/10 rounded-t-[2.5rem] border-x-4 border-t-4 border-usp-gold flex flex-col items-center justify-center shadow-2xl">
-                <span className="text-2xl md:text-4xl font-black text-usp-gold">{formatHours(topThree[0].total_seconds)}h</span>
+                <span className="text-2xl md:text-4xl font-black text-usp-gold">
+                  {view === 'hours' ? `${formatHours(topThree[0].total_seconds)}h` : `${topThree[0].prestigePoints} pts`}
+                </span>
               </div>
             </div>
           )}
@@ -204,7 +220,9 @@ const Ranking: React.FC<RankingProps> = ({ userId, session }) => {
                 <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{topThree[2].rank_name}</p>
               </div>
               <div className="w-20 md:w-28 h-16 md:h-24 bg-orange-50 dark:bg-white/5 rounded-t-2xl border-x-2 border-t-2 border-orange-200 dark:border-white/10 flex flex-col items-center justify-center">
-                <span className="text-base md:text-xl font-black text-orange-500">{formatHours(topThree[2].total_seconds)}h</span>
+                <span className="text-base md:text-xl font-black text-orange-500">
+                  {view === 'hours' ? `${formatHours(topThree[2].total_seconds)}h` : `${topThree[2].prestigePoints} pts`}
+                </span>
               </div>
             </div>
           )}
@@ -229,14 +247,27 @@ const Ranking: React.FC<RankingProps> = ({ userId, session }) => {
                    <div className="truncate">
                       <p className="font-black uppercase text-xs md:text-sm tracking-tight truncate">{entry.name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
-                         <TrendingUp size={10} className={entry.user_id === userId ? 'text-white' : 'text-sanfran-rubi'} />
-                         <span className={`text-[9px] font-bold uppercase tracking-widest ${entry.user_id === userId ? 'text-white/80' : 'text-slate-400'}`}>Em Ascensão</span>
+                         {view === 'hours' ? (
+                           <>
+                             <TrendingUp size={10} className={entry.user_id === userId ? 'text-white' : 'text-sanfran-rubi'} />
+                             <span className={`text-[9px] font-bold uppercase tracking-widest ${entry.user_id === userId ? 'text-white/80' : 'text-slate-400'}`}>Em Ascensão</span>
+                           </>
+                         ) : (
+                           <>
+                             <Star size={10} className={entry.user_id === userId ? 'text-white' : 'text-usp-gold'} />
+                             <span className={`text-[9px] font-bold uppercase tracking-widest ${entry.user_id === userId ? 'text-white/80' : 'text-slate-400'}`}>Prestígio Acadêmico</span>
+                           </>
+                         )}
                       </div>
                    </div>
                 </div>
               </div>
-              <div className={`w-20 text-right font-black tabular-nums text-sm md:text-lg ${entry.user_id === userId ? 'text-white' : 'text-sanfran-rubi'}`}>
-                {formatHours(entry.total_seconds)}<span className="text-[10px] font-bold ml-1">h</span>
+              <div className={`w-24 text-right font-black tabular-nums text-sm md:text-lg ${entry.user_id === userId ? 'text-white' : 'text-sanfran-rubi'}`}>
+                {view === 'hours' ? (
+                  <>{formatHours(entry.total_seconds)}<span className="text-[10px] font-bold ml-1">h</span></>
+                ) : (
+                  <>{entry.prestigePoints}<span className="text-[10px] font-bold ml-1">pts</span></>
+                )}
               </div>
             </div>
           ))}

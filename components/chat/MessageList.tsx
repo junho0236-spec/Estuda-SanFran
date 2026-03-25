@@ -32,6 +32,7 @@ interface MessageListProps {
   polls: Record<string, any>;
   votePoll: (pollId: string, optionIdx: number) => void;
   typingUsers: string[];
+  createTaskFromMessage?: (msg: ChatMessage) => void;
 }
 
 const MessageList: React.FC<MessageListProps> = ({
@@ -40,7 +41,8 @@ const MessageList: React.FC<MessageListProps> = ({
   starredMessages, messagesEndRef, toggleStarMessage, showReactionPicker,
   setShowReactionPicker, addReaction, removeReaction, messageReactions,
   startReplying, setForwardingMessage, setShowForwardModal, startEditing,
-  deleteMessage, openUserProfile, onNavigate, polls, votePoll, typingUsers
+  deleteMessage, openUserProfile, onNavigate, polls, votePoll, typingUsers,
+  createTaskFromMessage
 }) => {
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   
@@ -143,6 +145,7 @@ const MessageList: React.FC<MessageListProps> = ({
               onNavigate={onNavigate}
               polls={polls}
               votePoll={votePoll}
+              createTaskFromMessage={createTaskFromMessage}
             />
           </div>
         )}

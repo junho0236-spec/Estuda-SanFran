@@ -274,6 +274,7 @@ export interface RankingEntry {
   name: string;
   total_seconds: number;
   rank_name: string;
+  prestigePoints?: number;
 }
 
 export interface Note {
