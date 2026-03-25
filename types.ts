@@ -825,6 +825,8 @@ export interface SpacedTopic {
   topic: string;
   study_date: string; // YYYY-MM-DD
   reviews_completed: number[]; // Array of intervals done [1, 7, 15, 30]
+  custom_intervals?: number[]; // Optional custom intervals
+  doctor_feedback?: string; // AI feedback
   created_at: string;
 }
 

@@ -26,6 +26,11 @@ const Ranking: React.FC<RankingProps> = ({ userId, session, flashcards }) => {
     { name: 'Magistrado', hours: 1500, icon: Gavel, color: 'text-purple-600', bg: 'bg-purple-50' },
   ];
 
+  const getRankName = (hours: number) => {
+    const rank = [...ranksInfo].reverse().find(r => hours >= r.hours);
+    return rank ? rank.name : ranksInfo[0].name;
+  };
+
   const handleChallenge = async (opponentId: string, opponentName: string) => {
     if (opponentId === userId) return;
     

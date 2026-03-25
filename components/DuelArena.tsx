@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Sword, Trophy, Shield, Zap, Timer, CheckCircle2, XCircle, Gavel, User, Scale } from 'lucide-react';
-import { Duel, DuelQuestion } from '../types';
+import { Duel, DuelQuestion, UserProfile } from '../types';
 import { supabase } from '../services/supabaseClient';
 import confetti from 'canvas-confetti';
 

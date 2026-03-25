@@ -3,6 +3,44 @@ import React, { useState, useRef, useEffect } from 'react';
 import { fetchLegalReference } from '../services/geminiService';
 import { Loader2, Book, ExternalLink } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import mermaid from 'mermaid';
+
+// Initialize mermaid
+mermaid.initialize({
+  startOnLoad: true,
+  theme: 'default',
+  securityLevel: 'loose',
+  fontFamily: 'Inter, sans-serif'
+});
+
+const Mermaid: React.FC<{ chart: string }> = ({ chart }) => {
+  const [svg, setSvg] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const id = useRef(`mermaid-${Math.random().toString(36).substr(2, 9)}`);
+
+  useEffect(() => {
+    const renderChart = async () => {
+      if (!chart.trim()) return;
+      try {
+        const { svg } = await mermaid.render(id.current, chart);
+        setSvg(svg);
+        setError(null);
+      } catch (err) {
+        console.error('Mermaid error:', err);
+        setError('Erro ao renderizar diagrama.');
+      }
+    };
+
+    renderChart();
+  }, [chart]);
+
+  if (error) return <div className="p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-xs rounded-xl border border-red-100 dark:border-red-800/30">{error}</div>;
+  if (!svg) return <div className="flex items-center justify-center p-8"><Loader2 className="animate-spin text-blue-500" /></div>;
+
+  return <div className="mermaid-container overflow-x-auto py-4 flex justify-center" dangerouslySetInnerHTML={{ __html: svg }} />;
+};
 
 interface LegalLinkProps {
   reference: string;
@@ -68,7 +106,7 @@ const LegalLink: React.FC<LegalLinkProps> = ({ reference }) => {
             </div>
           ) : (
             <div className="prose prose-sm dark:prose-invert max-w-none text-xs font-medium leading-relaxed text-slate-700 dark:text-slate-300">
-              <ReactMarkdown>{content || "Nenhum conteúdo encontrado."}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{content || "Nenhum conteúdo encontrado."}</ReactMarkdown>
             </div>
           )}
           
@@ -82,10 +120,9 @@ const LegalLink: React.FC<LegalLinkProps> = ({ reference }) => {
 };
 
 export const SmartText: React.FC<{ text: string }> = ({ text }) => {
-  if (!text) return null;
+  if (!text || typeof text !== 'string') return <>{text}</>;
 
   // Regex para detectar referências legais comuns
-  // Exemplos: Art. 186 do CC, Súmula 350 do STF, Artigo 5º da CF
   const legalRegex = /(Art\.?\s?\d+[^\s,.;]*(?:\s?do\s?[A-Z]+)?|Súmula\s?\d+(?:\s?do\s?[A-Z]+)?|Artigo\s?\d+[^\s,.;]*(?:\s?da\s?[A-Z]+)?)/gi;
 
   const parts = text.split(legalRegex);
@@ -105,3 +142,45 @@ export const SmartText: React.FC<{ text: string }> = ({ text }) => {
     </>
   );
 };
+
+export const MarkdownWithLegalLinks: React.FC<{ content: string }> = ({ content }) => {
+  return (
+    <div className="prose dark:prose-invert max-w-none">
+      <ReactMarkdown 
+        remarkPlugins={[remarkGfm]}
+        components={{
+          code({ node, className, children, ...props }) {
+            const match = /language-(\w+)/.exec(className || '');
+            const lang = match ? match[1] : '';
+            const isBlock = !!match;
+            
+            if (isBlock && lang === 'mermaid') {
+              return <Mermaid chart={String(children).replace(/\n$/, '')} />;
+            }
+            
+            return (
+              <code className={className} {...props}>
+                {children}
+              </code>
+            );
+          },
+          p: ({ children }) => {
+            return (
+              <p>
+                {React.Children.map(children, child => {
+                  if (typeof child === 'string') {
+                    return <SmartText text={child} />;
+                  }
+                  return child;
+                })}
+              </p>
+            );
+          }
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+};
+
