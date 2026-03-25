@@ -159,12 +159,12 @@ const Anki: React.FC<AnkiProps> = ({
       }
     };
   }, [whiteNoiseType, anki.mode]);
-  };
-  }, [whiteNoiseType, mode]);
+
   const [activeGlossaryTerm, setActiveGlossaryTerm] = useState<string | null>(null);
-  const [glossaryData, setGlossaryData] = useState<GlossaryTerm | null>(null);
+  const [glossaryData, setGlossaryData] = useState<any | null>(null);
   const [glossaryPosition, setGlossaryPosition] = useState({ x: 0, y: 0 });
   const [isLoadingGlossary, setIsLoadingGlossary] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   const handleSemanticSearch = async () => {
     if (!semanticSearchQuery.trim()) return;
@@ -241,18 +241,20 @@ João, servidor público, [situação]...
     setGlossaryData(null);
 
     try {
-      const data = await fetchTermDefinition(term);
-      setGlossaryData(data);
+      // Assuming fetchTermDefinition is available or defined elsewhere
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const prompt = `Defina o termo jurídico "${term}" de forma concisa e clara para um estudante de Direito.`;
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt
+      });
+      setGlossaryData({ term, definition: response.text });
     } catch (error) {
       console.error("Error fetching glossary term:", error);
     } finally {
       setIsLoadingGlossary(false);
     }
   };
-  const [activeGlossaryTerm, setActiveGlossaryTerm] = useState<string | null>(null);
-  const [glossaryData, setGlossaryData] = useState<any | null>(null);
-  const [isGlossaryLoading, setIsGlossaryLoading] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
 
 
   const currentContextIds = useMemo(() => getSubfolderIds(currentFolderId), h-4" /> Arquivar ({selectedCardIds.size})
