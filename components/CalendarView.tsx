@@ -115,9 +115,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId, st
       } else {
         throw new Error('Não foi possível obter o token do Google');
       }
-    } catch (err) {
-      console.error('Error syncing with Google:', err);
-      toast.error('Erro ao conectar com o Google Agenda');
+    } catch (err: any) {
+      if (err.code === 'auth/popup-closed-by-user') {
+        toast.info('Conexão cancelada: o pop-up foi fechado.');
+      } else {
+        console.error('Error syncing with Google:', err);
+        toast.error('Erro ao conectar com o Google Agenda');
+      }
     } finally {
       setIsSyncing(false);
     }
