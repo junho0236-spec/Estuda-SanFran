@@ -630,7 +630,23 @@ const App: React.FC = () => {
         if (subs) setSubjects(subs);
         
         const profile = await dataService.getUserProfile(userId, isOnline);
-        if (profile) setUserProfile(profile);
+        if (profile) {
+          const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+          if (profile.lastInteractionDate && profile.lastInteractionDate !== today) {
+            const updatedProfile = {
+              ...profile,
+              productivityStats: {
+                ...profile.productivityStats,
+                completedYesterday: profile.productivityStats?.completedToday || 0,
+                completedToday: 0
+              }
+            };
+            setUserProfile(updatedProfile);
+            await dataService.saveUserProfile(updatedProfile, userId, isOnline);
+          } else {
+            setUserProfile(profile);
+          }
+        }
 
         // Fetch others in parallel but handle them individually to avoid one failure crashing everything
         const [resFlds, resCards, resTks, resBoards, resSessions, resReadings, resProgress] = await Promise.all([
@@ -1411,8 +1427,6 @@ const App: React.FC = () => {
                     isOnline={isOnline}
                     setStudySessions={setStudySessions}
                     isLoadingFlashcards={isLoadingFlashcards}
-                    userProfile={userProfile}
-                    setUserProfile={setUserProfile}
                   />
                 } />
                 <Route path={getPathFromView(View.Library)} element={<Library readings={readings} setReadings={setReadings} subjects={subjects} userId={session.user.id} />} />
@@ -1452,7 +1466,7 @@ const App: React.FC = () => {
                 <Route path={getPathFromView(View.CodeTracker)} element={<CodeTracker userId={session.user.id} />} />
                 <Route path={getPathFromView(View.IracMethod)} element={<IracMethod userId={session.user.id} />} />
                 <Route path={getPathFromView(View.SpacedRepetition)} element={<SpacedRepetition userId={session.user.id} />} />
-                <Route path={getPathFromView(View.Connect)} element={<Connect userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} onNavigate={setCurrentView} setTasks={setTasks} />} />
+                <Route path={getPathFromView(View.Connect)} element={<Connect userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} onNavigate={setCurrentView} />} />
                 <Route path={getPathFromView(View.Friends)} element={<Friends userId={session.user.id} userName={userProfile?.full_name || session.user.email || 'Usuário'} onNavigate={setCurrentView} />} />
                 <Route path={getPathFromView(View.AttendanceCalculator)} element={<AttendanceCalculator userId={session.user.id} />} />
                 <Route path={getPathFromView(View.SyllabusTracker)} element={<SyllabusTracker userId={session.user.id} />} />
@@ -1484,9 +1498,6 @@ const App: React.FC = () => {
                     userId={session.user.id} 
                     onFinished={() => { setActiveDuel(null); setCurrentView(View.Largo); }} 
                     onCorrectAnswer={incrementCorrectQuestions}
-                    userProfile={userProfile}
-                    setUserProfile={setUserProfile}
-                    isOnline={isOnline}
                   />
                  : null} />
                 
@@ -1530,7 +1541,7 @@ const App: React.FC = () => {
 
                 <Route path={getPathFromView(View.OralArgument)} element={<OralArgument />} />
                 <Route path={getPathFromView(View.Calendar)} element={<CalendarView subjects={subjects} tasks={tasks} userId={session.user.id} studySessions={studySessions} />} />
-                <Route path={getPathFromView(View.Ranking)} element={<Ranking userId={session.user.id} session={session} flashcards={flashcards} />} />
+                <Route path={getPathFromView(View.Ranking)} element={<Ranking userId={session.user.id} session={session} />} />
                 <Route path={getPathFromView(View.Subjects)} element={
                   <Subjects 
                     subjects={subjects} 
@@ -1564,7 +1575,6 @@ const App: React.FC = () => {
                     isOnline={isOnline} 
                     userProfile={userProfile}
                     setUserProfile={setUserProfile}
-                    folders={folders}
                   />
                 } />
 

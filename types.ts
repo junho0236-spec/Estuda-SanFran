@@ -167,6 +167,7 @@ export interface Subject {
   p1_date?: string;
   p2_date?: string;
   topics?: { id: string; title: string; completed: boolean }[];
+  content?: string; // New field for document content
 }
 
 export type TaskPriority = 'urgente' | 'alta' | 'normal';
@@ -811,6 +812,7 @@ export interface SpacedTopic {
   reviews_completed: number[]; // Array of intervals done [1, 7, 15, 30]
   cycles: number;
   created_at: string;
+  content?: string; // New field for document content
 }
 
 // Attendance Types

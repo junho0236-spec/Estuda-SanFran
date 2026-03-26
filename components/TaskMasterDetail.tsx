@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Task, Subject, Board, BoardColumn, SubTask, StudySession, UserProfile, TaskPriority, TaskCategory, Notification, Friendship, SubjectFile, Folder } from '../types';
+import { Task, Subject, Board, BoardColumn, SubTask, StudySession, UserProfile, TaskPriority, TaskCategory, Notification, Friendship, SubjectFile } from '../types';
 import { 
   Plus, Layout, List, MoreVertical, Trash2, CheckSquare, 
   Clock, Paperclip, ChevronRight, X, Calendar, AlertCircle,
@@ -85,13 +85,12 @@ interface TaskMasterDetailProps {
   isOnline: boolean;
   userProfile: UserProfile | null;
   setUserProfile: React.Dispatch<React.SetStateAction<UserProfile | null>>;
-  folders: Folder[];
 }
 
 const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({ 
   tasks, subjects, setTasks, boards, setBoards, 
   studySessions, setStudySessions, userId, isOnline,
-  userProfile, setUserProfile, folders
+  userProfile, setUserProfile
 }) => {
   // --- View State ---
   const [activeTab, setActiveTab] = useState<string>('Geral');
@@ -365,9 +364,6 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   const [availableFiles, setAvailableFiles] = useState<SubjectFile[]>([]);
   const [isBreakingDown, setIsBreakingDown] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
-  const [showCleanupConfirm, setShowCleanupConfirm] = useState(false);
-  const [isGeneratingMnemonic, setIsGeneratingMnemonic] = useState(false);
-  const [mnemonic, setMnemonic] = useState<string | null>(null);
 
   const [revisionStatus, setRevisionStatus] = useState({
     firstReading: false,
@@ -637,49 +633,6 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     setSaveTimeout(timeout);
   };
 
-  const handleCleanupStaleTasks = async () => {
-    const fifteenDaysAgo = new Date().getTime() - 15 * 24 * 60 * 60 * 1000;
-    const staleTasks = tasks.filter(t => 
-      !t.completed && 
-      t.last_activity_at && 
-      new Date(t.last_activity_at).getTime() < fifteenDaysAgo
-    );
-
-    if (staleTasks.length === 0) {
-      toast.success('Sua lista está saudável! Nenhuma tarefa estagnada encontrada.');
-      return;
-    }
-
-    // Instead of confirm(), we use a state-based confirmation or just proceed if the user clicked the confirm button in the UI
-    staleTasks.forEach(t => {
-      handleUpdateTask({ archived_at: new Date().toISOString() }, t.id);
-    });
-    toast.success(`${staleTasks.length} tarefas arquivadas com sucesso.`);
-    setShowCleanupConfirm(false);
-  };
-
-  const handleGenerateMnemonic = async () => {
-    if (!selectedTask) return;
-    setIsGeneratingMnemonic(true);
-    setMnemonic(null);
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.1-flash-lite-preview',
-        contents: `Crie um mnemônico engraçado ou uma frase de efeito para ajudar a decorar o conceito jurídico: "${selectedTask.title}". 
-        O mnemônico deve ser fácil de lembrar e criativo. Retorne apenas o mnemônico e uma breve explicação.`
-      });
-      
-      setMnemonic(response.text || "Não foi possível gerar o mnemônico.");
-      toast.success("Mnemônico gerado com sucesso!");
-    } catch (error) {
-      console.error("Mnemonic generation error:", error);
-      toast.error("Erro ao gerar mnemônico");
-    } finally {
-      setIsGeneratingMnemonic(false);
-    }
-  };
-
   const handleAddTask = async (boardId?: string, columnId?: string, template?: 'fichamento' | 'gestao') => {
     let title = '';
     let subtasks: SubTask[] = [];
@@ -737,9 +690,6 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     
     const taskToUpdate = tasks.find(t => t.id === taskId);
     if (!taskToUpdate) return;
-
-    // Update activity timestamp
-    updates.last_activity_at = new Date().toISOString();
 
     // If marking as completed, set the timestamp
     if (updates.completed === true && !taskToUpdate.completedAt) {
@@ -801,13 +751,41 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       }
       // Track productivity
       if (userProfile) {
-        const newStats = {
-          ...userProfile.productivityStats!,
-          completedToday: (userProfile.productivityStats?.completedToday || 0) + 1
-        };
-        const updatedProfile = { ...userProfile, productivityStats: newStats };
+        const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+        const lastInteraction = userProfile.lastInteractionDate;
+        
+        let newStreak = userProfile.productivityStats?.streak || 0;
+        if (lastInteraction !== today) {
+          if (!lastInteraction) {
+            newStreak = 1;
+          } else {
+            const lastDate = new Date(lastInteraction);
+            const todayDate = new Date(today);
+            const diffTime = Math.abs(todayDate.getTime() - lastDate.getTime());
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffDays === 1) {
+              newStreak += 1;
+            } else {
+              newStreak = 1;
+            }
+          }
+        }
+
+        const updatedProfile: UserProfile = {
+          ...userProfile,
+          arcadia_score: (userProfile.arcadia_score || 0) + 25, // 25 XP per task
+          lastInteractionDate: today,
+          productivityStats: {
+            ...userProfile.productivityStats,
+            completedToday: (userProfile.productivityStats?.completedToday || 0) + 1,
+            streak: newStreak
+          }
+        } as UserProfile;
+
         setUserProfile(updatedProfile);
         dataService.saveUserProfile(updatedProfile, userId, isOnline);
+        toast.success("+25 XP: Tarefa Concluída!");
       }
     } else if (updates.completed === false) {
       updates.completedAt = undefined;
@@ -1098,8 +1076,6 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       ? (task.subtasks.filter((s: any) => s.completed).length / task.subtasks.length) * 100
       : 0;
 
-    const isStale = task.last_activity_at && !task.completed && (new Date().getTime() - new Date(task.last_activity_at).getTime()) > 7 * 24 * 60 * 60 * 1000;
-
     return (
       <div
         ref={setNodeRef}
@@ -1107,16 +1083,10 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         {...attributes}
         {...listeners}
         onClick={() => setSelectedTaskId(task.id)}
-        className={`p-4 rounded-2xl cursor-pointer transition-all border relative overflow-hidden group ${selectedTaskId === task.id ? 'bg-[#800000] text-white border-transparent shadow-lg scale-[1.02]' : 'bg-white text-slate-700 border-slate-100 hover:border-[#800000]/30 hover:shadow-sm'} ${task.completed ? 'opacity-50' : 'opacity-100'} ${task.priority === 'urgente' ? 'border-l-4 border-l-red-500' : task.priority === 'alta' ? 'border-l-4 border-l-amber-500' : ''} ${isStale ? 'border-dashed border-slate-300' : ''}`}
+        className={`p-4 rounded-2xl cursor-pointer transition-all border relative overflow-hidden group ${selectedTaskId === task.id ? 'bg-[#800000] text-white border-transparent shadow-lg scale-[1.02]' : 'bg-white text-slate-700 border-slate-100 hover:border-[#800000]/30 hover:shadow-sm'} ${task.completed ? 'opacity-50' : 'opacity-100'} ${task.priority === 'urgente' ? 'border-l-4 border-l-red-500' : task.priority === 'alta' ? 'border-l-4 border-l-amber-500' : ''}`}
       >
         {(task.priority === 'urgente' || task.priority === 'alta') && !task.completed && (
           <div className={`absolute inset-0 pointer-events-none animate-pulse ${task.priority === 'urgente' ? 'bg-red-500/5' : 'bg-amber-500/5'}`} />
-        )}
-        
-        {isStale && !task.completed && (
-          <div className="absolute top-0 right-0 p-1 bg-slate-100 text-slate-400 text-[8px] font-bold uppercase rounded-bl-lg">
-            Estagnada
-          </div>
         )}
         
         <div className="flex items-center gap-3 relative z-10">
@@ -1152,11 +1122,6 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                 {task.boardId && (
                   <div className={`text-[9px] font-bold uppercase tracking-tighter ${selectedTaskId === task.id ? 'text-white/60' : 'text-[#800000]/60'}`}>
                     {boards.find((b: any) => b.id === task.boardId)?.name}
-                  </div>
-                )}
-                {task.deckId && (
-                  <div className={`flex items-center gap-1 text-[9px] font-bold ${selectedTaskId === task.id ? 'text-white/70' : 'text-purple-600'}`}>
-                    <BookOpen size={10} /> {folders.find(f => f.id === task.deckId)?.name || 'Deck'}
                   </div>
                 )}
                 {task.delegatedBy && task.delegatedBy !== userId && (
@@ -1235,44 +1200,6 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      {/* Cleanup Confirmation Modal */}
-      <AnimatePresence>
-        {showCleanupConfirm && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl border border-slate-200 dark:border-white/10"
-            >
-              <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mb-6 mx-auto">
-                <Trash2 className="text-red-600 dark:text-red-400" size={32} />
-              </div>
-              <h3 className="text-2xl font-black text-center text-slate-900 dark:text-white uppercase tracking-tighter mb-4">
-                Hora da Faxina!
-              </h3>
-              <p className="text-center text-slate-600 dark:text-slate-400 font-medium mb-8">
-                Encontramos tarefas sem atividade há mais de 15 dias. Deseja arquivá-las para manter seu foco no que realmente importa?
-              </p>
-              <div className="flex gap-4">
-                <button 
-                  onClick={() => setShowCleanupConfirm(false)}
-                  className="flex-1 py-4 rounded-2xl font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
-                >
-                  Agora não
-                </button>
-                <button 
-                  onClick={handleCleanupStaleTasks}
-                  className="flex-1 py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-bold shadow-lg shadow-red-600/20 transition-all"
-                >
-                  Sim, arquivar
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
       <div className="h-[calc(100vh-120px)] flex flex-col bg-slate-50 rounded-[32px] overflow-hidden border border-slate-200 shadow-2xl">
         {/* Header Tabs */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white sticky top-0 z-20">
@@ -1301,7 +1228,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
               className="p-2 rounded-full text-slate-400 hover:text-[#800000] hover:bg-slate-50 transition-all"
               title="Sincronização Externa"
             >
-              <Download size={20} />
+              <Calendar size={20} />
             </button>
             <AnimatePresence>
               {showExportMenu && (
@@ -1315,20 +1242,13 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                     onClick={() => { handleExportAllDeadlines(); setShowExportMenu(false); }}
                     className="w-full text-left px-4 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 rounded-xl flex items-center gap-3"
                   >
-                    <Calendar size={14} className="text-blue-500" />
-                    Exportar Todos os Prazos (iCal)
-                  </button>
-                  <button 
-                    onClick={() => { setShowCleanupConfirm(true); setShowExportMenu(false); }}
-                    className="w-full text-left px-4 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 rounded-xl flex items-center gap-3"
-                  >
-                    <Trash2 size={14} className="text-red-500" />
-                    Faxina (Stale Tasks)
+                    <Download size={14} className="text-[#800000]" />
+                    Exportar Todos os Prazos
                   </button>
                   <div className="h-px bg-slate-50 my-1" />
                   <p className="px-4 py-2 text-[9px] text-slate-400 font-bold uppercase tracking-widest">Dica</p>
                   <p className="px-4 pb-2 text-[10px] text-slate-500 leading-relaxed">
-                    Mantenha sua lista limpa arquivando o que está parado há +15 dias.
+                    Importe o arquivo .ics no Google Calendar ou Apple Calendar.
                   </p>
                 </motion.div>
               )}
@@ -1465,9 +1385,6 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                           </button>
                           <button onClick={() => handleAddTask(undefined, undefined, 'gestao')} className="w-full text-left px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 rounded-lg flex items-center gap-2">
                             <Layout size={14} /> Reunião Gestão (Template)
-                          </button>
-                          <button onClick={handleCleanupStaleTasks} className="w-full text-left px-3 py-2 text-xs font-bold text-amber-600 hover:bg-amber-50 rounded-lg flex items-center gap-2 border-t border-slate-100 mt-2 pt-2">
-                            <Trash2 size={14} /> Faxina (Stale Tasks)
                           </button>
                         </motion.div>
                       )}
@@ -1607,14 +1524,6 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                           >
                             <Zap size={20} />
                           </button>
-                          <button 
-                            onClick={handleGenerateMnemonic} 
-                            disabled={isGeneratingMnemonic}
-                            className={`p-2 transition-all ${isGeneratingMnemonic ? 'animate-pulse text-amber-500' : 'text-slate-400 hover:text-amber-500'}`}
-                            title="Me ajude a decorar (Mnemônico IA)"
-                          >
-                            <BookOpen size={20} />
-                          </button>
                           <button onClick={() => handleExportToICal()} className="p-2 text-slate-400 hover:text-[#800000]" title="Exportar iCal"><Calendar size={20} /></button>
                           {isTaskBlocked(selectedTask) && (
                             <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 text-amber-600 rounded-lg text-[10px] font-bold border border-amber-100">
@@ -1642,35 +1551,6 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                         </div>
                       </div>
                       <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
-                        {/* Mnemonic Result */}
-                        <AnimatePresence>
-                          {mnemonic && (
-                            <motion.div 
-                              initial={{ opacity: 0, y: -20 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -20 }}
-                              className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 p-6 rounded-[2rem] relative overflow-hidden mb-6"
-                            >
-                              <div className="absolute top-4 right-4">
-                                <button onClick={() => setMnemonic(null)} className="text-amber-400 hover:text-amber-600 transition-colors">
-                                  <X size={18} />
-                                </button>
-                              </div>
-                              <div className="flex gap-4">
-                                <div className="shrink-0 w-12 h-12 bg-amber-100 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center">
-                                  <BookOpen size={24} className="text-amber-600" />
-                                </div>
-                                <div>
-                                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 mb-2">Mnemônico Sugerido pela IA</p>
-                                  <p className="text-lg font-serif italic text-amber-900 dark:text-amber-100 whitespace-pre-wrap leading-relaxed">
-                                    "{mnemonic}"
-                                  </p>
-                                </div>
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-
                         {/* Board & Category & Priority Selection */}
                         <section className="grid grid-cols-3 gap-6">
                           <div>
@@ -1798,22 +1678,6 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                               placeholder="Nome do responsável (ex: SanFran Jr, Moradia...)"
                               className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#800000]/10"
                             />
-                          </section>
-
-                          <section>
-                            <div className="flex items-center gap-2 mb-3 text-slate-400 font-bold text-[10px] uppercase tracking-widest">
-                              <BookOpen size={14} /> Deck de Flashcards Associado
-                            </div>
-                            <select 
-                              value={selectedTask.deckId || ''}
-                              onChange={e => handleUpdateTask({ deckId: e.target.value })}
-                              className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#800000]/10"
-                            >
-                              <option value="">Nenhum Deck Selecionado</option>
-                              {folders.map(f => (
-                                <option key={f.id} value={f.id}>{f.name}</option>
-                              ))}
-                            </select>
                           </section>
 
                           <section className="grid grid-cols-3 gap-6">

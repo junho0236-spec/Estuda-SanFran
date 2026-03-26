@@ -1,8 +1,10 @@
 
 import React, { useState } from 'react';
-import { Plus, Trash2, BookOpen, GraduationCap } from 'lucide-react';
+import { Plus, Trash2, BookOpen, GraduationCap, FileText, X, Save, RotateCcw } from 'lucide-react';
 import { Subject, Task } from '../types';
 import { supabase } from '../services/supabaseClient';
+import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 
 interface SubjectsProps {
   subjects: Subject[];
@@ -29,6 +31,10 @@ const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId, onVi
   const [workload, setWorkload] = useState(0);
   const [p1Date, setP1Date] = useState('');
   const [p2Date, setP2Date] = useState('');
+
+  const [selectedSubjectForContent, setSelectedSubjectForContent] = useState<Subject | null>(null);
+  const [subjectContent, setSubjectContent] = useState('');
+  const [isSavingContent, setIsSavingContent] = useState(false);
 
   const colors = [
     '#9B111E', '#1094ab', '#fcb421', '#1a1a1a', 
@@ -113,6 +119,32 @@ const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId, onVi
     setWorkload(subject.workload || 0);
     setP1Date(subject.p1_date || '');
     setP2Date(subject.p2_date || '');
+  };
+
+  const handleSaveContent = async () => {
+    if (!selectedSubjectForContent) return;
+    setIsSavingContent(true);
+    try {
+      const { error } = await supabase.from('subjects').update({
+        content: subjectContent
+      }).eq('id', selectedSubjectForContent.id);
+
+      if (error) throw error;
+
+      setSubjects(prev => prev.map(s => s.id === selectedSubjectForContent.id ? { ...s, content: subjectContent } : s));
+      toast.success("Conteúdo da disciplina salvo!");
+      setSelectedSubjectForContent(null);
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro ao salvar conteúdo.");
+    } finally {
+      setIsSavingContent(false);
+    }
+  };
+
+  const openSubjectContent = (subject: Subject) => {
+    setSelectedSubjectForContent(subject);
+    setSubjectContent(subject.content || '');
   };
 
   const getNextDeadline = (subjectId: string) => {
@@ -308,6 +340,12 @@ const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId, onVi
                         >
                           Entregas
                         </button>
+                        <button 
+                          onClick={() => openSubjectContent(subject)}
+                          className="flex-1 py-2 bg-slate-100 dark:bg-white/5 text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-xl transition-all"
+                        >
+                          Documento
+                        </button>
                       </div>
 
                       <div className="mt-4 space-y-3" onClick={() => onViewNotes(subject.id)}>
@@ -344,6 +382,70 @@ const Subjects: React.FC<SubjectsProps> = ({ subjects, setSubjects, userId, onVi
               })}
             </div>
       </div>
+
+      {/* CONTENT MODAL (DOCS) */}
+      <AnimatePresence>
+        {selectedSubjectForContent && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-white dark:bg-[#1a1a1a] w-full max-w-4xl rounded-3xl p-6 sm:p-8 border-4 border-slate-100 dark:border-slate-800 shadow-2xl relative flex flex-col h-[85vh]"
+            >
+              <div className="flex justify-between items-center mb-6 shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center text-slate-600 dark:text-slate-400">
+                    <FileText size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase leading-tight">{selectedSubjectForContent.name}</h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Conteúdo da Disciplina</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setSelectedSubjectForContent(null)} 
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded-full transition-colors"
+                >
+                  <X className="text-slate-400" />
+                </button>
+              </div>
+
+              <div className="flex-1 min-h-0 mb-6">
+                <textarea
+                  value={subjectContent}
+                  onChange={(e) => setSubjectContent(e.target.value)}
+                  placeholder="Adicione aqui o conteúdo programático ou resumos desta disciplina..."
+                  className="w-full h-full p-6 bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-slate-700 rounded-2xl font-medium outline-none focus:border-slate-500 transition-all resize-none text-slate-800 dark:text-slate-200"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 shrink-0">
+                <button
+                  onClick={() => setSelectedSubjectForContent(null)}
+                  className="px-6 py-3 text-slate-500 font-bold uppercase text-xs tracking-widest hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSaveContent}
+                  disabled={isSavingContent}
+                  className="px-8 py-3 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
+                  style={{ backgroundColor: selectedSubjectForContent.color }}
+                >
+                  {isSavingContent ? <RotateCcw size={16} className="animate-spin" /> : <Save size={16} />}
+                  <span>{isSavingContent ? 'Salvando...' : 'Salvar Conteúdo'}</span>
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -109,23 +109,13 @@ export const dataService = {
         academic_background: sanitized.academic_background || [],
         visible_modules: sanitized.visible_modules || ['jornada', 'grade', 'evolucao', 'mural', 'lideranca', 'conexoes'],
         prestigePoints: sanitized.prestigePoints || 0,
-        streak_days: sanitized.streak_days || 0,
-        last_review_date: sanitized.last_review_date || null,
-        league_division: sanitized.league_division || 'Bronze',
-        weekly_cards_reviewed: sanitized.weekly_cards_reviewed || 0,
-        mascot_level: sanitized.mascot_level || 1,
-        mascot_xp: sanitized.mascot_xp || 0
+        productivityStats: sanitized.productivityStats || { completedToday: 0, completedYesterday: 0, streak: 0 },
+        lastInteractionDate: sanitized.lastInteractionDate || null
       },
       profile_completion: sanitized.arcadia_score || 0,
       full_name: sanitized.full_name || null,
       bio: sanitized.bio || null,
       avatar_url: sanitized.avatar_url || null,
-      streak_days: sanitized.streak_days || 0,
-      last_review_date: sanitized.last_review_date || null,
-      league_division: sanitized.league_division || 'Bronze',
-      weekly_cards_reviewed: sanitized.weekly_cards_reviewed || 0,
-      mascot_level: sanitized.mascot_level || 1,
-      mascot_xp: sanitized.mascot_xp || 0,
       turma_ano: sanitized.turma_ano || null,
       turma: Number(sanitized.turma) || null,
       sala: sanitized.sala || null,
@@ -238,6 +228,8 @@ export const dataService = {
           academic_background: data.persona_data?.academic_background || [],
           visible_modules: data.persona_data?.visible_modules || ['jornada', 'grade', 'evolucao', 'mural', 'lideranca', 'conexoes'],
           prestigePoints: data.persona_data?.prestigePoints || 0,
+          productivityStats: data.persona_data?.productivityStats || { completedToday: 0, completedYesterday: 0, streak: 0 },
+          lastInteractionDate: data.persona_data?.lastInteractionDate || null,
           creditos_aula: data.creditos_aula,
           creditos_trabalho: data.creditos_trabalho,
           media: data.media,
@@ -355,19 +347,6 @@ export const dataService = {
       await addToSyncQueue({ table: 'folders', action: 'delete', data: { id, recursive: true } });
     }
   },
-
-  async getFolders() {
-    return await db.folders.toArray();
-  },
-
-  async getSubjects() {
-    return await db.subjects.toArray();
-  },
-
-  async getCards() {
-    return await db.flashcards.toArray();
-  },
-
   // FILES
   async saveFile(file: SubjectFile, userId: string, isOnline: boolean) {
     await db.subject_files.put(file);
@@ -471,8 +450,7 @@ export const dataService = {
           parentTaskId: task.parentTaskId,
           dependencies: task.dependencies,
           storyPoints: task.storyPoints,
-          comments: task.comments,
-          last_activity_at: task.last_activity_at
+          comments: task.comments
         })
       };
 
@@ -523,8 +501,7 @@ export const dataService = {
             parentTaskId: desc.parentTaskId,
             dependencies: desc.dependencies,
             storyPoints: desc.storyPoints,
-            comments: desc.comments || [],
-            last_activity_at: desc.last_activity_at
+            comments: desc.comments || []
           };
         });
         await db.tasks.bulkPut(mappedTasks);
@@ -725,7 +702,6 @@ export const dataService = {
     if (isOnline) {
       const { error } = await supabase.from('study_sessions').insert({
         ...session,
-        cards_reviewed: session.cards_reviewed || 0,
         user_id: userId
       });
       if (error) {

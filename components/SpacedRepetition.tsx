@@ -4,13 +4,15 @@ import {
   Repeat, Calendar, CheckCircle2, Circle, Plus, Trash2, 
   BookOpen, AlertCircle, RefreshCw, Flame, Zap, Trophy, 
   Star, Ghost, Sword, X, TrendingUp, Award, Target,
-  ChevronRight, Brain, Sparkles, ZapIcon, ShieldCheck, Clock
+  ChevronRight, Brain, Sparkles, ZapIcon, ShieldCheck, Clock,
+  FileText, Save, RotateCcw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../services/supabaseClient';
 import { SpacedTopic, UserProfile } from '../types';
 import confetti from 'canvas-confetti';
 import { toast } from 'sonner';
+import { dataService } from '../services/dataService';
 
 interface SpacedRepetitionProps {
   userId: string;
@@ -39,6 +41,10 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
+  const [selectedTopicForContent, setSelectedTopicForContent] = useState<SpacedTopic | null>(null);
+  const [topicContent, setTopicContent] = useState('');
+  const [isSavingContent, setIsSavingContent] = useState(false);
+  const isOnline = true; // Assuming online for now as per app context
   
   // Form
   const [subject, setSubject] = useState('');
@@ -201,15 +207,45 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId }) => {
          description: "Você está derrotando a curva do esquecimento!"
        });
 
-       // Update XP in profile
+       // Update XP and Streak in profile
        if (profile) {
          const newXP = (profile.arcadia_score || 0) + 50;
-         setProfile({ ...profile, arcadia_score: newXP });
+         const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+         const lastInteraction = profile.lastInteractionDate || '';
          
-         // Update in DB
-         await supabase.from('user_persona').update({
-           arcadia_score: newXP
-         }).eq('id', userId);
+         let newStreak = profile.productivityStats?.streak || 0;
+         if (lastInteraction !== today) {
+           if (!lastInteraction) {
+             newStreak = 1;
+           } else {
+             const lastDate = new Date(lastInteraction);
+             const todayDate = new Date(today);
+             const diffTime = Math.abs(todayDate.getTime() - lastDate.getTime());
+             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+             
+             if (diffDays === 1) {
+               newStreak += 1;
+             } else {
+               newStreak = 1;
+             }
+           }
+         }
+
+         const updatedProfile = { 
+           ...profile, 
+           arcadia_score: newXP,
+           lastInteractionDate: today,
+           productivityStats: {
+             ...(profile.productivityStats || { completedToday: 0, completedYesterday: 0, streak: 0 }),
+             streak: newStreak,
+             completedToday: (profile.productivityStats?.completedToday || 0) + 1
+           }
+         };
+         
+         setProfile(updatedProfile);
+         
+         // Update in DB using dataService for consistency
+         await dataService.saveUserProfile(updatedProfile, userId, isOnline);
        }
     }
 
@@ -231,6 +267,32 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId }) => {
       setTopics(newTopics);
       calculateReviews(newTopics);
     } catch (e) { console.error(e); }
+  };
+
+  const handleSaveContent = async () => {
+    if (!selectedTopicForContent) return;
+    setIsSavingContent(true);
+    try {
+      const { error } = await supabase.from('spaced_topics').update({
+        content: topicContent
+      }).eq('id', selectedTopicForContent.id);
+
+      if (error) throw error;
+
+      setTopics(prev => prev.map(t => t.id === selectedTopicForContent.id ? { ...t, content: topicContent } : t));
+      toast.success("Conteúdo salvo com sucesso!");
+      setSelectedTopicForContent(null);
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro ao salvar conteúdo.");
+    } finally {
+      setIsSavingContent(false);
+    }
+  };
+
+  const openTopicContent = (topic: SpacedTopic) => {
+    setSelectedTopicForContent(topic);
+    setTopicContent(topic.content || '');
   };
 
   const getIntervalLabel = (days: number) => {
@@ -501,7 +563,14 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId }) => {
                ) : (
                   <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 custom-scrollbar">
                      {todaysReviews.map((task, idx) => (
-                        <div key={`${task.topicId}-${task.interval}`} className={`group p-3 sm:p-4 rounded-2xl border-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all ${task.status === 'overdue' ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30' : 'bg-slate-50 dark:bg-white/5 border-slate-100 dark:border-white/5 hover:border-sky-200 dark:hover:border-sky-900'}`}>
+                         <div 
+                            key={`${task.topicId}-${task.interval}`} 
+                            onClick={() => {
+                              const topic = topics.find(t => t.id === task.topicId);
+                              if (topic) openTopicContent(topic);
+                            }}
+                            className={`group p-3 sm:p-4 rounded-2xl border-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all cursor-pointer ${task.status === 'overdue' ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30' : 'bg-slate-50 dark:bg-white/5 border-slate-100 dark:border-white/5 hover:border-sky-200 dark:hover:border-sky-900'}`}
+                         >
                            <div className="flex items-start gap-3 sm:gap-4 min-w-0">
                               <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex flex-col items-center justify-center shrink-0 ${task.status === 'overdue' ? 'bg-red-100 text-red-600' : 'bg-sky-100 text-sky-600 dark:bg-sky-900/20 dark:text-sky-400'}`}>
                                  <span className="text-[8px] sm:text-[10px] font-black uppercase">Rev</span>
@@ -518,7 +587,10 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId }) => {
                               </div>
                            </div>
                            <button 
-                              onClick={() => completeReview(task)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                completeReview(task);
+                              }}
                               className={`p-2.5 sm:p-3 rounded-xl transition-all flex items-center justify-center gap-2 sm:block ${task.status === 'overdue' ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-white dark:bg-black/20 text-slate-300 hover:text-sky-50 text-xs sm:text-base font-bold hover:bg-sky-50 dark:hover:bg-sky-900/20'}`}
                            >
                               <CheckCircle2 size={24} className="shrink-0" />
@@ -556,9 +628,10 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId }) => {
                         <motion.div 
                           layout
                           key={t.id} 
-                          className={`bg-white dark:bg-[#1a1a1a] p-5 rounded-3xl shadow-sm border transition-all relative group ${isUrgent ? 'border-red-200 dark:border-red-900/30 ring-1 ring-red-500/10' : 'border-slate-200 dark:border-white/5'}`}
+                          onClick={() => openTopicContent(t)}
+                          className={`bg-white dark:bg-[#1a1a1a] p-5 rounded-3xl shadow-sm border transition-all relative group cursor-pointer ${isUrgent ? 'border-red-200 dark:border-red-900/30 ring-1 ring-red-500/10' : 'border-slate-200 dark:border-white/5'}`}
                         >
-                           <button onClick={() => deleteTopic(t.id)} className="absolute top-4 right-4 p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all bg-slate-50 dark:bg-black/20 rounded-xl">
+                           <button onClick={(e) => { e.stopPropagation(); deleteTopic(t.id); }} className="absolute top-4 right-4 p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all bg-slate-50 dark:bg-black/20 rounded-xl">
                               <Trash2 size={14} />
                            </button>
                            
@@ -588,44 +661,6 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId }) => {
                                 )}
                               </div>
                               <h4 className="text-base font-black text-slate-900 dark:text-white leading-tight pr-8">{t.topic}</h4>
-                           </div>
-
-                           {/* Ebbinghaus Curve Visualization */}
-                           <div className="relative h-12 mb-4 bg-slate-50 dark:bg-black/20 rounded-2xl overflow-hidden border border-slate-100 dark:border-white/5 p-2">
-                              <svg className="w-full h-full" viewBox="0 0 100 40" preserveAspectRatio="none">
-                                 {/* Grid lines */}
-                                 <line x1="0" y1="35" x2="100" y2="35" stroke="currentColor" strokeWidth="0.5" className="text-slate-200 dark:text-slate-800" />
-                                 
-                                 {/* The Curve */}
-                                 <path 
-                                    d="M 0 5 Q 20 35 100 35" 
-                                    fill="none" 
-                                    stroke="currentColor" 
-                                    strokeWidth="2" 
-                                    className="text-slate-200 dark:text-slate-800"
-                                 />
-                                 
-                                 {/* Progress on Curve */}
-                                 <motion.path 
-                                    initial={{ pathLength: 0 }}
-                                    animate={{ pathLength: t.reviews_completed.length / (t.cycles || 4) }}
-                                    d="M 0 5 Q 20 35 100 35" 
-                                    fill="none" 
-                                    stroke="url(#curveGradient)" 
-                                    strokeWidth="3" 
-                                    strokeLinecap="round"
-                                 />
-                                 <defs>
-                                    <linearGradient id="curveGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                       <stop offset="0%" stopColor="#0ea5e9" />
-                                       <stop offset="100%" stopColor="#10b981" />
-                                    </linearGradient>
-                                 </defs>
-                              </svg>
-                              <div className="absolute inset-0 flex items-center justify-between px-4 pointer-events-none">
-                                 <span className="text-[8px] font-black text-slate-400 uppercase">Início</span>
-                                 <span className="text-[8px] font-black text-slate-400 uppercase">Domínio</span>
-                              </div>
                            </div>
 
                            <div className="flex items-center gap-1.5 mb-4">
@@ -659,6 +694,69 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId }) => {
          </div>
 
       </div>
+
+      {/* CONTENT MODAL (DOCS) */}
+      <AnimatePresence>
+        {selectedTopicForContent && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-white dark:bg-[#1a1a1a] w-full max-w-4xl rounded-3xl p-6 sm:p-8 border-4 border-sky-100 dark:border-sky-900 shadow-2xl relative flex flex-col h-[85vh]"
+            >
+              <div className="flex justify-between items-center mb-6 shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-sky-100 dark:bg-sky-900/30 rounded-xl flex items-center justify-center text-sky-600 dark:text-sky-400">
+                    <FileText size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase leading-tight">{selectedTopicForContent.topic}</h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{selectedTopicForContent.subject}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setSelectedTopicForContent(null)} 
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded-full transition-colors"
+                >
+                  <X className="text-slate-400" />
+                </button>
+              </div>
+
+              <div className="flex-1 min-h-0 mb-6">
+                <textarea
+                  value={topicContent}
+                  onChange={(e) => setTopicContent(e.target.value)}
+                  placeholder="Adicione aqui o conteúdo deste assunto para revisão..."
+                  className="w-full h-full p-6 bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-slate-700 rounded-2xl font-medium outline-none focus:border-sky-500 transition-all resize-none text-slate-800 dark:text-slate-200"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 shrink-0">
+                <button
+                  onClick={() => setSelectedTopicForContent(null)}
+                  className="px-6 py-3 text-slate-500 font-bold uppercase text-xs tracking-widest hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSaveContent}
+                  disabled={isSavingContent}
+                  className="px-8 py-3 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-lg shadow-sky-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isSavingContent ? <RotateCcw size={16} className="animate-spin" /> : <Save size={16} />}
+                  <span>{isSavingContent ? 'Salvando...' : 'Salvar Conteúdo'}</span>
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
