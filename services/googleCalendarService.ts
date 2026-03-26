@@ -1,5 +1,6 @@
 
 import { supabase } from './supabaseClient';
+import { auth } from '../firebase';
 import { Task } from '../types';
 
 export interface GoogleCalendarEvent {
@@ -15,14 +16,27 @@ export interface GoogleCalendarEvent {
   };
 }
 
+// Store token in memory or localStorage for the session
+let firebaseGoogleToken: string | null = localStorage.getItem('fb_google_token');
+
 export const googleCalendarService = {
+  setFirebaseToken(token: string) {
+    firebaseGoogleToken = token;
+    localStorage.setItem('fb_google_token', token);
+  },
+
   async getAccessToken() {
+    // Try Firebase token first (since it's what we'll use for the fix)
+    if (firebaseGoogleToken) return firebaseGoogleToken;
+
+    // Fallback to Supabase (original logic)
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.provider_token) {
-      console.warn('[googleCalendarService] No provider token found. User might not be signed in with Google or scope not granted.');
-      return null;
+    if (session?.provider_token) {
+      return session.provider_token;
     }
-    return session.provider_token;
+    
+    console.warn('[googleCalendarService] No provider token found.');
+    return null;
   },
 
   async createEvent(event: GoogleCalendarEvent) {

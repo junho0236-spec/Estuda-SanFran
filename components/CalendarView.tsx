@@ -3,6 +3,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Clock, History, Trophy, Gavel, Scale, CheckCircle2, Calendar as CalendarIcon, List, LayoutGrid, Plus, ExternalLink, RefreshCw, MoreHorizontal, Info } from 'lucide-react';
 import { Subject, StudySession, Task } from '../types';
 import { supabase } from '../services/supabaseClient';
+import { googleCalendarService } from '../services/googleCalendarService';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -90,14 +91,30 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId, st
   const handleGoogleSync = async () => {
     setIsSyncing(true);
     try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          scopes: 'https://www.googleapis.com/auth/calendar.events',
-          redirectTo: window.location.origin + '/auth/callback'
+      const { auth, googleProvider, signInWithPopup } = await import('../firebase');
+      const result = await signInWithPopup(auth, googleProvider);
+      
+      // Get the credential to access the Google token
+      const credential = (await import('firebase/auth')).GoogleAuthProvider.credentialFromResult(result);
+      const token = credential?.accessToken;
+
+      if (token) {
+        googleCalendarService.setFirebaseToken(token);
+        toast.success('Conectado ao Google Agenda com sucesso!');
+        
+        // Trigger a sync of all pending tasks
+        const pendingTasks = tasks.filter(t => t.dueDate && !t.google_event_id);
+        if (pendingTasks.length > 0) {
+          toast.info(`Sincronizando ${pendingTasks.length} tarefas...`);
+          for (const task of pendingTasks) {
+            const subject = subjects.find(s => s.id === task.subjectId);
+            await googleCalendarService.syncTaskToGoogle(task, subject?.name);
+          }
+          toast.success('Sincronização concluída!');
         }
-      });
-      if (error) throw error;
+      } else {
+        throw new Error('Não foi possível obter o token do Google');
+      }
     } catch (err) {
       console.error('Error syncing with Google:', err);
       toast.error('Erro ao conectar com o Google Agenda');

@@ -1,0 +1,167 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users
+// Document ID: userId (Firebase UID)
+// Fields:
+//   - uid: string (required)
+//   - email: string (required, email format)
+//   - displayName: string (optional)
+//   - photoURL: string (optional)
+//   - createdAt: timestamp (required)
+//
+// Collection: subjects
+// Document ID: subjectId (auto-generated)
+// Fields:
+//   - id: string (required)
+//   - userId: string (required, matches owner)
+//   - name: string (required, min 1, max 100)
+//   - color: string (required, hex format)
+//   - createdAt: timestamp (required)
+//
+// Collection: tasks
+// Document ID: taskId (auto-generated)
+// Fields:
+//   - id: string (required)
+//   - userId: string (required, matches owner)
+//   - subjectId: string (optional)
+//   - title: string (required, min 1, max 200)
+//   - notes: string (optional, max 1000)
+//   - dueDate: timestamp (optional)
+//   - completed: boolean (required)
+//   - google_event_id: string (optional)
+//   - createdAt: timestamp (required)
+//
+// Collection: study_sessions
+// Document ID: sessionId (auto-generated)
+// Fields:
+//   - id: string (required)
+//   - userId: string (required, matches owner)
+//   - subjectId: string (optional)
+//   - duration: number (required, positive)
+//   - mode: string (required)
+//   - createdAt: timestamp (required)
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    function uidUnchanged() {
+      return !('userId' in request.resource.data) || request.resource.data.userId == request.auth.uid;
+    }
+
+    function uidNotModified() {
+      return !('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidString(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+             request.resource.data[field].size() >= minLen &&
+             request.resource.data[field].size() <= maxLen;
+    }
+
+    function isValidOptionalString(field, maxLen) {
+      return ! (field in request.resource.data) || 
+             (request.resource.data[field] is string && request.resource.data[field].size() <= maxLen);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasRequiredFields(['uid', 'email', 'createdAt']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email);
+    }
+
+    function isValidSubject(data) {
+      return hasRequiredFields(['id', 'userId', 'name', 'color', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.color is string && data.color.matches("^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$");
+    }
+
+    function isValidTask(data) {
+      return hasRequiredFields(['id', 'userId', 'title', 'completed', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+             data.completed is bool &&
+             isValidOptionalString('notes', 1000);
+    }
+
+    function isValidStudySession(data) {
+      return hasRequiredFields(['id', 'userId', 'duration', 'mode', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.duration is number && data.duration > 0 &&
+             data.mode is string;
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+    }
+
+    match /subjects/{subjectId} {
+      allow read: if isDocOwner();
+      allow create: if isAuthenticated() && isValidSubject(request.resource.data);
+      allow update: if isDocOwner() && isValidSubject(request.resource.data) && uidNotModified();
+      allow delete: if isDocOwner();
+    }
+
+    match /tasks/{taskId} {
+      allow read: if isDocOwner();
+      allow create: if isAuthenticated() && isValidTask(request.resource.data);
+      allow update: if isDocOwner() && isValidTask(request.resource.data) && uidNotModified();
+      allow delete: if isDocOwner();
+    }
+
+    match /study_sessions/{sessionId} {
+      allow read: if isDocOwner();
+      allow create: if isAuthenticated() && isValidStudySession(request.resource.data);
+      allow update: if isDocOwner() && isValidStudySession(request.resource.data) && uidNotModified();
+      allow delete: if isDocOwner();
+    }
+
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
