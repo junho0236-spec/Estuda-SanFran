@@ -1,12 +1,11 @@
 
+// Dashboard Component - Refactored to use CompetenceRadar
 import { Brain, CheckCircle2, Clock, Zap, TrendingUp, Medal, Gavel, Award, Scale, Briefcase, GraduationCap, Quote, Sun, Book, Shield, Zap as ZapIcon, Trophy, BookOpen, Layout, MousePointerClick, Calculator, Target, Calendar } from 'lucide-react';
 import React, { useMemo, useState, useEffect } from 'react';
 import { View, Subject, Flashcard, Task, StudySession, Reading } from '../types';
 import { getBrasiliaDate } from '../utils';
 import BadgeGallery, { BadgeData } from './BadgeGallery';
 import CompetenceRadar from './CompetenceRadar';
-import RetentionRadar from './RetentionRadar';
-import TaskSummaryWidget from './Tasks';
 import { supabase } from '../services/supabaseClient';
 
 interface DashboardProps {
@@ -121,39 +120,6 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
     }
     return currentStreak;
   }, [studySessions, tasks]);
-
-  const retentionData = useMemo(() => {
-    const subjectStats: Record<string, { total: number, score: number }> = {};
-    
-    flashcards.forEach(f => {
-      const subject = f.subjectId || 'Geral';
-      if (!subjectStats[subject]) {
-        subjectStats[subject] = { total: 0, score: 0 };
-      }
-      
-      let score = 0;
-      if (f.status === 'review') {
-        const easeScore = Math.min(((f.easeFactor || 2.5) / 2.5) * 50, 50);
-        const intervalScore = Math.min(((f.interval || 0) / 30) * 50, 50);
-        score = easeScore + intervalScore;
-      } else if (f.status === 'learning') {
-        score = 20;
-      } else {
-        score = 5;
-      }
-      
-      subjectStats[subject].total += 1;
-      subjectStats[subject].score += score;
-    });
-
-    return Object.entries(subjectStats).map(([name, data]) => {
-      const subjectName = subjects.find(s => s.id === name)?.name || name;
-      return {
-        subject: subjectName,
-        retention: Math.round(data.score / data.total)
-      };
-    }).sort((a, b) => b.retention - a.retention).slice(0, 12);
-  }, [flashcards, subjects]);
 
   const badges: BadgeData[] = useMemo(() => {
     return [
@@ -320,8 +286,6 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
         </div>
       </div>
 
-      <TaskSummaryWidget subjects={subjects} tasks={tasks} onNavigate={onNavigate} />
-
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         <StatCard 
           icon={<Brain className="text-sanfran-rubi dark:text-white" />} 
@@ -360,13 +324,8 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-10">
-        <div className="lg:col-span-1 flex flex-col gap-6">
-           <div className="cursor-pointer" onClick={() => onNavigate(View.DominioJuridico)}>
-              <CompetenceRadar subjects={subjects} studySessions={studySessions} />
-           </div>
-           <div className="cursor-pointer" onClick={() => onNavigate(View.Anki)}>
-              <RetentionRadar data={retentionData} />
-           </div>
+        <div className="lg:col-span-1 cursor-pointer" onClick={() => onNavigate(View.DominioJuridico)}>
+           <CompetenceRadar subjects={subjects} studySessions={studySessions} />
         </div>
 
         <div className="lg:col-span-2 flex flex-col gap-6 md:gap-10">
