@@ -355,6 +355,19 @@ export const dataService = {
       await addToSyncQueue({ table: 'folders', action: 'delete', data: { id, recursive: true } });
     }
   },
+
+  async getFolders() {
+    return await db.folders.toArray();
+  },
+
+  async getSubjects() {
+    return await db.subjects.toArray();
+  },
+
+  async getCards() {
+    return await db.flashcards.toArray();
+  },
+
   // FILES
   async saveFile(file: SubjectFile, userId: string, isOnline: boolean) {
     await db.subject_files.put(file);

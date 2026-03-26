@@ -72,12 +72,14 @@ import {
   Landmark,
   Library,
   Timer,
-  Mic
+  Mic,
+  Gavel,
+  Table
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
+import ReactMarkdown from 'react-markdown';
 import { toast } from "sonner";
-import { MarkdownWithLegalLinks } from "./MarkdownWithLegalLinks";
-import { SmartText } from "./SmartText";
+import { MarkdownWithLegalLinks, SmartText } from "./SmartVadeMecum";
 import { Flashcard, Subject, Folder, StudySession, UserProfile } from '../types';
 import { dataService } from '../services/dataService';
 import { useAnkiLogic } from '../hooks/useAnkiLogic';
@@ -86,7 +88,8 @@ import { AnkiStudy } from './Anki/AnkiStudy';
 import { AnkiCommunity } from './Anki/AnkiCommunity';
 import { AnkiCreate } from './Anki/AnkiCreate';
 import { MascotEvolution, LeagueProgress } from './AnkiStats';
-import { FOLDER_COLORS, FOLDER_ICONS } from '../src/constants';
+import { GlossaryPopover } from './GlossaryPopover';
+import { FOLDER_COLORS, FOLDER_ICONS, GEMINI_MODEL } from '../src/constants';
 
 interface AnkiProps {
   subjects: Subject[];
@@ -123,6 +126,158 @@ const Anki: React.FC<AnkiProps> = ({
   const { state } = location;
 
   const anki = useAnkiLogic(userId, isOnline);
+  const {
+    mode, setMode,
+    folders, setFolders,
+    subjects, setSubjects,
+    flashcards, setFlashcards,
+    currentFolderId, setCurrentFolderId,
+    selectedSubjectId, setSelectedSubjectId,
+    isLoading, setIsLoading,
+    error, setError,
+    activeMenuFolderId, setActiveMenuFolderId,
+    isTableView, setIsTableView,
+    searchQuery, setSearchQuery,
+    selectedTag, setSelectedTag,
+    isGlobalSearch, setIsGlobalSearch,
+    toast, setToast,
+    confirmModal, setConfirmModal,
+    showToast, askConfirmation,
+    aiSourceText, setAiSourceText,
+    aiUrls, setAiUrls,
+    aiFiles, setAiFiles,
+    aiDifficulty, setAiDifficulty,
+    aiFormat, setAiFormat,
+    aiSourceType, setAiSourceType,
+    aiIncludeMnemonics, setAiIncludeMnemonics,
+    aiQuantity, setAiQuantity,
+    aiCardType, setAiCardType,
+    aiFrontLength, setAiFrontLength,
+    aiBackLength, setAiBackLength,
+    aiCustomInstructions, setAiCustomInstructions,
+    aiGeneratedCardsPreview, setAiGeneratedCardsPreview,
+    isPreviewMode, setIsPreviewMode,
+    aiGenerationHistory, setAiGenerationHistory,
+    showHistory, setShowHistory,
+    isGeneratingCloze, setIsGeneratingCloze,
+    isSelectionMode, setIsSelectionMode,
+    selectedCardIds, setSelectedCardIds,
+    selectedFolderIds, setSelectedFolderIds,
+    publicDecks, setPublicDecks,
+    isFetchingCommunity, setIsFetchingCommunity,
+    deckRequests, setDeckRequests,
+    fetchData,
+    toggleCardSelection,
+    toggleFolderSelection,
+    archiveSelectedCards,
+    handleAIGenerate,
+    handleSaveAIGeneratedCards,
+    toggleSuspension,
+    archiveCard,
+    deleteFolder,
+    handleRenameFolder,
+    handleResetFolderProgress,
+    handleExportFolder,
+    fetchPublicDecks,
+    handleDownloadDeck,
+    communitySearch, setCommunitySearch,
+    handleHeatmapClick,
+    startStudySession,
+    maxForecast,
+    sessionStats, setSessionStats,
+    getFolderStats,
+    setEditingFolder,
+    handlePublishDeck,
+    isSessionModalOpen, setIsSessionModalOpen,
+    selectedFolderIdsForSession, setSelectedFolderIdsForSession,
+    studyableFlashcards,
+    currentTime,
+    isFocusMode, setIsFocusMode,
+    isExtremeFocus, setIsExtremeFocus,
+    isPodcastMode, setIsPodcastMode,
+    currentCard, setCurrentCard,
+    sessionCounters, setSessionCounters,
+    undoAction, undoStack,
+    redoAction, redoStack,
+    cardTimer,
+    isCramMode, setIsCramMode,
+    handleNextCram,
+    handleReview,
+    isFlipped, setIsFlipped,
+    isDissertativeMode, setIsDissertativeMode,
+    leftOverlayOpacity,
+    rightOverlayOpacity,
+    userWrittenAnswer, setUserWrittenAnswer,
+    isEvaluating,
+    aiEvaluation, setAiEvaluation,
+    followUpChat,
+    isFollowUpLoading,
+    followUpInput, setFollowUpInput,
+    handleFollowUp,
+    isAudioMode,
+    audioSpeed, setAudioSpeed,
+    showMnemonicModal, setShowMnemonicModal,
+    generatedMnemonic,
+    showPracticalCaseModal, setShowPracticalCaseModal,
+    practicalCaseData, setPracticalCaseData,
+    showJurisprudenceModal, setShowJurisprudenceModal,
+    jurisprudenceResult,
+    handleFileChange,
+    handleGenerateCloze,
+    bulkInput, setBulkInput,
+    handleAnkiImport,
+    handleBulkImport,
+    handlePaste,
+    manualImage, setManualImage,
+    isImageOcclusionMode, setIsImageOcclusionMode,
+    setOcclusionRects,
+    isDrawing, setIsDrawing,
+    startPos, setStartPos,
+    occlusionRects,
+    manualNotes, setManualNotes,
+    handleImageUpload,
+    isPreviewModalOpen, setIsPreviewModalOpen,
+    getButtonLabel,
+    handleEvaluateDissertative,
+    handleGenerateMnemonic,
+    handleGeneratePracticalCase,
+    handleCheckJurisprudence,
+    restoreFromHistory,
+    removeAiFile,
+    removePreviewCard,
+    updatePreviewCard,
+    handleManualCreate,
+    handleEditCard,
+    handleCreateFolder,
+    handleUpdateFolder,
+    fetchDeckRequests,
+    handleCreateDeckRequest,
+    handleSemanticSearch,
+    manualFront, setManualFront,
+    manualBack, setManualBack,
+    stats, setStats,
+    dailyGoal, setDailyGoal,
+    studyHistory, setStudyHistory,
+    isHeatMode, setIsHeatMode,
+    isAdvanceMode, setIsAdvanceMode,
+    forecast, setForecast,
+    allTags, setAllTags,
+    currentCards, setCurrentCards,
+    currentFolders, setCurrentFolders,
+    editingCard, setEditingCard,
+    previewDeck, setPreviewDeck,
+    selectedHeatmapDate, setSelectedHeatmapDate,
+    dailySummaryData, setDailySummaryData,
+    isDailySummaryLoading, setIsDailySummaryLoading,
+    reviewQueue, setReviewQueue,
+    hoveredHeatmapDay, setHoveredHeatmapDay,
+    isGeneratingMnemonic, setIsGeneratingMnemonic,
+    isGeneratingPracticalCase, setIsGeneratingPracticalCase,
+    isJurisprudenceLoading, setIsJurisprudenceLoading,
+    renderPerformanceSummary,
+    swipeDirection, setSwipeDirection,
+    dragX
+  } = anki;
 
   // Sync initial props with hook state if needed
   useEffect(() => {
@@ -133,6 +288,7 @@ const Anki: React.FC<AnkiProps> = ({
 
   const [whiteNoiseType, setWhiteNoiseType] = useState<'none' | 'rain' | 'waves' | 'static'>('none');
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const imageRef = useRef<HTMLImageElement | null>(null);
   
   // White Noise Audio Handler
   useEffect(() => {
@@ -172,32 +328,7 @@ const Anki: React.FC<AnkiProps> = ({
   const [semanticSearchQuery, setSemanticSearchQuery] = useState('');
   const [isSemanticSearching, setIsSemanticSearching] = useState(false);
 
-  const handleSemanticSearch = async () => {
-    if (!semanticSearchQuery.trim()) return;
-    
-    setIsSemanticSearching(true);
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const prompt = `Você é um especialista em Direito. O usuário está pesquisando por: "${semanticSearchQuery}". 
-      Retorne uma lista de 5 a 10 termos jurídicos estritamente relacionados, sinônimos ou conceitos que abrangem essa pesquisa (ex: se pesquisar "prisão preventiva", inclua "medidas cautelares", "periculum libertatis", "prisão cautelar").
-      Retorne APENAS os termos separados por vírgula, sem explicações.`;
-      
-      const response = await ai.models.generateContent({
-        model: GEMINI_MODEL,
-        contents: prompt
-      });
-      
-      const relatedTerms = response.text?.split(',').map(t => t.trim().toLowerCase()) || [];
-      setSearchQuery(semanticSearchQuery + ' ' + relatedTerms.join(' '));
-      showToast("Busca semântica concluída! Termos relacionados incluídos.", "success");
-    } catch (error) {
-      console.error("Semantic search failed:", error);
-      showToast("Erro na busca semântica. Tente novamente.", "error");
-    } finally {
-      setIsSemanticSearching(false);
-    }
-  };
-
+  // Removed local handleSemanticSearch definition
   const insertTableTemplate = () => {
     const template = `
 | Conceito A | Conceito B |
@@ -661,11 +792,11 @@ João, servidor público, [situação]...
                 placeholder="Busca Semântica (IA)..." 
                 value={semanticSearchQuery}
                 onChange={(e) => setSemanticSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSemanticSearch()}
+                onKeyDown={(e) => e.key === 'Enter' && anki.handleSemanticSearch(semanticSearchQuery)}
                 className="w-full p-4 pl-12 bg-white dark:bg-white/5 border-2 border-slate-200 dark:border-white/10 rounded-2xl font-bold outline-none focus:border-usp-gold transition-all"
               />
               <button 
-                onClick={handleSemanticSearch}
+                onClick={() => anki.handleSemanticSearch(semanticSearchQuery)}
                 disabled={isSemanticSearching || !semanticSearchQuery.trim()}
                 className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-2 bg-usp-gold text-white rounded-xl font-black uppercase text-[10px] tracking-widest disabled:opacity-50"
               >
@@ -1301,14 +1432,14 @@ João, servidor público, [situação]...
                       if (isCramMode) {
                         handleNextCram();
                       } else {
-                        handleReview(3); // Good
+                        handleReview(currentCard.id, '3'); // Good
                       }
                     } else if (info.offset.x < -100) {
                       setSwipeDirection('left');
                       if (isCramMode) {
                         handleNextCram();
                       } else {
-                        handleReview(0); // Again
+                        handleReview(currentCard.id, '0'); // Again
                       }
                     }
                   }}
@@ -1455,12 +1586,12 @@ João, servidor público, [situação]...
                                       type="text"
                                       value={followUpInput}
                                       onChange={(e) => setFollowUpInput(e.target.value)}
-                                      onKeyDown={(e) => e.key === 'Enter' && handleFollowUp()}
+                                      onKeyDown={(e) => e.key === 'Enter' && handleFollowUp(followUpInput)}
                                       placeholder="Tire uma dúvida ou peça para aprofundar..."
                                       className="flex-1 p-3 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold outline-none focus:border-purple-500"
                                     />
                                     <button 
-                                      onClick={handleFollowUp}
+                                      onClick={() => handleFollowUp(followUpInput)}
                                       disabled={isFollowUpLoading || !followUpInput.trim()}
                                       className="p-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors disabled:opacity-50"
                                     >
@@ -1544,17 +1675,17 @@ João, servidor público, [situação]...
                 </button>
               ) : (
                 <div className="grid grid-cols-4 gap-4 w-full">
-                  <button onClick={() => handleReview(0)} className="flex flex-col items-center gap-1 p-4 bg-red-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform">
+                  <button onClick={() => handleReview(currentCard.id, '0')} className="flex flex-col items-center gap-1 p-4 bg-red-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform">
                     <span>Errei</span>
                     <span className="text-[8px] opacity-60">~{getButtonLabel(0, currentCard)}</span>
                     <span className="px-2 py-0.5 bg-black/20 rounded text-[8px]">1</span>
                   </button>
-                  <button onClick={() => handleReview(2)} className="flex flex-col items-center gap-1 p-4 bg-orange-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform">
+                  <button onClick={() => handleReview(currentCard.id, '2')} className="flex flex-col items-center gap-1 p-4 bg-orange-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform">
                     <span>Difícil</span>
                     <span className="text-[8px] opacity-60">~{getButtonLabel(2, currentCard)}</span>
                     <span className="px-2 py-0.5 bg-black/20 rounded text-[8px]">2</span>
                   </button>
-                  <button onClick={() => handleReview(3)} className="flex flex-col items-center gap-1 p-4 bg-usp-gold text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform">
+                  <button onClick={() => handleReview(currentCard.id, '3')} className="flex flex-col items-center gap-1 p-4 bg-usp-gold text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform">
                     <span>Bom</span>
                     <span className="text-[8px] opacity-60">
                       {getButtonLabel(3, currentCard)}
@@ -1562,7 +1693,7 @@ João, servidor público, [situação]...
                     <span className="px-2 py-0.5 bg-black/20 rounded text-[8px]">3</span>
                   </button>
                   <button 
-                    onClick={() => handleReview(5)} 
+                    onClick={() => handleReview(currentCard.id, '5')} 
                     className={`flex flex-col items-center gap-1 p-4 bg-usp-blue text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 transition-transform`}
                   >
                     <span>Fácil</span>
