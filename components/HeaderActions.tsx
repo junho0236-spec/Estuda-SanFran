@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { HelpCircle, Bell, ChevronDown, User, Settings, LogOut, ShieldAlert, CheckCircle2, UserPlus, Moon, Sun } from 'lucide-react';
+import { HelpCircle, Bell, ChevronDown, User, Settings, LogOut, ShieldAlert, CheckCircle2, UserPlus, Moon, Sun, Zap, Coffee, Gavel } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Notification, UserProfile, View } from '../types';
 import { dataService } from '../services/dataService';
 
@@ -15,6 +16,10 @@ interface HeaderActionsProps {
   onMarkAllRead: () => void;
   onViewChange: (view: View) => void;
   onLogout: () => void;
+  timerIsActive?: boolean;
+  timerSecondsLeft?: number;
+  timerTotalInitial?: number;
+  timerMode?: 'work' | 'break';
 }
 
 const HeaderActions: React.FC<HeaderActionsProps> = ({ 
@@ -28,7 +33,11 @@ const HeaderActions: React.FC<HeaderActionsProps> = ({
   onDeclineFriendRequest,
   onMarkAllRead,
   onViewChange,
-  onLogout
+  onLogout,
+  timerIsActive = false,
+  timerSecondsLeft = 0,
+  timerTotalInitial = 1,
+  timerMode = 'work'
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -39,6 +48,14 @@ const HeaderActions: React.FC<HeaderActionsProps> = ({
 
   const userDisplayName = userProfile?.full_name || 'Doutor(a)';
   const userAvatar = userProfile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`;
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const progress = ((timerTotalInitial - timerSecondsLeft) / timerTotalInitial) * 100;
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -84,6 +101,41 @@ const HeaderActions: React.FC<HeaderActionsProps> = ({
 
   return (
     <div className="flex items-center gap-4 p-2.5 bg-white/80 backdrop-blur-xl rounded-full border border-slate-200 shadow-[0_4px_15px_rgba(0,0,0,0.05)] relative z-[100]">
+      {/* Mini Timer Integrado */}
+      <AnimatePresence>
+        {timerIsActive && (
+          <motion.button
+            initial={{ opacity: 0, width: 0, x: -20 }}
+            animate={{ opacity: 1, width: 'auto', x: 0 }}
+            exit={{ opacity: 0, width: 0, x: -20 }}
+            onClick={() => handleNavigate(View.Timer)}
+            className={`flex items-center gap-2.5 pl-2 pr-4 py-1.5 rounded-full border transition-all hover:shadow-md active:scale-95 overflow-hidden whitespace-nowrap ${
+              timerMode === 'work' 
+                ? 'bg-red-50/50 border-red-200 text-[#800000]' 
+                : 'bg-blue-50/50 border-blue-200 text-blue-700'
+            }`}
+          >
+            <div className="relative w-8 h-8 flex items-center justify-center">
+              <svg className="absolute inset-0 w-full h-full transform -rotate-90">
+                <circle cx="50%" cy="50%" r="42%" stroke="currentColor" strokeWidth="2.5" fill="transparent" className="opacity-10" />
+                <circle 
+                  cx="50%" cy="50%" r="42%" stroke="currentColor" strokeWidth="2.5" fill="transparent" 
+                  strokeDasharray="100" strokeDashoffset={100 - progress} 
+                  className="transition-all duration-1000" pathLength="100" strokeLinecap="round" 
+                />
+              </svg>
+              {timerMode === 'work' ? <Gavel size={12} /> : <Coffee size={12} />}
+            </div>
+            <div className="flex flex-col items-start">
+              <span className="text-xs font-black tabular-nums leading-none">{formatTime(timerSecondsLeft)}</span>
+              <span className="text-[7px] font-black uppercase tracking-widest opacity-60">
+                {timerMode === 'work' ? 'Em Pauta' : 'Recesso'}
+              </span>
+            </div>
+          </motion.button>
+        )}
+      </AnimatePresence>
+
       {/* Help */}
       <button 
         onClick={() => handleNavigate(View.FAQ)}

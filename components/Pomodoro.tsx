@@ -33,6 +33,8 @@ interface PomodoroProps {
   setTotalInitial: (seconds: number) => void;
   onManualFinalize?: () => void;
   isExtremeFocus?: boolean;
+  isExtremeFocusRequested: boolean;
+  setIsExtremeFocusRequested: (requested: boolean) => void;
   studyMode: StudyMode;
   setStudyMode: (mode: StudyMode) => void;
   customWorkMinutes: number;
@@ -70,7 +72,9 @@ const Pomodoro: React.FC<PomodoroProps> = ({
   setCustomWorkMinutes,
   customBreakMinutes,
   setCustomBreakMinutes,
-  onMinimize
+  onMinimize,
+  isExtremeFocusRequested,
+  setIsExtremeFocusRequested
 }) => {
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -334,6 +338,24 @@ const Pomodoro: React.FC<PomodoroProps> = ({
                 </div>
               </div>
             )}
+
+            <div className="mt-6 pt-6 border-t border-slate-100 dark:border-white/10 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-sanfran-rubi/10 rounded-xl flex items-center justify-center text-sanfran-rubi">
+                  <ShieldCheck size={20} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-900 dark:text-white">Foco Extremo</p>
+                  <p className="text-[8px] font-bold text-slate-400 uppercase">Bloqueia distrações e oculta a interface</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsExtremeFocusRequested(!isExtremeFocusRequested)}
+                className={`w-12 h-6 rounded-full relative transition-colors ${isExtremeFocusRequested ? 'bg-sanfran-rubi' : 'bg-slate-200 dark:bg-white/10'}`}
+              >
+                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isExtremeFocusRequested ? 'right-1' : 'left-1'}`} />
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -385,29 +407,27 @@ const Pomodoro: React.FC<PomodoroProps> = ({
           </div>
         )}
 
-        <div className={`flex flex-col md:flex-row gap-4 md:gap-6 w-full ${isExtremeFocus ? 'max-w-xs' : 'max-w-sm'} transition-all`}>
+        <div className={`flex flex-col md:flex-row gap-4 md:gap-6 w-full ${isExtremeFocus ? 'max-w-md' : 'max-w-sm'} transition-all`}>
           <div className="flex gap-4 flex-1">
             <button 
               onClick={toggleTimer} 
-              className={`flex-1 ${isExtremeFocus ? 'py-4 rounded-2xl bg-white/5 text-slate-400 border border-white/10 hover:bg-sanfran-rubi hover:text-white' : 'py-5 md:py-6 rounded-3xl md:rounded-[2rem] shadow-xl hover:scale-[1.03] active:scale-95 border-b-4'} flex items-center justify-center transition-all ${!isExtremeFocus && (isActive ? 'bg-slate-100 dark:bg-white/10 text-slate-500 border-slate-300 dark:border-white/10' : 'bg-sanfran-rubi text-white border-sanfran-rubiDark')}`}
+              className={`flex-1 ${isExtremeFocus ? 'py-5 rounded-2xl bg-white/5 text-slate-400 border border-white/10 hover:bg-sanfran-rubi hover:text-white' : 'py-5 md:py-6 rounded-3xl md:rounded-[2rem] shadow-xl hover:scale-[1.03] active:scale-95 border-b-4'} flex items-center justify-center transition-all ${!isExtremeFocus && (isActive ? 'bg-slate-100 dark:bg-white/10 text-slate-500 border-slate-300 dark:border-white/10' : 'bg-sanfran-rubi text-white border-sanfran-rubiDark')}`}
             >
-              {isActive ? <Pause className={isExtremeFocus ? "w-5 h-5" : "w-6 h-6 md:w-8 md:h-8"} /> : <Play className={`${isExtremeFocus ? "w-5 h-5" : "w-6 h-6 md:w-8 md:h-8"} fill-current`} />}
-              {isExtremeFocus && <span className="ml-2 text-[10px] font-black uppercase tracking-widest">{isActive ? 'Interromper' : 'Prosseguir'}</span>}
+              {isActive ? <Pause className={isExtremeFocus ? "w-6 h-6" : "w-6 h-6 md:w-8 md:h-8"} /> : <Play className={`${isExtremeFocus ? "w-6 h-6" : "w-6 h-6 md:w-8 md:h-8"} fill-current`} />}
+              {isExtremeFocus && <span className="ml-3 text-[10px] font-black uppercase tracking-widest">{isActive ? 'Pausar' : 'Prosseguir'}</span>}
             </button>
-            {!isExtremeFocus && (
-              <button 
-                onClick={resetTimer} 
-                className="w-16 md:w-24 bg-white dark:bg-white/5 border-2 border-slate-200 dark:border-sanfran-rubi/30 text-slate-400 hover:text-sanfran-rubi hover:border-sanfran-rubi rounded-3xl md:rounded-[2rem] flex items-center justify-center transition-all shadow-lg active:scale-90"
-              >
-                <RotateCcw className="w-6 h-6 md:w-7 md:h-7" />
-              </button>
-            )}
+            <button 
+              onClick={resetTimer} 
+              className={`${isExtremeFocus ? 'w-16 bg-white/5 border border-white/10 text-slate-400 hover:text-sanfran-rubi' : 'w-16 md:w-24 bg-white dark:bg-white/5 border-2 border-slate-200 dark:border-sanfran-rubi/30 text-slate-400 hover:text-sanfran-rubi hover:border-sanfran-rubi'} rounded-3xl md:rounded-[2rem] flex items-center justify-center transition-all shadow-lg active:scale-90`}
+            >
+              <RotateCcw className={isExtremeFocus ? "w-5 h-5" : "w-6 h-6 md:w-7 md:h-7"} />
+            </button>
           </div>
           
-          {(isActive || secondsLeft < totalTime) && mode === 'work' && !isExtremeFocus && (
+          {(isActive || secondsLeft < totalTime) && mode === 'work' && (
             <button 
               onClick={handleFinalizeWrapper}
-              className="w-full md:w-auto px-8 py-5 md:py-6 bg-emerald-500 hover:bg-emerald-600 text-white rounded-3xl md:rounded-[2rem] flex items-center justify-center gap-3 font-black uppercase text-[10px] tracking-widest shadow-xl shadow-emerald-900/20 transition-all hover:scale-[1.03] active:scale-95 border-b-4 border-emerald-700 animate-in fade-in zoom-in duration-300"
+              className={`${isExtremeFocus ? 'px-6 py-5 bg-emerald-500/20 border border-emerald-500/30 text-emerald-500 hover:bg-emerald-500 hover:text-white' : 'w-full md:w-auto px-8 py-5 md:py-6 bg-emerald-500 hover:bg-emerald-600 text-white border-b-4 border-emerald-700 shadow-xl shadow-emerald-900/20'} rounded-3xl md:rounded-[2rem] flex items-center justify-center gap-3 font-black uppercase text-[10px] tracking-widest transition-all hover:scale-[1.03] active:scale-95 animate-in fade-in zoom-in duration-300`}
             >
               <Check className="w-5 h-5" /> Protocolar
             </button>

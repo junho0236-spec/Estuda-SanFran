@@ -266,8 +266,9 @@ const App: React.FC = () => {
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
   const [roomStartTime, setRoomStartTime] = useState<number | null>(null);
   const [isPomodoroMinimized, setIsPomodoroMinimized] = useState(false);
+  const [isExtremeFocusRequested, setIsExtremeFocusRequested] = useState(false);
 
-  const isExtremeFocus = timerIsActive && currentView === View.Timer && timerMode === 'work' && !isPomodoroMinimized;
+  const isExtremeFocus = timerIsActive && currentView === View.Timer && timerMode === 'work' && !isPomodoroMinimized && isExtremeFocusRequested;
 
   const toggleMinimizePomodoro = () => {
     setIsPomodoroMinimized(!isPomodoroMinimized);
@@ -1154,44 +1155,7 @@ const App: React.FC = () => {
   return (
     <div className={`flex h-screen overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#F8F9FA]'}`}>
       <Toaster position="top-right" richColors />
-      {/* Mini Timer Flutuante */}
-      {timerIsActive && currentView !== View.Timer && (
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.8, x: 20 }}
-          animate={{ opacity: 1, scale: 1, x: 0 }}
-          onClick={() => {
-            setCurrentView(View.Timer);
-            setIsPomodoroMinimized(false);
-          }}
-          className="fixed top-6 right-6 z-[60] cursor-pointer group"
-        >
-          <div className={`relative flex items-center gap-3 p-2 pr-4 rounded-full border-2 shadow-2xl backdrop-blur-md transition-all hover:scale-105 ${timerMode === 'work' ? 'bg-white/90 dark:bg-sanfran-rubi/20 border-sanfran-rubi' : 'bg-white/90 dark:bg-usp-blue/20 border-usp-blue'}`}>
-            <div className="relative w-10 h-10">
-              <svg className="w-full h-full transform -rotate-90">
-                <circle cx="50%" cy="50%" r="45%" stroke="currentColor" className="text-slate-200 dark:text-white/10" strokeWidth="3" fill="transparent" />
-                <circle 
-                  cx="50%" cy="50%" r="45%" stroke="currentColor" strokeWidth="3" fill="transparent" 
-                  strokeDasharray="100" strokeDashoffset={100 - ((timerTotalInitial - timerSecondsLeft) / timerTotalInitial * 100)} 
-                  className={timerMode === 'work' ? 'text-sanfran-rubi' : 'text-usp-blue'} pathLength="100" strokeLinecap="round" 
-                />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                {timerMode === 'work' ? <Zap size={14} className="text-sanfran-rubi" /> : <Coffee size={14} className="text-usp-blue" />}
-              </div>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-black tabular-nums text-slate-900 dark:text-white leading-none">
-                {Math.floor(timerSecondsLeft / 60).toString().padStart(2, '0')}:{(timerSecondsLeft % 60).toString().padStart(2, '0')}
-              </span>
-              <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">
-                {timerMode === 'work' ? 'Foco' : 'Pausa'}
-              </span>
-            </div>
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse border-2 border-white dark:border-[#0d0303]" />
-          </div>
-        </motion.div>
-      )}
-
+      
       <Atmosphere isExtremeFocus={isExtremeFocus} isSidebarOpen={isSidebarOpen} isSidebarMinimized={isSidebarMinimized} />
       
       <Suspense fallback={null}>
@@ -1385,6 +1349,10 @@ const App: React.FC = () => {
                 onMarkAllRead={() => setNotifications(prev => prev.map(n => n.type === 'friend_request' ? n : { ...n, is_read: true }))}
                 onViewChange={setCurrentView}
                 onLogout={handleLogout}
+                timerIsActive={timerIsActive && currentView !== View.Timer}
+                timerSecondsLeft={timerSecondsLeft}
+                timerTotalInitial={timerTotalInitial}
+                timerMode={timerMode}
               />
             </div>
           )}
@@ -1587,6 +1555,8 @@ const App: React.FC = () => {
                     customBreakMinutes={timerCustomBreakMinutes}
                     setCustomBreakMinutes={setTimerCustomBreakMinutes}
                     onMinimize={toggleMinimizePomodoro}
+                    isExtremeFocusRequested={isExtremeFocusRequested}
+                    setIsExtremeFocusRequested={setIsExtremeFocusRequested}
                   />
                 } />
 
@@ -1636,27 +1606,6 @@ const App: React.FC = () => {
              </Suspense>
           </div>
         </main>
-
-        {timerIsActive && currentView !== View.Timer && (
-          <div 
-            onClick={() => setCurrentView(View.Timer)}
-            className="fixed bottom-6 right-6 md:bottom-10 md:right-10 z-50 animate-in slide-in-from-bottom-10 duration-500 cursor-pointer group"
-          >
-            <div className={`flex items-center gap-3 p-3 md:p-4 rounded-[2rem] border-2 shadow-2xl backdrop-blur-xl transition-all hover:scale-105 active:scale-95 ${timerMode === 'work' ? 'bg-white/90 dark:bg-sanfran-rubi/20 border-sanfran-rubi shadow-red-900/20' : 'bg-white/90 dark:bg-usp-blue/20 border-usp-blue shadow-cyan-900/20'}`}>
-              <div className="relative w-10 h-10 md:w-12 md:h-12 flex items-center justify-center">
-                 <svg className="absolute inset-0 w-full h-full transform -rotate-90">
-                    <circle cx="50%" cy="50%" r="45%" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-slate-100 dark:text-white/5" />
-                    <circle cx="50%" cy="50%" r="45%" stroke="currentColor" strokeWidth="4" fill="transparent" strokeDasharray="100" strokeDashoffset={100 - ( (timerSecondsLeft / timerTotalInitial) * 100 )} className={`transition-all duration-1000 ${timerMode === 'work' ? 'text-sanfran-rubi' : 'text-usp-blue'}`} pathLength="100" strokeLinecap="round" />
-                 </svg>
-                 {timerMode === 'work' ? <Gavel className="w-4 h-4 md:w-5 md:h-5 text-sanfran-rubi" /> : <Coffee className="w-4 h-4 md:w-5 md:h-5 text-usp-blue" />}
-              </div>
-              <div className="pr-2">
-                <p className="text-[8px] font-black uppercase text-slate-500 tracking-widest">{timerMode === 'work' ? 'Em Pauta' : 'Recesso'}</p>
-                <h4 className="text-sm md:text-lg font-black tabular-nums dark:text-white">{formatTime(timerSecondsLeft)}</h4>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
