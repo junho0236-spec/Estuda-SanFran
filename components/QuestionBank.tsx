@@ -8,6 +8,7 @@ import { NotebookModal } from './NotebookModal';
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { GEMINI_MODEL, extractPrecedent } from '../services/geminiService';
 import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
@@ -3624,7 +3625,7 @@ Forneça a explicação de forma concisa e didática.`;
                                   {typeof aiCommentary[q.id] === 'string' ? (
                                   <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
                                     <div className="prose prose-sm dark:prose-invert max-w-none">
-                                      <Markdown>{aiCommentary[q.id]}</Markdown>
+                                      <Markdown remarkPlugins={[remarkGfm]}>{aiCommentary[q.id]}</Markdown>
                                     </div>
                                   </div>
                                 ) : (
@@ -3698,7 +3699,7 @@ Forneça a explicação de forma concisa e didática.`;
                                               : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-tl-none border border-slate-100 dark:border-white/5'
                                           }`}>
                                             <div className="prose prose-xs dark:prose-invert max-w-none">
-                                              <Markdown>{msg.text}</Markdown>
+                                              <Markdown remarkPlugins={[remarkGfm]}>{msg.text}</Markdown>
                                             </div>
                                           </div>
                                         </div>
@@ -3977,7 +3978,7 @@ Forneça a explicação de forma concisa e didática.`;
                           </div>
                           <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-[2rem] border-2 border-slate-200 dark:border-slate-700">
                             <div className="prose prose-sm dark:prose-invert max-w-none">
-                              <Markdown>{aiCommentary[currentQuestion.id]}</Markdown>
+                              <Markdown remarkPlugins={[remarkGfm]}>{aiCommentary[currentQuestion.id]}</Markdown>
                             </div>
                           </div>
                         </div>
@@ -4057,7 +4058,7 @@ Forneça a explicação de forma concisa e didática.`;
                                     : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-tl-none border border-slate-100 dark:border-white/5'
                                 }`}>
                                   <div className="prose prose-xs dark:prose-invert max-w-none">
-                                    <Markdown>{msg.text}</Markdown>
+                                    <Markdown remarkPlugins={[remarkGfm]}>{msg.text}</Markdown>
                                   </div>
                                 </div>
                               </div>
@@ -4262,7 +4263,7 @@ Forneça a explicação de forma concisa e didática.`;
                 </div>
               ) : (
                 <div className="prose prose-slate dark:prose-invert max-w-none prose-headings:font-black prose-headings:uppercase prose-headings:tracking-tighter prose-p:font-medium prose-p:leading-relaxed prose-strong:text-purple-600 dark:prose-strong:text-purple-400">
-                  <Markdown>{aiLessonContent}</Markdown>
+                  <Markdown remarkPlugins={[remarkGfm]}>{aiLessonContent}</Markdown>
                 </div>
               )}
             </div>

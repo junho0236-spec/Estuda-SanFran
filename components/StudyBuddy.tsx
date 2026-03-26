@@ -16,6 +16,7 @@ import {
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { GEMINI_MODEL } from '../services/geminiService';
 import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface Message {
   role: 'user' | 'ai';
@@ -257,7 +258,7 @@ Podemos começar? Me conte: em qual ano da faculdade você está e qual seu prin
                   : 'bg-white dark:bg-white/10 text-slate-800 dark:text-slate-100 border border-slate-100 dark:border-white/5 rounded-tl-none'
               }`}>
                 <div className="markdown-body prose dark:prose-invert prose-sm max-w-none">
-                  <Markdown>{msg.content}</Markdown>
+                  <Markdown remarkPlugins={[remarkGfm]}>{msg.content}</Markdown>
                 </div>
                 <p className={`text-[9px] mt-2 font-bold uppercase opacity-50 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
                   {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

@@ -16,6 +16,7 @@ import {
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { GEMINI_MODEL } from '../services/geminiService';
 import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface CaseAnalyzerProps {
   onBack: () => void;
@@ -152,7 +153,7 @@ const CaseAnalyzer: React.FC<CaseAnalyzerProps> = ({ onBack }) => {
 
               <div className="bg-slate-50 dark:bg-white/5 p-8 rounded-[2.5rem] border border-slate-100 dark:border-white/10 shadow-inner">
                 <div className="markdown-body prose dark:prose-invert prose-slate max-w-none">
-                  <Markdown>{analysis}</Markdown>
+                  <Markdown remarkPlugins={[remarkGfm]}>{analysis}</Markdown>
                 </div>
               </div>
 

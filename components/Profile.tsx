@@ -14,6 +14,7 @@ import { dataService } from '../services/dataService';
 import { geminiService } from '../services/geminiService';
 import { supabase } from '../services/supabaseClient';
 import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { db } from '../services/offlineService';
 import { UserProfile } from '../types';
 
@@ -1653,7 +1654,7 @@ const Profile: React.FC = () => {
               <div className="p-8 overflow-y-auto custom-scrollbar">
                 <div className="prose prose-slate dark:prose-invert max-w-none">
                   <div className="markdown-body">
-                    <Markdown>{aiAnalysis}</Markdown>
+                    <Markdown remarkPlugins={[remarkGfm]}>{aiAnalysis}</Markdown>
                   </div>
                 </div>
               </div>

@@ -3,10 +3,11 @@ import React from 'react';
 import { 
   Star, Smile, Reply, Forward, Edit2, Trash2, 
   Mic, FileText, BarChart2, User, Share2, 
-  Ghost, Clock, Check, CheckCheck, CheckSquare
+  Ghost, Clock, Check, CheckCheck 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { ChatMessage, ChatRoom } from '../../types';
 
 interface MessageItemProps {
@@ -32,7 +33,6 @@ interface MessageItemProps {
   onNavigate?: (view: any, params?: any) => void;
   polls: Record<string, any>;
   votePoll: (pollId: string, optionIdx: number) => void;
-  createTaskFromMessage?: (msg: ChatMessage) => void;
 }
 
 const MessageItem: React.FC<MessageItemProps> = ({
@@ -40,8 +40,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
   toggleStarMessage, showReactionPicker, setShowReactionPicker,
   addReaction, removeReaction, messageReactions, startReplying,
   setForwardingMessage, setShowForwardModal, startEditing, deleteMessage,
-  openUserProfile, onNavigate, polls, votePoll,
-  createTaskFromMessage
+  openUserProfile, onNavigate, polls, votePoll
 }) => {
   
   const isStarred = starredMessages.includes(msg.id);
@@ -84,11 +83,6 @@ const MessageItem: React.FC<MessageItemProps> = ({
             <button onClick={() => { setForwardingMessage(msg); setShowForwardModal(true); }} className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/5 rounded-md text-slate-500" title="Encaminhar">
               <Forward size={14} />
             </button>
-            {createTaskFromMessage && msg.content && (
-              <button onClick={() => createTaskFromMessage(msg)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/5 rounded-md text-emerald-500" title="Autuar como Tarefa">
-                <CheckSquare size={14} />
-              </button>
-            )}
             {isMe && (
               <>
                 <button onClick={() => startEditing(msg)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/5 rounded-md text-slate-500" title="Editar">
@@ -181,7 +175,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
           <div className="relative">
             {msg.content && (
               <div className={`text-sm leading-relaxed break-words whitespace-pre-wrap markdown-body ${isMe ? 'prose-invert' : ''}`}>
-                <Markdown>{msg.content}</Markdown>
+                <Markdown remarkPlugins={[remarkGfm]}>{msg.content}</Markdown>
               </div>
             )}
 

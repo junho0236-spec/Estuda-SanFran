@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Sparkles, FileText, BookOpen, Brain, Copy, Check, History, Trash2, X, Loader2, Zap, ArrowRight, Key } from 'lucide-react';
 import { summarizeText, extractKeyPoints, generateMindMap } from '../services/geminiService';
 import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { supabase } from '../services/supabaseClient';
 
 interface IntelligentSummarizerProps {
@@ -241,7 +242,7 @@ export const IntelligentSummarizer: React.FC<IntelligentSummarizerProps> = ({ us
             <div className="flex-1 w-full bg-white/5 border border-white/5 rounded-2xl p-6 font-medium text-lg leading-relaxed text-slate-200 overflow-y-auto custom-scrollbar relative z-10">
                {outputText ? (
                   <div className="markdown-body prose prose-invert max-w-none prose-p:leading-relaxed prose-headings:text-blue-300 prose-a:text-blue-400">
-                    <Markdown>{outputText}</Markdown>
+                    <Markdown remarkPlugins={[remarkGfm]}>{outputText}</Markdown>
                   </div>
                ) : (
                   <span className="text-slate-600 italic">O resultado aparecerá aqui...</span>
