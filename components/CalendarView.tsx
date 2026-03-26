@@ -106,11 +106,36 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId, st
         const pendingTasks = tasks.filter(t => t.dueDate && !t.google_event_id);
         if (pendingTasks.length > 0) {
           toast.info(`Sincronizando ${pendingTasks.length} tarefas...`);
+          let successCount = 0;
+          
           for (const task of pendingTasks) {
-            const subject = subjects.find(s => s.id === task.subjectId);
-            await googleCalendarService.syncTaskToGoogle(task, subject?.name);
+            try {
+              const subject = subjects.find(s => s.id === task.subjectId);
+              const googleEvent = await googleCalendarService.syncTaskToGoogle(task, subject?.name);
+              
+              // If sync was successful, update the task in Supabase with the Google Event ID
+              if (googleEvent && googleEvent.id) {
+                const { error: supabaseError } = await supabase
+                  .from('tasks')
+                  .update({ google_event_id: googleEvent.id })
+                  .eq('id', task.id);
+                
+                if (!supabaseError) {
+                  successCount++;
+                } else {
+                  console.error('Error updating task in Supabase:', supabaseError);
+                }
+              }
+            } catch (taskErr) {
+              console.error(`Failed to sync task ${task.id}:`, taskErr);
+            }
           }
-          toast.success('Sincronização concluída!');
+          
+          if (successCount > 0) {
+            toast.success(`${successCount} tarefas sincronizadas com sucesso!`);
+          } else if (pendingTasks.length > 0) {
+            toast.error('Não foi possível sincronizar as tarefas com o Google Agenda.');
+          }
         }
       } else {
         throw new Error('Não foi possível obter o token do Google');
@@ -118,9 +143,15 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId, st
     } catch (err: any) {
       if (err.code === 'auth/popup-closed-by-user') {
         toast.info('Conexão cancelada: o pop-up foi fechado.');
+      } else if (err.code === 'auth/popup-blocked') {
+        toast.error('O pop-up foi bloqueado pelo navegador. Por favor, permita pop-ups para este site.');
+      } else if (err.code === 'auth/cancelled-popup-request') {
+        toast.info('Uma solicitação de pop-up já está em andamento.');
+      } else if (err.code === 'auth/internal-error') {
+        toast.error('Erro interno do Firebase. Tente novamente mais tarde.');
       } else {
         console.error('Error syncing with Google:', err);
-        toast.error('Erro ao conectar com o Google Agenda');
+        toast.error(`Erro ao conectar com o Google Agenda: ${err.message || 'Erro desconhecido'}`);
       }
     } finally {
       setIsSyncing(false);

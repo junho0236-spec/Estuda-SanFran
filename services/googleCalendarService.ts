@@ -53,10 +53,16 @@ export const googleCalendarService = {
         body: JSON.stringify(event),
       });
 
+      if (response.status === 401) {
+        localStorage.removeItem('fb_google_token');
+        firebaseGoogleToken = null;
+        throw new Error('Sessão do Google expirada. Por favor, conecte-se novamente.');
+      }
+
       if (!response.ok) {
         const error = await response.json();
         console.error('[googleCalendarService] Error creating event:', error);
-        return null;
+        throw new Error(error.error?.message || 'Erro ao criar evento no Google Agenda');
       }
 
       return await response.json();
@@ -80,10 +86,16 @@ export const googleCalendarService = {
         body: JSON.stringify(event),
       });
 
+      if (response.status === 401) {
+        localStorage.removeItem('fb_google_token');
+        firebaseGoogleToken = null;
+        throw new Error('Sessão do Google expirada. Por favor, conecte-se novamente.');
+      }
+
       if (!response.ok) {
         const error = await response.json();
         console.error('[googleCalendarService] Error updating event:', error);
-        return null;
+        throw new Error(error.error?.message || 'Erro ao atualizar evento no Google Agenda');
       }
 
       return await response.json();
