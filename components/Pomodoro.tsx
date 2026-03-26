@@ -112,7 +112,7 @@ const Pomodoro: React.FC<PomodoroProps> = ({
       setSecondsLeft(initial);
       setTotalInitial(initial);
     }
-  }, [studyMode, customWorkMinutes, customBreakMinutes, mode, isActive, setSecondsLeft, setTotalInitial]);
+  }, [studyMode, customWorkMinutes, customBreakMinutes, mode]);
 
   useEffect(() => {
     if (!selectedSubjectId && subjects.length > 0) {
@@ -264,7 +264,7 @@ const Pomodoro: React.FC<PomodoroProps> = ({
   }
 
   return (
-    <div className={`w-full max-w-4xl mx-auto transition-all duration-1000 ${isExtremeFocus ? 'flex flex-col items-center justify-center min-h-[80vh]' : 'space-y-6 md:space-y-10 pb-20 px-2'}`}>
+    <div className={`w-full max-w-4xl mx-auto transition-all duration-1000 ${isExtremeFocus ? 'flex flex-col items-center justify-center min-h-[75vh] pb-12' : 'space-y-6 md:space-y-10 pb-20 px-2'}`}>
       
       {!isExtremeFocus && (
         <header className="flex items-center justify-between">

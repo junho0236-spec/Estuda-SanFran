@@ -268,7 +268,7 @@ const App: React.FC = () => {
   const [isPomodoroMinimized, setIsPomodoroMinimized] = useState(false);
   const [isExtremeFocusRequested, setIsExtremeFocusRequested] = useState(false);
 
-  const isExtremeFocus = timerIsActive && currentView === View.Timer && timerMode === 'work' && !isPomodoroMinimized && isExtremeFocusRequested;
+  const isExtremeFocus = (timerIsActive || timerSecondsLeft < timerTotalInitial) && currentView === View.Timer && timerMode === 'work' && !isPomodoroMinimized && isExtremeFocusRequested;
 
   const toggleMinimizePomodoro = () => {
     setIsPomodoroMinimized(!isPomodoroMinimized);
