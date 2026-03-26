@@ -147,6 +147,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ subjects, tasks, userId, st
         toast.error('O pop-up foi bloqueado pelo navegador. Por favor, permita pop-ups para este site.');
       } else if (err.code === 'auth/cancelled-popup-request') {
         toast.info('Uma solicitação de pop-up já está em andamento.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        toast.error('Domínio não autorizado no Firebase. Verifique as instruções no chat.');
+        console.error('Domínio atual:', window.location.hostname);
       } else if (err.code === 'auth/internal-error') {
         toast.error('Erro interno do Firebase. Tente novamente mais tarde.');
       } else {
