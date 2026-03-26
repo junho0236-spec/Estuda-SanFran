@@ -268,6 +268,7 @@ export enum StudyMode {
   CLASSIC = 'classic',
   FOCUSED = 'focused',
   MARATHON = 'marathon',
+  CUSTOM = 'custom',
 }
 
 export interface RankingEntry {

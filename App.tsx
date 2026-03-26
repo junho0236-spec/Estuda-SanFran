@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
+import { motion } from 'motion/react';
 import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map as MapIcon, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck, BookX, ScrollText, FileText, Repeat, UserX, ListTodo, Handshake, Eye, Key, CalendarCheck, Loader2, BarChart3, Search, Command, ChevronLeft, ChevronRight } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel, StudyMode, Board, Notification, Friendship, UserProfile } from './types';
 import Login from './components/Login';
@@ -253,6 +254,8 @@ const App: React.FC = () => {
   const [timerSecondsLeft, setTimerSecondsLeft] = useState(25 * 60);
   const [timerMode, setTimerMode] = useState<'work' | 'break'>('work');
   const [timerStudyMode, setTimerStudyMode] = useState<StudyMode>(StudyMode.CLASSIC);
+  const [timerCustomWorkMinutes, setTimerCustomWorkMinutes] = useState(25);
+  const [timerCustomBreakMinutes, setTimerCustomBreakMinutes] = useState(5);
   const [timerSelectedSubjectId, setTimerSelectedSubjectId] = useState<string | null>(null);
   const [timerSelectedReadingId, setTimerSelectedReadingId] = useState<string | null>(null);
   const [timerSelectedTaskId, setTimerSelectedTaskId] = useState<string | null>(null);
@@ -262,8 +265,13 @@ const App: React.FC = () => {
   // --- Study Room State ---
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
   const [roomStartTime, setRoomStartTime] = useState<number | null>(null);
+  const [isPomodoroMinimized, setIsPomodoroMinimized] = useState(false);
 
-  const isExtremeFocus = timerIsActive && currentView === View.Timer && timerMode === 'work';
+  const isExtremeFocus = timerIsActive && currentView === View.Timer && timerMode === 'work' && !isPomodoroMinimized;
+
+  const toggleMinimizePomodoro = () => {
+    setIsPomodoroMinimized(!isPomodoroMinimized);
+  };
 
   // --- Realtime Presence & Duel Listening ---
   useEffect(() => {
@@ -1146,6 +1154,44 @@ const App: React.FC = () => {
   return (
     <div className={`flex h-screen overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#F8F9FA]'}`}>
       <Toaster position="top-right" richColors />
+      {/* Mini Timer Flutuante */}
+      {timerIsActive && currentView !== View.Timer && (
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.8, x: 20 }}
+          animate={{ opacity: 1, scale: 1, x: 0 }}
+          onClick={() => {
+            setCurrentView(View.Timer);
+            setIsPomodoroMinimized(false);
+          }}
+          className="fixed top-6 right-6 z-[60] cursor-pointer group"
+        >
+          <div className={`relative flex items-center gap-3 p-2 pr-4 rounded-full border-2 shadow-2xl backdrop-blur-md transition-all hover:scale-105 ${timerMode === 'work' ? 'bg-white/90 dark:bg-sanfran-rubi/20 border-sanfran-rubi' : 'bg-white/90 dark:bg-usp-blue/20 border-usp-blue'}`}>
+            <div className="relative w-10 h-10">
+              <svg className="w-full h-full transform -rotate-90">
+                <circle cx="50%" cy="50%" r="45%" stroke="currentColor" className="text-slate-200 dark:text-white/10" strokeWidth="3" fill="transparent" />
+                <circle 
+                  cx="50%" cy="50%" r="45%" stroke="currentColor" strokeWidth="3" fill="transparent" 
+                  strokeDasharray="100" strokeDashoffset={100 - ((timerTotalInitial - timerSecondsLeft) / timerTotalInitial * 100)} 
+                  className={timerMode === 'work' ? 'text-sanfran-rubi' : 'text-usp-blue'} pathLength="100" strokeLinecap="round" 
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                {timerMode === 'work' ? <Zap size={14} className="text-sanfran-rubi" /> : <Coffee size={14} className="text-usp-blue" />}
+              </div>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-black tabular-nums text-slate-900 dark:text-white leading-none">
+                {Math.floor(timerSecondsLeft / 60).toString().padStart(2, '0')}:{(timerSecondsLeft % 60).toString().padStart(2, '0')}
+              </span>
+              <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">
+                {timerMode === 'work' ? 'Foco' : 'Pausa'}
+              </span>
+            </div>
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse border-2 border-white dark:border-[#0d0303]" />
+          </div>
+        </motion.div>
+      )}
+
       <Atmosphere isExtremeFocus={isExtremeFocus} isSidebarOpen={isSidebarOpen} isSidebarMinimized={isSidebarMinimized} />
       
       <Suspense fallback={null}>
@@ -1536,6 +1582,11 @@ const App: React.FC = () => {
                     isExtremeFocus={isExtremeFocus}
                     studyMode={timerStudyMode}
                     setStudyMode={setTimerStudyMode}
+                    customWorkMinutes={timerCustomWorkMinutes}
+                    setCustomWorkMinutes={setTimerCustomWorkMinutes}
+                    customBreakMinutes={timerCustomBreakMinutes}
+                    setCustomBreakMinutes={setTimerCustomBreakMinutes}
+                    onMinimize={toggleMinimizePomodoro}
                   />
                 } />
 

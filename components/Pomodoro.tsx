@@ -1,20 +1,14 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
-import { Play, Pause, RotateCcw, Clock, Settings2, ShieldCheck, Coffee, History, Trash2, ArrowLeft, Calendar, Gavel, Trash, Check, Book, Quote, Zap, BrainCircuit, CheckSquare } from 'lucide-react';
-import { Subject, StudySession, Reading, Task } from '../types';
+import { Play, Pause, RotateCcw, Clock, Settings2, ShieldCheck, Coffee, History, Trash2, ArrowLeft, Calendar, Gavel, Trash, Check, Book, Quote, Zap, BrainCircuit, CheckSquare, Minimize2, Maximize2 } from 'lucide-react';
+import { Subject, StudySession, Reading, Task, StudyMode } from '../types';
 import { supabase } from '../services/supabaseClient';
 import { updateQuestProgress } from '../services/questService';
-
-enum StudyMode {
-  CLASSIC = 'classic',
-  FOCUSED = 'focused',
-  MARATHON = 'marathon',
-}
 
 const STUDY_MODE_TIMES = {
   [StudyMode.CLASSIC]: { work: 25, break: 5, longBreak: 15, cycles: 4 },
   [StudyMode.FOCUSED]: { work: 50, break: 10, longBreak: 20, cycles: 3 },
   [StudyMode.MARATHON]: { work: 90, break: 15, longBreak: 30, cycles: 2 },
+  [StudyMode.CUSTOM]: { work: 25, break: 5, longBreak: 15, cycles: 4 }, // Default for custom
 };
 
 interface PomodoroProps {
@@ -41,6 +35,11 @@ interface PomodoroProps {
   isExtremeFocus?: boolean;
   studyMode: StudyMode;
   setStudyMode: (mode: StudyMode) => void;
+  customWorkMinutes: number;
+  setCustomWorkMinutes: (mins: number) => void;
+  customBreakMinutes: number;
+  setCustomBreakMinutes: (mins: number) => void;
+  onMinimize?: () => void;
 }
 
 const Pomodoro: React.FC<PomodoroProps> = ({ 
@@ -66,10 +65,13 @@ const Pomodoro: React.FC<PomodoroProps> = ({
   onManualFinalize,
   isExtremeFocus = false,
   studyMode,
-  setStudyMode
+  setStudyMode,
+  customWorkMinutes,
+  setCustomWorkMinutes,
+  customBreakMinutes,
+  setCustomBreakMinutes,
+  onMinimize
 }) => {
-  const [workMinutes, setWorkMinutes] = useState(STUDY_MODE_TIMES[studyMode].work);
-  const [breakMinutes, setBreakMinutes] = useState(STUDY_MODE_TIMES[studyMode].break);
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
 
@@ -99,11 +101,14 @@ const Pomodoro: React.FC<PomodoroProps> = ({
 
   useEffect(() => {
     if (!isActive) {
-      const initial = mode === 'work' ? STUDY_MODE_TIMES[studyMode].work * 60 : STUDY_MODE_TIMES[studyMode].break * 60;
+      let workMins = studyMode === StudyMode.CUSTOM ? customWorkMinutes : STUDY_MODE_TIMES[studyMode].work;
+      let breakMins = studyMode === StudyMode.CUSTOM ? customBreakMinutes : STUDY_MODE_TIMES[studyMode].break;
+      
+      const initial = mode === 'work' ? workMins * 60 : breakMins * 60;
       setSecondsLeft(initial);
       setTotalInitial(initial);
     }
-  }, [workMinutes, breakMinutes, mode, isActive, setSecondsLeft, setTotalInitial, studyMode]);
+  }, [studyMode, customWorkMinutes, customBreakMinutes, mode, isActive, setSecondsLeft, setTotalInitial]);
 
   useEffect(() => {
     if (!selectedSubjectId && subjects.length > 0) {
@@ -137,7 +142,9 @@ const Pomodoro: React.FC<PomodoroProps> = ({
   
   const resetTimer = () => { 
     setIsActive(false); 
-    const initial = mode === 'work' ? STUDY_MODE_TIMES[studyMode].work * 60 : STUDY_MODE_TIMES[studyMode].break * 60;
+    let workMins = studyMode === StudyMode.CUSTOM ? customWorkMinutes : STUDY_MODE_TIMES[studyMode].work;
+    let breakMins = studyMode === StudyMode.CUSTOM ? customBreakMinutes : STUDY_MODE_TIMES[studyMode].break;
+    const initial = mode === 'work' ? workMins * 60 : breakMins * 60;
     setSecondsLeft(initial); 
     setTotalInitial(initial);
   };
@@ -148,21 +155,20 @@ const Pomodoro: React.FC<PomodoroProps> = ({
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const totalTime = mode === 'work' ? STUDY_MODE_TIMES[studyMode].work * 60 : STUDY_MODE_TIMES[studyMode].break * 60;
+  const currentWorkMins = studyMode === StudyMode.CUSTOM ? customWorkMinutes : STUDY_MODE_TIMES[studyMode].work;
+  const currentBreakMins = studyMode === StudyMode.CUSTOM ? customBreakMinutes : STUDY_MODE_TIMES[studyMode].break;
+  const totalTime = mode === 'work' ? currentWorkMins * 60 : currentBreakMins * 60;
   const progress = ((totalTime - secondsLeft) / totalTime) * 100;
 
-  // Wrapper para onManualFinalize que também atualiza a quest
   const handleFinalizeWrapper = async () => {
-    // Calcula tempo decorrido
-    const initial = mode === 'work' ? STUDY_MODE_TIMES[studyMode].work * 60 : STUDY_MODE_TIMES[studyMode].break * 60;
-    const elapsed = initial - secondsLeft;
+    const elapsed = totalTime - secondsLeft;
     
-    // Atualiza a quest se tiver passado pelo menos 1 minuto
     if (elapsed > 60) {
        await updateQuestProgress(userId, 'focus_time', Math.floor(elapsed / 60));
     }
 
     if (onManualFinalize) onManualFinalize();
+    resetTimer();
   };
 
   if (showHistory && !isExtremeFocus) {
@@ -285,18 +291,49 @@ const Pomodoro: React.FC<PomodoroProps> = ({
             <label className="flex items-center gap-2 text-[9px] font-black uppercase text-slate-400 tracking-widest mb-4">
               <BrainCircuit className="w-4 h-4 text-sanfran-rubi" /> Modo de Estudo
             </label>
-            <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex flex-wrap gap-2">
               {Object.values(StudyMode).map((modeOption) => (
                 <button
                   key={modeOption}
                   onClick={() => setStudyMode(modeOption)}
-                  className={`flex-1 py-3 px-4 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all border-2 ${studyMode === modeOption ? 'bg-sanfran-rubi text-white border-sanfran-rubi shadow-md' : 'bg-slate-50 dark:bg-black/40 text-slate-500 border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10'}`}
+                  className={`flex-1 min-w-[120px] py-3 px-4 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all border-2 ${studyMode === modeOption ? 'bg-sanfran-rubi text-white border-sanfran-rubi shadow-md' : 'bg-slate-50 dark:bg-black/40 text-slate-500 border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10'}`}
                 >
-                  {modeOption === StudyMode.CLASSIC ? 'Clássico' : modeOption === StudyMode.FOCUSED ? 'Focado' : 'Maratona'}
-                  <span className="block text-[8px] font-medium normal-case opacity-70">{STUDY_MODE_TIMES[modeOption].work}m foco / {STUDY_MODE_TIMES[modeOption].break}m pausa</span>
+                  {modeOption === StudyMode.CLASSIC ? 'Clássico' : modeOption === StudyMode.FOCUSED ? 'Focado' : modeOption === StudyMode.MARATHON ? 'Maratona' : 'Personalizado'}
+                  <span className="block text-[8px] font-medium normal-case opacity-70">
+                    {modeOption === StudyMode.CUSTOM 
+                      ? `${customWorkMinutes}m foco / ${customBreakMinutes}m pausa`
+                      : `${STUDY_MODE_TIMES[modeOption].work}m foco / ${STUDY_MODE_TIMES[modeOption].break}m pausa`}
+                  </span>
                 </button>
               ))}
             </div>
+
+            {studyMode === StudyMode.CUSTOM && (
+              <div className="mt-6 grid grid-cols-2 gap-4 animate-in fade-in duration-300">
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block ml-1">Minutos de Foco</label>
+                  <input 
+                    type="number" 
+                    min="1" 
+                    max="180"
+                    value={customWorkMinutes}
+                    onChange={(e) => setCustomWorkMinutes(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full p-3 bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-white/10 rounded-xl font-black text-sm outline-none focus:border-sanfran-rubi transition-all"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block ml-1">Minutos de Pausa</label>
+                  <input 
+                    type="number" 
+                    min="1" 
+                    max="60"
+                    value={customBreakMinutes}
+                    onChange={(e) => setCustomBreakMinutes(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full p-3 bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-white/10 rounded-xl font-black text-sm outline-none focus:border-usp-blue transition-all"
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -312,6 +349,17 @@ const Pomodoro: React.FC<PomodoroProps> = ({
              </div>
              <p className="text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase tracking-widest">A academia aguarda seus resultados.</p>
           </div>
+        )}
+
+        {/* Botão Minimizar no modo Foco Extremo */}
+        {isExtremeFocus && onMinimize && (
+          <button 
+            onClick={onMinimize}
+            className="absolute top-8 right-8 p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-slate-400 transition-all group"
+            title="Minimizar e permitir navegação"
+          >
+            <Minimize2 size={20} className="group-hover:scale-110 transition-transform" />
+          </button>
         )}
 
         <div className={`relative ${isExtremeFocus ? 'w-80 h-80 md:w-[28rem] md:h-[28rem]' : 'w-60 h-60 sm:w-72 sm:h-72 md:w-80 md:h-80'} mb-8 transition-all duration-700`}>
