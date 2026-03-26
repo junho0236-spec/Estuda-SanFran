@@ -266,9 +266,9 @@ const App: React.FC = () => {
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
   const [roomStartTime, setRoomStartTime] = useState<number | null>(null);
   const [isPomodoroMinimized, setIsPomodoroMinimized] = useState(false);
-  const [isExtremeFocusRequested, setIsExtremeFocusRequested] = useState(false);
+  const [isExtremeFocusActive, setIsExtremeFocusActive] = useState(false);
 
-  const isExtremeFocus = (timerIsActive || timerSecondsLeft < timerTotalInitial) && currentView === View.Timer && timerMode === 'work' && !isPomodoroMinimized && isExtremeFocusRequested;
+  const isExtremeFocus = isExtremeFocusActive && currentView === View.Timer && timerMode === 'work' && !isPomodoroMinimized;
 
   const toggleMinimizePomodoro = () => {
     setIsPomodoroMinimized(!isPomodoroMinimized);
@@ -1349,7 +1349,7 @@ const App: React.FC = () => {
                 onMarkAllRead={() => setNotifications(prev => prev.map(n => n.type === 'friend_request' ? n : { ...n, is_read: true }))}
                 onViewChange={setCurrentView}
                 onLogout={handleLogout}
-                timerIsActive={timerIsActive && currentView !== View.Timer}
+                timerIsActive={(timerIsActive || timerSecondsLeft < timerTotalInitial) && currentView !== View.Timer}
                 timerSecondsLeft={timerSecondsLeft}
                 timerTotalInitial={timerTotalInitial}
                 timerMode={timerMode}
@@ -1545,6 +1545,7 @@ const App: React.FC = () => {
                     setSelectedReadingId={setTimerSelectedReadingId}
                     selectedTaskId={timerSelectedTaskId}
                     setSelectedTaskId={setTimerSelectedTaskId}
+                    totalTime={timerTotalInitial}
                     setTotalInitial={setTimerTotalInitial}
                     onManualFinalize={manualFinalize}
                     isExtremeFocus={isExtremeFocus}
@@ -1555,8 +1556,8 @@ const App: React.FC = () => {
                     customBreakMinutes={timerCustomBreakMinutes}
                     setCustomBreakMinutes={setTimerCustomBreakMinutes}
                     onMinimize={toggleMinimizePomodoro}
-                    isExtremeFocusRequested={isExtremeFocusRequested}
-                    setIsExtremeFocusRequested={setIsExtremeFocusRequested}
+                    isExtremeFocusRequested={isExtremeFocusActive}
+                    setIsExtremeFocusRequested={setIsExtremeFocusActive}
                   />
                 } />
 

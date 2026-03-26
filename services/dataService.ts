@@ -459,6 +459,31 @@ export const dataService = {
         console.error("Error syncing task to cloud, adding to queue", error);
         await addToSyncQueue({ table: 'tasks', action: 'update', data: task });
       }
+
+      // Sync to Google Calendar if dueDate exists and user is connected
+      if (task.dueDate) {
+        (async () => {
+          try {
+            const { googleCalendarService } = await import('./googleCalendarService');
+            const result = await googleCalendarService.syncTaskToGoogle(task);
+            
+            if (result && result.id && result.id !== task.google_event_id) {
+              // Save the event ID back to the task
+              const updatedTask = { ...task, google_event_id: result.id };
+              await db.tasks.put(updatedTask);
+              
+              // Also update in Supabase without triggering another sync
+              const desc = JSON.parse(payload.description);
+              desc.google_event_id = result.id;
+              await supabase.from('tasks').update({ 
+                description: JSON.stringify(desc) 
+              }).eq('id', task.id);
+            }
+          } catch (e) {
+            console.warn("[dataService] Google Calendar sync failed:", e);
+          }
+        })();
+      }
     } else {
       await addToSyncQueue({ table: 'tasks', action: 'update', data: task });
     }

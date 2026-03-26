@@ -42,6 +42,7 @@ interface PomodoroProps {
   customBreakMinutes: number;
   setCustomBreakMinutes: (mins: number) => void;
   onMinimize?: () => void;
+  totalTime: number;
 }
 
 const Pomodoro: React.FC<PomodoroProps> = ({ 
@@ -63,6 +64,7 @@ const Pomodoro: React.FC<PomodoroProps> = ({
   setSelectedReadingId,
   selectedTaskId,
   setSelectedTaskId,
+  totalTime,
   setTotalInitial,
   onManualFinalize,
   isExtremeFocus = false,
@@ -109,8 +111,12 @@ const Pomodoro: React.FC<PomodoroProps> = ({
       let breakMins = studyMode === StudyMode.CUSTOM ? customBreakMinutes : STUDY_MODE_TIMES[studyMode].break;
       
       const initial = mode === 'work' ? workMins * 60 : breakMins * 60;
-      setSecondsLeft(initial);
-      setTotalInitial(initial);
+      
+      // Only reset if it's a fresh start or if the settings actually changed
+      if (secondsLeft === totalTime || initial !== totalTime) {
+        setSecondsLeft(initial);
+        setTotalInitial(initial);
+      }
     }
   }, [studyMode, customWorkMinutes, customBreakMinutes, mode]);
 
@@ -161,7 +167,6 @@ const Pomodoro: React.FC<PomodoroProps> = ({
 
   const currentWorkMins = studyMode === StudyMode.CUSTOM ? customWorkMinutes : STUDY_MODE_TIMES[studyMode].work;
   const currentBreakMins = studyMode === StudyMode.CUSTOM ? customBreakMinutes : STUDY_MODE_TIMES[studyMode].break;
-  const totalTime = mode === 'work' ? currentWorkMins * 60 : currentBreakMins * 60;
   const progress = ((totalTime - secondsLeft) / totalTime) * 100;
 
   const handleFinalizeWrapper = async () => {
@@ -173,6 +178,11 @@ const Pomodoro: React.FC<PomodoroProps> = ({
 
     if (onManualFinalize) onManualFinalize();
     resetTimer();
+    
+    // Exit extreme focus on finalize
+    if (isExtremeFocus) {
+      setIsExtremeFocusRequested(false);
+    }
   };
 
   if (showHistory && !isExtremeFocus) {
@@ -299,7 +309,15 @@ const Pomodoro: React.FC<PomodoroProps> = ({
               {Object.values(StudyMode).map((modeOption) => (
                 <button
                   key={modeOption}
-                  onClick={() => setStudyMode(modeOption)}
+                  onClick={() => {
+                    setStudyMode(modeOption);
+                    // Force reset when changing mode
+                    let workMins = modeOption === StudyMode.CUSTOM ? customWorkMinutes : STUDY_MODE_TIMES[modeOption].work;
+                    let breakMins = modeOption === StudyMode.CUSTOM ? customBreakMinutes : STUDY_MODE_TIMES[modeOption].break;
+                    const initial = mode === 'work' ? workMins * 60 : breakMins * 60;
+                    setSecondsLeft(initial);
+                    setTotalInitial(initial);
+                  }}
                   className={`flex-1 min-w-[120px] py-3 px-4 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all border-2 ${studyMode === modeOption ? 'bg-sanfran-rubi text-white border-sanfran-rubi shadow-md' : 'bg-slate-50 dark:bg-black/40 text-slate-500 border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10'}`}
                 >
                   {modeOption === StudyMode.CLASSIC ? 'Clássico' : modeOption === StudyMode.FOCUSED ? 'Focado' : modeOption === StudyMode.MARATHON ? 'Maratona' : 'Personalizado'}
@@ -407,14 +425,14 @@ const Pomodoro: React.FC<PomodoroProps> = ({
           </div>
         )}
 
-        <div className={`flex flex-col md:flex-row gap-4 md:gap-6 w-full ${isExtremeFocus ? 'max-w-md' : 'max-w-sm'} transition-all`}>
+        <div className={`flex flex-col md:flex-row gap-4 md:gap-6 w-full ${isExtremeFocus ? 'max-w-md' : 'max-w-sm'} transition-all -mt-4`}>
           <div className="flex gap-4 flex-1">
             <button 
               onClick={toggleTimer} 
               className={`flex-1 ${isExtremeFocus ? 'py-5 rounded-2xl bg-white/5 text-slate-400 border border-white/10 hover:bg-sanfran-rubi hover:text-white' : 'py-5 md:py-6 rounded-3xl md:rounded-[2rem] shadow-xl hover:scale-[1.03] active:scale-95 border-b-4'} flex items-center justify-center transition-all ${!isExtremeFocus && (isActive ? 'bg-slate-100 dark:bg-white/10 text-slate-500 border-slate-300 dark:border-white/10' : 'bg-sanfran-rubi text-white border-sanfran-rubiDark')}`}
             >
               {isActive ? <Pause className={isExtremeFocus ? "w-6 h-6" : "w-6 h-6 md:w-8 md:h-8"} /> : <Play className={`${isExtremeFocus ? "w-6 h-6" : "w-6 h-6 md:w-8 md:h-8"} fill-current`} />}
-              {isExtremeFocus && <span className="ml-3 text-[10px] font-black uppercase tracking-widest">{isActive ? 'Pausar' : 'Prosseguir'}</span>}
+              {isExtremeFocus && <span className="ml-3 text-[10px] font-black uppercase tracking-widest">{isActive ? 'Pausar' : 'Continuar'}</span>}
             </button>
             <button 
               onClick={resetTimer} 
@@ -433,6 +451,16 @@ const Pomodoro: React.FC<PomodoroProps> = ({
             </button>
           )}
         </div>
+        
+        {!isExtremeFocus && mode === 'work' && (
+          <button
+            onClick={() => setIsExtremeFocusRequested(true)}
+            className="mt-6 flex items-center gap-2 px-6 py-3 bg-slate-900 dark:bg-white/5 text-white dark:text-slate-400 rounded-2xl font-black uppercase text-[9px] tracking-[0.2em] hover:bg-sanfran-rubi hover:text-white transition-all shadow-lg group"
+          >
+            <ShieldCheck className="w-4 h-4 group-hover:scale-110 transition-transform" />
+            Ativar Foco Extremo
+          </button>
+        )}
 
         {!isExtremeFocus && (
           <div className="w-full mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl">

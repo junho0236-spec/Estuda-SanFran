@@ -237,6 +237,7 @@ export interface Task {
   created_at?: string;
   updated_at?: string;
   comments?: { id: string; userId: string; text: string; createdAt: string }[];
+  google_event_id?: string;
 }
 
 export interface StudySession {
