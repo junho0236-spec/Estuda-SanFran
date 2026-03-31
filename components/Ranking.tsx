@@ -76,16 +76,16 @@ const Ranking: React.FC<RankingProps> = ({ userId, session, flashcards }) => {
       if (sessionErr) throw sessionErr;
 
       // 2. Busca nomes e pontos de prestígio da tabela 'user_persona'
-      let profileMap: Record<string, { name: string, prestige: number, league: any, weeklyCards: number, mascotLevel: number }> = {};
+      let profileMap: Record<string, { name: string, prestige: number, league: string, weeklyCards: number, mascotLevel: number }> = {};
       try {
         const { data: personaData } = await supabase.from('user_persona').select('user_id, full_name, persona_data');
         personaData?.forEach(p => { 
           profileMap[p.user_id] = { 
             name: p.full_name, 
             prestige: p.persona_data?.prestigePoints || 0,
-            league: p.persona_data?.league_division || 'Bronze',
-            weeklyCards: p.persona_data?.weekly_cards_reviewed || 0,
-            mascotLevel: p.persona_data?.mascot_level || 1
+            league: p.persona_data?.leagueDivision || p.persona_data?.league_division || 'Bronze',
+            weeklyCards: p.persona_data?.weeklyCardsReviewed || p.persona_data?.weekly_cards_reviewed || 0,
+            mascotLevel: p.persona_data?.mascotLevel || p.persona_data?.mascot_level || 1
           }; 
         });
       } catch (e) {
@@ -118,8 +118,7 @@ const Ranking: React.FC<RankingProps> = ({ userId, session, flashcards }) => {
             rank_name: getRankName(hours),
             prestigePoints: profile?.prestige || 0,
             league_division: profile?.league || 'Bronze',
-            weekly_cards_reviewed: profile?.weeklyCards || 0,
-            mascot_level: profile?.mascotLevel || 1
+            weekly_cards_reviewed: profile?.weeklyCards || 0
           };
         })
         .sort((a, b) => {

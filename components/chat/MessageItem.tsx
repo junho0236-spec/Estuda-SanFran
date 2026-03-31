@@ -33,6 +33,7 @@ interface MessageItemProps {
   onNavigate?: (view: any, params?: any) => void;
   polls: Record<string, any>;
   votePoll: (pollId: string, optionIdx: number) => void;
+  createTaskFromMessage?: (msg: ChatMessage) => void;
 }
 
 const MessageItem: React.FC<MessageItemProps> = ({
@@ -40,7 +41,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
   toggleStarMessage, showReactionPicker, setShowReactionPicker,
   addReaction, removeReaction, messageReactions, startReplying,
   setForwardingMessage, setShowForwardModal, startEditing, deleteMessage,
-  openUserProfile, onNavigate, polls, votePoll
+  openUserProfile, onNavigate, polls, votePoll, createTaskFromMessage
 }) => {
   
   const isStarred = starredMessages.includes(msg.id);
@@ -80,6 +81,11 @@ const MessageItem: React.FC<MessageItemProps> = ({
             <button onClick={() => startReplying(msg)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/5 rounded-md text-slate-500" title="Responder">
               <Reply size={14} />
             </button>
+            {createTaskFromMessage && !msg.is_deleted && !!msg.content?.trim() && (
+              <button onClick={() => createTaskFromMessage(msg)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/5 rounded-md text-slate-500" title="Criar tarefa">
+                <FileText size={14} />
+              </button>
+            )}
             <button onClick={() => { setForwardingMessage(msg); setShowForwardModal(true); }} className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/5 rounded-md text-slate-500" title="Encaminhar">
               <Forward size={14} />
             </button>

@@ -278,6 +278,8 @@ export interface RankingEntry {
   total_seconds: number;
   rank_name: string;
   prestigePoints?: number;
+  weekly_cards_reviewed?: number;
+  league_division?: string;
 }
 
 export interface Note {
@@ -553,6 +555,10 @@ export interface UserProfile {
   };
   tags: string[];
   prestigePoints?: number;
+  mascotXp?: number;
+  mascotLevel?: number;
+  mascot_xp?: number;
+  mascot_level?: number;
   arcadia_score: number;
   full_name?: string;
   bio?: string;

@@ -81,7 +81,7 @@
 
 .quill-editor-custom .ql-editor {
   min-height: 100%;
-  padding: 96px; /* 1 inch margins like Google Docs */
+  padding: 72px;
   background-color: #ffffff;
 }
 
@@ -93,8 +93,8 @@
 .quill-editor-custom .ql-editor.ql-blank::before {
   color: #94a3b8;
   font-style: normal;
-  left: 96px;
-  right: 96px;
+  left: 72px;
+  right: 72px;
 }
 
 .ql-picker-options {
@@ -243,12 +243,12 @@
 }
 
 .is-maximized .quill-editor-custom .ql-editor {
-  padding: 2rem 4rem !important;
-  max-width: 900px !important;
+  padding: 64px 72px !important;
+  max-width: 816px !important;
   margin: 0 auto !important;
   background: white !important;
-  min-height: calc(100vh - 100px) !important;
-  box-shadow: 0 0 50px rgba(0,0,0,0.05) !important;
+  min-height: calc(100vh - 120px) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08) !important;
 }
 
 .dark .is-maximized .quill-editor-custom .ql-toolbar {

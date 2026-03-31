@@ -1563,7 +1563,7 @@ const App: React.FC = () => {
 
                 <Route path={getPathFromView(View.OralArgument)} element={<OralArgument />} />
                 <Route path={getPathFromView(View.Calendar)} element={<CalendarView subjects={subjects} tasks={tasks} userId={session.user.id} studySessions={studySessions} />} />
-                <Route path={getPathFromView(View.Ranking)} element={<Ranking userId={session.user.id} session={session} />} />
+                <Route path={getPathFromView(View.Ranking)} element={<Ranking userId={session.user.id} session={session} flashcards={flashcards} />} />
                 <Route path={getPathFromView(View.Subjects)} element={
                   <Subjects 
                     subjects={subjects} 
