@@ -555,10 +555,6 @@ export interface UserProfile {
   };
   tags: string[];
   prestigePoints?: number;
-  mascotXp?: number;
-  mascotLevel?: number;
-  mascot_xp?: number;
-  mascot_level?: number;
   arcadia_score: number;
   full_name?: string;
   bio?: string;
@@ -607,6 +603,8 @@ export interface UserProfile {
   interests?: string[];
   academic_background?: { degree: string; institution: string; year: string }[];
   visible_modules?: string[];
+  mascot_xp?: number;
+  mascot_level?: number;
 }
 
 export interface UserConfig {

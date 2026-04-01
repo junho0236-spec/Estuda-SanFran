@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css'; // Import Quill styles
-import { ArrowLeft, Save, Loader2, FileText, BrainCircuit, Sparkles, Tag, Split, Download, Gavel, Edit3, Pencil, Maximize2, Minimize2, Star } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, FileText, BrainCircuit, Sparkles, Tag, Split, Download, Gavel, Plus, Trash2, Edit3, Pencil, Archive, Maximize2, Minimize2, Star } from 'lucide-react';
 import { Note, Subject, SubjectFile } from '../types';
 import { dataService } from '../services/dataService';
 import { summarizeText, generateFlashcardFromHighlight } from '../services/geminiService';
@@ -9,15 +9,10 @@ import html2pdf from 'html2pdf.js';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { SmartText } from './SmartVadeMecum';
 import * as pdfjsLib from 'pdfjs-dist';
-import { CheckCircle2 } from 'lucide-react';
+import { Folder, Upload, File, CheckCircle2, AlertCircle, X } from 'lucide-react';
 import HandwritingCanvas from './HandwritingCanvas';
 import DocsToolbar from './DocsToolbar';
 import { toast } from 'sonner';
-import FloatingSelectionMenu from './noteview/FloatingSelectionMenu';
-import FlashcardModal from './noteview/FlashcardModal';
-import NoteSidebar from './noteview/NoteSidebar';
-import FilePreviewPanel from './noteview/FilePreviewPanel';
-import NoteEditorPane from './noteview/NoteEditorPane';
 
 // Register Line Height for Quill
 const Parchment = Quill.import('parchment');
@@ -125,11 +120,6 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   const [pageOrientation, setPageOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [isPageless, setIsPageless] = useState(false);
   const [zoom, setZoom] = useState('100%');
-  const zoomScale = useMemo(() => {
-    const zoomValue = parseInt(zoom, 10);
-    if (!Number.isFinite(zoomValue) || zoomValue <= 0) return 1;
-    return zoomValue / 100;
-  }, [zoom]);
   
   // Sync selectedSubjectId when initialSubjectId changes from props
   useEffect(() => {
@@ -140,8 +130,6 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
 
   const quillRef = useRef<Quill | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const templateMenuRef = useRef<HTMLDivElement>(null);
-  const exportMenuRef = useRef<HTMLDivElement>(null);
 
   const imageHandler = useCallback(() => {
     const input = document.createElement('input');
@@ -218,6 +206,13 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
 
   const onEditorRef = useCallback((node: HTMLDivElement | null) => {
     if (node !== null) {
+      // Evita duplicidade: Remove qualquer barra de ferramentas (ql-toolbar) que tenha ficado órfã no container pai
+      const parent = node.parentElement;
+      if (parent) {
+        const existingToolbars = parent.querySelectorAll('.ql-toolbar');
+        existingToolbars.forEach(tb => tb.remove());
+      }
+
       if (!quillRef.current) {
         quillRef.current = new Quill(node, {
           theme: 'snow',
@@ -249,14 +244,12 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
 
         quillRef.current.on('selection-change', (range: any) => {
           if (range && range.length > 0) {
-            const quill = quillRef.current;
-            const bounds = quill?.getBounds(range.index, range.length);
+            const bounds = quillRef.current?.getBounds(range.index, range.length);
             if (bounds) {
-              const containerRect = quill?.container.getBoundingClientRect();
               setSelectionRange(range);
               setFloatingMenuPos({
-                top: (containerRect?.top ?? 0) + bounds.top - 40,
-                left: (containerRect?.left ?? 0) + bounds.left + bounds.width / 2
+                top: bounds.top - 40,
+                left: bounds.left + bounds.width / 2
               });
             }
           } else {
@@ -305,35 +298,6 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   useEffect(() => {
     setActiveTab(initialTab);
   }, [initialTab]);
-
-  useEffect(() => {
-    const handleGlobalClick = (event: MouseEvent) => {
-      const target = event.target as Node;
-
-      if (isTemplateMenuOpen && templateMenuRef.current && !templateMenuRef.current.contains(target)) {
-        setIsTemplateMenuOpen(false);
-      }
-
-      if (isExportMenuOpen && exportMenuRef.current && !exportMenuRef.current.contains(target)) {
-        setIsExportMenuOpen(false);
-      }
-    };
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsTemplateMenuOpen(false);
-        setIsExportMenuOpen(false);
-        setFloatingMenuPos(null);
-      }
-    };
-
-    document.addEventListener('mousedown', handleGlobalClick);
-    document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.removeEventListener('mousedown', handleGlobalClick);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [isTemplateMenuOpen, isExportMenuOpen]);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -569,20 +533,6 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     saveNoteContent(false);
   };
 
-  useEffect(() => {
-    const handleSaveShortcut = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
-        event.preventDefault();
-        if (selectedNoteRef.current && !isSaving && !isAutoSaving) {
-          saveNoteContent(false);
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleSaveShortcut);
-    return () => window.removeEventListener('keydown', handleSaveShortcut);
-  }, [isSaving, isAutoSaving, saveNoteContent]);
-
   const handleExportHandwritingImage = (base64: string) => {
     const quill = quillRef.current;
     if (quill) {
@@ -734,7 +684,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     });
 
     const buffer = await Packer.toBuffer(doc);
-    const blob = new Blob([new Uint8Array(buffer)], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = 'anotacao.docx';
@@ -847,26 +797,91 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   };
 
   return (
-    <div className={`flex flex-col animate-in slide-in-from-right-4 duration-500 transition-all ${isMaximized ? 'is-maximized fixed inset-0 z-[100] bg-white dark:bg-[#0d0303] h-full' : 'w-full min-h-[calc(100vh-10rem)]'}`}>
+    <div className={`flex flex-col animate-in slide-in-from-right-4 duration-500 transition-all duration-500 ${isMaximized ? 'is-maximized fixed inset-0 z-[100] bg-white dark:bg-[#0d0303] h-full' : 'w-full min-h-[calc(100vh-10rem)]'}`}>
       
-      <FloatingSelectionMenu
-        position={floatingMenuPos}
-        isLoading={isGeneratingFlashcard}
-        onTransform={handleTransformToFlashcard}
-      />
+      {/* Floating Selection Menu */}
+      {floatingMenuPos && (
+        <div 
+          className="fixed z-[200] flex items-center gap-1 p-1 bg-slate-900 text-white rounded-xl shadow-2xl animate-in zoom-in-95 duration-200"
+          style={{ 
+            top: `${floatingMenuPos.top}px`, 
+            left: `${floatingMenuPos.left}px`,
+            transform: 'translateX(-50%)'
+          }}
+        >
+          <button 
+            onClick={handleTransformToFlashcard}
+            disabled={isGeneratingFlashcard}
+            className="flex items-center gap-2 px-3 py-1.5 hover:bg-white/10 rounded-lg transition-colors disabled:opacity-50"
+          >
+            {isGeneratingFlashcard ? <Loader2 size={14} className="animate-spin" /> : <BrainCircuit size={14} />}
+            <span className="text-[10px] font-bold whitespace-nowrap">Transformar em Flashcard</span>
+          </button>
+        </div>
+      )}
 
-      <FlashcardModal
-        isOpen={showFlashcardModal}
-        data={newFlashcardData}
-        onChange={setNewFlashcardData}
-        onClose={() => setShowFlashcardModal(false)}
-        onSave={handleSaveGeneratedFlashcard}
-      />
+      {/* Flashcard Confirmation Modal */}
+      {showFlashcardModal && newFlashcardData && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10 animate-in slide-in-from-bottom-8 duration-500">
+            <div className="p-8 space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-2xl flex items-center justify-center">
+                    <Sparkles className="text-purple-600" size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Flashcard Gerado</h3>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Confira e salve no seu Anki</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowFlashcardModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
+                  <X size={20} className="text-slate-400" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Frente (Pergunta)</label>
+                  <textarea 
+                    value={newFlashcardData.front}
+                    onChange={(e) => setNewFlashcardData({...newFlashcardData, front: e.target.value})}
+                    className="w-full p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-purple-500 transition-all min-h-[80px]"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Verso (Resposta)</label>
+                  <textarea 
+                    value={newFlashcardData.back}
+                    onChange={(e) => setNewFlashcardData({...newFlashcardData, back: e.target.value})}
+                    className="w-full p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-purple-500 transition-all min-h-[120px]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button 
+                  onClick={handleSaveGeneratedFlashcard}
+                  className="flex-1 py-4 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-purple-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  Salvar no Anki
+                </button>
+                <button 
+                  onClick={() => setShowFlashcardModal(false)}
+                  className="px-8 py-4 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 rounded-2xl font-black uppercase tracking-widest transition-all hover:bg-slate-200"
+                >
+                  Descartar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Editorial Header */}
-      <header className={`relative border-b border-slate-100 dark:border-white/5 transition-all ${isMaximized ? 'sticky top-0 z-20 py-2 px-4 mb-0 bg-slate-50/95 dark:bg-[#0d0303]/95 backdrop-blur' : 'py-4 px-6 mb-6 bg-white dark:bg-white/2'}`}>
+      <header className={`relative border-b border-slate-100 dark:border-white/5 transition-all ${isMaximized ? 'py-2 px-4 mb-0 bg-slate-50 dark:bg-white/5' : 'py-4 px-6 mb-6 bg-white dark:bg-white/2'}`}>
         <div className={`flex flex-col lg:flex-row lg:items-center justify-between ${isMaximized ? 'gap-2' : 'gap-4'}`}>
-          <div className="flex items-center gap-4">
+          <div className={`flex items-center gap-4 ${isMaximized ? 'scale-75 origin-left' : ''}`}>
             <div className="flex items-center gap-3">
               <button 
                 onClick={handleBack} 
@@ -940,7 +955,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
           </div>
 
           {/* Action Groups */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className={`flex flex-wrap items-center gap-2 ${isMaximized ? 'scale-75 origin-right' : ''}`}>
             {/* Group 1: AI & Smart Tools */}
             <div className="flex bg-white dark:bg-white/5 p-1 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm">
               <button 
@@ -973,7 +988,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
 
             {/* Group 2: Editor Tools */}
             <div className="flex bg-white dark:bg-white/5 p-1 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm">
-              <div className="relative" ref={templateMenuRef}>
+              <div className="relative">
                 <button 
                   onClick={() => setIsTemplateMenuOpen(!isTemplateMenuOpen)}
                   disabled={!selectedNote}
@@ -1005,7 +1020,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
 
             {/* Group 3: Export & View */}
             <div className="flex bg-white dark:bg-white/5 p-1 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm">
-              <div className="relative" ref={exportMenuRef}>
+              <div className="relative">
                 <button 
                   onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
                   disabled={!selectedNote}
@@ -1074,35 +1089,136 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
       <div className={`flex gap-8 ${isMaximized ? 'flex-1 overflow-hidden' : 'flex-1 min-h-[700px]'}`}>
         {/* Sidebar for Notes and Files */}
         {!isSplitView && (
-          <NoteSidebar
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            notes={notes}
-            files={files}
-            selectedNote={selectedNote}
-            selectedFile={selectedFile}
-            isUploading={isUploading}
-            isLoading={isLoading}
-            onCreateNote={createNewNote}
-            onUploadClick={() => fileInputRef.current?.click()}
-            onSelectNote={(note) => {
-              setSelectedNote(note);
-              setSelectedFile(null);
-              setNoteContent(note.content);
-              setHandwritingData(note.handwriting_data);
-              if (quillRef.current) {
-                const delta = quillRef.current.clipboard.convert({ html: note.content });
-                quillRef.current.setContents(delta, 'silent');
-              }
-            }}
-            onSelectFile={(file) => {
-              setSelectedFile(file);
-              setSelectedNote(null);
-            }}
-            onDeleteNote={deleteNote}
-            onDeleteFile={deleteFile}
-            getCardColor={getCardColor}
-          />
+          <aside className="w-80 flex flex-col bg-slate-50 dark:bg-white/5 rounded-[3rem] border border-slate-200 dark:border-white/10 overflow-hidden shadow-inner animate-in slide-in-from-left-4 duration-300">
+            {/* Tabs */}
+            <div className="flex p-3 bg-white dark:bg-black/20 border-b border-slate-100 dark:border-white/5">
+              <button 
+                onClick={() => setActiveTab('notes')}
+                className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'notes' ? 'bg-sanfran-rubi text-white shadow-lg shadow-red-500/20' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                Notas
+              </button>
+              <button 
+                onClick={() => setActiveTab('repository')}
+                className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'repository' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                Repositório
+              </button>
+              <button 
+                onClick={() => setActiveTab('assignments')}
+                className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'assignments' ? 'bg-green-600 text-white shadow-lg shadow-green-500/20' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                Entregas
+              </button>
+            </div>
+
+            <div className="px-8 py-6 flex items-center justify-between">
+              <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
+                {activeTab === 'notes' ? 'Documentos' : activeTab === 'repository' ? 'PDFs / Textos' : 'Trabalhos'}
+              </h3>
+              {activeTab === 'notes' ? (
+                <button onClick={createNewNote} className="p-2.5 bg-white dark:bg-white/10 text-sanfran-rubi hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl shadow-sm border border-slate-100 dark:border-white/5 transition-all hover:rotate-90 flex flex-col items-center gap-1">
+                  <Plus size={20} />
+                  <span className="text-[7px] font-black uppercase">Novo</span>
+                </button>
+              ) : (
+                <button 
+                  onClick={() => fileInputRef.current?.click()} 
+                  disabled={isUploading}
+                  className={`p-2.5 bg-white dark:bg-white/10 rounded-xl shadow-sm border border-slate-100 dark:border-white/5 transition-all flex flex-col items-center gap-1 ${activeTab === 'repository' ? 'text-blue-500 hover:bg-blue-50' : 'text-green-500 hover:bg-green-50'}`}
+                >
+                  {isUploading ? <Loader2 size={20} className="animate-spin" /> : <Upload size={20} />}
+                  <span className="text-[7px] font-black uppercase">Subir</span>
+                </button>
+              )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-4 pb-8 space-y-4 custom-scrollbar">
+              {activeTab === 'notes' ? (
+                notes.map(note => (
+                  <div 
+                    key={note.id}
+                    onClick={() => {
+                      setSelectedNote(note);
+                      setSelectedFile(null);
+                      setNoteContent(note.content);
+                      if (quillRef.current) {
+                        const delta = quillRef.current.clipboard.convert({ html: note.content });
+                        quillRef.current.setContents(delta, 'silent');
+                      }
+                    }}
+                    className={`group p-5 rounded-[2rem] cursor-pointer transition-all flex items-center justify-between border-2 relative overflow-hidden ${selectedNote?.id === note.id ? 'bg-white dark:bg-slate-900 border-sanfran-rubi shadow-xl -translate-y-1' : 'bg-white/50 dark:bg-white/5 border-transparent hover:bg-white dark:hover:bg-white/10 hover:shadow-lg'}`}
+                  >
+                    {/* Color accent bar */}
+                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${getCardColor(note.id).split(' ')[2]}`}></div>
+                    
+                    <div className="flex items-center gap-4 overflow-hidden">
+                      <div className={`p-3 rounded-2xl ${getCardColor(note.id)}`}>
+                        <FileText size={20} />
+                      </div>
+                      <div className="flex flex-col overflow-hidden">
+                        <span className={`text-sm font-black truncate ${selectedNote?.id === note.id ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>
+                          {note.title || 'Documento sem título'}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                          {new Date(note.updated_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); deleteNote(note.id); }}
+                      className="opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                ))
+              ) : (
+                files.filter(f => f.type === (activeTab === 'repository' ? 'repository' : 'assignment')).map(file => (
+                  <div 
+                    key={file.id}
+                    onClick={() => {
+                      setSelectedFile(file);
+                      setSelectedNote(null);
+                    }}
+                    className={`group p-5 rounded-[2rem] cursor-pointer transition-all flex items-center justify-between border-2 relative overflow-hidden ${selectedFile?.id === file.id ? 'bg-white dark:bg-slate-900 border-' + (activeTab === 'repository' ? 'blue-500' : 'green-500') + ' shadow-xl -translate-y-1' : 'bg-white/50 dark:bg-white/5 border-transparent hover:bg-white dark:hover:bg-white/10 hover:shadow-lg'}`}
+                  >
+                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${activeTab === 'repository' ? 'bg-blue-500' : 'bg-green-500'}`}></div>
+
+                    <div className="flex items-center gap-4 overflow-hidden">
+                      <div className={`p-3 rounded-2xl ${selectedFile?.id === file.id ? (activeTab === 'repository' ? 'bg-blue-500 text-white' : 'bg-green-500 text-white') : 'bg-slate-100 dark:bg-white/10 text-slate-400'}`}>
+                        <File size={20} />
+                      </div>
+                      <div className="flex flex-col overflow-hidden">
+                        <span className={`text-sm font-black truncate ${selectedFile?.id === file.id ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>
+                          {file.name}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                          {new Date(file.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); deleteFile(file.id); }}
+                      className="opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                ))
+              )}
+              
+              {((activeTab === 'notes' && notes.length === 0) || (activeTab !== 'notes' && files.filter(f => f.type === (activeTab === 'repository' ? 'repository' : 'assignment')).length === 0)) && !isLoading && (
+                <div className="text-center py-20 px-8">
+                  <div className="w-20 h-20 bg-white dark:bg-white/5 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-sm border border-slate-100 dark:border-white/5">
+                    <Archive size={32} className="text-slate-200" />
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em]">Vazio</p>
+                  <p className="text-xs text-slate-400 mt-2 font-medium">Nenhum item encontrado nesta categoria.</p>
+                </div>
+              )}
+            </div>
+          </aside>
         )}
 
         {/* Editor Area or File Preview */}
@@ -1172,10 +1288,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                       setNotes(prev => prev.map(n => n.id === updatedNote.id ? updatedNote : n));
                     }}
                     onNew={createNewNote}
-                    onOpen={() => {
-                      setIsSplitView(false);
-                      onToggleSidebar(true);
-                    }}
+                    onOpen={() => onToggleSidebar(true)}
                     onCopy={duplicateNote}
                     onShare={() => {
                       navigator.clipboard.writeText(window.location.href);
@@ -1223,31 +1336,165 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                     setIsPageless={setIsPageless}
                   />
                   
-                  <NoteEditorPane
-                    showRuler={showRuler}
-                    isVadeMecumMode={isVadeMecumMode}
-                    showEquationToolbar={showEquationToolbar}
-                    editMode={editMode}
-                    setEditMode={setEditMode}
-                    showPrintLayout={showPrintLayout}
-                    isPageless={isPageless}
-                    showNonPrintingChars={showNonPrintingChars}
-                    onEditorRef={onEditorRef}
-                    pageOrientation={pageOrientation}
-                    zoomScale={zoomScale}
-                    showComments={showComments}
-                    setShowComments={setShowComments}
-                    quillRef={quillRef}
-                  />
+                  {/* Ruler */}
+                  {showRuler && !isVadeMecumMode && (
+                    <div className="h-6 bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-white/10 flex items-center px-10 relative overflow-hidden">
+                      {/* Left Margin Marker */}
+                      <div className="absolute left-10 top-0 z-10 flex flex-col items-center">
+                        <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[6px] border-t-blue-600"></div>
+                        <div className="w-[2px] h-2 bg-blue-600"></div>
+                      </div>
+                      
+                      {/* Right Margin Marker */}
+                      <div className="absolute right-10 top-0 z-10 flex flex-col items-center">
+                        <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[6px] border-t-blue-600"></div>
+                      </div>
+
+                      <div className="absolute inset-0 flex items-center justify-between px-10 opacity-30 pointer-events-none">
+                        {[...Array(20)].map((_, i) => (
+                          <div key={i} className="flex flex-col items-center">
+                            <div className="h-2 w-px bg-slate-400"></div>
+                            <span className="text-[8px] mt-0.5">{i}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Equation Toolbar */}
+                  {showEquationToolbar && (
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-2 border-b border-blue-100 dark:border-blue-900/30 flex items-center gap-4 animate-in slide-in-from-top duration-200">
+                      <span className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 px-2">Equação</span>
+                      <div className="flex gap-2">
+                        {['∑', '∏', '∫', '√', '∞', '≠', '≈', '≤', '≥'].map(sym => (
+                          <button key={sym} onClick={() => quillRef.current?.insertText(quillRef.current.getSelection()?.index || 0, sym)} className="w-8 h-8 flex items-center justify-center bg-white dark:bg-slate-800 rounded shadow-sm hover:bg-blue-500 hover:text-white transition-all font-serif">
+                            {sym}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Suggestions Mode Banner */}
+                  {editMode === 'suggesting' && (
+                    <div className="bg-amber-50 dark:bg-amber-900/20 p-2 border-b border-amber-100 dark:border-amber-900/30 flex items-center justify-between px-4 animate-in slide-in-from-top duration-200">
+                      <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 text-sm">
+                        <Sparkles size={16} />
+                        <span>Você está no modo de <strong>Sugestão</strong>. Suas edições serão marcadas para revisão.</span>
+                      </div>
+                      <button onClick={() => setEditMode('editing')} className="text-xs font-bold text-amber-800 dark:text-amber-300 hover:underline">Voltar para Edição</button>
+                    </div>
+                  )}
+
+                  <div className="flex-1 flex overflow-hidden relative z-0">
+                    <div 
+                      className={`flex-1 quill-editor-custom overflow-y-auto ${showPrintLayout && !isPageless ? 'paper-effect p-4 md:p-8' : 'bg-white dark:bg-[#1a1a1a]'} ${showNonPrintingChars ? 'show-non-printing' : ''} relative`}
+                      onClick={() => {
+                        const editor = document.querySelector('.ql-editor') as HTMLElement;
+                        if (editor) {
+                          editor.focus();
+                        } else {
+                          const mainEditor = document.querySelector('[contenteditable="true"]') as HTMLElement;
+                          if (mainEditor) mainEditor.focus();
+                        }
+                      }}
+                    >
+                      <div 
+                        ref={onEditorRef} 
+                        contentEditable={editMode !== 'viewing'}
+                        suppressContentEditableWarning={true}
+                        onInput={(e) => setNoteContent(e.currentTarget.innerHTML)}
+                        className={`flex-1 ${showPrintLayout && !isPageless ? `shadow-[0_1px_3px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.08)] ${pageOrientation === 'portrait' ? 'max-w-[816px] min-h-[1056px]' : 'max-w-[1056px] min-h-[816px]'} mx-auto border border-slate-200 dark:border-white/10` : 'h-full w-full max-w-[1200px] mx-auto'}`} 
+                        style={{
+                          transform: zoom !== '100%' ? `scale(${parseInt(zoom) / 100})` : 'none',
+                          transformOrigin: 'top center',
+                          transition: 'transform 0.2s ease-in-out'
+                        }}
+                      />
+                    </div>
+
+                    {/* Comments Sidebar */}
+                    {showComments && (
+                      <aside className="w-80 bg-slate-50 dark:bg-white/5 border-l border-slate-200 dark:border-white/10 p-6 animate-in slide-in-from-right duration-300">
+                        <div className="flex items-center justify-between mb-6">
+                          <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Comentários</h4>
+                          <button onClick={() => setShowComments(false)} className="text-slate-400 hover:text-slate-600"><Minimize2 size={16} /></button>
+                        </div>
+                        <div className="space-y-4">
+                          <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-white/5">
+                            <p className="text-xs text-slate-500 italic">Nenhum comentário neste documento.</p>
+                          </div>
+                        </div>
+                      </aside>
+                    )}
+                  </div>
                 </div>
               )
             ) : (
-              <FilePreviewPanel
-                activeTab={activeTab === 'repository' ? 'repository' : 'assignments'}
-                selectedFile={selectedFile}
-                onUploadClick={() => fileInputRef.current?.click()}
-                onGenerateFlashcards={handleGenerateFlashcardsFromFile}
-              />
+              !selectedFile ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-slate-400 space-y-8 p-12 text-center">
+                  <div className="w-32 h-32 bg-slate-50 dark:bg-white/5 rounded-[3rem] flex items-center justify-center animate-float shadow-inner">
+                    <Folder size={64} className="opacity-10" />
+                  </div>
+                  <div className="space-y-3">
+                    <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter">Seu Repositório</h3>
+                    <p className="text-sm font-medium max-w-sm mx-auto text-slate-500 leading-relaxed">Suba PDFs, doutrinas ou enunciados para ter tudo organizado em um só lugar e gerar flashcards instantâneos.</p>
+                  </div>
+                  <button 
+                    onClick={() => fileInputRef.current?.click()} 
+                    className={`px-10 py-5 text-white rounded-[2rem] font-black uppercase tracking-widest text-xs transition-all shadow-2xl active:scale-95 ${activeTab === 'repository' ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/30' : 'bg-green-600 hover:bg-green-700 shadow-green-500/30'}`}
+                  >
+                    Enviar Arquivo
+                  </button>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col p-12 md:p-16 overflow-hidden">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 mb-16 p-10 bg-slate-50 dark:bg-white/5 rounded-[3rem] border border-slate-100 dark:border-white/10 shadow-sm">
+                    <div className="flex items-center gap-8">
+                      <div className={`w-20 h-20 rounded-[2rem] flex items-center justify-center shadow-2xl ${activeTab === 'repository' ? 'bg-blue-500 text-white shadow-blue-500/30' : 'bg-green-500 text-white shadow-green-500/30'}`}>
+                        <File size={40} />
+                      </div>
+                      <div>
+                        <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none mb-3">{selectedFile.name}</h3>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Enviado em {new Date(selectedFile.created_at).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <a 
+                        href={selectedFile.file_url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="py-4 px-8 bg-white dark:bg-white/10 text-slate-700 dark:text-slate-200 rounded-[2rem] font-black uppercase tracking-widest text-[10px] hover:bg-slate-50 transition-all border border-slate-200 dark:border-white/10 shadow-sm"
+                      >
+                        Abrir Arquivo
+                      </a>
+                      <button 
+                        onClick={() => handleGenerateFlashcardsFromFile(selectedFile)}
+                        className="py-4 px-8 bg-blue-600 text-white rounded-[2rem] font-black uppercase tracking-widest text-[10px] flex items-center gap-4 hover:bg-blue-700 transition-all shadow-2xl shadow-blue-500/30"
+                      >
+                        <BrainCircuit size={20} /> Gerar Flashcards
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex-1 bg-slate-50 dark:bg-black/20 rounded-[3rem] p-10 overflow-y-auto border border-slate-100 dark:border-white/5 shadow-inner">
+                    <div className="flex items-center gap-4 mb-8">
+                      <Sparkles size={20} className="text-amber-500" />
+                      <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Conteúdo Extraído por IA</h4>
+                    </div>
+                    {selectedFile.content ? (
+                      <div className="prose dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 leading-loose text-lg font-medium">
+                        {selectedFile.content}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-32 text-slate-400 italic">
+                        <AlertCircle size={64} className="mb-6 opacity-5" />
+                        <p className="text-lg font-bold tracking-tight">Nenhum texto extraído deste arquivo.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
             )}
           </div>
           

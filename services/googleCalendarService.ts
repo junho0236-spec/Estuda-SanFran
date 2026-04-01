@@ -30,9 +30,17 @@ export const googleCalendarService = {
     if (firebaseGoogleToken) return firebaseGoogleToken;
 
     // Fallback to Supabase (original logic)
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.provider_token) {
-      return session.provider_token;
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error) {
+        console.warn('[googleCalendarService] Error getting session:', error.message);
+        return null;
+      }
+      if (session?.provider_token) {
+        return session.provider_token;
+      }
+    } catch (e) {
+      console.error('[googleCalendarService] Unexpected error in getAccessToken:', e);
     }
     
     console.warn('[googleCalendarService] No provider token found.');
@@ -67,7 +75,8 @@ export const googleCalendarService = {
 
       return await response.json();
     } catch (err) {
-      console.error('[googleCalendarService] Fetch error:', err);
+      const isNetworkError = (err instanceof TypeError && err.message === 'Failed to fetch') || (err instanceof Error && err.message.includes('fetch'));
+      console.error('[googleCalendarService] Create event fetch error:', err);
       return null;
     }
   },
@@ -100,7 +109,8 @@ export const googleCalendarService = {
 
       return await response.json();
     } catch (err) {
-      console.error('[googleCalendarService] Fetch error:', err);
+      const isNetworkError = (err instanceof TypeError && err.message === 'Failed to fetch') || (err instanceof Error && err.message.includes('fetch'));
+      console.error('[googleCalendarService] Update event fetch error:', err);
       return null;
     }
   },
@@ -119,7 +129,8 @@ export const googleCalendarService = {
 
       return response.ok;
     } catch (err) {
-      console.error('[googleCalendarService] Fetch error:', err);
+      const isNetworkError = (err instanceof TypeError && err.message === 'Failed to fetch') || (err instanceof Error && err.message.includes('fetch'));
+      console.error('[googleCalendarService] Delete event fetch error:', err);
       return false;
     }
   },

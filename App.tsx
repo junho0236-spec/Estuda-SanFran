@@ -483,10 +483,13 @@ const App: React.FC = () => {
       if (error) {
         console.warn("[Auth] Failed to get initial session:", error.message);
         // If refresh token is invalid or not found, force a logout to clear the stale state
-        if (error.message.includes("Refresh Token Not Found") || error.message.includes("Invalid Refresh Token")) {
-          supabase.auth.signOut();
+        if (error.message.includes("Refresh Token Not Found") || error.message.includes("Invalid Refresh Token") || error.message.includes("Failed to fetch")) {
+          console.error("[Auth] Stale or invalid session detected. Signing out.");
+          supabase.auth.signOut().catch(() => {});
           setSession(null);
           setIsAuthenticated(false);
+          // Clear the storage key manually as a last resort
+          localStorage.removeItem('sb-sanfran-auth-token');
         }
         return;
       }
@@ -499,20 +502,30 @@ const App: React.FC = () => {
       }
     }).catch(err => {
       console.warn("[Auth] Unexpected error getting session:", err);
+      if (err.message?.includes("Failed to fetch")) {
+        // Network error, but we might still have a local session
+        console.log("[Auth] Network error during session fetch. Using cached state if available.");
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log("[Auth] State changed:", event);
-      setSession(session);
-      setIsAuthenticated(!!session);
       
-      if (session?.user) {
-        syncProfile(session.user);
-        clearOldLocalStorage(session.user.id);
-      } else if (event === 'SIGNED_OUT') {
-        // Clear any local state if needed
+      if (event === 'TOKEN_REFRESHED') {
+        console.log("[Auth] Token successfully refreshed");
+      }
+      
+      if (event === 'SIGNED_OUT') {
         setSession(null);
         setIsAuthenticated(false);
+        localStorage.removeItem('sb-sanfran-auth-token');
+      } else {
+        setSession(session);
+        setIsAuthenticated(!!session);
+        if (session?.user) {
+          syncProfile(session.user);
+          clearOldLocalStorage(session.user.id);
+        }
       }
     });
 

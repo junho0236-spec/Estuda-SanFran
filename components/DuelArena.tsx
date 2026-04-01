@@ -114,13 +114,11 @@ const DuelArena: React.FC<DuelArenaProps> = ({
         const xpGain = amIWinner ? 50 : (isDraw ? 25 : 10);
         const prestigeGain = amIWinner ? 10 : (isDraw ? 5 : 2);
         
-        const currentXp = userProfile.mascotXp ?? userProfile.mascot_xp ?? 0;
-        const currentLevel = userProfile.mascotLevel ?? userProfile.mascot_level ?? 1;
-        const newXp = currentXp + xpGain;
+        const newXp = (userProfile.mascot_xp || 0) + xpGain;
         const newPrestige = (userProfile.prestigePoints || 0) + prestigeGain;
 
         // Mascot Level Logic
-        let newLevel = currentLevel;
+        let newLevel = userProfile.mascot_level || 1;
         if (newXp >= 4000) newLevel = 5;
         else if (newXp >= 1500) newLevel = 4;
         else if (newXp >= 500) newLevel = 3;
@@ -128,8 +126,6 @@ const DuelArena: React.FC<DuelArenaProps> = ({
 
         const updatedProfile = {
           ...userProfile,
-          mascotXp: newXp,
-          mascotLevel: newLevel,
           mascot_xp: newXp,
           mascot_level: newLevel,
           prestigePoints: newPrestige
