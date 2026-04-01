@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css'; // Import Quill styles
-import { ArrowLeft, Save, Loader2, FileText, BrainCircuit, Sparkles, Tag, Split, Download, Gavel, Edit3, Pencil, Maximize2, Minimize2, Star } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, FileText, BrainCircuit, Sparkles, Tag, Split, Download, Gavel, Edit3, Pencil, Maximize2, Minimize2, Star, X } from 'lucide-react';
 import { Note, Subject, SubjectFile } from '../types';
 import { dataService } from '../services/dataService';
 import { summarizeText, generateFlashcardFromHighlight } from '../services/geminiService';
@@ -105,6 +105,8 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   const [isHandwritingOpen, setIsHandwritingOpen] = useState(false);
   const [handwritingData, setHandwritingData] = useState<string | undefined>(undefined);
   const [isOfflineAvailable, setIsOfflineAvailable] = useState(true);
+  const [isNewNoteTitleModalOpen, setIsNewNoteTitleModalOpen] = useState(false);
+  const [newNoteTitleDraft, setNewNoteTitleDraft] = useState('');
   
   // Highlight to Card States
   const [selectionRange, setSelectionRange] = useState<{ index: number, length: number } | null>(null);
@@ -139,6 +141,10 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   }, [initialSubjectId]);
 
   const quillRef = useRef<Quill | null>(null);
+  /** Último intervalo Quill não nulo — atualizado junto ao listener do editor (DocsToolbar usa para restaurar após menus). */
+  const quillSavedRangeRef = useRef<{ index: number; length: number } | null>(null);
+  const lastRangeNoteIdRef = useRef<string | null>(null);
+  const loadRequestIdRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const templateMenuRef = useRef<HTMLDivElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
@@ -225,8 +231,8 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
           formats: formats,
         });
 
-        // Add custom icon for legal citation button
-        const toolbar = node.parentElement?.querySelector('.ql-toolbar');
+        // Toolbar lives in #docs-toolbar (not a DOM parent of the editor mount)
+        const toolbar = document.querySelector('#docs-toolbar');
         if (toolbar) {
           const legalButton = toolbar.querySelector('.ql-legal-citation');
           if (legalButton) {
@@ -248,6 +254,9 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
         });
 
         quillRef.current.on('selection-change', (range: any) => {
+          if (range) {
+            quillSavedRangeRef.current = { index: range.index, length: range.length };
+          }
           if (range && range.length > 0) {
             const quill = quillRef.current;
             const bounds = quill?.getBounds(range.index, range.length);
@@ -274,6 +283,8 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
       }
     } else {
       quillRef.current = null;
+      quillSavedRangeRef.current = null;
+      lastRangeNoteIdRef.current = null;
       contentInitializedRef.current = false;
     }
   }, [modules]); // Depende de modules para reinicializar se necessário
@@ -281,17 +292,28 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   // Sync content from state to editor when note is loaded or changed
   useEffect(() => {
     if (quillRef.current && selectedNote && !isLoading) {
+      if (lastRangeNoteIdRef.current !== selectedNote.id) {
+        lastRangeNoteIdRef.current = selectedNote.id;
+        quillSavedRangeRef.current = null;
+      }
+
       // Only update if the content is actually different to avoid cursor jumping
       if (quillRef.current.root.innerHTML !== selectedNote.content) {
         const delta = quillRef.current.clipboard.convert({ html: selectedNote.content });
         quillRef.current.setContents(delta, 'silent');
       }
-      
+
       // Handle viewing mode
       if (editMode === 'viewing') {
         quillRef.current.disable();
       } else {
         quillRef.current.enable();
+      }
+
+      // Recapture selection into saved ref (setContents / enable may not emit selection-change in time for menus)
+      const sel = quillRef.current.getSelection();
+      if (sel) {
+        quillSavedRangeRef.current = { index: sel.index, length: sel.length };
       }
     }
   }, [selectedNote?.id, isLoading, isVadeMecumMode, editMode]);
@@ -336,19 +358,24 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   }, [isTemplateMenuOpen, isExportMenuOpen]);
 
   const loadData = useCallback(async () => {
+    const reqId = ++loadRequestIdRef.current;
     setIsLoading(true);
     try {
       const [subjectNotes, subjectFiles] = await Promise.all([
         dataService.getNotesBySubjectId(selectedSubjectId, userId, isOnline),
         dataService.getFilesBySubjectId(selectedSubjectId, userId, isOnline)
       ]);
+      if (reqId !== loadRequestIdRef.current) return;
       setNotes(subjectNotes);
       setFiles(subjectFiles);
     } catch (error) {
+      if (reqId !== loadRequestIdRef.current) return;
       console.error('Error loading data:', error);
       alert('Erro ao carregar dados.');
     } finally {
-      setIsLoading(false);
+      if (reqId === loadRequestIdRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [selectedSubjectId, userId, isOnline]);
 
@@ -380,15 +407,18 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     }
   }, [notes, selectedSubjectId, selectedNote]);
 
-  const createNewNote = async () => {
-    const title = prompt("Título do novo documento:");
-    if (!title) return;
+  const createNoteWithTitle = async (title: string) => {
+    const trimmed = title.trim();
+    if (!trimmed) {
+      toast.error('Informe um título para o documento.');
+      return;
+    }
 
     const newNote: Note = {
       id: crypto.randomUUID(),
       subject_id: selectedSubjectId,
       user_id: userId,
-      title: title,
+      title: trimmed,
       content: '',
       updated_at: new Date().toISOString(),
       tags: []
@@ -402,10 +432,22 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
       if (quillRef.current) {
         quillRef.current.setContents([] as any, 'silent');
       }
+      setIsNewNoteTitleModalOpen(false);
+      setNewNoteTitleDraft('');
+      toast.success('Documento criado.');
     } catch (error) {
       console.error("Error creating note:", error);
       toast.error("Erro ao criar documento.");
     }
+  };
+
+  const openNewNoteTitleModal = () => {
+    setNewNoteTitleDraft('');
+    setIsNewNoteTitleModalOpen(true);
+  };
+
+  const confirmNewNoteFromModal = () => {
+    void createNoteWithTitle(newNoteTitleDraft);
   };
 
   const deleteNote = async (id: string) => {
@@ -834,7 +876,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex min-h-[280px] items-center justify-center py-16">
         <Loader2 className="w-10 h-10 animate-spin text-purple-500" />
         <p className="ml-3 text-slate-500">Carregando anotação...</p>
       </div>
@@ -847,7 +889,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   };
 
   return (
-    <div className={`flex flex-col animate-in slide-in-from-right-4 duration-500 transition-all ${isMaximized ? 'is-maximized fixed inset-0 z-[100] bg-white dark:bg-[#0d0303] h-full' : 'w-full min-h-[calc(100vh-10rem)]'}`}>
+    <div className={`flex flex-col min-h-0 animate-in slide-in-from-right-4 duration-500 transition-all ${isMaximized ? 'is-maximized fixed inset-0 z-[100] bg-white dark:bg-[#0d0303] h-full' : 'w-full min-h-0 h-[calc(100dvh-10rem)]'}`}>
       
       <FloatingSelectionMenu
         position={floatingMenuPos}
@@ -862,6 +904,70 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
         onClose={() => setShowFlashcardModal(false)}
         onSave={handleSaveGeneratedFlashcard}
       />
+
+      {isNewNoteTitleModalOpen && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="new-note-title-heading"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              setIsNewNoteTitleModalOpen(false);
+              setNewNoteTitleDraft('');
+            }
+          }}
+        >
+          <div className="bg-white dark:bg-[#1a1a1a] w-full max-w-md rounded-3xl border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden">
+            <div className="p-5 border-b border-slate-100 dark:border-white/10 flex items-center justify-between">
+              <h3 id="new-note-title-heading" className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                Novo documento
+              </h3>
+              <button
+                type="button"
+                onClick={() => { setIsNewNoteTitleModalOpen(false); setNewNoteTitleDraft(''); }}
+                className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500"
+                aria-label="Fechar"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">Título</label>
+              <input
+                type="text"
+                value={newNoteTitleDraft}
+                onChange={(e) => setNewNoteTitleDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    confirmNewNoteFromModal();
+                  }
+                }}
+                className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-sanfran-rubi/40"
+                placeholder="Ex.: Aula 1 — Introdução"
+                autoFocus
+              />
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setIsNewNoteTitleModalOpen(false); setNewNoteTitleDraft(''); }}
+                  className="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmNewNoteFromModal}
+                  className="px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-wide bg-sanfran-rubi text-white hover:bg-red-700"
+                >
+                  Criar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Editorial Header */}
       <header className={`relative border-b border-slate-100 dark:border-white/5 transition-all ${isMaximized ? 'sticky top-0 z-20 py-2 px-4 mb-0 bg-slate-50/95 dark:bg-[#0d0303]/95 backdrop-blur' : 'py-4 px-6 mb-6 bg-white dark:bg-white/2'}`}>
@@ -1071,7 +1177,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
         </div>
       </header>
 
-      <div className={`flex gap-8 ${isMaximized ? 'flex-1 overflow-hidden' : 'flex-1 min-h-[700px]'}`}>
+      <div className="flex gap-8 flex-1 min-h-0 overflow-hidden">
         {/* Sidebar for Notes and Files */}
         {!isSplitView && (
           <NoteSidebar
@@ -1083,7 +1189,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
             selectedFile={selectedFile}
             isUploading={isUploading}
             isLoading={isLoading}
-            onCreateNote={createNewNote}
+            onCreateNote={openNewNoteTitleModal}
             onUploadClick={() => fileInputRef.current?.click()}
             onSelectNote={(note) => {
               setSelectedNote(note);
@@ -1106,8 +1212,8 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
         )}
 
         {/* Editor Area or File Preview */}
-        <main className="flex-1 flex flex-col overflow-hidden min-w-0">
-          <div className={`flex-1 bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 shadow-2xl relative flex flex-col transition-all duration-500 ${isMaximized ? 'rounded-none border-0' : 'rounded-3xl border'}`}>
+        <main className="flex-1 flex flex-col overflow-hidden min-w-0 min-h-0">
+          <div className={`flex-1 flex flex-col min-h-0 overflow-hidden bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 shadow-2xl relative transition-all duration-500 ${isMaximized ? 'rounded-none border-0' : 'rounded-3xl border'}`}>
             {activeTab === 'notes' ? (
               !selectedNote ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-slate-400 space-y-8 p-12 text-center">
@@ -1119,7 +1225,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                     <p className="text-sm font-medium max-w-sm mx-auto text-slate-500 leading-relaxed">Selecione um documento na barra lateral ou crie um novo para registrar seus estudos com o poder da IA.</p>
                   </div>
                   <button 
-                    onClick={createNewNote} 
+                    onClick={openNewNoteTitleModal} 
                     className="px-10 py-5 bg-sanfran-rubi text-white rounded-[2rem] font-black uppercase tracking-widest text-xs hover:bg-red-700 transition-all shadow-2xl shadow-red-500/30 active:scale-95"
                   >
                     Criar Primeiro Documento
@@ -1138,9 +1244,10 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                   </div>
                 </div>
               ) : (
-                <div className={`flex-1 flex flex-col transition-all duration-500 ${isMaximized ? 'p-0' : 'p-6 md:p-10 min-h-[600px]'}`}>
+                <div className={`note-view-editor-root flex flex-1 min-h-0 flex-col overflow-visible transition-all duration-500 ${isMaximized ? 'p-0' : 'p-6 md:p-10'}`}>
                   <DocsToolbar 
-                    quillRef={quillRef} 
+                    quillRef={quillRef}
+                    savedQuillRangeRef={quillSavedRangeRef}
                     onImageUpload={imageHandler} 
                     onExportPdf={handleExportPdf} 
                     onExportDocx={handleExportDocx} 
@@ -1171,7 +1278,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                       dataService.saveNote(updatedNote, userId, isOnline);
                       setNotes(prev => prev.map(n => n.id === updatedNote.id ? updatedNote : n));
                     }}
-                    onNew={createNewNote}
+                    onNew={openNewNoteTitleModal}
                     onOpen={() => {
                       setIsSplitView(false);
                       onToggleSidebar(true);
@@ -1222,7 +1329,8 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                     isPageless={isPageless}
                     setIsPageless={setIsPageless}
                   />
-                  
+
+                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                   <NoteEditorPane
                     showRuler={showRuler}
                     isVadeMecumMode={isVadeMecumMode}
@@ -1239,6 +1347,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                     setShowComments={setShowComments}
                     quillRef={quillRef}
                   />
+                  </div>
                 </div>
               )
             ) : (

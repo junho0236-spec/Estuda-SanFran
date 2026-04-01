@@ -98,7 +98,11 @@
 }
 
 .ql-picker-options {
-  z-index: 100 !important;
+  z-index: 600 !important;
+}
+
+.ql-snow .ql-tooltip {
+  z-index: 650 !important;
 }
 
 /* Dark mode adjustments */
@@ -224,40 +228,148 @@
   background-color: #0f172a;
 }
 
-/* Maximized Mode Overrides */
-.is-maximized .quill-editor-custom {
-  padding: 0 !important;
+/* NoteView editor shell: flex column; Docs toolbar is NOT inside .ql-container */
+.note-view-editor-root {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0%;
+  min-height: 0;
+  width: 100%;
+  /* overflow visible so Arquivo/Editar dropdowns are not clipped; scroll lives in inner wrapper */
+  overflow: visible;
 }
 
-.is-maximized .quill-editor-custom .ql-toolbar {
-  padding: 4px 8px !important;
-  border-top: 0 !important;
-  border-left: 0 !important;
-  border-right: 0 !important;
-  background: #f8fafc !important;
+/* Quill Snow uses float:left on toolbar controls — breaks Tailwind flex. Reset for our hybrid toolbar */
+#docs-toolbar.ql-toolbar.ql-snow {
+  display: flex !important;
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: flex-start;
+  gap: 0.25rem 0.35rem;
+  row-gap: 0.35rem;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 6px 10px !important;
+  border: none !important;
+  border-top: 1px solid #dadce0 !important;
+  border-radius: 0 !important;
+  background: #edf2fa !important;
+  font-family: 'Google Sans', 'Segoe UI', system-ui, sans-serif;
+}
+
+.dark #docs-toolbar.ql-toolbar.ql-snow {
+  background: rgba(30, 41, 59, 0.85) !important;
+  border-top-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+#docs-toolbar.ql-toolbar.ql-snow::after {
+  display: none !important;
+}
+
+#docs-toolbar.ql-toolbar.ql-snow button,
+#docs-toolbar.ql-toolbar.ql-snow .ql-picker {
+  float: none !important;
+}
+
+#docs-toolbar.ql-toolbar.ql-snow .ql-formats {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.15rem;
+  margin-right: 0 !important;
+  vertical-align: middle;
+}
+
+/* Estado ativo estilo Google Docs */
+#docs-toolbar.ql-toolbar.ql-snow button.ql-active,
+#docs-toolbar.ql-toolbar.ql-snow .ql-picker-label.ql-active {
+  background-color: #d3e3fd !important;
+  color: #001d35 !important;
+  border-radius: 4px;
+}
+
+.dark #docs-toolbar.ql-toolbar.ql-snow button.ql-active,
+.dark #docs-toolbar.ql-toolbar.ql-snow .ql-picker-label.ql-active {
+  background-color: rgba(59, 130, 246, 0.35) !important;
+  color: #e2e8f0 !important;
+}
+
+#docs-toolbar.ql-toolbar.ql-snow {
+  pointer-events: auto !important;
+}
+
+/* Mount interno: largura total da “folha” */
+.note-view-editor-root .note-quill-mount.ql-container,
+.note-view-editor-root .quill-editor-custom .ql-container {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+#docs-toolbar.ql-toolbar.ql-snow.docs-toolbar-collapsed {
+  min-height: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  row-gap: 0 !important;
+  border-top-width: 0 !important;
+  /* Override global pointer-events: auto so collapsed toolbar cannot steal clicks */
+  pointer-events: none !important;
+}
+
+.note-view-editor-root .quill-editor-custom {
+  flex: 1 1 0%;
+  min-height: 0;
+  min-width: 0;
+}
+
+.note-view-editor-root .quill-editor-custom .ql-container {
+  flex: 1 1 0%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.note-view-editor-root .quill-editor-custom .ql-editor {
+  flex: 1 1 auto;
+  min-height: 12rem;
+}
+
+/* Maximized: toolbar lives in DocsToolbar (#docs-toolbar), not inside .quill-editor-custom */
+.is-maximized .note-view-editor-root {
+  flex: 1 1 0%;
+  min-height: 0;
+}
+
+.is-maximized #docs-toolbar.ql-toolbar.ql-snow {
+  border-radius: 0 !important;
+  border-top-color: #dadce0 !important;
+}
+
+.is-maximized .quill-editor-custom {
+  padding: 0 !important;
 }
 
 .is-maximized .quill-editor-custom .ql-container {
   padding: 0 !important;
   border: 0 !important;
+  background: transparent !important;
 }
 
 .is-maximized .quill-editor-custom .ql-editor {
-  padding: 64px 72px !important;
+  padding: 56px 72px 96px !important;
   max-width: 816px !important;
-  margin: 0 auto !important;
-  background: white !important;
-  min-height: calc(100vh - 120px) !important;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.08) !important;
-}
-
-.dark .is-maximized .quill-editor-custom .ql-toolbar {
-  background: rgba(255,255,255,0.05) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  background: #ffffff !important;
+  min-height: min(1056px, calc(100dvh - 220px)) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 4px 24px rgba(0, 0, 0, 0.06) !important;
 }
 
 .dark .is-maximized .quill-editor-custom .ql-editor {
   background: #1a1a1a !important;
-  box-shadow: 0 0 50px rgba(0,0,0,0.2) !important;
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.35) !important;
 }
 
 /* Show Non-Printing Characters */

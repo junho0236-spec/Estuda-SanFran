@@ -40,7 +40,7 @@ const NoteSidebar: React.FC<NoteSidebarProps> = ({
   const visibleFiles = files.filter((f) => f.type === (activeTab === 'repository' ? 'repository' : 'assignment'));
 
   return (
-    <aside className="w-80 flex flex-col bg-slate-50 dark:bg-white/5 rounded-[3rem] border border-slate-200 dark:border-white/10 overflow-hidden shadow-inner animate-in slide-in-from-left-4 duration-300">
+    <aside className="w-80 shrink-0 min-h-0 max-h-full flex flex-col bg-slate-50 dark:bg-white/5 rounded-[3rem] border border-slate-200 dark:border-white/10 overflow-hidden shadow-inner animate-in slide-in-from-left-4 duration-300">
       <div className="flex p-3 bg-white dark:bg-black/20 border-b border-slate-100 dark:border-white/5">
         <button
           onClick={() => setActiveTab('notes')}
@@ -91,7 +91,12 @@ const NoteSidebar: React.FC<NoteSidebarProps> = ({
               onClick={() => onSelectNote(note)}
               className={`group p-5 rounded-[2rem] cursor-pointer transition-all flex items-center justify-between border-2 relative overflow-hidden ${selectedNote?.id === note.id ? 'bg-white dark:bg-slate-900 border-sanfran-rubi shadow-xl -translate-y-1' : 'bg-white/50 dark:bg-white/5 border-transparent hover:bg-white dark:hover:bg-white/10 hover:shadow-lg'}`}
             >
-              <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${getCardColor(note.id).split(' ')[2]}`}></div>
+              <div
+                className={`absolute left-0 top-0 bottom-0 w-1.5 rounded-full ${getCardColor(note.id)
+                  .split(' ')
+                  .filter((c) => c.startsWith('bg-'))
+                  .join(' ')}`}
+              />
               <div className="flex items-center gap-4 overflow-hidden">
                 <div className={`p-3 rounded-2xl ${getCardColor(note.id)}`}>
                   <FileText size={20} />
