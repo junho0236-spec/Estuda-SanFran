@@ -2,6 +2,18 @@ import { supabase } from './supabaseClient';
 import { db, addToSyncQueue } from './offlineService';
 import { Flashcard, Task, StudySession, Note, SubjectFile, Folder, Board, UserProgress, Friendship, Notification } from '../types';
 
+/** When the remote table has no handwriting_data column yet, PostgREST returns PGRST204; retry without that field so text notes still sync. */
+async function upsertNoteToSupabase(payload: Record<string, unknown>) {
+  let { error } = await supabase.from('notes').upsert(payload);
+  const msg = String((error as { message?: string })?.message ?? '');
+  const code = (error as { code?: string })?.code;
+  if (error && code === 'PGRST204' && msg.includes('handwriting_data')) {
+    const { handwriting_data: _omit, ...rest } = payload;
+    ({ error } = await supabase.from('notes').upsert(rest));
+  }
+  return { error };
+}
+
 export const dataService = {
   // BOARDS
   async saveBoard(board: Board, userId: string, isOnline: boolean) {
@@ -770,11 +782,11 @@ export const dataService = {
 
     if (isOnline) {
       try {
-        const { error } = await supabase.from('notes').upsert({
+        const { error } = await upsertNoteToSupabase({
           ...note,
           user_id: userId,
           subject_id: note.subject_id,
-          handwriting_data: note.handwriting_data || null,
+          handwriting_data: note.handwriting_data ?? null,
           is_starred: note.is_starred || false
         });
         
@@ -948,8 +960,11 @@ export const dataService = {
             await db.syncQueue.delete(item.id!);
             continue;
           }
-          
-          const { error } = await supabase.from(item.table as any).upsert(payload);
+
+          const { error } =
+            item.table === 'notes'
+              ? await upsertNoteToSupabase(payload)
+              : await supabase.from(item.table as any).upsert(payload);
           if (error) throw error;
         }
         await db.syncQueue.delete(item.id!);
