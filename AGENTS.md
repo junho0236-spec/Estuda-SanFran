@@ -26,3 +26,5 @@ All commands are defined in `package.json`:
 - Supabase anon key and URL are hardcoded in `services/supabaseClient.ts`.
 - Firebase config is hardcoded in `firebase-applet-config.json`.
 - The app is a SPA with client-side routing via `react-router-dom`. The Vite dev server serves it on port 3000.
+- All routes are authentication-gated. You must log in (via Supabase email/password auth) to access any feature beyond the login/sign-up page. Use the `TEST_LOGIN_USERNAME` and `TEST_LOGIN_PASSWORD` environment secrets for test access.
+- Sign-up for new accounts may fail with "DATABASE ERROR SAVING NEW USER" due to Supabase RLS policies or project state; use existing test credentials instead.
