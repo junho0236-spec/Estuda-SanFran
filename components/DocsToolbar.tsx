@@ -38,6 +38,7 @@ interface DocsToolbarProps {
   onDetails: () => void;
   onLanguageChange: (lang: string) => void;
   onPageSetup: () => void;
+  onLegalCitation: () => void;
   zoom: string;
   onZoomChange: (zoom: string) => void;
   editMode: 'editing' | 'suggesting' | 'viewing';
@@ -62,7 +63,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
   quillRef, onImageUpload, onExportPdf, onExportDocx, onExportTxt, onPrint, 
   isMaximized, setIsMaximized, title, onRename, isStarred, onToggleStar,
   onNew, onOpen, onCopy, onShare, onEmail, onDelete, onVersionHistory,
-  onOfflineToggle, isOfflineAvailable, onDetails, onLanguageChange, onPageSetup,
+  onOfflineToggle, isOfflineAvailable, onDetails, onLanguageChange, onPageSetup, onLegalCitation,
   zoom, onZoomChange,
   editMode, setEditMode, showComments, setShowComments, showPrintLayout, setShowPrintLayout,
   showRuler, setShowRuler, showEquationToolbar, setShowEquationToolbar,
@@ -70,6 +71,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
   pageOrientation, setPageOrientation, isPageless, setIsPageless
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
+  const [promptModal, setPromptModal] = useState<{ isOpen: boolean; title: string; defaultValue: string; onConfirm: (value: string) => void } | null>(null);
   const [localTitle, setLocalTitle] = useState(title);
   const [formatPainter, setFormatPainter] = useState<any>(null);
   const [showFindReplace, setShowFindReplace] = useState(false);
@@ -336,11 +338,18 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
     if (quillRef.current) {
       const selection = quillRef.current.getSelection();
       if (selection && selection.length > 0) {
-        const comment = window.prompt('Digite seu comentário:');
-        if (comment) {
-          quillRef.current.format('comment', comment);
-          toast.success('Comentário adicionado.');
-        }
+        setPromptModal({
+          isOpen: true,
+          title: 'Digite seu comentário:',
+          defaultValue: '',
+          onConfirm: (comment) => {
+            if (comment && quillRef.current) {
+              quillRef.current.formatText(selection.index, selection.length, 'comment', comment);
+              toast.success('Comentário adicionado.');
+            }
+            setPromptModal(null);
+          }
+        });
       } else {
         toast.error('Selecione um texto para comentar.');
       }
@@ -363,36 +372,21 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
     if (quillRef.current) {
       const selection = quillRef.current.getSelection();
       if (selection && selection.length > 0) {
-        const url = window.prompt('Digite a URL do link:');
-        if (url) {
-          quillRef.current.format('link', url);
-        }
+        setPromptModal({
+          isOpen: true,
+          title: 'Digite a URL do link:',
+          defaultValue: '',
+          onConfirm: (url) => {
+            if (url && quillRef.current) {
+              quillRef.current.formatText(selection.index, selection.length, 'link', url);
+            }
+            setPromptModal(null);
+          }
+        });
       } else {
         toast.error('Selecione um texto para adicionar um link.');
       }
     }
-  };
-
-  const handleImage = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = (e: any) => {
-      const file = e.target.files[0];
-      if (file && quillRef.current) {
-        const reader = new FileReader();
-        reader.onload = (readerEvent: any) => {
-          const base64 = readerEvent.target.result;
-          const range = quillRef.current?.getSelection(true);
-          if (range) {
-            quillRef.current?.insertEmbed(range.index, 'image', base64);
-            quillRef.current?.setSelection(range.index + 1, 0);
-          }
-        };
-        reader.readAsDataURL(file);
-      }
-    };
-    input.click();
   };
 
   const handleClearFormatting = () => {
@@ -537,29 +531,51 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
   const [isListening, setIsListening] = useState(false);
 
   const handleInsertTable = () => {
-    const rows = parseInt(prompt('Número de linhas:', '3') || '0', 10);
-    const cols = parseInt(prompt('Número de colunas:', '3') || '0', 10);
-    if (rows > 0 && cols > 0 && quillRef.current) {
-      const quill = quillRef.current;
-      const table = quill.getModule('table');
-      if (table) {
-        table.insertTable(rows, cols);
-        toast.success('Tabela inserida.');
-      } else {
-        let tableHtml = '<table style="width: 100%; border-collapse: collapse;" border="1">';
-        for (let i = 0; i < rows; i++) {
-          tableHtml += '<tr>';
-          for (let j = 0; j < cols; j++) {
-            tableHtml += '<td style="border: 1px solid #ccc; padding: 8px;">&nbsp;</td>';
+    if (quillRef.current) {
+      const selection = quillRef.current.getSelection();
+      setPromptModal({
+        isOpen: true,
+        title: 'Número de linhas:',
+        defaultValue: '3',
+        onConfirm: (rowsStr) => {
+          const rows = parseInt(rowsStr || '0', 10);
+          if (rows > 0) {
+            setPromptModal({
+              isOpen: true,
+              title: 'Número de colunas:',
+              defaultValue: '3',
+              onConfirm: (colsStr) => {
+                const cols = parseInt(colsStr || '0', 10);
+                if (cols > 0 && quillRef.current) {
+                  const quill = quillRef.current;
+                  const table = quill.getModule('table');
+                  if (table) {
+                    table.insertTable(rows, cols);
+                    toast.success('Tabela inserida.');
+                  } else {
+                    let tableHtml = '<table style="width: 100%; border-collapse: collapse;" border="1">';
+                    for (let i = 0; i < rows; i++) {
+                      tableHtml += '<tr>';
+                      for (let j = 0; j < cols; j++) {
+                        tableHtml += '<td style="border: 1px solid #ccc; padding: 8px;">&nbsp;</td>';
+                      }
+                      tableHtml += '</tr>';
+                    }
+                    tableHtml += '</table><p><br></p>';
+                    const range = selection || { index: quill.getLength(), length: 0 };
+                    const delta = quill.clipboard.convert({ html: tableHtml });
+                    quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
+                    toast.success('Tabela inserida.');
+                  }
+                }
+                setPromptModal(null);
+              }
+            });
+          } else {
+            setPromptModal(null);
           }
-          tableHtml += '</tr>';
         }
-        tableHtml += '</table><p><br></p>';
-        const range = quill.getSelection(true);
-        const delta = quill.clipboard.convert({ html: tableHtml });
-        quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
-        toast.success('Tabela inserida.');
-      }
+      });
     }
   };
 
@@ -587,15 +603,22 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
   };
 
   const handleInsertPerson = () => {
-    const name = prompt('Nome da pessoa:');
-    if (name && quillRef.current) {
-      const quill = quillRef.current;
-      const range = quill.getSelection(true);
-      const html = `<span style="background-color: #e2e8f0; padding: 2px 6px; border-radius: 12px; font-size: 0.9em;">@${name}</span>&nbsp;`;
-      const delta = quill.clipboard.convert({ html });
-      quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
-      toast.success('Pessoa marcada.');
-    }
+    setPromptModal({
+      isOpen: true,
+      title: 'Nome da pessoa:',
+      defaultValue: '',
+      onConfirm: (name) => {
+        if (name && quillRef.current) {
+          const quill = quillRef.current;
+          const range = quill.getSelection(true);
+          const html = `<span style="background-color: #e2e8f0; padding: 2px 6px; border-radius: 12px; font-size: 0.9em;">@${name}</span>&nbsp;`;
+          const delta = quill.clipboard.convert({ html });
+          quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
+          toast.success('Pessoa marcada.');
+        }
+        setPromptModal(null);
+      }
+    });
   };
 
   const handleInsertDate = () => {
@@ -688,15 +711,22 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
   };
 
   const handleColumns = () => {
-    const cols = prompt('Número de colunas (1, 2 ou 3):', '2');
-    if (cols && ['1', '2', '3'].includes(cols) && quillRef.current) {
-      const root = quillRef.current.root;
-      root.style.columnCount = cols;
-      root.style.columnGap = '40px';
-      toast.success(`Layout alterado para ${cols} coluna(s).`);
-    } else if (cols) {
-      toast.error('Número de colunas inválido.');
-    }
+    setPromptModal({
+      isOpen: true,
+      title: 'Número de colunas (1, 2 ou 3):',
+      defaultValue: '2',
+      onConfirm: (cols) => {
+        if (cols && ['1', '2', '3'].includes(cols) && quillRef.current) {
+          const root = quillRef.current.root;
+          root.style.columnCount = cols;
+          root.style.columnGap = '40px';
+          toast.success(`Layout alterado para ${cols} coluna(s).`);
+        } else if (cols) {
+          toast.error('Número de colunas inválido.');
+        }
+        setPromptModal(null);
+      }
+    });
   };
 
   const handleInsertChart = () => {
@@ -723,15 +753,23 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
   const handleInsertBookmark = () => {
     if (quillRef.current) {
-      const name = prompt('Nome do favorito:');
-      if (name) {
-        const html = `<a name="${name.replace(/\s+/g, '-').toLowerCase()}" style="border-left: 2px solid #3b82f6; padding-left: 4px;">[Favorito: ${name}]</a>&nbsp;`;
-        const quill = quillRef.current;
-        const range = quill.getSelection(true);
-        const delta = quill.clipboard.convert({ html });
-        quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
-        toast.success('Favorito adicionado.');
-      }
+      const selection = quillRef.current.getSelection();
+      setPromptModal({
+        isOpen: true,
+        title: 'Nome do favorito:',
+        defaultValue: '',
+        onConfirm: (name) => {
+          if (name && quillRef.current) {
+            const html = `<a name="${name.replace(/\s+/g, '-').toLowerCase()}" style="border-left: 2px solid #3b82f6; padding-left: 4px;">[Favorito: ${name}]</a>&nbsp;`;
+            const quill = quillRef.current;
+            const range = selection || { index: quill.getLength(), length: 0 };
+            const delta = quill.clipboard.convert({ html });
+            quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
+            toast.success('Favorito adicionado.');
+          }
+          setPromptModal(null);
+        }
+      });
     }
   };
 
@@ -747,11 +785,18 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
   };
 
   const handleTranslate = () => {
-    const lang = prompt('Para qual idioma deseja traduzir? (ex: en, es, fr)', 'en');
-    if (lang && quillRef.current) {
-      toast.info(`Iniciando tradução para ${lang}...`);
-      setTimeout(() => toast.success('Tradução concluída! (Simulação)'), 2000);
-    }
+    setPromptModal({
+      isOpen: true,
+      title: 'Para qual idioma deseja traduzir? (ex: en, es, fr)',
+      defaultValue: 'en',
+      onConfirm: (lang) => {
+        if (lang && quillRef.current) {
+          toast.info(`Iniciando tradução para ${lang}...`);
+          setTimeout(() => toast.success('Tradução concluída! (Simulação)'), 2000);
+        }
+        setPromptModal(null);
+      }
+    });
   };
 
   const handleDictionary = () => {
@@ -763,29 +808,25 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
     }
   };
 
-  const handleCitation = () => {
-    if (quillRef.current) {
-      const citation = prompt('Digite a citação (ex: SILVA, 2023):');
-      if (citation) {
-        const quill = quillRef.current;
-        const range = quill.getSelection(true);
-        quill.insertText(range.index, `(${citation})`);
-        toast.success('Citação inserida.');
-      }
-    }
-  };
-
   const handleSignature = () => {
     if (quillRef.current) {
-      const name = prompt('Nome para assinatura:');
-      if (name) {
-        const html = `<div style="margin-top: 40px; text-align: center; width: 300px;"><hr style="border-top: 1px solid #000;" /><p>${name}</p></div><p><br></p>`;
-        const quill = quillRef.current;
-        const range = quill.getSelection(true);
-        const delta = quill.clipboard.convert({ html });
-        quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
-        toast.success('Assinatura inserida.');
-      }
+      const selection = quillRef.current.getSelection();
+      setPromptModal({
+        isOpen: true,
+        title: 'Nome para assinatura:',
+        defaultValue: '',
+        onConfirm: (name) => {
+          if (name && quillRef.current) {
+            const html = `<div style="margin-top: 40px; text-align: center; width: 300px;"><hr style="border-top: 1px solid #000;" /><p>${name}</p></div><p><br></p>`;
+            const quill = quillRef.current;
+            const range = selection || { index: quill.getLength(), length: 0 };
+            const delta = quill.clipboard.convert({ html });
+            quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
+            toast.success('Assinatura inserida.');
+          }
+          setPromptModal(null);
+        }
+      });
     }
   };
 
@@ -807,7 +848,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
     { name: 'Negrito', icon: <Bold size={16} />, action: () => handleToggleFormat('bold') },
     { name: 'Itálico', icon: <Italic size={16} />, action: () => handleToggleFormat('italic') },
     { name: 'Sublinhado', icon: <Underline size={16} />, action: () => handleToggleFormat('underline') },
-    { name: 'Alinhar à esquerda', icon: <AlignLeft size={16} />, action: () => handleFormat('align', '') },
+    { name: 'Alinhar à esquerda', icon: <AlignLeft size={16} />, action: () => handleFormat('align', false) },
     { name: 'Centralizar', icon: <AlignCenter size={16} />, action: () => handleFormat('align', 'center') },
     { name: 'Alinhar à direita', icon: <AlignRight size={16} />, action: () => handleFormat('align', 'right') },
     { name: 'Justificar', icon: <AlignJustify size={16} />, action: () => handleFormat('align', 'justify') },
@@ -841,7 +882,15 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
   }, []);
 
   return (
-    <div className="flex flex-col border-b border-slate-200 dark:border-white/10 bg-[#f9fbfd] dark:bg-slate-900 rounded-t-xl transition-all shadow-sm select-none relative z-[150]">
+    <div 
+      className="flex flex-col border-b border-slate-200 dark:border-white/10 bg-[#f9fbfd] dark:bg-slate-900 rounded-t-xl transition-all shadow-sm select-none relative z-[150]"
+      onMouseDown={(e) => {
+        const target = e.target as HTMLElement;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'SELECT' && target.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+        }
+      }}
+    >
       {/* Top Row: Title & Main Actions */}
       <div className="flex items-center justify-between px-4 py-2 bg-white dark:bg-slate-900">
         <div className="flex items-center gap-2">
@@ -1084,10 +1133,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                       </button>
                     </div>
                   </div>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => {
-                    const url = window.prompt('Digite a URL do link:');
-                    if (url) handleFormat('link', url);
-                  }}>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleLink}>
                     <LinkIcon size={16} className="text-slate-400" /> Link
                   </button>
                   <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
@@ -1179,7 +1225,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                       <ChevronDown size={14} className="-rotate-90 text-slate-400" />
                     </button>
                     <div className="absolute left-full top-0 hidden group-hover/sub:block w-64 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
-                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => handleFormat('align', '')}>
+                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => handleFormat('align', false)}>
                         <AlignLeft size={16} className="text-slate-400" /> Esquerda
                       </button>
                       <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => handleFormat('align', 'center')}>
@@ -1252,7 +1298,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleCompareDocuments}>
                     <FileSearch size={16} className="text-slate-400" /> Comparar documentos
                   </button>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleCitation}>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={onLegalCitation}>
                     <Quote size={16} className="text-slate-400" /> Citações
                   </button>
                   <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
@@ -1340,7 +1386,10 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
       </div>
 
       {/* Toolbar Row */}
-      <div id="docs-toolbar" className={`flex flex-wrap items-center gap-1.5 px-3 py-1 bg-[#edf2fa] dark:bg-slate-800/50 border-t border-slate-200 dark:border-white/10 transition-all ${isExpanded ? '' : 'h-0 overflow-hidden py-0 border-t-0'}`}>
+      <div 
+        id="docs-toolbar" 
+        className={`flex flex-wrap items-center gap-1.5 px-3 py-1 bg-[#edf2fa] dark:bg-slate-800/50 border-t border-slate-200 dark:border-white/10 transition-all ${isExpanded ? '' : 'h-0 overflow-hidden py-0 border-t-0'}`}
+      >
         <div className="flex items-center bg-white dark:bg-slate-900 rounded-full px-3 py-1.5 mr-2 shadow-sm border border-slate-200 dark:border-white/10 w-48">
           <Search size={16} strokeWidth={2.5} className="text-slate-700 dark:text-slate-300 mr-2" />
           <input 
@@ -1352,14 +1401,14 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
           />
         </div>
         <button 
-          className="ql-undo p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
+          className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
           data-tooltip="Desfazer (Ctrl+Z)"
           onClick={handleUndo}
         >
           <Undo2 size={18}/>
         </button>
         <button 
-          className="ql-redo p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
+          className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
           data-tooltip="Refazer (Ctrl+Y)"
           onClick={handleRedo}
         >
@@ -1525,14 +1574,14 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
-        <button className="ql-link p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Inserir link (Ctrl+K)" onClick={handleLink}><Link size={18}/></button>
+        <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Inserir link (Ctrl+K)" onClick={handleLink}><Link size={18}/></button>
         <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Adicionar comentário" onClick={handleAddComment}><MessageSquarePlus size={18}/></button>
-        <button className="ql-image p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Inserir imagem" onClick={handleImage}><Image size={18}/></button>
+        <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Inserir imagem" onClick={onImageUpload}><Image size={18}/></button>
         
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
         <button 
-          className={`ql-align p-1.5 rounded transition-colors has-tooltip ${activeFormats.alignLeft ? 'bg-slate-300 dark:bg-white/20' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
+          className={`p-1.5 rounded transition-colors has-tooltip ${activeFormats.alignLeft ? 'bg-slate-300 dark:bg-white/20' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
           value="" 
           data-tooltip="Alinhar à esquerda (Ctrl+Shift+L)"
           onClick={() => handleAlign('justifyLeft')}
@@ -1540,7 +1589,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
           <AlignLeft size={18}/>
         </button>
         <button 
-          className={`ql-align p-1.5 rounded transition-colors has-tooltip ${activeFormats.alignCenter ? 'bg-slate-300 dark:bg-white/20' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
+          className={`p-1.5 rounded transition-colors has-tooltip ${activeFormats.alignCenter ? 'bg-slate-300 dark:bg-white/20' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
           value="center" 
           data-tooltip="Centralizar (Ctrl+Shift+E)"
           onClick={() => handleAlign('justifyCenter')}
@@ -1548,7 +1597,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
           <AlignCenter size={18}/>
         </button>
         <button 
-          className={`ql-align p-1.5 rounded transition-colors has-tooltip ${activeFormats.alignRight ? 'bg-slate-300 dark:bg-white/20' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
+          className={`p-1.5 rounded transition-colors has-tooltip ${activeFormats.alignRight ? 'bg-slate-300 dark:bg-white/20' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
           value="right" 
           data-tooltip="Alinhar à direita (Ctrl+Shift+R)"
           onClick={() => handleAlign('justifyRight')}
@@ -1556,7 +1605,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
           <AlignRight size={18}/>
         </button>
         <button 
-          className={`ql-align p-1.5 rounded transition-colors has-tooltip ${activeFormats.alignJustify ? 'bg-slate-300 dark:bg-white/20' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
+          className={`p-1.5 rounded transition-colors has-tooltip ${activeFormats.alignJustify ? 'bg-slate-300 dark:bg-white/20' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
           value="justify" 
           data-tooltip="Justificar (Ctrl+Shift+J)"
           onClick={() => handleAlign('justifyFull')}
@@ -1586,7 +1635,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
         <div className="flex items-center gap-0.5">
           <button 
-            className="ql-list p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
+            className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
             value="check" 
             data-tooltip="Checklist"
             onClick={handleChecklist}
@@ -1597,7 +1646,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         </div>
         <div className="flex items-center gap-0.5">
           <button 
-            className="ql-list p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
+            className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
             value="bullet" 
             data-tooltip="Lista com marcadores (Ctrl+Shift+8)"
             onClick={() => handleList('insertUnorderedList')}
@@ -1608,7 +1657,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         </div>
         <div className="flex items-center gap-0.5">
           <button 
-            className="ql-list p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
+            className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
             value="ordered" 
             data-tooltip="Lista numerada (Ctrl+Shift+7)"
             onClick={() => handleList('insertOrderedList')}
@@ -1619,7 +1668,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         </div>
         
         <button 
-          className="ql-indent p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
+          className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
           value="-1" 
           data-tooltip="Diminuir recuo (Ctrl+[)"
           onClick={handleOutdent}
@@ -1627,7 +1676,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
           <IndentDecrease size={18}/>
         </button>
         <button 
-          className="ql-indent p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
+          className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
           value="+1" 
           data-tooltip="Aumentar recuo (Ctrl+])"
           onClick={handleIndent}
@@ -1638,7 +1687,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
         <button 
-          className="ql-clean p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
+          className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
           data-tooltip="Limpar formatação (Ctrl+\)"
           onClick={handleClearFormatting}
         >
@@ -1815,6 +1864,44 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
               <button onClick={() => setShowShortcuts(false)} className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm transition-all">
                 Entendido
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Prompt Modal */}
+      {promptModal && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10 animate-in slide-in-from-bottom-8 duration-500">
+            <div className="p-8 space-y-6">
+              <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">{promptModal.title}</h3>
+              <input 
+                type="text" 
+                autoFocus
+                defaultValue={promptModal.defaultValue}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    promptModal.onConfirm(e.currentTarget.value);
+                  }
+                }}
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-blue-500 transition-all"
+              />
+              <div className="flex gap-3 pt-2">
+                <button 
+                  onClick={() => {
+                    const input = document.querySelector('.fixed.inset-0.z-\\[400\\] input') as HTMLInputElement;
+                    promptModal.onConfirm(input?.value || '');
+                  }}
+                  className="flex-1 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-blue-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  Confirmar
+                </button>
+                <button 
+                  onClick={() => setPromptModal(null)}
+                  className="px-8 py-4 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 rounded-2xl font-black uppercase tracking-widest transition-all hover:bg-slate-200"
+                >
+                  Cancelar
+                </button>
+              </div>
             </div>
           </div>
         </div>

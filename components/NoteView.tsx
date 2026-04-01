@@ -28,8 +28,9 @@ Font.whitelist = ['sans-serif', 'serif', 'monospace', 'georgia', 'trebuchet', 'v
 Quill.register(Font, true);
 
 // Register Sizes
-const SizeStyle = Quill.import('attributors/style/size') as any;
-SizeStyle.whitelist = ['8px', '10px', '12px', '14px', '16px', '18px', '20px', '24px', '32px', '48px', '64px'];
+const SizeStyle = new Parchment.StyleAttributor('size', 'font-size', {
+  scope: Parchment.Scope.INLINE
+});
 Quill.register(SizeStyle, true);
 
 // Register Comment
@@ -120,6 +121,8 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   const [pageOrientation, setPageOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [isPageless, setIsPageless] = useState(false);
   const [zoom, setZoom] = useState('100%');
+  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void } | null>(null);
+  const [promptModal, setPromptModal] = useState<{ isOpen: boolean; title: string; defaultValue: string; onConfirm: (value: string) => void } | null>(null);
   
   // Sync selectedSubjectId when initialSubjectId changes from props
   useEffect(() => {
@@ -152,7 +155,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
           }
         } catch (error) {
           console.error("Error uploading image to Quill:", error);
-          alert("Erro ao carregar imagem.");
+          toast.error("Erro ao carregar imagem.");
         } finally {
           setIsUploading(false);
         }
@@ -169,38 +172,30 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     
     if (range && range.length > 0) {
       text = quill.getText(range.index, range.length);
-    } else {
-      text = prompt('Digite a citação legal (ex: Art. 5, CF):') || '';
-    }
-
-    if (text) {
       const url = `https://www.google.com/search?q=site:planalto.gov.br+${encodeURIComponent(text)}`;
-      if (range && range.length > 0) {
-        quill.format('link', url);
-      } else {
-        const index = range ? range.index : quill.getLength();
-        quill.insertText(index, text, 'link', url);
-      }
+      quill.format('link', url);
+    } else {
+      setPromptModal({
+        isOpen: true,
+        title: 'Citação Legal',
+        defaultValue: '',
+        onConfirm: (val) => {
+          if (val) {
+            const url = `https://www.google.com/search?q=site:planalto.gov.br+${encodeURIComponent(val)}`;
+            const index = range ? range.index : quill.getLength();
+            quill.insertText(index, val, 'link', url);
+          }
+          setPromptModal(null);
+        }
+      });
     }
   }, []);
 
   const modules = useMemo(() => ({
     history: { delay: 1000, maxStack: 500 },
     table: true,
-    toolbar: {
-      container: '#docs-toolbar',
-      handlers: {
-        'image': imageHandler,
-        'legal-citation': legalCitationHandler,
-        'undo': function() {
-          if (quillRef.current) quillRef.current.history.undo();
-        },
-        'redo': function() {
-          if (quillRef.current) quillRef.current.history.redo();
-        }
-      }
-    },
-  }), [imageHandler, legalCitationHandler]);
+    toolbar: false,
+  }), []);
 
   const contentInitializedRef = useRef(false);
 
@@ -219,23 +214,6 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
           modules: modules,
           formats: formats,
         });
-
-        // Add custom icon for legal citation button
-        const toolbar = node.parentElement?.querySelector('.ql-toolbar');
-        if (toolbar) {
-          const legalButton = toolbar.querySelector('.ql-legal-citation');
-          if (legalButton) {
-            legalButton.innerHTML = `
-              <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                <path d="m14 5 3 3L7 18l-3-3L14 5Z"></path>
-                <path d="m14 5 3 3-3-3Z"></path>
-                <path d="M16 16v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"></path>
-                <path d="m8 14 3 3"></path>
-              </svg>
-            `;
-            legalButton.setAttribute('title', 'Citação Legal');
-          }
-        }
 
         quillRef.current.on('text-change', () => {
           const html = node.querySelector('.ql-editor')?.innerHTML || '';
@@ -310,7 +288,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
       setFiles(subjectFiles);
     } catch (error) {
       console.error('Error loading data:', error);
-      alert('Erro ao carregar dados.');
+      toast.error('Erro ao carregar dados.');
     } finally {
       setIsLoading(false);
     }
@@ -345,51 +323,64 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   }, [notes, selectedSubjectId, selectedNote]);
 
   const createNewNote = async () => {
-    const title = prompt("Título do novo documento:");
-    if (!title) return;
+    setPromptModal({
+      isOpen: true,
+      title: 'Título do novo documento',
+      defaultValue: '',
+      onConfirm: async (title) => {
+        if (!title) {
+          setPromptModal(null);
+          return;
+        }
 
-    const newNote: Note = {
-      id: crypto.randomUUID(),
-      subject_id: selectedSubjectId,
-      user_id: userId,
-      title: title,
-      content: '',
-      updated_at: new Date().toISOString(),
-      tags: []
-    };
+        const newNote: Note = {
+          id: crypto.randomUUID(),
+          subject_id: selectedSubjectId,
+          user_id: userId,
+          title: title,
+          content: '',
+          updated_at: new Date().toISOString(),
+          tags: []
+        };
 
-    try {
-      await dataService.saveNote(newNote, userId, isOnline);
-      setNotes(prev => [newNote, ...prev]);
-      setSelectedNote(newNote);
-      setNoteContent('');
-      if (quillRef.current) {
-        quillRef.current.setContents([] as any, 'silent');
+        try {
+          await dataService.saveNote(newNote, userId, isOnline);
+          setNotes(prev => [newNote, ...prev]);
+          setSelectedNote(newNote);
+          setNoteContent('');
+          if (quillRef.current) {
+            quillRef.current.setContents([] as any, 'silent');
+          }
+        } catch (error) {
+          console.error("Error creating note:", error);
+          toast.error("Erro ao criar documento.");
+        }
+        setPromptModal(null);
       }
-    } catch (error) {
-      console.error("Error creating note:", error);
-      toast.error("Erro ao criar documento.");
-    }
+    });
   };
 
   const deleteNote = async (id: string) => {
-    // Using toast for confirmation is tricky without state, but we can at least avoid window.confirm
-    // For now, I'll just use a simple state-based confirmation if I can add it easily, 
-    // but let's just replace the alert for now.
-    if (!window.confirm("Deseja realmente excluir este documento?")) return;
-    
-    try {
-      await dataService.deleteNote(id, userId, isOnline);
-      setNotes(prev => prev.filter(n => n.id !== id));
-      if (selectedNote?.id === id) {
-        setSelectedNote(null);
-        setNoteContent('');
+    setConfirmModal({
+      isOpen: true,
+      title: 'Excluir Documento',
+      message: 'Deseja realmente excluir este documento? Esta ação não pode ser desfeita.',
+      onConfirm: async () => {
+        try {
+          await dataService.deleteNote(id, userId, isOnline);
+          setNotes(prev => prev.filter(n => n.id !== id));
+          if (selectedNote?.id === id) {
+            setSelectedNote(null);
+            setNoteContent('');
+          }
+          toast.success("Documento excluído.");
+        } catch (error) {
+          console.error("Error deleting note:", error);
+          toast.error("Erro ao excluir documento.");
+        }
+        setConfirmModal(null);
       }
-      toast.success("Documento excluído.");
-    } catch (error) {
-      console.error("Error deleting note:", error);
-      toast.error("Erro ao excluir documento.");
-    }
+    });
   };
 
   const handleExportTxt = () => {
@@ -630,16 +621,23 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   };
 
   const deleteFile = async (id: string) => {
-    if (!window.confirm("Deseja realmente excluir este arquivo?")) return;
-    try {
-      await dataService.deleteFile(id, userId, isOnline);
-      setFiles(prev => prev.filter(f => f.id !== id));
-      if (selectedFile?.id === id) setSelectedFile(null);
-      toast.success("Arquivo excluído.");
-    } catch (error) {
-      console.error("Error deleting file:", error);
-      toast.error("Erro ao excluir arquivo.");
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Excluir Arquivo',
+      message: 'Deseja realmente excluir este arquivo? Esta ação não pode ser desfeita.',
+      onConfirm: async () => {
+        try {
+          await dataService.deleteFile(id, userId, isOnline);
+          setFiles(prev => prev.filter(f => f.id !== id));
+          if (selectedFile?.id === id) setSelectedFile(null);
+          toast.success("Arquivo excluído.");
+        } catch (error) {
+          console.error("Error deleting file:", error);
+          toast.error("Erro ao excluir arquivo.");
+        }
+        setConfirmModal(null);
+      }
+    });
   };
 
   const handleGenerateFlashcards = () => {
@@ -799,6 +797,78 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   return (
     <div className={`flex flex-col animate-in slide-in-from-right-4 duration-500 transition-all duration-500 ${isMaximized ? 'is-maximized fixed inset-0 z-[100] bg-white dark:bg-[#0d0303] h-full' : 'w-full min-h-[calc(100vh-10rem)]'}`}>
       
+      {/* Confirm Modal */}
+      {confirmModal && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10 animate-in slide-in-from-bottom-8 duration-500">
+            <div className="p-8 space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-2xl flex items-center justify-center">
+                  <AlertCircle className="text-red-600" size={24} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">{confirmModal.title}</h3>
+                </div>
+              </div>
+              <p className="text-sm font-medium text-slate-500">{confirmModal.message}</p>
+              <div className="flex gap-3 pt-2">
+                <button 
+                  onClick={confirmModal.onConfirm}
+                  className="flex-1 py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-red-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  Confirmar
+                </button>
+                <button 
+                  onClick={() => setConfirmModal(null)}
+                  className="px-8 py-4 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 rounded-2xl font-black uppercase tracking-widest transition-all hover:bg-slate-200"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Prompt Modal */}
+      {promptModal && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10 animate-in slide-in-from-bottom-8 duration-500">
+            <div className="p-8 space-y-6">
+              <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">{promptModal.title}</h3>
+              <input 
+                type="text" 
+                autoFocus
+                defaultValue={promptModal.defaultValue}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    promptModal.onConfirm(e.currentTarget.value);
+                  }
+                }}
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-blue-500 transition-all"
+              />
+              <div className="flex gap-3 pt-2">
+                <button 
+                  onClick={() => {
+                    const input = document.querySelector('.fixed.inset-0.z-\\[400\\] input') as HTMLInputElement;
+                    promptModal.onConfirm(input?.value || '');
+                  }}
+                  className="flex-1 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-blue-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  Confirmar
+                </button>
+                <button 
+                  onClick={() => setPromptModal(null)}
+                  className="px-8 py-4 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 rounded-2xl font-black uppercase tracking-widest transition-all hover:bg-slate-200"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Floating Selection Menu */}
       {floatingMenuPos && (
         <div 
@@ -1311,11 +1381,20 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                       }
                     }}
                     onPageSetup={() => {
-                      const margins = prompt('Margens (em cm, ex: 2.5):', '2.5');
-                      if (margins) {
-                        toast.success(`Margens ajustadas para ${margins}cm.`);
-                      }
+                      setPromptModal({
+                        isOpen: true,
+                        title: 'Margens (em cm)',
+                        defaultValue: '2.5',
+                        onConfirm: (margins) => {
+                          if (margins && quillRef.current) {
+                            quillRef.current.root.style.padding = `${parseFloat(margins) * 37.8}px`;
+                            toast.success(`Margens ajustadas para ${margins}cm.`);
+                          }
+                          setPromptModal(null);
+                        }
+                      });
                     }}
+                    onLegalCitation={legalCitationHandler}
                     zoom={zoom}
                     onZoomChange={setZoom}
                     editMode={editMode}
@@ -1401,9 +1480,6 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                     >
                       <div 
                         ref={onEditorRef} 
-                        contentEditable={editMode !== 'viewing'}
-                        suppressContentEditableWarning={true}
-                        onInput={(e) => setNoteContent(e.currentTarget.innerHTML)}
                         className={`flex-1 ${showPrintLayout && !isPageless ? `shadow-[0_1px_3px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.08)] ${pageOrientation === 'portrait' ? 'max-w-[816px] min-h-[1056px]' : 'max-w-[1056px] min-h-[816px]'} mx-auto border border-slate-200 dark:border-white/10` : 'h-full w-full max-w-[1200px] mx-auto'}`} 
                         style={{
                           transform: zoom !== '100%' ? `scale(${parseInt(zoom) / 100})` : 'none',
