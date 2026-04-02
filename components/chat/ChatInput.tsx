@@ -42,6 +42,7 @@ interface ChatInputProps {
   handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   fetchUsers: () => void;
   setShowShareProfileModal: (show: boolean) => void;
+  startRecording: () => void;
 }
 
 const ChatInput: React.FC<ChatInputProps> = ({
@@ -51,7 +52,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   stopRecording, audioUrl, setAudioUrl, sendAudioMessage, isVanishMode,
   setIsVanishMode, showGifPicker, setShowGifPicker, gifType, setGifType,
   gifSearch, setGifSearch, searchGifs, gifs, sendGif, uploading,
-  handleFileUpload, fetchUsers, setShowShareProfileModal
+  handleFileUpload, fetchUsers, setShowShareProfileModal, startRecording
 }) => {
   
   return (
@@ -238,13 +239,21 @@ const ChatInput: React.FC<ChatInputProps> = ({
               />
             </div>
             
-            <button 
-              onClick={sendMessage}
-              disabled={!newMessage.trim() && !audioUrl && !uploading}
-              className={`p-3 rounded-2xl transition-all shadow-lg ${newMessage.trim() || audioUrl ? 'bg-blue-600 text-white shadow-blue-500/20 hover:bg-blue-700' : 'bg-slate-100 dark:bg-white/5 text-slate-400 cursor-not-allowed'}`}
-            >
-              <Send size={20} />
-            </button>
+            {newMessage.trim() ? (
+              <button 
+                onClick={sendMessage}
+                className="p-3 bg-blue-600 text-white rounded-xl transition-all shadow-lg shadow-blue-600/20 hover:scale-105 active:scale-95"
+              >
+                <Send size={20} />
+              </button>
+            ) : (
+              <button 
+                onClick={startRecording}
+                className="p-3 bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-blue-600 rounded-xl transition-all"
+              >
+                <Mic size={20} />
+              </button>
+            )}
           </>
         )}
       </div>

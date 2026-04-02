@@ -7,7 +7,7 @@ import {
   Edit2, Trash2, Reply, CornerUpLeft, Mic, Pin, PinOff,
   Link, File, Play, Pause, Trash, Bell, BellOff,
   Smile, Forward, Star, BarChart2, VolumeX, Volume2,
-  Clock, Share2, Folder, History, UserPlus, Phone, Video, PhoneOff, VideoOff, Ghost, Eye, EyeOff, MicOff, Palette, Users,
+  Clock, Folder, History, UserPlus, Phone, Video, PhoneOff, VideoOff, Ghost, Eye, EyeOff, MicOff, Palette, Users,
   Settings, LogOut, Shield, ChevronRight, LayoutGrid, Archive
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -16,10 +16,26 @@ import ChatSidebar from './chat/ChatSidebar';
 import MessageList from './chat/MessageList';
 import ChatInput from './chat/ChatInput';
 import MediaGallery from './chat/MediaGallery';
-import NewChatModal from './connect/NewChatModal';
 import GroupInfoModal from './connect/GroupInfoModal';
+import CallOverlay from './connect/CallOverlay';
+import GlobalSearchModal from './connect/GlobalSearchModal';
+import ProfileModals from './connect/ProfileModals';
+import UserDiscoveryModal from './connect/UserDiscoveryModal';
+import { getChatAvatarForRoom, getChatNameForRoom, getTypingUsersForRoom } from './connect/chatUtils';
+import WallpaperModal from './connect/WallpaperModal';
+import MediaGalleryModal from './connect/MediaGalleryModal';
+import ForwardModal from './connect/ForwardModal';
+import PollModal from './connect/PollModal';
+import CreateStoryModal from './connect/CreateStoryModal';
+import ViewStoryModal from './connect/ViewStoryModal';
+import ShareProfileModal from './connect/ShareProfileModal';
+import { useOnlineUsersPresence } from './connect/hooks/useOnlineUsersPresence';
+import { useConnectInit } from './connect/hooks/useConnectInit';
+import { usePresenceHeartbeat } from './connect/hooks/usePresenceHeartbeat';
+import { useActiveRoomLifecycle } from './connect/hooks/useActiveRoomLifecycle';
+import { useTypingIndicator } from './connect/hooks/useTypingIndicator';
 import { useChatStore } from '../src/store/useChatStore';
-import { ChatRoom, ChatMessage, ChatParticipant, UserProfile, PresenceUser, ChatStory } from '../types';
+import { ChatRoom, ChatMessage, ChatParticipant, UserProfile, ChatStory } from '../types';
 import { dataService } from '../services/dataService';
 import { toast } from 'sonner';
 import { GoogleGenAI, Type } from "@google/genai";
@@ -47,10 +63,6 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     setParticipants,
     userPresence,
     updateUserPresence,
-    typingStatus,
-    setTypingStatus,
-    addTypingUser,
-    removeTypingUser,
     pinnedRooms,
     setPinnedRooms,
     archivedRooms,
@@ -63,8 +75,10 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   const [searchQuery, setSearchQuery] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [newMessage, setNewMessage] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
   const [loading, setLoading] = useState(true);
+  const getTypingUsers = (roomId: string) => getTypingUsersForRoom(participants, roomId, userId);
+  const getChatName = (room: ChatRoom) => getChatNameForRoom(room, participants, userId);
+  const getChatAvatar = (room: ChatRoom) => getChatAvatarForRoom(room, participants, userId);
   const setMessages = (msgs: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => {
     if (!activeRoomId) return;
     if (typeof msgs === 'function') {
@@ -75,64 +89,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     }
   };
 
-  // Presence System
-  useEffect(() => {
-    if (!userId) return;
-
-    const channel = supabase.channel('online-users', {
-      config: {
-        presence: {
-          key: userId,
-        },
-      },
-    });
-
-    channel
-      .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState();
-        
-        Object.keys(state).forEach((key) => {
-          const userPresences = state[key] as any[];
-          const isTyping = userPresences.some(p => p.is_typing);
-          const roomId = userPresences[0]?.room_id;
-          const uName = userPresences[0]?.user_name;
-
-          updateUserPresence(key, {
-            is_online: true,
-            last_seen: new Date().toISOString()
-          });
-
-          if (roomId && uName && key !== userId) {
-            if (isTyping) {
-              addTypingUser(roomId, uName);
-            } else {
-              removeTypingUser(roomId, uName);
-            }
-          }
-        });
-      })
-      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-        updateUserPresence(key, { is_online: true, last_seen: new Date().toISOString() });
-      })
-      .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-        updateUserPresence(key, { is_online: false, last_seen: new Date().toISOString() });
-      })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          await channel.track({
-            online_at: new Date().toISOString(),
-            user_id: userId,
-            user_name: userName,
-            is_typing: isTyping,
-            room_id: activeRoomId
-          });
-        }
-      });
-
-    return () => {
-      channel.unsubscribe();
-    };
-  }, [userId, isTyping, activeRoomId]);
+  useOnlineUsersPresence(userId, userName, updateUserPresence);
 
   const markAsRead = async (roomId: string) => {
     if (!userId) return;
@@ -157,18 +114,12 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     }
   };
 
-  useEffect(() => {
-    if (activeRoom) {
-      markAsRead(activeRoom.id);
-    }
-  }, [activeRoom]);
   const [showGroupInfoModal, setShowGroupInfoModal] = useState(false);
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [presenceUsers, setPresenceUsers] = useState<Record<string, PresenceUser>>({});
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [showMsgOptions, setShowMsgOptions] = useState<string | null>(null);
@@ -266,27 +217,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [giphyApiKey] = useState('dc6zaTOxFJmzC'); // Public beta key for demo, should be replaced with real key
 
-  const handleTypingStatus = () => {
-    if (!isTyping) {
-      setIsTyping(true);
-    }
-    
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-    
-    typingTimeoutRef.current = setTimeout(() => {
-      setIsTyping(false);
-    }, 3000);
-  };
-
-  useEffect(() => {
-    if (newMessage) {
-      handleTypingStatus();
-    }
-  }, [newMessage]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const typingTimeoutRef = useRef<any>(null);
   const isInitialLoadMessages = useRef(true);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -297,37 +228,20 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { handleTyping } = useTypingIndicator(activeRoom?.id || null, userId);
 
-  useEffect(() => {
-    if ('Notification' in window) {
-      setNotificationPermission(Notification.permission);
-    }
-    
-    // Register Service Worker for Push Notifications
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').then(reg => {
-        console.log('Service Worker registrado com sucesso:', reg);
-      }).catch(err => {
-        console.error('Erro ao registrar Service Worker:', err);
-      });
-    }
-
-    fetchRooms();
-    fetchUserProfile();
-    fetchStarredMessages();
-    fetchStories();
-    fetchCallHistory();
-    const unsubscribeRooms = subscribeToAllRooms();
-    const unsubscribePresence = subscribeToPresence();
-    const unsubscribeStories = subscribeToStories();
-    const unsubscribeCalls = subscribeToCalls();
-    return () => {
-      if (unsubscribeRooms) unsubscribeRooms();
-      if (unsubscribePresence) unsubscribePresence();
-      if (unsubscribeStories) unsubscribeStories();
-      if (unsubscribeCalls) unsubscribeCalls();
-    };
-  }, [userId]);
+  useConnectInit({
+    userId,
+    setNotificationPermission,
+    fetchRooms: () => fetchRooms(),
+    fetchUserProfile: () => fetchUserProfile(),
+    fetchStarredMessages: () => fetchStarredMessages(),
+    fetchStories: () => fetchStories(),
+    fetchCallHistory: () => fetchCallHistory(),
+    subscribeToAllRooms: () => subscribeToAllRooms(),
+    subscribeToStories: () => subscribeToStories(),
+    subscribeToCalls: () => subscribeToCalls(),
+  });
 
   const fetchCallHistory = async () => {
     try {
@@ -517,62 +431,6 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     }
   };
 
-  const subscribeToPresence = () => {
-    const channel = supabase.channel('global_presence', {
-      config: {
-        presence: {
-          key: userId,
-        },
-      },
-    });
-    
-    channel
-      .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState();
-        Object.keys(state).forEach((key) => {
-          const userState = state[key][0] as any;
-          if (userState.user_id) {
-            updateUserPresence(userState.user_id, {
-              is_online: true,
-              last_seen: userState.last_seen || new Date().toISOString()
-            });
-          }
-        });
-      })
-      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-        const userState = newPresences[0] as any;
-        if (userState.user_id) {
-          updateUserPresence(userState.user_id, {
-            is_online: true,
-            last_seen: userState.last_seen || new Date().toISOString()
-          });
-        }
-      })
-      .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-        const userState = leftPresences[0] as any;
-        if (userState.user_id) {
-          updateUserPresence(userState.user_id, {
-            is_online: false,
-            last_seen: new Date().toISOString()
-          });
-        }
-      })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          await channel.track({
-            user_id: userId,
-            name: userName,
-            last_seen: new Date().toISOString(),
-            is_online: true
-          });
-        }
-      });
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  };
-
   const subscribeToAllRooms = () => {
     const channel = supabase
       .channel('global-chat-updates')
@@ -598,31 +456,22 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     };
   };
 
-  useEffect(() => {
-    if (activeRoom) {
-      setInternalSearchQuery('');
-      setShowInternalSearch(false);
-      fetchMessages(activeRoom.id);
-      fetchReactions(activeRoom.id);
-      fetchStarredMessages();
-      fetchPolls(activeRoom.id);
-      const unsubscribe = subscribeToMessages(activeRoom.id);
-      const unsubscribeReactions = subscribeToReactions(activeRoom.id);
-      const unsubscribePolls = subscribeToPolls(activeRoom.id);
-      markAsRead(activeRoom.id);
-      
-      const otherId = participants[activeRoom.id]?.find(p => p.user_id !== userId)?.user_id;
-      if (otherId) {
-        fetchOtherUserLastSeen(otherId);
-      }
-      
-      return () => {
-        if (unsubscribe) unsubscribe();
-        if (unsubscribeReactions) unsubscribeReactions();
-        if (unsubscribePolls) unsubscribePolls();
-      };
-    }
-  }, [activeRoom, participants]);
+  useActiveRoomLifecycle({
+    activeRoomId: activeRoom?.id || null,
+    participants,
+    userId,
+    setInternalSearchQuery,
+    setShowInternalSearch,
+    fetchMessages: (roomId) => fetchMessages(roomId),
+    fetchReactions: (roomId) => fetchReactions(roomId),
+    fetchStarredMessages: () => fetchStarredMessages(),
+    fetchPolls: (roomId) => fetchPolls(roomId),
+    subscribeToMessages: (roomId) => subscribeToMessages(roomId),
+    subscribeToReactions: (roomId) => subscribeToReactions(roomId),
+    subscribeToPolls: (roomId) => subscribeToPolls(roomId),
+    markAsRead: (roomId) => markAsRead(roomId),
+    fetchOtherUserLastSeen: (otherId) => fetchOtherUserLastSeen(otherId),
+  });
 
   const fetchOtherUserLastSeen = async (otherId: string) => {
     const { data, error } = await supabase
@@ -853,25 +702,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     }
   };
 
-  // Presence Heartbeat
-  useEffect(() => {
-    if (!userId) return;
-
-    const updateLastSeen = async () => {
-      await supabase
-        .from('user_presence')
-        .upsert({ 
-          user_id: userId, 
-          last_seen: new Date().toISOString(),
-          name: userName 
-        });
-    };
-
-    updateLastSeen();
-    const interval = setInterval(updateLastSeen, 30000); // Every 30s
-
-    return () => clearInterval(interval);
-  }, [userId, userName]);
+  usePresenceHeartbeat(userId, userName);
 
   const fetchAvailableUsers = async () => {
     if (!userId) return;
@@ -1528,13 +1359,13 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
       const filePath = `${userId}/${activeRoom.id}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('chat-attachments')
+        .from('chat_attachments')
         .upload(filePath, audioBlob);
 
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
-        .from('chat-attachments')
+        .from('chat_attachments')
         .getPublicUrl(filePath);
 
       const { error: msgError } = await supabase
@@ -1979,30 +1810,6 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     setShowMsgOptions(null);
   };
 
-  const handleTyping = () => {
-    if (!activeRoom) return;
-    
-    if (!isTyping) {
-      setIsTyping(true);
-      supabase
-        .from('chat_participants')
-        .update({ is_typing: true })
-        .eq('room_id', activeRoom.id)
-        .eq('user_id', userId);
-    }
-
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-
-    typingTimeoutRef.current = setTimeout(() => {
-      setIsTyping(false);
-      supabase
-        .from('chat_participants')
-        .update({ is_typing: false })
-        .eq('room_id', activeRoom.id)
-        .eq('user_id', userId);
-    }, 3000);
-  };
-
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -2205,11 +2012,6 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     }
   };
 
-  const getChatName = (room: ChatRoom) => {
-    if (room.is_group) return room.name || 'Grupo';
-    const otherParticipant = participants[room.id]?.find(p => p.user_id !== userId);
-    return otherParticipant?.user_name || 'Conversa';
-  };
 
   const updateGroupInfo = async () => {
     if (!activeRoom || !activeRoom.is_group) return;
@@ -2316,19 +2118,6 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     }
   };
 
-  const getChatAvatar = (room: ChatRoom) => {
-    if (room.is_group) return room.avatar_url;
-    const otherParticipant = participants[room.id]?.find(p => p.user_id !== userId);
-    return otherParticipant?.user_avatar;
-  };
-
-  const filteredRooms = rooms.filter(room => {
-    const matchesSearch = getChatName(room).toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStarred = !showStarredOnly || starredRoomIds.has(room.id);
-    const participant = participants[room.id]?.find(p => p.user_id === userId);
-    const matchesCategory = activeCategory === 'Tudo' || participant?.category === activeCategory;
-    return matchesSearch && matchesStarred && matchesCategory;
-  });
 
   return (
     <div className="flex h-[calc(100vh-120px)] bg-white dark:bg-[#0a0a0a] md:rounded-[2rem] border-0 md:border border-slate-200 dark:border-white/5 overflow-hidden shadow-2xl relative">
@@ -2363,6 +2152,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
         toggleArchive={toggleArchive}
         showArchived={showArchived}
         setShowArchived={setShowArchived}
+        starredRoomIds={starredRoomIds}
         callHistory={callHistory}
         startCall={startCall}
         onNavigate={onNavigate}
@@ -2429,9 +2219,9 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
                     {getChatName(activeRoom)}
                   </h3>
                   <p className="text-[9px] md:text-[10px] text-blue-500 font-black uppercase tracking-widest truncate">
-                    {typingStatus[activeRoom.id]?.length > 0 ? (
+                    {getTypingUsers(activeRoom.id).length > 0 ? (
                       <span className="text-blue-500 italic">
-                        {typingStatus[activeRoom.id].join(', ')} {typingStatus[activeRoom.id].length > 1 ? 'estão digitando...' : 'está digitando...'}
+                        {getTypingUsers(activeRoom.id).join(', ')} {getTypingUsers(activeRoom.id).length > 1 ? 'estão digitando...' : 'está digitando...'}
                       </span>
                     ) : (
                       (() => {
@@ -2633,213 +2423,47 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
               onNavigate={onNavigate}
               polls={polls}
               votePoll={votePoll}
-              typingUsers={typingStatus[activeRoom.id] || []}
+              typingUsers={getTypingUsers(activeRoom.id)}
               createTaskFromMessage={handleCreateTaskFromMessage}
             />
 
             {/* INPUT AREA */}
-            <div className="p-3 md:p-4 bg-white dark:bg-[#1a1a1a] border-t border-slate-200 dark:border-white/5">
-              
-              {/* REPLY/EDIT INDICATOR */}
-              <AnimatePresence>
-                {(replyingTo || editingMessage) && (
-                  <motion.div 
-                    key="reply-edit-indicator"
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="mb-3 p-3 bg-slate-50 dark:bg-white/5 rounded-xl border-l-4 border-blue-500 flex items-center justify-between"
-                  >
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      <div className="text-blue-500">
-                        {replyingTo ? <CornerUpLeft size={18} /> : <Edit2 size={18} />}
-                      </div>
-                      <div className="overflow-hidden">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-blue-500">
-                          {replyingTo ? `Respondendo a ${replyingTo.sender_name === userName ? 'você' : replyingTo.sender_name}` : 'Editando mensagem'}
-                        </p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                          {replyingTo ? replyingTo.content : editingMessage?.content}
-                        </p>
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => { setReplyingTo(null); setEditingMessage(null); if(editingMessage) setNewMessage(''); }}
-                      className="p-1 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-colors"
-                    >
-                      <X size={16} />
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <div className="flex items-end gap-3 max-w-4xl mx-auto">
-                {isRecording ? (
-                  <div className="flex-1 flex items-center gap-4 bg-red-50 dark:bg-red-500/10 p-3 rounded-2xl border border-red-200 dark:border-red-500/20">
-                    <div className="flex items-center gap-3 shrink-0">
-                      <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                      <span className="text-red-500 font-black text-[10px] uppercase tracking-widest tabular-nums">{formatTime(recordingTime)}</span>
-                    </div>
-                    <div className="flex-1 h-8 bg-black/5 dark:bg-white/5 rounded-lg overflow-hidden">
-                      <canvas ref={canvasRef} width={300} height={32} className="w-full h-full" />
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button onClick={cancelRecording} className="p-2 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-all">
-                        <Trash size={18} />
-                      </button>
-                      <button onClick={stopRecording} className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-500/20 rounded-full transition-all">
-                        <Pause size={18} />
-                      </button>
-                    </div>
-                  </div>
-                ) : audioUrl ? (
-                  <div className="flex-1 flex items-center justify-between bg-blue-50 dark:bg-blue-500/10 p-3 rounded-2xl border border-blue-200 dark:border-blue-500/20">
-                    <div className="flex items-center gap-3">
-                      <Mic size={18} className="text-blue-500" />
-                      <span className="text-blue-500 font-black text-xs uppercase tracking-widest">Áudio Gravado</span>
-                      <audio src={audioUrl} controls className="h-8 max-w-[150px]" />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => setAudioUrl(null)} className="p-2 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-all">
-                        <X size={18} />
-                      </button>
-                      <button onClick={sendAudioMessage} className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20">
-                        <Send size={18} />
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <button 
-                        onClick={() => setIsVanishMode(!isVanishMode)}
-                        className={`p-3 rounded-xl transition-all ${isVanishMode ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-indigo-500'}`}
-                        title="Modo Vanish"
-                      >
-                        <Ghost size={20} />
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setShowGifPicker(!showGifPicker);
-                          if (!showGifPicker && gifs.length === 0) searchGifs('');
-                        }}
-                        className={`p-3 rounded-xl transition-all ${showGifPicker ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-blue-600'}`}
-                        title="GIFs"
-                      >
-                        <ImageIcon size={20} />
-                      </button>
-                      <div className="relative">
-                        <input 
-                          type="file" 
-                          id="file-upload" 
-                          className="hidden" 
-                          onChange={handleFileUpload}
-                        />
-                        <label 
-                          htmlFor="file-upload"
-                          className="p-3 bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-blue-600 rounded-xl cursor-pointer transition-all block"
-                        >
-                          {uploading ? <Loader2 className="animate-spin" size={20} /> : <Paperclip size={20} />}
-                        </label>
-                      </div>
-                      
-                      <button 
-                        onClick={() => { fetchUsers(); setShowShareProfileModal(true); }}
-                        className="p-3 bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-blue-600 rounded-xl transition-all"
-                        title="Compartilhar Perfil"
-                      >
-                        <UserPlus size={20} />
-                      </button>
-                    </div>
-                    
-                    <div className="flex-1 relative">
-                      {/* GIF PICKER POPOVER */}
-                      <AnimatePresence>
-                        {showGifPicker && (
-                          <motion.div 
-                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                            className="absolute bottom-full left-0 mb-4 w-80 h-96 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-[2rem] shadow-2xl z-50 flex flex-col overflow-hidden"
-                          >
-                            <div className="p-4 border-b border-slate-100 dark:border-white/5">
-                              <div className="flex gap-2 mb-3">
-                                <button 
-                                  onClick={() => setGifType('gifs')}
-                                  className={`flex-1 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${gifType === 'gifs' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10'}`}
-                                >
-                                  GIFs
-                                </button>
-                                <button 
-                                  onClick={() => setGifType('stickers')}
-                                  className={`flex-1 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${gifType === 'stickers' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10'}`}
-                                >
-                                  Stickers
-                                </button>
-                              </div>
-                              <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                                <input 
-                                  type="text"
-                                  placeholder={`Buscar ${gifType === 'gifs' ? 'GIFs' : 'Stickers'}...`}
-                                  value={gifSearch}
-                                  onChange={(e) => {
-                                    setGifSearch(e.target.value);
-                                    searchGifs(e.target.value);
-                                  }}
-                                  className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/5 rounded-xl outline-none focus:border-blue-500 transition-all text-xs"
-                                />
-                              </div>
-                            </div>
-                            <div className="flex-1 overflow-y-auto p-2 grid grid-cols-2 gap-2 custom-scrollbar">
-                              {gifs.map(gif => (
-                                <button 
-                                  key={gif.id}
-                                  onClick={() => sendGif(gif.images.fixed_height.url, gifType === 'gifs' ? 'gif' : 'sticker')}
-                                  className="rounded-lg overflow-hidden hover:scale-105 transition-transform"
-                                >
-                                  <img src={gif.images.fixed_height.url} alt="Media" className="w-full h-24 object-cover" />
-                                </button>
-                              ))}
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-
-                      <textarea 
-                        value={newMessage}
-                        onChange={(e) => { setNewMessage(e.target.value); handleTyping(); }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            sendMessage();
-                          }
-                        }}
-                        placeholder="Digite uma mensagem..."
-                        className="w-full p-3 bg-slate-100 dark:bg-black/40 border border-slate-200 dark:border-white/5 rounded-2xl outline-none focus:border-blue-500 transition-all text-sm resize-none max-h-32 min-h-[48px]"
-                        rows={1}
-                      />
-                    </div>
-
-                    {newMessage.trim() ? (
-                      <button 
-                        onClick={sendMessage}
-                        className="p-3 bg-blue-600 text-white rounded-xl transition-all shadow-lg shadow-blue-600/20 hover:scale-105 active:scale-95"
-                      >
-                        <Send size={20} />
-                      </button>
-                    ) : (
-                      <button 
-                        onClick={startRecording}
-                        className="p-3 bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-blue-600 rounded-xl transition-all"
-                      >
-                        <Mic size={20} />
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
+            <ChatInput
+              newMessage={newMessage}
+              setNewMessage={setNewMessage}
+              handleTyping={handleTyping}
+              sendMessage={sendMessage}
+              replyingTo={replyingTo}
+              setReplyingTo={setReplyingTo}
+              editingMessage={editingMessage}
+              setEditingMessage={setEditingMessage}
+              userName={userName}
+              isRecording={isRecording}
+              recordingTime={recordingTime}
+              formatTime={formatTime}
+              canvasRef={canvasRef}
+              cancelRecording={cancelRecording}
+              stopRecording={stopRecording}
+              audioUrl={audioUrl}
+              setAudioUrl={setAudioUrl}
+              sendAudioMessage={sendAudioMessage}
+              isVanishMode={isVanishMode}
+              setIsVanishMode={setIsVanishMode}
+              showGifPicker={showGifPicker}
+              setShowGifPicker={setShowGifPicker}
+              gifType={gifType}
+              setGifType={setGifType}
+              gifSearch={gifSearch}
+              setGifSearch={setGifSearch}
+              searchGifs={searchGifs}
+              gifs={gifs}
+              sendGif={sendGif}
+              uploading={uploading}
+              handleFileUpload={handleFileUpload}
+              fetchUsers={fetchUsers}
+              setShowShareProfileModal={setShowShareProfileModal}
+              startRecording={startRecording}
+            />
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center opacity-40">
@@ -2852,1095 +2476,147 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
         )}
       </div>
 
-      {/* WALLPAPER MODAL */}
-      <AnimatePresence>
-        {showWallpaperModal && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white dark:bg-[#1a1a1a] w-full max-w-2xl rounded-[2.5rem] border border-slate-200 dark:border-white/5 shadow-2xl overflow-hidden"
-            >
-              <div className="p-6 border-b border-slate-200 dark:border-white/5 flex items-center justify-between">
-                <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Papel de Parede</h3>
-                <button onClick={() => setShowWallpaperModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full">
-                  <X size={20} />
-                </button>
-              </div>
-              <div className="p-6 overflow-y-auto max-h-[70vh] custom-scrollbar">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {/* COLORS */}
-                  <div>
-                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">Cores Sólidas</h4>
-                    <div className="grid grid-cols-4 gap-3">
-                      {[
-                        '#f8fafc', '#f1f5f9', '#e2e8f0', '#cbd5e1',
-                        '#fee2e2', '#ffedd5', '#fef9c3', '#dcfce7',
-                        '#d1fae5', '#ccfbf1', '#e0f2fe', '#e0e7ff',
-                        '#f5f3ff', '#fae8ff', '#fce7f3', '#fef2f2'
-                      ].map(color => (
-                        <button
-                          key={color}
-                          onClick={() => {
-                            setSelectedColor(color);
-                            setSelectedWallpaper(null);
-                          }}
-                          className={`w-full aspect-square rounded-xl border-2 transition-all ${selectedColor === color ? 'border-blue-500 scale-110 shadow-lg' : 'border-transparent hover:scale-105'}`}
-                          style={{ backgroundColor: color }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* IMAGES */}
-                  <div>
-                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">Imagens de Fundo</h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      {[
-                        'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&h=600&fit=crop',
-                        'https://images.unsplash.com/photo-1511497584788-876760111969?w=400&h=600&fit=crop',
-                        'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400&h=600&fit=crop',
-                        'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=400&h=600&fit=crop',
-                        'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=400&h=600&fit=crop',
-                        'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=600&fit=crop'
-                      ].map(url => (
-                        <button
-                          key={url}
-                          onClick={() => {
-                            setSelectedWallpaper(url);
-                            setSelectedColor(null);
-                          }}
-                          className={`w-full aspect-[2/3] rounded-xl overflow-hidden border-2 transition-all ${selectedWallpaper === url ? 'border-blue-500 scale-105 shadow-lg' : 'border-transparent hover:scale-105'}`}
-                        >
-                          <img src={url} alt="Wallpaper" className="w-full h-full object-cover" />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="p-6 border-t border-slate-200 dark:border-white/5 flex gap-3">
-                <button 
-                  onClick={() => {
-                    setSelectedColor(null);
-                    setSelectedWallpaper(null);
-                    if (activeRoom) updateWallpaper(activeRoom.id, null, null);
-                    setShowWallpaperModal(false);
-                  }}
-                  className="flex-1 py-3 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-200"
-                >
-                  Remover
-                </button>
-                <button 
-                  onClick={() => {
-                    if (activeRoom) updateWallpaper(activeRoom.id, selectedWallpaper, selectedColor);
-                    setShowWallpaperModal(false);
-                  }}
-                  className="flex-1 py-3 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-blue-600/20 hover:bg-blue-700"
-                >
-                  Aplicar
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <NewChatModal 
-        show={showNewChatModal} 
-        onClose={() => setShowNewChatModal(false)} 
-        users={allUsers} 
-        onStartChat={startNewChat} 
+      <WallpaperModal
+        show={showWallpaperModal}
+        onClose={() => setShowWallpaperModal(false)}
+        selectedColor={selectedColor}
+        selectedWallpaper={selectedWallpaper}
+        setSelectedColor={setSelectedColor}
+        setSelectedWallpaper={setSelectedWallpaper}
+        onRemove={() => {
+          setSelectedColor(null);
+          setSelectedWallpaper(null);
+          if (activeRoom) updateWallpaper(activeRoom.id, null, null);
+          setShowWallpaperModal(false);
+        }}
+        onApply={() => {
+          if (activeRoom) updateWallpaper(activeRoom.id, selectedWallpaper, selectedColor);
+          setShowWallpaperModal(false);
+        }}
       />
 
-        {/* MEDIA GALLERY MODAL */}
-        <AnimatePresence>
-          {showMediaGallery && activeRoom && (
-            <motion.div 
-              key="media-gallery-modal"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-            >
-              <motion.div 
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-white dark:bg-[#1a1a1a] w-full max-w-2xl rounded-[2.5rem] border border-slate-200 dark:border-white/5 shadow-2xl overflow-hidden"
-              >
-                <div className="p-6 border-b border-slate-200 dark:border-white/5 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-50 dark:bg-blue-500/10 rounded-xl text-blue-500">
-                      <ImageIcon size={20} />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Galeria da Conversa</h3>
-                      <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">{getChatName(activeRoom)}</p>
-                    </div>
-                  </div>
-                  <button onClick={() => setShowMediaGallery(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
-                    <X size={20} />
-                  </button>
-                </div>
-                
-                <div className="p-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
-                  <div className="grid grid-cols-3 gap-4">
-                    {messages
-                      .filter(m => m.attachment_url && !m.is_deleted)
-                      .map(m => {
-                        const isImage = m.attachment_type?.startsWith('image/');
-                        const isAudio = m.attachment_type === 'audio';
-                        
-                        return (
-                          <div key={m.id} className="group relative aspect-square rounded-2xl overflow-hidden bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5">
-                            {isImage ? (
-                              <img src={m.attachment_url} alt={m.attachment_name} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
-                            ) : isAudio ? (
-                              <div className="w-full h-full flex flex-col items-center justify-center gap-2 p-2 text-center">
-                                <Mic size={24} className="text-blue-500" />
-                                <span className="text-[8px] font-black uppercase tracking-widest truncate w-full">Áudio</span>
-                              </div>
-                            ) : (
-                              <div className="w-full h-full flex flex-col items-center justify-center gap-2 p-2 text-center">
-                                <FileText size={24} className="text-slate-400" />
-                                <span className="text-[8px] font-black uppercase tracking-widest truncate w-full">{m.attachment_name}</span>
-                              </div>
-                            )}
-                            <a 
-                              href={m.attachment_url} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                            >
-                              <div className="p-2 bg-white rounded-full text-slate-900">
-                                <Plus size={16} />
-                              </div>
-                            </a>
-                          </div>
-                        );
-                      })}
-                    {messages.filter(m => m.attachment_url && !m.is_deleted).length === 0 && (
-                      <div className="col-span-3 py-12 text-center opacity-40">
-                        <ImageIcon size={48} className="mx-auto mb-4" />
-                        <p className="text-sm font-black uppercase tracking-widest">Nenhuma mídia encontrada</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <MediaGalleryModal
+          show={showMediaGallery}
+          activeRoom={activeRoom}
+          roomName={activeRoom ? getChatName(activeRoom) : ''}
+          messages={messages}
+          onClose={() => setShowMediaGallery(false)}
+        />
 
-        {/* GROUP INFO MODAL */}
-      <AnimatePresence>
-        {showGroupInfoModal && activeRoom && (
-          <motion.div 
-            key="group-info-modal"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white dark:bg-[#1a1a1a] w-full max-w-md rounded-[2.5rem] border border-slate-200 dark:border-white/5 shadow-2xl overflow-hidden"
-            >
-              <div className="p-6 border-b border-slate-200 dark:border-white/5 flex items-center justify-between">
-                <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Info do Grupo</h3>
-                <button onClick={() => setShowGroupInfoModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
-                  <X size={20} />
-                </button>
-              </div>
-              <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
-                {/* EDIT GROUP INFO (IF CREATOR) */}
-                {activeRoom.created_by === userId ? (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 block">Nome do Grupo</label>
-                      <input 
-                        type="text"
-                        value={editingGroupName}
-                        onChange={(e) => setEditingGroupName(e.target.value)}
-                        className="w-full p-3 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl outline-none focus:border-blue-500 transition-all"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 block">URL do Avatar</label>
-                      <input 
-                        type="text"
-                        value={editingGroupAvatar}
-                        onChange={(e) => setEditingGroupAvatar(e.target.value)}
-                        className="w-full p-3 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl outline-none focus:border-blue-500 transition-all"
-                      />
-                    </div>
-                    <button 
-                      onClick={updateGroupInfo}
-                      className="w-full py-3 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
-                    >
-                      Salvar Alterações
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="w-24 h-24 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center overflow-hidden shadow-xl">
-                      {activeRoom.avatar_url ? (
-                        <img src={activeRoom.avatar_url} alt={activeRoom.name || ''} className="w-full h-full object-cover" />
-                      ) : (
-                        <User size={48} className="text-slate-400" />
-                      )}
-                    </div>
-                    <h4 className="font-black text-xl uppercase tracking-tight">{activeRoom.name || 'Grupo'}</h4>
-                  </div>
-                )}
+      <GroupInfoModal
+        show={showGroupInfoModal}
+        onClose={() => setShowGroupInfoModal(false)}
+        activeRoom={activeRoom}
+        userId={userId}
+        participants={participants}
+        editingGroupName={editingGroupName}
+        setEditingGroupName={setEditingGroupName}
+        editingGroupAvatar={editingGroupAvatar}
+        setEditingGroupAvatar={setEditingGroupAvatar}
+        updateGroupInfo={updateGroupInfo}
+        removeParticipant={removeParticipant}
+        allUsers={allUsers}
+        addParticipant={addParticipant}
+        leaveGroup={leaveGroup}
+        deleteGroup={deleteGroup}
+        onNavigate={onNavigate}
+      />
 
-                {/* PARTICIPANTS LIST */}
-                <div>
-                  <h5 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Participantes ({participants[activeRoom.id]?.length || 0})</h5>
-                  <div className="space-y-3">
-                    {participants[activeRoom.id]?.map(p => (
-                      <div key={p.user_id} className="flex items-center justify-between group">
-                        <div className="flex items-center gap-3">
-                          <div 
-                            className="w-8 h-8 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center overflow-hidden cursor-pointer"
-                            onClick={() => {
-                              if (onNavigate && p.user_id !== userId) {
-                                setShowGroupInfoModal(false);
-                                onNavigate('profile', { userId: p.user_id });
-                              }
-                            }}
-                          >
-                            {p.user_avatar ? (
-                              <img src={p.user_avatar} alt={p.user_name} className="w-full h-full object-cover" />
-                            ) : (
-                              <User size={16} className="text-slate-400" />
-                            )}
-                          </div>
-                          <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{p.user_name} {p.user_id === userId && '(Você)'}</span>
-                        </div>
-                        {activeRoom.created_by === userId && p.user_id !== userId && (
-                          <button 
-                            onClick={() => removeParticipant(p.user_id)}
-                            className="p-1.5 text-red-500 opacity-0 group-hover:opacity-100 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all"
-                          >
-                            <X size={14} />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
+      <ForwardModal
+        show={showForwardModal}
+        forwardingMessage={forwardingMessage}
+        rooms={rooms}
+        getChatName={getChatName}
+        getChatAvatar={getChatAvatar}
+        forwardMessage={forwardMessage}
+        onClose={() => {
+          setShowForwardModal(false);
+          setForwardingMessage(null);
+        }}
+      />
+      <PollModal
+        show={showPollModal}
+        pollQuestion={pollQuestion}
+        setPollQuestion={setPollQuestion}
+        pollOptions={pollOptions}
+        setPollOptions={setPollOptions}
+        createPoll={createPoll}
+        onClose={() => setShowPollModal(false)}
+      />
+      <CreateStoryModal
+        show={showCreateStoryModal}
+        content={newStoryContent}
+        setContent={setNewStoryContent}
+        onCreate={createStory}
+        onClose={() => setShowCreateStoryModal(false)}
+      />
 
-                {/* ADD PARTICIPANT (IF CREATOR) */}
-                {activeRoom.created_by === userId && (
-                  <div className="pt-4 border-t border-slate-200 dark:border-white/5">
-                    <h5 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Adicionar Amigo</h5>
-                    <div className="space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar">
-                      {allUsers
-                        .filter(u => !participants[activeRoom.id]?.some(p => p.user_id === u.id))
-                        .map(user => (
-                          <button
-                            key={user.id}
-                            onClick={() => addParticipant(user)}
-                            className="w-full p-2 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all"
-                          >
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center overflow-hidden">
-                                {user.persona_data?.avatar_url ? (
-                                  <img src={user.persona_data.avatar_url} alt={user.persona_data.nome} className="w-full h-full object-cover" />
-                                ) : (
-                                  <User size={12} className="text-slate-400" />
-                                )}
-                              </div>
-                              <span className="text-xs font-bold">{user.persona_data?.nome || 'Usuário'}</span>
-                            </div>
-                            <Plus size={14} className="text-blue-500" />
-                          </button>
-                        ))
-                      }
-                    </div>
-                  </div>
-                )}
+      <ViewStoryModal
+        show={showStoryModal}
+        story={activeStory}
+        onClose={() => setShowStoryModal(false)}
+      />
 
-                {/* ACTIONS */}
-                <div className="pt-6 border-t border-slate-200 dark:border-white/5 space-y-3">
-                  <button 
-                    onClick={leaveGroup}
-                    className="w-full py-3 bg-red-50 dark:bg-red-500/10 text-red-600 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-red-100 transition-all flex items-center justify-center gap-2"
-                  >
-                    <LogOut size={14} />
-                    Sair do Grupo
-                  </button>
-                  {activeRoom.created_by === userId && (
-                    <button 
-                      onClick={deleteGroup}
-                      className="w-full py-3 bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 flex items-center justify-center gap-2"
-                    >
-                      <Trash2 size={14} />
-                      Excluir Grupo
-                    </button>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <ShareProfileModal
+        show={showShareProfileModal}
+        allUsers={allUsers}
+        onClose={() => setShowShareProfileModal(false)}
+        onShare={shareProfile}
+      />
+        <CallOverlay
+          incomingCall={incomingCall}
+          showCallModal={showCallModal}
+          acceptCall={acceptCall}
+          rejectCall={rejectCall}
+          remoteStream={remoteStream}
+          remoteVideoRef={remoteVideoRef}
+          localVideoRef={localVideoRef}
+          callStatus={callStatus}
+          isVideoOff={isVideoOff}
+          isMuted={isMuted}
+          toggleMute={toggleMute}
+          toggleVideo={toggleVideo}
+          endCall={endCall}
+          activeRoom={activeRoom}
+        />
 
-      {/* FORWARD MODAL */}
-      <AnimatePresence>
-        {showForwardModal && forwardingMessage && (
-          <motion.div 
-            key="forward-modal"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white dark:bg-[#1a1a1a] w-full max-w-md rounded-[2.5rem] border border-slate-200 dark:border-white/5 shadow-2xl overflow-hidden"
-            >
-              <div className="p-6 border-b border-slate-200 dark:border-white/5 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-50 dark:bg-blue-500/10 rounded-xl text-blue-500">
-                    <Forward size={20} />
-                  </div>
-                  <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Encaminhar Mensagem</h3>
-                </div>
-                <button onClick={() => { setShowForwardModal(false); setForwardingMessage(null); }} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
-                  <X size={20} />
-                </button>
-              </div>
-              
-              <div className="p-4 bg-slate-50 dark:bg-white/5 mx-6 mt-6 rounded-2xl border border-slate-200 dark:border-white/5">
-                <p className="text-[10px] text-blue-500 font-black uppercase tracking-widest mb-1">Mensagem selecionada</p>
-                <p className="text-sm text-slate-600 dark:text-slate-300 truncate italic">"{forwardingMessage.content}"</p>
-              </div>
+        <GlobalSearchModal
+          show={showGlobalSearch}
+          query={globalSearchQuery}
+          setQuery={setGlobalSearchQuery}
+          results={globalSearchResults}
+          searching={searchingGlobal}
+          rooms={rooms}
+          onSearch={searchGlobalMessages}
+          onClose={() => {
+            setShowGlobalSearch(false);
+            setGlobalSearchQuery('');
+            setGlobalSearchResults([]);
+          }}
+          onSelectRoom={setActiveRoom}
+          getChatName={getChatName}
+        />
 
-              <div className="p-6 max-h-[400px] overflow-y-auto custom-scrollbar">
-                <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-4">Selecione uma conversa</p>
-                <div className="space-y-2">
-                  {rooms.map(room => (
-                    <button
-                      key={room.id}
-                      onClick={() => forwardMessage(room.id)}
-                      className="w-full p-3 flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-white/5 rounded-2xl transition-all border border-transparent hover:border-blue-500/30 group"
-                    >
-                      <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center overflow-hidden">
-                        {getChatAvatar(room) ? (
-                          <img src={getChatAvatar(room)} alt={getChatName(room)} className="w-full h-full object-cover" />
-                        ) : (
-                          <User className="text-slate-400" size={20} />
-                        )}
-                      </div>
-                      <div className="text-left flex-1">
-                        <p className="font-bold text-slate-900 dark:text-white text-sm">{getChatName(room)}</p>
-                      </div>
-                      <div className="p-2 bg-blue-600 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Send size={14} />
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      {/* POLL MODAL */}
-      <AnimatePresence>
-        {showPollModal && (
-          <motion.div 
-            key="poll-modal"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white dark:bg-[#1a1a1a] w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-white/5"
-            >
-              <div className="p-6 border-b border-slate-100 dark:border-white/5 flex justify-between items-center bg-slate-50/50 dark:bg-white/5">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-blue-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
-                    <BarChart2 size={20} />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Criar Enquete</h2>
-                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Votação em grupo</p>
-                  </div>
-                </div>
-                <button onClick={() => setShowPollModal(false)} className="p-2 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-colors">
-                  <X size={20} className="text-slate-500" />
-                </button>
-              </div>
+        <ProfileModals
+          showProfileSettings={showProfileSettings}
+          setShowProfileSettings={setShowProfileSettings}
+          userProfile={userProfile}
+          userName={userName}
+          updateProfile={updateProfile}
+          showUserProfileModal={showUserProfileModal}
+          setShowUserProfileModal={setShowUserProfileModal}
+          onStartAudioCall={() => startCall('audio')}
+        />
 
-              <div className="p-6 space-y-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] text-slate-500 font-black uppercase tracking-widest ml-1">Pergunta</label>
-                  <input 
-                    type="text"
-                    value={pollQuestion}
-                    onChange={(e) => setPollQuestion(e.target.value)}
-                    placeholder="O que você quer perguntar?"
-                    className="w-full p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
-                  />
-                </div>
-
-                <div className="space-y-3">
-                  <label className="text-[10px] text-slate-500 font-black uppercase tracking-widest ml-1">Opções</label>
-                  {pollOptions.map((opt, idx) => (
-                    <div key={idx} className="flex gap-2">
-                      <input 
-                        type="text"
-                        value={opt}
-                        onChange={(e) => {
-                          const newOpts = [...pollOptions];
-                          newOpts[idx] = e.target.value;
-                          setPollOptions(newOpts);
-                        }}
-                        placeholder={`Opção ${idx + 1}`}
-                        className="flex-1 p-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
-                      />
-                      {pollOptions.length > 2 && (
-                        <button 
-                          onClick={() => setPollOptions(pollOptions.filter((_, i) => i !== idx))}
-                          className="p-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  {pollOptions.length < 5 && (
-                    <button 
-                      onClick={() => setPollOptions([...pollOptions, ''])}
-                      className="w-full p-3 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-xl text-slate-400 hover:text-blue-500 hover:border-blue-500 transition-all text-xs font-bold uppercase tracking-widest"
-                    >
-                      + Adicionar Opção
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="p-6 bg-slate-50/50 dark:bg-white/5 border-t border-slate-100 dark:border-white/5">
-                <button 
-                  onClick={createPoll}
-                  disabled={!pollQuestion || pollOptions.some(o => !o)}
-                  className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-blue-600/20 transition-all active:scale-95"
-                >
-                  Criar Enquete
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-        {/* CREATE STORY MODAL */}
-        <AnimatePresence>
-          {showCreateStoryModal && (
-            <motion.div 
-              key="create-story-modal"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-            >
-              <motion.div 
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-white dark:bg-[#1a1a1a] w-full max-w-md rounded-[2.5rem] border border-slate-200 dark:border-white/5 shadow-2xl overflow-hidden"
-              >
-                <div className="p-6 border-b border-slate-200 dark:border-white/5 flex items-center justify-between">
-                  <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Novo Status</h3>
-                  <button onClick={() => setShowCreateStoryModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
-                    <X size={20} />
-                  </button>
-                </div>
-                <div className="p-6 space-y-4">
-                  <textarea 
-                    value={newStoryContent}
-                    onChange={(e) => setNewStoryContent(e.target.value)}
-                    placeholder="O que está acontecendo? (Ex: Estou na biblioteca!)"
-                    className="w-full p-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl outline-none focus:border-blue-500 transition-all text-sm resize-none min-h-[120px]"
-                  />
-                  <button 
-                    onClick={createStory}
-                    className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
-                  >
-                    Publicar Status
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* VIEW STORY MODAL */}
-        <AnimatePresence>
-          {showStoryModal && activeStory && (
-            <motion.div 
-              key="view-story-modal"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md"
-            >
-              <motion.div 
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="w-full max-w-md aspect-[9/16] bg-gradient-to-br from-blue-600 to-indigo-900 rounded-[2.5rem] shadow-2xl overflow-hidden relative flex flex-col items-center justify-center p-8 text-center"
-              >
-                <button 
-                  onClick={() => setShowStoryModal(false)}
-                  className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-all"
-                >
-                  <X size={24} />
-                </button>
-                
-                <div className="absolute top-6 left-6 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center overflow-hidden border-2 border-white/30">
-                    {activeStory.user_avatar ? (
-                      <img src={activeStory.user_avatar} alt={activeStory.user_name} className="w-full h-full object-cover" />
-                    ) : (
-                      <User className="text-white" size={20} />
-                    )}
-                  </div>
-                  <div className="text-left">
-                    <p className="text-sm font-black text-white uppercase tracking-tight">{activeStory.user_name}</p>
-                    <p className="text-[10px] text-white/60 font-bold uppercase tracking-widest">
-                      {new Date(activeStory.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex-1 flex items-center justify-center">
-                  <p className="text-2xl md:text-3xl font-black text-white leading-tight px-4">
-                    "{activeStory.content}"
-                  </p>
-                </div>
-
-                <div className="absolute bottom-10 w-full px-8">
-                  <div className="h-1 w-full bg-white/20 rounded-full overflow-hidden">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: '100%' }}
-                      transition={{ duration: 5, ease: 'linear' }}
-                      onAnimationComplete={() => setShowStoryModal(false)}
-                      className="h-full bg-white"
-                    />
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* SHARE PROFILE MODAL */}
-        <AnimatePresence>
-          {showShareProfileModal && (
-            <motion.div 
-              key="share-profile-modal"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-            >
-              <motion.div 
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-white dark:bg-[#1a1a1a] w-full max-w-md rounded-[2.5rem] border border-slate-200 dark:border-white/5 shadow-2xl overflow-hidden"
-              >
-                <div className="p-6 border-b border-slate-200 dark:border-white/5 flex items-center justify-between">
-                  <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Compartilhar Contato</h3>
-                  <button onClick={() => setShowShareProfileModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
-                    <X size={20} />
-                  </button>
-                </div>
-                <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Selecione um colega para compartilhar</p>
-                  {allUsers.length === 0 ? (
-                    <p className="text-center py-8 text-sm text-slate-400">Nenhum colega encontrado</p>
-                  ) : (
-                    allUsers.map(user => (
-                      <button
-                        key={user.id}
-                        onClick={() => shareProfile(user.id)}
-                        className="w-full p-4 flex items-center gap-4 bg-slate-50 dark:bg-black/20 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-2xl border border-slate-200 dark:border-white/5 transition-all group"
-                      >
-                        <div className="w-12 h-12 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center overflow-hidden shrink-0">
-                          {user.persona_data?.avatar_url ? (
-                            <img src={user.persona_data.avatar_url} alt={user.persona_data.nome} className="w-full h-full object-cover" />
-                          ) : (
-                            <User className="text-slate-400" size={24} />
-                          )}
-                        </div>
-                        <div className="flex-1 text-left min-w-0">
-                          <h4 className="font-bold text-slate-900 dark:text-white truncate">{user.persona_data?.nome || 'Colega'}</h4>
-                          <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-black mt-1">
-                            {user.persona_data?.especialidade || 'Estudante'}
-                          </p>
-                        </div>
-                        <Share2 size={18} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
-                      </button>
-                    ))
-                  )}
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-        {/* INCOMING CALL NOTIFICATION */}
-        <AnimatePresence>
-          {incomingCall && !showCallModal && (
-            <motion.div
-              initial={{ y: -100, opacity: 0 }}
-              animate={{ y: 20, opacity: 1 }}
-              exit={{ y: -100, opacity: 0 }}
-              className="fixed top-0 left-1/2 -translate-x-1/2 z-[100] w-full max-w-sm px-4"
-            >
-              <div className="bg-white dark:bg-[#1a1a1a] p-4 rounded-3xl shadow-2xl border border-slate-200 dark:border-white/5 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center overflow-hidden shrink-0 animate-pulse border-2 border-blue-500/30">
-                  {incomingCall.caller_avatar ? (
-                    <img src={incomingCall.caller_avatar} alt={incomingCall.caller_name} className="w-full h-full object-cover" />
-                  ) : (
-                    incomingCall.type === 'video' ? <Video className="text-blue-600" /> : <Phone className="text-blue-600" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Chamada de {incomingCall.type === 'video' ? 'Vídeo' : 'Áudio'}</p>
-                  <p className="font-bold text-slate-900 dark:text-white truncate">{incomingCall.caller_name}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button 
-                    onClick={rejectCall}
-                    className="p-3 bg-red-100 dark:bg-red-500/20 text-red-600 rounded-full hover:bg-red-200 transition-colors"
-                  >
-                    <PhoneOff size={20} />
-                  </button>
-                  <button 
-                    onClick={acceptCall}
-                    className="p-3 bg-green-100 dark:bg-green-500/20 text-green-600 rounded-full hover:bg-green-200 transition-colors"
-                  >
-                    <Phone size={20} />
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* CALL MODAL */}
-        <AnimatePresence>
-          {showCallModal && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-4 md:p-8"
-            >
-              <div className="relative w-full max-w-4xl aspect-video bg-slate-900 rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10">
-                {/* REMOTE VIDEO */}
-                {remoteStream ? (
-                  <video 
-                    ref={remoteVideoRef}
-                    autoPlay 
-                    playsInline 
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center text-white gap-4">
-                    <div className="w-24 h-24 rounded-full bg-white/10 flex items-center justify-center animate-pulse">
-                      <User size={48} className="text-white/40" />
-                    </div>
-                    <p className="text-sm font-black uppercase tracking-widest text-white/60">
-                      {callStatus === 'calling' ? 'Chamando...' : 'Conectando...'}
-                    </p>
-                  </div>
-                )}
-
-                {/* LOCAL VIDEO (PIP) */}
-                <div className="absolute bottom-6 right-6 w-32 md:w-48 aspect-video bg-black rounded-2xl overflow-hidden border-2 border-white/20 shadow-xl z-10">
-                  {isVideoOff ? (
-                    <div className="w-full h-full flex items-center justify-center bg-slate-800">
-                      <VideoOff size={24} className="text-white/40" />
-                    </div>
-                  ) : (
-                    <video 
-                      ref={localVideoRef}
-                      autoPlay 
-                      muted 
-                      playsInline 
-                      className="w-full h-full object-cover"
-                    />
-                  )}
-                </div>
-
-                {/* CALL CONTROLS */}
-                <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-4 md:gap-6 z-20">
-                  <button 
-                    onClick={toggleMute}
-                    className={`p-4 md:p-5 rounded-full transition-all ${isMuted ? 'bg-red-600 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
-                  >
-                    {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
-                  </button>
-                  
-                  <button 
-                    onClick={endCall}
-                    className="p-5 md:p-6 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-xl shadow-red-600/40 transition-all active:scale-90"
-                  >
-                    <PhoneOff size={32} />
-                  </button>
-
-                  <button 
-                    onClick={toggleVideo}
-                    className={`p-4 md:p-5 rounded-full transition-all ${isVideoOff ? 'bg-red-600 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
-                  >
-                    {isVideoOff ? <VideoOff size={24} /> : <Video size={24} />}
-                  </button>
-                </div>
-
-                {/* CALL INFO */}
-                <div className="absolute top-10 left-10 text-white z-20">
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60 mb-1">Chamada em tempo real</p>
-                  <h3 className="text-xl font-black uppercase tracking-tight">
-                    {activeRoom?.name || 'Conversa'}
-                  </h3>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* GLOBAL SEARCH MODAL */}
-        <AnimatePresence>
-          {showGlobalSearch && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-            >
-              <motion.div 
-                initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                animate={{ scale: 1, opacity: 1, y: 0 }}
-                exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                className="bg-white dark:bg-[#1a1a1a] w-full max-w-2xl rounded-[2.5rem] border border-slate-200 dark:border-white/5 shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
-              >
-                <div className="p-6 border-b border-slate-200 dark:border-white/5 flex items-center gap-4">
-                  <div className="flex-1 relative">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                    <input 
-                      type="text"
-                      placeholder="Pesquisar em todas as mensagens..."
-                      value={globalSearchQuery}
-                      onChange={(e) => {
-                        setGlobalSearchQuery(e.target.value);
-                        searchGlobalMessages(e.target.value);
-                      }}
-                      className="w-full pl-12 pr-4 py-3 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/5 rounded-2xl outline-none focus:border-blue-500 transition-all font-bold"
-                      autoFocus
-                    />
-                  </div>
-                  <button 
-                    onClick={() => { setShowGlobalSearch(false); setGlobalSearchQuery(''); setGlobalSearchResults([]); }}
-                    className="p-3 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors"
-                  >
-                    <X size={24} />
-                  </button>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-                  {searchingGlobal ? (
-                    <div className="flex flex-col items-center justify-center py-12 opacity-40">
-                      <Loader2 className="animate-spin mb-2" />
-                      <p className="text-xs font-black uppercase tracking-widest">Pesquisando...</p>
-                    </div>
-                  ) : globalSearchResults.length > 0 ? (
-                    <div className="space-y-4">
-                      {globalSearchResults.map(msg => {
-                        const room = rooms.find(r => r.id === msg.room_id);
-                        return (
-                          <button 
-                            key={msg.id}
-                            onClick={() => {
-                              if (room) {
-                                setActiveRoom(room);
-                                setShowGlobalSearch(false);
-                                setGlobalSearchQuery('');
-                                setGlobalSearchResults([]);
-                              }
-                            }}
-                            className="w-full p-4 bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-2xl hover:border-blue-500 transition-all text-left group"
-                          >
-                            <div className="flex justify-between items-center mb-2">
-                              <span className="text-[10px] font-black uppercase tracking-widest text-blue-500">
-                                {room ? getChatName(room) : 'Conversa desconhecida'}
-                              </span>
-                              <span className="text-[10px] text-slate-400">
-                                {new Date(msg.created_at).toLocaleDateString()} {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                            </div>
-                            <p className="text-sm font-bold text-slate-900 dark:text-white mb-1">{msg.sender_name}</p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{msg.content}</p>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : globalSearchQuery ? (
-                    <div className="flex flex-col items-center justify-center py-12 opacity-40 text-center">
-                      <Search size={48} className="mb-4" />
-                      <p className="text-sm font-black uppercase tracking-widest">Nenhum resultado encontrado</p>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-12 opacity-40 text-center">
-                      <MessageSquare size={48} className="mb-4" />
-                      <p className="text-sm font-black uppercase tracking-widest">Digite algo para pesquisar</p>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* PROFILE SETTINGS MODAL */}
-        <AnimatePresence>
-          {showProfileSettings && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-            >
-              <motion.div 
-                initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                animate={{ scale: 1, opacity: 1, y: 0 }}
-                exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                className="bg-white dark:bg-[#1a1a1a] w-full max-w-md rounded-[2.5rem] border border-slate-200 dark:border-white/5 shadow-2xl overflow-hidden flex flex-col"
-              >
-                <div className="p-6 border-b border-slate-200 dark:border-white/5 flex items-center justify-between">
-                  <h3 className="text-lg font-black uppercase tracking-tight">Meu Perfil</h3>
-                  <button 
-                    onClick={() => setShowProfileSettings(false)}
-                    className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors"
-                  >
-                    <X size={24} />
-                  </button>
-                </div>
-
-                <div className="p-8 flex flex-col items-center text-center">
-                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow-2xl text-3xl mb-4 overflow-hidden">
-                    {userProfile?.persona_data?.avatar_url ? (
-                      <img src={userProfile.persona_data.avatar_url} alt={userName} className="w-full h-full object-cover" />
-                    ) : (
-                      userProfile?.persona_data?.nome?.[0] || userName[0]
-                    )}
-                  </div>
-                  <h4 className="text-xl font-black text-slate-900 dark:text-white mb-1">{userProfile?.persona_data?.nome || userName}</h4>
-                  <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-8">{userProfile?.persona_data?.email || 'Usuário Connect'}</p>
-
-                  <div className="w-full space-y-6">
-                    <div className="text-left">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">Recado / Bio</label>
-                      <textarea 
-                        defaultValue={userProfile?.bio || ''}
-                        onBlur={(e) => updateProfile(e.target.value)}
-                        placeholder="Escreva algo sobre você..."
-                        className="w-full p-4 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/5 rounded-2xl outline-none focus:border-blue-500 transition-all font-bold text-sm resize-none h-32"
-                      />
-                      <p className="text-[10px] text-slate-400 mt-2 italic">O recado será salvo automaticamente ao sair do campo.</p>
-                    </div>
-
-                    <div className="pt-4 border-t border-slate-200 dark:border-white/5">
-                      <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-white/5 rounded-2xl">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-blue-500/10 rounded-lg text-blue-500">
-                            <Shield size={18} />
-                          </div>
-                          <span className="text-xs font-bold">Privacidade</span>
-                        </div>
-                        <ChevronRight size={16} className="text-slate-400" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* USER PROFILE MODAL (FOR OTHERS) */}
-        <AnimatePresence>
-          {showUserProfileModal && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-            >
-              <motion.div 
-                initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                animate={{ scale: 1, opacity: 1, y: 0 }}
-                exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                className="bg-white dark:bg-[#1a1a1a] w-full max-w-md rounded-[2.5rem] border border-slate-200 dark:border-white/5 shadow-2xl overflow-hidden flex flex-col"
-              >
-                <div className="p-6 border-b border-slate-200 dark:border-white/5 flex items-center justify-between">
-                  <h3 className="text-lg font-black uppercase tracking-tight">Perfil</h3>
-                  <button 
-                    onClick={() => setShowUserProfileModal(null)}
-                    className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors"
-                  >
-                    <X size={24} />
-                  </button>
-                </div>
-
-                <div className="p-8 flex flex-col items-center text-center">
-                  <div className="w-24 h-24 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center text-slate-400 font-bold shadow-2xl text-3xl mb-4 overflow-hidden">
-                    {showUserProfileModal.avatar_url ? (
-                      <img src={showUserProfileModal.avatar_url} alt={showUserProfileModal.nome} className="w-full h-full object-cover" />
-                    ) : (
-                      <User size={48} />
-                    )}
-                  </div>
-                  <h4 className="text-xl font-black text-slate-900 dark:text-white mb-1">{showUserProfileModal.nome || 'Usuário'}</h4>
-                  <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-8">{showUserProfileModal.email || 'Connect User'}</p>
-
-                  <div className="w-full space-y-6">
-                    <div className="text-left">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">Recado / Bio</label>
-                      <div className="w-full p-4 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/5 rounded-2xl font-bold text-sm min-h-[80px]">
-                        {showUserProfileModal.bio || 'Sem recado disponível.'}
-                      </div>
-                    </div>
-
-                    <div className="pt-4 border-t border-slate-200 dark:border-white/5 flex gap-3">
-                      <button 
-                        onClick={() => {
-                          // Logic to start a direct chat if not already in one
-                          // For now, just close modal
-                          setShowUserProfileModal(null);
-                        }}
-                        className="flex-1 py-3 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2"
-                      >
-                        <MessageSquare size={14} />
-                        Mensagem
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setShowUserProfileModal(null);
-                          startCall('audio');
-                        }}
-                        className="p-3 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 rounded-2xl hover:bg-slate-200 transition-all"
-                      >
-                        <Phone size={18} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* NEW CHAT MODAL (USER DISCOVERY) */}
-        <AnimatePresence>
-          {showNewChatModal && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-            >
-              <motion.div 
-                initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                animate={{ scale: 1, opacity: 1, y: 0 }}
-                exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                className="bg-white dark:bg-[#1a1a1a] w-full max-w-md rounded-[2.5rem] border border-slate-200 dark:border-white/5 shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
-              >
-                <div className="p-6 border-b border-slate-200 dark:border-white/5 flex items-center justify-between">
-                  <h3 className="text-lg font-black uppercase tracking-tight">Nova Conversa</h3>
-                  <button 
-                    onClick={() => setShowNewChatModal(false)}
-                    className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors"
-                  >
-                    <X size={24} />
-                  </button>
-                </div>
-
-                <div className="p-4 border-b border-slate-200 dark:border-white/5">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input 
-                      type="text"
-                      placeholder="Buscar por nome ou email..."
-                      value={userSearchQuery}
-                      onChange={(e) => setUserSearchQuery(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/5 rounded-2xl outline-none focus:border-blue-500 transition-all text-sm font-bold"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
-                  {loadingUsers ? (
-                    <div className="flex flex-col items-center justify-center py-12 gap-4">
-                      <Loader2 className="animate-spin text-blue-500" size={32} />
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Carregando contatos...</p>
-                    </div>
-                  ) : availableUsers.length > 0 ? (
-                    <div className="space-y-1">
-                      {availableUsers.map(user => (
-                        <button
-                          key={user.id}
-                          onClick={() => startDirectChat(user.id)}
-                          className="w-full p-3 flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-white/5 rounded-2xl transition-all group"
-                        >
-                          <div className="w-12 h-12 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center overflow-hidden shrink-0 border-2 border-transparent group-hover:border-blue-500 transition-all">
-                            {user.avatar_url ? (
-                              <img src={user.avatar_url} alt={user.full_name} className="w-full h-full object-cover" />
-                            ) : (
-                              <User size={24} className="text-slate-400" />
-                            )}
-                          </div>
-                          <div className="flex-1 text-left min-w-0">
-                            <h4 className="font-black text-slate-900 dark:text-white uppercase tracking-tight text-sm truncate">{user.full_name}</h4>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 truncate">{user.bio || 'Usuário'}</p>
-                          </div>
-                          <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-600 opacity-0 group-hover:opacity-100 transition-all">
-                            <Plus size={16} />
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-12 text-center px-6">
-                      <Users size={48} className="text-slate-200 dark:text-white/5 mb-4" />
-                      <p className="text-sm font-bold text-slate-500">Nenhum usuário encontrado.</p>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <UserDiscoveryModal
+          show={showNewChatModal}
+          onClose={() => setShowNewChatModal(false)}
+          userSearchQuery={userSearchQuery}
+          setUserSearchQuery={setUserSearchQuery}
+          loadingUsers={loadingUsers}
+          availableUsers={availableUsers}
+          startDirectChat={startDirectChat}
+        />
       </div>
     );
   };

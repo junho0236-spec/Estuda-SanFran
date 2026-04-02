@@ -1,12 +1,12 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User } from 'lucide-react';
+import { LogOut, Plus, Trash2, User, X } from 'lucide-react';
 import { ChatRoom, ChatParticipant } from '../../types';
 
 interface GroupInfoModalProps {
   show: boolean;
   onClose: () => void;
-  activeRoom: ChatRoom;
+  activeRoom: ChatRoom | null;
   userId: string;
   participants: Record<string, ChatParticipant[]>;
   editingGroupName: string;
@@ -15,13 +15,17 @@ interface GroupInfoModalProps {
   setEditingGroupAvatar: (avatar: string) => void;
   updateGroupInfo: () => void;
   removeParticipant: (participantId: string) => void;
+  allUsers: any[];
+  addParticipant: (user: any) => void;
+  leaveGroup: () => void;
+  deleteGroup: () => void;
   onNavigate?: (view: any, params?: any) => void;
 }
 
 const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
   show, onClose, activeRoom, userId, participants, editingGroupName,
   setEditingGroupName, editingGroupAvatar, setEditingGroupAvatar,
-  updateGroupInfo, removeParticipant, onNavigate
+  updateGroupInfo, removeParticipant, allUsers, addParticipant, leaveGroup, deleteGroup, onNavigate
 }) => {
   return (
     <AnimatePresence>
@@ -122,6 +126,56 @@ const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* ADD PARTICIPANT (IF CREATOR) */}
+              {activeRoom.created_by === userId && (
+                <div className="pt-4 border-t border-slate-200 dark:border-white/5">
+                  <h5 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Adicionar Amigo</h5>
+                  <div className="space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar">
+                    {allUsers
+                      .filter((u) => !participants[activeRoom.id]?.some((p) => p.user_id === u.id))
+                      .map((user) => (
+                        <button
+                          key={user.id}
+                          onClick={() => addParticipant(user)}
+                          className="w-full p-2 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all"
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center overflow-hidden">
+                              {user.persona_data?.avatar_url ? (
+                                <img src={user.persona_data.avatar_url} alt={user.persona_data.nome} className="w-full h-full object-cover" />
+                              ) : (
+                                <User size={12} className="text-slate-400" />
+                              )}
+                            </div>
+                            <span className="text-xs font-bold">{user.persona_data?.nome || 'Usuário'}</span>
+                          </div>
+                          <Plus size={14} className="text-blue-500" />
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ACTIONS */}
+              <div className="pt-6 border-t border-slate-200 dark:border-white/5 space-y-3">
+                <button
+                  onClick={leaveGroup}
+                  className="w-full py-3 bg-red-50 dark:bg-red-500/10 text-red-600 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-red-100 transition-all flex items-center justify-center gap-2"
+                >
+                  <LogOut size={14} />
+                  Sair do Grupo
+                </button>
+                {activeRoom.created_by === userId && (
+                  <button
+                    onClick={deleteGroup}
+                    className="w-full py-3 bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 flex items-center justify-center gap-2"
+                  >
+                    <Trash2 size={14} />
+                    Excluir Grupo
+                  </button>
+                )}
               </div>
             </div>
           </motion.div>

@@ -46,6 +46,7 @@ interface ChatSidebarProps {
   toggleArchive: (roomId: string, e: React.MouseEvent) => void;
   showArchived: boolean;
   setShowArchived: (show: boolean) => void;
+  starredRoomIds: Set<string>;
 }
 
 const ChatSidebar: React.FC<ChatSidebarProps> = ({
@@ -56,7 +57,8 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
   loading, showStarredOnly, setShowStarredOnly, notificationPermission,
   requestNotificationPermission, setShowGlobalSearch, setShowProfileSettings,
   fetchAvailableUsers, setShowNewChatModal, onNavigate, getChatName, getChatAvatar,
-  startCall, archivedRooms, toggleArchive, showArchived, setShowArchived
+  startCall, archivedRooms, toggleArchive, showArchived, setShowArchived,
+  starredRoomIds
 }) => {
   
   const filteredRooms = rooms.filter(room => {
@@ -67,7 +69,8 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
     const name = getChatName(room).toLowerCase();
     const matchesSearch = name.includes(searchQuery.toLowerCase());
     const matchesCategory = activeCategory === 'Tudo' || room.category === activeCategory;
-    return matchesSearch && matchesCategory;
+    const matchesStarred = !showStarredOnly || starredRoomIds.has(room.id);
+    return matchesSearch && matchesCategory && matchesStarred;
   });
 
   return (
