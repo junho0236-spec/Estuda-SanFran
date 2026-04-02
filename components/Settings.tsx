@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Settings as SettingsIcon, 
   Bell, 
@@ -19,8 +20,36 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
+const SPACED_REMINDER_STORAGE_KEY = 'sanfran-spaced-reminders';
+const SPACED_REMINDER_OPEN_EVENT = 'sanfran-spaced-reminders-open';
+
 const Settings: React.FC = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('geral');
+
+  const openSpacedReminderPanel = useCallback(() => {
+    try {
+      const raw = localStorage.getItem(SPACED_REMINDER_STORAGE_KEY);
+      const base = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+      const time =
+        typeof base.time === 'string' && /^\d{2}:\d{2}$/.test(base.time) ? base.time : '09:00';
+      localStorage.setItem(
+        SPACED_REMINDER_STORAGE_KEY,
+        JSON.stringify({
+          enabled: typeof base.enabled === 'boolean' ? base.enabled : false,
+          time,
+          panelDismissed: false,
+        })
+      );
+    } catch {
+      localStorage.setItem(
+        SPACED_REMINDER_STORAGE_KEY,
+        JSON.stringify({ enabled: false, time: '09:00', panelDismissed: false })
+      );
+    }
+    window.dispatchEvent(new Event(SPACED_REMINDER_OPEN_EVENT));
+    navigate('/spaced_repetition');
+  }, [navigate]);
 
   const tabs = [
     { id: 'geral', label: 'Geral', icon: SettingsIcon },
@@ -127,6 +156,26 @@ const Settings: React.FC = () => {
 
             {activeTab === 'notificacoes' && (
               <div className="space-y-8">
+                <section>
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-widest mb-6 flex items-center gap-2">
+                    <Bell size={20} className="text-sanfran-rubi" /> Revisão espaçada
+                  </h3>
+                  <div className="mb-8 rounded-2xl border border-sky-100 bg-sky-50/90 p-5 dark:border-sky-900/40 dark:bg-sky-950/25">
+                    <p className="font-bold text-slate-900 dark:text-white">Lembretes no navegador</p>
+                    <p className="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
+                      Horário e “ativar” ficam salvos neste aparelho (localStorage), sem SQL. Abra a tela abaixo para
+                      permitir notificações, testar e ajustar o horário.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={openSpacedReminderPanel}
+                      className="mt-4 inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-white shadow-md transition-colors hover:bg-sky-700"
+                    >
+                      Abrir preferências na Revisão espaçada
+                      <ChevronRight size={14} aria-hidden />
+                    </button>
+                  </div>
+                </section>
                 <section>
                   <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-widest mb-6 flex items-center gap-2">
                     <Bell size={20} className="text-sanfran-rubi" /> Alertas do Sistema

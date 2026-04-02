@@ -1,7 +1,20 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
-import { Question, UserProgress, Notebook, Folder, Flashcard } from '../types';
+import {
+  Question,
+  UserProgress,
+  Notebook,
+  Folder,
+  Flashcard,
+  normalizeQuestionModality,
+  questionModalityLabel,
+  formatAlternativesAnalysisPlain,
+  isAlternativesAnalysisArray,
+  type QuestionAiCommentary,
+  type QuestionAiCorrection,
+  type AiCorrectionAlternativesAnalysis,
+} from '../types';
 import { dataService } from '../services/dataService';
 import { sampleQuestions } from './sampleQuestions';
 import { NotebookModal } from './NotebookModal';
@@ -9,9 +22,6 @@ import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { GEMINI_MODEL, extractPrecedent } from '../services/geminiService';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import html2canvas from 'html2canvas';
 import { QuestionComments } from './QuestionComments';
 import { 
   BookOpen, 
@@ -20,7 +30,6 @@ import {
   XCircle, 
   ChevronRight, 
   ChevronLeft,
-  Filter,
   Plus,
   Save,
   Loader2,
@@ -45,9 +54,7 @@ import {
   ShieldCheck,
   FileText,
   Timer,
-  Trophy,
   Clock,
-  BarChart3,
   History,
   Target,
   BrainCircuit,
@@ -64,287 +71,111 @@ import {
   Volume2,
   Send,
   MessageSquare,
-  Folder as FolderIcon
+  Folder as FolderIcon,
+  Bookmark,
+  ListFilter
 } from 'lucide-react';
 import { GlossaryText } from './GlossaryText.tsx';
 import { GlossaryPopover } from './GlossaryPopover.tsx';
 import { fetchTermDefinition } from '../services/geminiService';
 import { GlossaryTerm } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer, 
-  Cell,
-  PieChart,
-  Pie
-} from 'recharts';
+import { exportQuestionBankPdf } from './question-bank/exportQuestionBankPdf';
+import { MockResultsView } from './question-bank/MockResultsView';
+import { MockSetupModal } from './question-bank/MockSetupModal';
+import { QuestionBankAIGeneratorModal } from './question-bank/QuestionBankAIGeneratorModal';
+import { QuestionBankFiltersPanel } from './question-bank/QuestionBankFiltersPanel';
+import type {
+  SyncUserProgressUpdates,
+  QuestionBankMockResults,
+  QuestionBankAiConfig,
+} from './question-bank/types';
+import { validateAiQuestionsBatch } from './question-bank/validateAiGeneratedQuestions';
+import { dedupeSimilarAiStatements } from './question-bank/similarStatementDetection';
+import {
+  bumpAnswerGoals,
+  createDefaultAnswerGoals,
+  parseAnswerGoalsFromDb,
+  reconcileAnswerGoals,
+  type QuestionAnswerGoalsPersisted,
+} from './question-bank/answerGoals';
+import { QuestionBankGoalsBar } from './question-bank/QuestionBankGoalsBar';
+import {
+  isQuestionDueForReviewToday,
+  type QuestionStatForReview,
+} from './question-bank/questionReviewQueue';
+
+function normalizeQuestionFromApi(q: Question): Question {
+  const m = normalizeQuestionModality((q as { modality?: string | null }).modality);
+  return { ...q, modality: m };
+}
+
+const QB_OPTION_FOCUS =
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950';
+
+function QuestionAlternativeAnalysisBlocks({
+  analysis,
+  headingId,
+}: {
+  analysis: AiCorrectionAlternativesAnalysis | undefined;
+  headingId: string;
+}) {
+  if (analysis == null || analysis === '') return null;
+  if (isAlternativesAnalysisArray(analysis)) {
+    return (
+      <ul className="m-0 list-none space-y-2 p-0" aria-labelledby={headingId}>
+        {analysis.map((alt, idx) => (
+          <li key={`${alt.alternative}-${idx}`}>
+            <div
+              className={`rounded-xl border p-4 ${
+                alt.status === 'Correta'
+                  ? 'border-green-100 bg-green-50 dark:border-green-900/30 dark:bg-green-900/10'
+                  : 'border-red-100 bg-red-50 dark:border-red-900/30 dark:bg-red-900/10'
+              }`}
+              role="group"
+              aria-label={`Alternativa ${alt.alternative}, ${alt.status === 'Correta' ? 'correta' : 'incorreta'}. ${alt.explanation}`}
+            >
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                <span className="font-black uppercase">
+                  [{alt.alternative}] {alt.status}:
+                </span>{' '}
+                {alt.explanation}
+              </p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+  return (
+    <p
+      className="text-sm leading-relaxed text-slate-600 dark:text-slate-400"
+      role="region"
+      aria-label="Análise das alternativas"
+    >
+      {analysis}
+    </p>
+  );
+}
 
 interface QuestionBankProps {
   userId: string;
   folders?: Folder[];
   flashcards?: Flashcard[];
   isOnline?: boolean;
+  /** Chamado após persistir `user_progress` com sucesso (debounced). Atualiza contadores no App sem depender só do realtime. */
+  onUserProgressSynced?: () => void | Promise<void>;
 }
 
 const QuestionBank: React.FC<QuestionBankProps> = ({ 
   userId, 
   folders = [], 
   flashcards = [],
-  isOnline = true
+  isOnline = true,
+  onUserProgressSynced
 }) => {
-  const navigate = useNavigate();
-  // ... (rest of the component)
-
-  const handleExportPDF = async () => {
-    setIsExporting(true);
-    setExportProgress(0);
-    
-    // Wait for React to render the hidden container
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    try {
-      const doc = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const margin = 15;
-      const contentWidth = pageWidth - 2 * margin;
-      let currentY = margin;
-      
-      const addWatermark = (page: number) => {
-        doc.setPage(page);
-        
-        // Double Border
-        doc.setDrawColor(122, 0, 0); // Bordô
-        doc.setLineWidth(0.5);
-        doc.rect(5, 5, 200, 287);
-        doc.setLineWidth(0.2);
-        doc.rect(7, 7, 196, 283);
-
-        // Corner Ornaments
-        doc.setLineWidth(0.5);
-        doc.line(5, 10, 10, 5); // Top Left
-        doc.line(205, 5, 200, 10); // Top Right
-        doc.line(5, 282, 10, 287); // Bottom Left
-        doc.line(205, 287, 200, 282); // Bottom Right
-
-        // Watermark via Text (Diagonal, 4% opacity)
-        doc.setGState(new (doc as any).GState({opacity: 0.04}));
-        doc.setTextColor(0, 0, 0);
-        doc.setFontSize(60);
-        doc.setFont('helvetica', 'bold');
-        doc.text('SANFRAN ACADEMY', pageWidth / 2, pageHeight / 2, { align: 'center', angle: 45 });
-        
-        // Reset state to avoid bugging the rest of the PDF
-        doc.setGState(new (doc as any).GState({opacity: 1.0}));
-        doc.setTextColor(0, 0, 0);
-      };
-
-      // Native PDF Generation for Questions
-      let processedElements = 0;
-      const totalElements = filteredQuestions.length + 3; // cover + header + questions + answer key
-
-      // Capture Cover
-      const coverEl = document.getElementById('pdf-cover');
-      if (coverEl) {
-        let canvas: HTMLCanvasElement | null = await html2canvas(coverEl, { scale: 1.5, useCORS: true, logging: false });
-        const imgData = canvas.toDataURL('image/jpeg', 0.8);
-        canvas = null; // Free memory
-        const imgProps = doc.getImageProperties(imgData);
-        const imgHeight = (imgProps.height * contentWidth) / imgProps.width;
-        
-        doc.addImage(imgData, 'JPEG', margin, currentY, contentWidth, imgHeight, undefined, 'FAST');
-        processedElements++;
-        setExportProgress(Math.round((processedElements / totalElements) * 100));
-        
-        doc.addPage();
-        currentY = margin;
-      }
-
-      // Capture Header
-      const headerEl = document.getElementById('pdf-header');
-      if (headerEl) {
-        let canvas: HTMLCanvasElement | null = await html2canvas(headerEl, { scale: 1.5, useCORS: true, logging: false });
-        const imgData = canvas.toDataURL('image/jpeg', 0.8);
-        canvas = null; // Free memory
-        const imgProps = doc.getImageProperties(imgData);
-        const imgHeight = (imgProps.height * contentWidth) / imgProps.width;
-        
-        doc.addImage(imgData, 'JPEG', margin, currentY, contentWidth, imgHeight, undefined, 'FAST');
-        currentY += imgHeight + 10;
-        processedElements++;
-        setExportProgress(Math.round((processedElements / totalElements) * 100));
-      }
-
-      // Native PDF Generation for Questions
-      for (let i = 0; i < filteredQuestions.length; i++) {
-        const q = filteredQuestions[i];
-        
-        // Calculate text heights
-        doc.setFontSize(11);
-        doc.setFont('times', 'normal');
-        
-        const statementLines = doc.splitTextToSize(q.statement, contentWidth - 20);
-        const statementHeight = statementLines.length * 6;
-        
-        let optionsHeight = 0;
-        const optionsLines: string[][] = [];
-        
-        q.options.forEach(opt => {
-           const lines = doc.splitTextToSize(opt, contentWidth - 30);
-           optionsLines.push(lines);
-           optionsHeight += lines.length * 6 + 4; // 4mm padding between options
-        });
-        
-        const cardHeight = statementHeight + optionsHeight + 20; // paddings
-        
-        // Check page break
-        if (currentY + cardHeight > pageHeight - margin) {
-           doc.addPage();
-           currentY = margin;
-        }
-        
-        // Draw Card Border
-        doc.setDrawColor(200, 200, 200);
-        doc.setLineWidth(0.2);
-        doc.setFillColor(255, 255, 255);
-        doc.roundedRect(margin, currentY, contentWidth, cardHeight, 3, 3, 'FD');
-        
-        let cardY = currentY + 10;
-        
-        // Draw Question Number
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(12);
-        doc.setTextColor(122, 0, 0);
-        doc.text(`${i + 1}.`, margin + 5, cardY);
-        
-        // Draw Statement
-        doc.setFont('times', 'normal');
-        doc.setFontSize(11);
-        doc.setTextColor(0, 0, 0);
-        doc.text(statementLines, margin + 15, cardY, { align: 'left', maxWidth: contentWidth - 20 });
-        
-        cardY += statementHeight + 5;
-        
-        // Draw Options
-        q.options.forEach((opt, optIdx) => {
-           const lines = optionsLines[optIdx];
-           
-           // Draw checkbox
-           doc.setDrawColor(150, 150, 150);
-           doc.rect(margin + 15, cardY - 4, 4, 4);
-           
-           // Draw Option Letter
-           doc.setFont('helvetica', 'bold');
-           doc.setFontSize(10);
-           doc.setTextColor(100, 100, 100);
-           doc.text(String.fromCharCode(65 + optIdx), margin + 17, cardY - 0.5, { align: 'center' });
-           
-           // Draw Option Text
-           doc.setFont('times', 'normal');
-           doc.setFontSize(11);
-           doc.setTextColor(50, 50, 50);
-           doc.text(lines, margin + 22, cardY, { align: 'left', maxWidth: contentWidth - 30 });
-           
-           cardY += lines.length * 6 + 4;
-        });
-        
-        currentY += cardHeight + 5;
-        
-        processedElements++;
-        setExportProgress(Math.round((processedElements / totalElements) * 100));
-        
-        if ((i + 1) % 10 === 0) {
-          await new Promise(resolve => setTimeout(resolve, 50));
-        }
-      }
-
-      // Answer Key
-      doc.addPage();
-      currentY = margin;
-      
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(18);
-      doc.setTextColor(122, 0, 0);
-      doc.text('Cartão de Respostas', pageWidth / 2, currentY + 10, { align: 'center' });
-      
-      let akCurrentY = currentY + 25;
-      const cols = 2;
-      const colWidth = contentWidth / cols;
-      const rowHeight = 12;
-      
-      doc.setFontSize(11);
-      
-      for (let i = 0; i < filteredQuestions.length; i++) {
-        const q = filteredQuestions[i];
-        const col = i % cols;
-        
-        if (col === 0 && i > 0) {
-          akCurrentY += rowHeight;
-        }
-        
-        if (akCurrentY > pageHeight - margin - 20 && col === 0) {
-           doc.addPage();
-           akCurrentY = margin + 10;
-        }
-        
-        const x = margin + col * colWidth;
-        
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(0, 0, 0);
-        doc.text(`${i + 1}.`, x + 5, akCurrentY);
-        
-        for (let lIdx = 0; lIdx < Math.min(5, q.options.length); lIdx++) {
-           const letterX = x + 20 + lIdx * 12;
-           const isCorrect = q.correct_answer === lIdx;
-           
-           if (isCorrect) {
-             doc.setFillColor(122, 0, 0);
-             doc.circle(letterX + 2, akCurrentY - 1.5, 3.5, 'F');
-             doc.setTextColor(255, 255, 255);
-           } else {
-             doc.setDrawColor(150, 150, 150);
-             doc.circle(letterX + 2, akCurrentY - 1.5, 3.5, 'S');
-             doc.setTextColor(100, 100, 100);
-           }
-           
-           doc.setFontSize(9);
-           doc.text(String.fromCharCode(65 + lIdx), letterX + 2, akCurrentY, { align: 'center' });
-        }
-      }
-      
-      processedElements++;
-      setExportProgress(Math.round((processedElements / totalElements) * 100));
-
-      // Add watermark and page numbers to all pages
-      const pageCount = (doc.internal as any).getNumberOfPages();
-      for (let i = 1; i <= pageCount; i++) {
-        addWatermark(i);
-        doc.setPage(i);
-        doc.setFontSize(9);
-        doc.setTextColor(100, 100, 100);
-        doc.setFont('helvetica', 'italic');
-        doc.text('SanFran Academy - XI de Agosto', pageWidth / 2, pageHeight - 15, { align: 'center' });
-        doc.setFont('helvetica', 'normal');
-        doc.text(`Página ${i}`, pageWidth / 2, pageHeight - 11, { align: 'center' });
-      }
-
-      // Final delay to allow memory cleanup before saving
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      doc.save('simulado-sanfran.pdf');
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      alert('Erro ao gerar o PDF. Verifique o console para mais detalhes.');
-    } finally {
-      setIsExporting(false);
-      setExportProgress(0);
-    }
-  };
+  const [searchParams, setSearchParams] = useSearchParams();
+  const qbDeepLinkApplied = useRef(false);
 
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
@@ -376,49 +207,58 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
   const [hideResolved, setHideResolved] = useState(false);
   const [institutions, setInstitutions] = useState<string[]>([]);
   const [examNames, setExamNames] = useState<string[]>([]);
-  const [modalities, setModalities] = useState<string[]>([]);
   const [legalDiplomas, setLegalDiplomas] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'difficulty_asc' | 'difficulty_desc'>('newest');
   const [favorites, setFavorites] = useState<string[]>([]);
   const [wrongQuestions, setWrongQuestions] = useState<string[]>([]);
   const [correctQuestions, setCorrectQuestions] = useState<string[]>([]);
+  /** Evita gravar [] no localStorage antes de ler o cache deste userId (uma gravação prematura apagaria os dados). */
+  const [progressStorageHydrated, setProgressStorageHydrated] = useState(false);
 
   // Load from localStorage as soon as userId is available
   useEffect(() => {
-    if (userId) {
-      const savedCorrect = localStorage.getItem(`correct_questions_${userId}`);
-      if (savedCorrect) {
-        try {
-          setCorrectQuestions(JSON.parse(savedCorrect));
-        } catch (e) {
-          console.error('Error parsing correct questions from storage', e);
-        }
-      }
-      
-      const savedWrong = localStorage.getItem(`wrong_questions_${userId}`);
-      if (savedWrong) {
-        try {
-          setWrongQuestions(JSON.parse(savedWrong));
-        } catch (e) {
-          console.error('Error parsing wrong questions from storage', e);
-        }
+    if (!userId) {
+      setProgressStorageHydrated(false);
+      return;
+    }
+    let correct: string[] = [];
+    let wrong: string[] = [];
+    const savedCorrect = localStorage.getItem(`correct_questions_${userId}`);
+    if (savedCorrect) {
+      try {
+        const parsed = JSON.parse(savedCorrect);
+        if (Array.isArray(parsed)) correct = parsed;
+      } catch (e) {
+        console.error('Error parsing correct questions from storage', e);
       }
     }
+    const savedWrong = localStorage.getItem(`wrong_questions_${userId}`);
+    if (savedWrong) {
+      try {
+        const parsed = JSON.parse(savedWrong);
+        if (Array.isArray(parsed)) wrong = parsed;
+      } catch (e) {
+        console.error('Error parsing wrong questions from storage', e);
+      }
+    }
+    setCorrectQuestions(correct);
+    setWrongQuestions(wrong);
+    setProgressStorageHydrated(true);
   }, [userId]);
 
-  // Save to localStorage whenever state changes
+  // Save to localStorage whenever state changes (inclui listas vazias após reset / sync)
   useEffect(() => {
-    if (userId && correctQuestions.length > 0) {
-      localStorage.setItem(`correct_questions_${userId}`, JSON.stringify(correctQuestions));
-    }
-  }, [correctQuestions, userId]);
+    if (!userId || !progressStorageHydrated) return;
+    localStorage.setItem(`correct_questions_${userId}`, JSON.stringify(correctQuestions));
+  }, [correctQuestions, userId, progressStorageHydrated]);
 
   useEffect(() => {
-    if (userId && wrongQuestions.length > 0) {
-      localStorage.setItem(`wrong_questions_${userId}`, JSON.stringify(wrongQuestions));
-    }
-  }, [wrongQuestions, userId]);
-  const [questionStatus, setQuestionStatus] = useState<'all' | 'resolved' | 'unresolved' | 'correct' | 'wrong'>('all');
+    if (!userId || !progressStorageHydrated) return;
+    localStorage.setItem(`wrong_questions_${userId}`, JSON.stringify(wrongQuestions));
+  }, [wrongQuestions, userId, progressStorageHydrated]);
+  const [questionStatus, setQuestionStatus] = useState<
+    'all' | 'resolved' | 'unresolved' | 'correct' | 'wrong' | 'review_today'
+  >('all');
   const [showFilters, setShowFilters] = useState(false);
   const [showXRay, setShowXRay] = useState(true);
   const [viewMode, setViewMode] = useState<'list' | 'single'>('list');
@@ -551,8 +391,9 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
   const [correctCount, setCorrectCount] = useState(0);
   const [wrongCount, setWrongCount] = useState(0);
   const [userProgress, setUserProgress] = useState<UserProgress | null>(null);
+  const [answerGoals, setAnswerGoals] = useState(createDefaultAnswerGoals);
   const [isProgressLoaded, setIsProgressLoaded] = useState(false);
-  const [questionStats, setQuestionStats] = useState<Record<string, { totalAttempts: number, correctAttempts: number, lastAttemptCorrect: boolean }>>({});
+  const [questionStats, setQuestionStats] = useState<Record<string, QuestionStatForReview>>({});
   const [errorMastery, setErrorMastery] = useState<Record<string, number>>({});
   const [isErrorNotebookMode, setIsErrorNotebookMode] = useState(false);
   const [showAiLesson, setShowAiLesson] = useState(false);
@@ -568,18 +409,12 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
   const [showMockSetup, setShowMockSetup] = useState(false);
   const [mockDurationMinutes, setMockDurationMinutes] = useState(60);
   const [mockQuestions, setMockQuestions] = useState<Question[]>([]);
-  const [mockResults, setMockResults] = useState<{
-    score: number;
-    total: number;
-    timeSpent: number;
-    subjectStats: { subject: string; correct: number; total: number; confidence: Record<string, number>; correctConfidence: Record<string, number> }[];
-    avgTimePerQuestion: number;
-    confidenceStats: { certeza: number; duvida: number; chute: number };
-    luckyGuesses: string[];
-    doubtGuesses: string[];
-  } | null>(null);
+  const [mockResults, setMockResults] = useState<QuestionBankMockResults | null>(null);
+  const [mockNavUnansweredOnly, setMockNavUnansweredOnly] = useState(false);
+  const [mockMarkReviewLater, setMockMarkReviewLater] = useState<Record<string, boolean>>({});
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const mockAnswersRef = useRef<Record<string, number>>({});
 
   const startMock = (questionsToUse: Question[], durationMinutes: number) => {
     setMockQuestions(questionsToUse);
@@ -588,6 +423,8 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
     setIsMockMode(true);
     setIsMockFinished(false);
     setMockAnswers({});
+    setMockMarkReviewLater({});
+    setMockNavUnansweredOnly(false);
     setMockStartTime(Date.now());
     setCurrentIndex(0);
     setShowMockSetup(false);
@@ -611,7 +448,9 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
     const confidenceStats = { certeza: 0, duvida: 0, chute: 0 };
     const luckyGuesses: string[] = [];
     const doubtGuesses: string[] = [];
-    
+    const reviewLaterIds = mockQuestions.filter(q => mockMarkReviewLater[q.id]).map(q => q.id);
+    const unansweredIds = mockQuestions.filter(q => mockAnswers[q.id] === undefined).map(q => q.id);
+
     mockQuestions.forEach(q => {
       const userAnswer = mockAnswers[q.id];
       const isCorrect = userAnswer === q.correct_answer;
@@ -644,14 +483,53 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
       score: correct,
       total: mockQuestions.length,
       timeSpent,
+      startedAtIso: mockStartTime != null ? new Date(mockStartTime).toISOString() : undefined,
       subjectStats,
       avgTimePerQuestion: timeSpent / (Object.keys(mockAnswers).length || 1),
       confidenceStats,
       luckyGuesses,
-      doubtGuesses
+      doubtGuesses,
+      reviewLaterIds,
+      unansweredIds,
     });
     
     setIsMockFinished(true);
+
+    const answeredQuestions = mockQuestions.filter(q => mockAnswers[q.id] !== undefined);
+    let nextStats = { ...questionStats };
+    let nextGoals = answerGoals;
+    const nowIso = new Date().toISOString();
+    for (const q of answeredQuestions) {
+      const userAnswer = mockAnswers[q.id];
+      const isCorrect = userAnswer === q.correct_answer;
+      const cur = nextStats[q.id] || { totalAttempts: 0, correctAttempts: 0, lastAttemptCorrect: false };
+      const newStat: QuestionStatForReview = {
+        totalAttempts: cur.totalAttempts + 1,
+        correctAttempts: isCorrect ? cur.correctAttempts + 1 : cur.correctAttempts,
+        lastAttemptCorrect: isCorrect,
+        updatedAt: nowIso,
+      };
+      nextStats[q.id] = newStat;
+      nextGoals = bumpAnswerGoals(nextGoals);
+      void supabase
+        .from('user_question_stats')
+        .upsert(
+          {
+            user_id: userId,
+            question_id: q.id,
+            total_attempts: newStat.totalAttempts,
+            correct_attempts: newStat.correctAttempts,
+            last_attempt_correct: newStat.lastAttemptCorrect,
+            updated_at: nowIso,
+          },
+          { onConflict: 'user_id, question_id' }
+        )
+        .then(({ error }) => {
+          if (error) console.error('Error saving question stat (simulado):', error);
+        });
+    }
+    setQuestionStats(nextStats);
+    setAnswerGoals(nextGoals);
     
     // Update local state and sync to Supabase
     const correctIds = mockQuestions
@@ -678,13 +556,18 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
       wrongQuestions: newWrongQuestions,
       correctCount: newCorrectCount,
       wrongCount: newWrongCount,
-      confidence_levels: currentConfidenceLevels
+      confidence_levels: currentConfidenceLevels,
+      question_answer_goals: nextGoals,
     });
   };
 
   useEffect(() => {
     finishMockRef.current = finishMock;
   }, [finishMock]);
+
+  useEffect(() => {
+    mockAnswersRef.current = mockAnswers;
+  }, [mockAnswers]);
 
   useEffect(() => {
     if (isMockMode && !isMockFinished && mockTimeRemaining > 0) {
@@ -743,23 +626,23 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
   }, []);
 
   const [showAIGenerator, setShowAIGenerator] = useState(false);
-  const [aiConfig, setAiConfig] = useState({
+  const [aiConfig, setAiConfig] = useState<QuestionBankAiConfig>({
     subject: '',
     topic: '',
     context: '',
     count: 3,
-    difficulty: 'media' as 'muito_facil' | 'facil' | 'media' | 'dificil' | 'muito_dificil',
-    examStyle: 'OAB (FGV)' as string,
-    legalFocus: [] as string[],
-    statementType: 'Caso Prático (Situação Hipotética)' as 'Caso Prático (Situação Hipotética)' | 'Enunciado Direto',
+    difficulty: 'media',
+    examStyle: 'OAB (FGV)',
+    legalFocus: [],
+    statementType: 'Caso Prático (Situação Hipotética)',
     baseOnFlashcards: false,
     selectedFolderId: '',
-    tribunal: 'Ambos' as 'Jurisprudência STF' | 'Jurisprudência STJ' | 'Ambos',
-    yearFilter: 'Últimos 2 anos' as '2025-2026' | 'Últimos 2 anos',
+    tribunal: 'Ambos',
+    yearFilter: 'Últimos 2 anos',
     institution: '',
     examName: '',
-    modality: 'Múltipla Escolha' as 'Múltipla Escolha' | 'Certo ou Errado',
-    legalDiploma: ''
+    modality: 'multipla_escolha',
+    legalDiploma: '',
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [voiceSpeed, setVoiceSpeed] = useState(1);
@@ -858,7 +741,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
           back += `⚖️ **Correção IA:**\n\n${commentary}\n\n`;
         } else {
           back += `⚖️ **Fundamentação:** ${commentary.legalBasis}\n\n`;
-          back += `❌ **Análise:** ${commentary.alternativesAnalysis}\n\n`;
+          back += `❌ **Análise:** ${formatAlternativesAnalysisPlain(commentary.alternativesAnalysis)}\n\n`;
           back += `💡 **Pulo do Gato:** ${commentary.mnemonic}`;
         }
       } else {
@@ -902,9 +785,13 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
         table: 'questions' 
       }, (payload) => {
         if (payload.eventType === 'INSERT') {
-          setQuestions(prev => [payload.new as Question, ...prev]);
+          setQuestions(prev => [normalizeQuestionFromApi(payload.new as Question), ...prev]);
         } else if (payload.eventType === 'UPDATE') {
-          setQuestions(prev => prev.map(q => q.id === payload.new.id ? payload.new as Question : q));
+          setQuestions(prev =>
+            prev.map(q =>
+              q.id === (payload.new as Question).id ? normalizeQuestionFromApi(payload.new as Question) : q
+            )
+          );
         } else if (payload.eventType === 'DELETE') {
           setQuestions(prev => prev.filter(q => q.id !== payload.old.id));
         }
@@ -929,7 +816,6 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
           table: 'user_progress',
           filter: `user_id=eq.${userId}`
         }, () => {
-          console.log("[QuestionBank] User progress changed remotely, fetching...");
           fetchUserProgress();
         })
         .subscribe();
@@ -941,7 +827,6 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
           table: 'question_notebooks',
           filter: `user_id=eq.${userId}`
         }, () => {
-          console.log("[QuestionBank] Notebooks changed remotely, fetching...");
           fetchNotebooks();
         })
         .subscribe();
@@ -952,6 +837,30 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
       };
     }
   }, [userId]);
+
+  useEffect(() => {
+    qbDeepLinkApplied.current = false;
+  }, [userId]);
+
+  useEffect(() => {
+    if (qbDeepLinkApplied.current) return;
+    const rs = searchParams.get('reviewToday');
+    const sub = searchParams.get('qbSubject');
+    const top = searchParams.get('qbTopic');
+    const qsearch = searchParams.get('qbSearch');
+    if (!rs && !sub && !top && !qsearch) return;
+    qbDeepLinkApplied.current = true;
+    if (sub) setSelectedSubject(sub);
+    if (top) setSelectedTopic(top);
+    if (qsearch) setSearchTerm(qsearch);
+    if (rs === '1' || rs === 'true') setQuestionStatus('review_today');
+    const next = new URLSearchParams(searchParams);
+    next.delete('reviewToday');
+    next.delete('qbSubject');
+    next.delete('qbTopic');
+    next.delete('qbSearch');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const fetchQuestionStats = async () => {
     if (!userId) return;
@@ -967,7 +876,8 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
           statsMap[row.question_id] = {
             totalAttempts: row.total_attempts,
             correctAttempts: row.correct_attempts,
-            lastAttemptCorrect: row.last_attempt_correct
+            lastAttemptCorrect: row.last_attempt_correct,
+            updatedAt: row.updated_at != null ? String(row.updated_at) : undefined,
           };
         });
         setQuestionStats(statsMap);
@@ -979,7 +889,6 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
 
   const fetchUserProgress = async () => {
     try {
-      console.log('Fetching user progress for userId:', userId);
       const { data, error } = await supabase
         .from('user_progress')
         .select('*')
@@ -991,9 +900,9 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
         return;
       }
 
-      console.log('User progress fetched:', data);
       if (data) {
         setUserProgress(data);
+        setAnswerGoals(parseAnswerGoalsFromDb(data.question_answer_goals));
         setFavorites(data.favorites || []);
         // Merge with local state to ensure progress is not lost
         setWrongQuestions(prev => [...new Set([...prev, ...(data.wrong_questions || data.wrong_question_ids || [])])]);
@@ -1010,40 +919,44 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
     }
   };
 
-  const syncUserProgress = async (updates: any) => {
+  const appProgressNotifyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (appProgressNotifyTimerRef.current) {
+        clearTimeout(appProgressNotifyTimerRef.current);
+        appProgressNotifyTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const scheduleAppProgressRefresh = useCallback(() => {
+    if (!onUserProgressSynced) return;
+    if (appProgressNotifyTimerRef.current) clearTimeout(appProgressNotifyTimerRef.current);
+    appProgressNotifyTimerRef.current = setTimeout(() => {
+      appProgressNotifyTimerRef.current = null;
+      void onUserProgressSynced();
+    }, 400);
+  }, [onUserProgressSynced]);
+
+  const syncUserProgress = async (updates: SyncUserProgressUpdates = {}) => {
     if (!userId || !isProgressLoaded) {
-      console.log('DEBUG: Skipping sync because userId is missing or progress not loaded yet.', { userId, isProgressLoaded });
       return;
     }
-    console.log('DEBUG: syncUserProgress called with:', updates);
     try {
-      // 1. Fetch current state from DB to avoid overwriting with stale local state
-      const { data: current, error: fetchError } = await supabase
-        .from('user_progress')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (fetchError) {
-        handleFirestoreError(fetchError, OperationType.GET, 'user_progress');
-      }
-
-      // 2. Construct payload merging current DB state, local state, and updates
-      // We prioritize: updates > local state > current DB state
+      // updates (explícito) > estado React. Não reutilizar o banco quando local é 0 ou [] — evita reaplicar contadores antigos após reset.
       const payload = {
         user_id: userId,
-        favorites: updates.favorites !== undefined ? updates.favorites : (favorites.length > 0 ? favorites : (current?.favorites || [])),
-        wrong_questions: updates.wrongQuestions !== undefined ? updates.wrongQuestions : (wrongQuestions.length > 0 ? wrongQuestions : (current?.wrong_questions || current?.wrong_question_ids || [])),
-        correct_questions: updates.correctQuestions !== undefined ? updates.correctQuestions : (correctQuestions.length > 0 ? correctQuestions : (current?.correct_questions || [])),
-        notes: updates.notes !== undefined ? updates.notes : (Object.keys(notes).length > 0 ? notes : (current?.notes || {})),
-        correct_count: updates.correctCount !== undefined ? updates.correctCount : (correctCount > 0 ? correctCount : (current?.correct_count || 0)),
-        wrong_count: updates.wrongCount !== undefined ? updates.wrongCount : (wrongCount > 0 ? wrongCount : (current?.wrong_count || 0)),
-        error_mastery: updates.errorMastery !== undefined ? updates.errorMastery : (Object.keys(errorMastery).length > 0 ? errorMastery : (current?.error_mastery || {})),
-        confidence_levels: updates.confidence_levels !== undefined ? updates.confidence_levels : (Object.keys(userProgress?.confidence_levels || {}).length > 0 ? userProgress?.confidence_levels : (current?.confidence_levels || {})),
+        favorites: updates.favorites ?? favorites,
+        wrong_questions: updates.wrongQuestions ?? wrongQuestions,
+        correct_questions: updates.correctQuestions ?? correctQuestions,
+        notes: updates.notes ?? notes,
+        correct_count: updates.correctCount ?? correctCount,
+        wrong_count: updates.wrongCount ?? wrongCount,
+        error_mastery: updates.errorMastery ?? errorMastery,
+        confidence_levels: updates.confidence_levels ?? (userProgress?.confidence_levels ?? {}),
+        question_answer_goals: updates.question_answer_goals ?? answerGoals,
         updated_at: new Date().toISOString()
       };
-
-      console.log('DEBUG: Payload to upsert:', payload);
 
       let { data, error } = await supabase
         .from('user_progress')
@@ -1060,6 +973,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
           wrong_questions: payload.wrong_questions,
           correct_count: payload.correct_count,
           wrong_count: payload.wrong_count,
+          question_answer_goals: payload.question_answer_goals,
           updated_at: payload.updated_at
         };
         
@@ -1073,13 +987,14 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
           handleFirestoreError(retry.error, OperationType.WRITE, 'user_progress');
         } else {
           setUserProgress(retry.data);
+          scheduleAppProgressRefresh();
         }
-      } else {
-        console.log('DEBUG: Sync successful! Data:', data);
+      } else if (data) {
         setUserProgress(data);
+        scheduleAppProgressRefresh();
       }
     } catch (err) {
-      console.error('DEBUG: Unexpected error in syncUserProgress:', err);
+      console.error('Unexpected error in syncUserProgress:', err);
     }
   };
 
@@ -1205,7 +1120,7 @@ Forneça a explicação de forma concisa e didática.`;
     }
   };
 
-  const [aiCommentary, setAiCommentary] = useState<Record<string, any>>({});
+  const [aiCommentary, setAiCommentary] = useState<Record<string, QuestionAiCommentary>>({});
   const [followUpChat, setFollowUpChat] = useState<Record<string, { role: 'user' | 'assistant', text: string }[]>>({});
   const [isFollowUpLoading, setIsFollowUpLoading] = useState<Record<string, boolean>>({});
   const [followUpInput, setFollowUpInput] = useState<Record<string, string>>({});
@@ -1252,7 +1167,6 @@ Forneça a explicação de forma concisa e didática.`;
     if (aiCommentary[question.id]) return;
 
     try {
-      console.log('generateIntelligentCorrection called for question:', question.id);
       setLoadingAiCommentary(prev => ({ ...prev, [question.id]: true }));
 
       // 2. Check-First Pattern: SELECT from database
@@ -1261,9 +1175,7 @@ Forneça a explicação de forma concisa e didática.`;
         .select('texto_gabarito_ia, ai_correction')
         .eq('id', question.id)
         .single();
-        
-      console.log('dbQuestion:', dbQuestion, 'fetchError:', fetchError);
-        
+
       // Se a coluna texto_gabarito_ia não existir, tenta buscar apenas ai_correction
       if (fetchError && fetchError.code === '42703') {
         const result = await supabase
@@ -1281,7 +1193,7 @@ Forneça a explicação de forma concisa e didática.`;
         if (dbQuestion?.texto_gabarito_ia) {
           try {
             const parsedData = JSON.parse(dbQuestion.texto_gabarito_ia);
-            setAiCommentary(prev => ({ ...prev, [question.id]: parsedData }));
+            setAiCommentary(prev => ({ ...prev, [question.id]: parsedData as QuestionAiCommentary }));
             return;
           } catch (e) {
             // Se não for JSON, exibe como string simples
@@ -1290,13 +1202,15 @@ Forneça a explicação de forma concisa e didática.`;
           }
         } else if (dbQuestion?.ai_correction) {
           // Fallback para o formato antigo
-          setAiCommentary(prev => ({ ...prev, [question.id]: dbQuestion.ai_correction }));
+          setAiCommentary(prev => ({
+            ...prev,
+            [question.id]: dbQuestion.ai_correction as QuestionAiCommentary,
+          }));
           return;
         }
       }
 
       // Cenário B (Primeira Geração)
-      console.log('Generating new AI commentary...');
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
       
       const prompt = `Como um professor de Direito especialista em concursos, forneça uma correção técnica e didática para esta questão:
@@ -1324,8 +1238,6 @@ Forneça a explicação de forma concisa e didática.`;
         contents: prompt
       });
 
-      console.log('AI response received:', response.text);
-
       if (response.text) {
         let data;
         try {
@@ -1343,9 +1255,8 @@ Forneça a explicação de forma concisa e didática.`;
           setAiCommentary(prev => ({ ...prev, [question.id]: response.text }));
           return;
         }
-        
-        console.log('Parsed AI data:', data);
-        setAiCommentary(prev => ({ ...prev, [question.id]: data }));
+
+        setAiCommentary(prev => ({ ...prev, [question.id]: data as QuestionAiCommentary }));
         
         // Imediatamente faça um UPDATE no banco de dados
         let { error: updateError } = await supabase
@@ -1400,6 +1311,7 @@ Forneça a explicação de forma concisa e didática.`;
       } else {
         back += `⚖️ **Fundamentação Legal:** ${commentary.legalBasis}\n\n`;
         back += `📖 **Explicação Doutrinária:** ${commentary.doctrineAndContext}\n\n`;
+        back += `📋 **Análise das alternativas:** ${formatAlternativesAnalysisPlain(commentary.alternativesAnalysis)}\n\n`;
         back += `💡 **Mnemônico/Dica:** ${commentary.mnemonic}`;
       }
     } else {
@@ -1463,6 +1375,42 @@ Forneça a explicação de forma concisa e didática.`;
   const [loadingJuridiquesExplanation, setLoadingJuridiquesExplanation] = useState(false);
   const [showJuridiquesModal, setShowJuridiquesModal] = useState(false);
 
+  useEffect(() => {
+    const anyOpen =
+      showConfidenceSelection ||
+      showAiLesson ||
+      showJuridiquesModal ||
+      showManualGlossarySearch ||
+      isDeckModalOpen ||
+      showAIGenerator ||
+      showMockSetup ||
+      isNotebookModalOpen;
+    if (!anyOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      if (showConfidenceSelection) setShowConfidenceSelection(false);
+      else if (showAiLesson) setShowAiLesson(false);
+      else if (isDeckModalOpen) setIsDeckModalOpen(false);
+      else if (showManualGlossarySearch) setShowManualGlossarySearch(false);
+      else if (showMockSetup) setShowMockSetup(false);
+      else if (isNotebookModalOpen) setIsNotebookModalOpen(false);
+      else if (showAIGenerator) setShowAIGenerator(false);
+      else if (showJuridiquesModal) setShowJuridiquesModal(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [
+    showConfidenceSelection,
+    showAiLesson,
+    showJuridiquesModal,
+    showManualGlossarySearch,
+    isDeckModalOpen,
+    showAIGenerator,
+    showMockSetup,
+    isNotebookModalOpen,
+  ]);
+
   const fetchQuestions = async () => {
     try {
       setLoading(true);
@@ -1474,11 +1422,12 @@ Forneça a explicação de forma concisa e didática.`;
       if (error) {
         // If table doesn't exist yet, we'll use samples
         if (error.code === '42P01') {
-          console.log('Table questions does not exist yet, using samples');
-          const questionsWithIds = sampleQuestions.map((q, i) => ({
-            ...q,
-            id: (q as any).id || `sample-${i}`
-          })) as Question[];
+          const questionsWithIds = sampleQuestions.map((q, i) =>
+            normalizeQuestionFromApi({
+              ...(q as Question),
+              id: (q as any).id || `sample-${i}`,
+            })
+          );
           setQuestions(questionsWithIds);
           updateFilters(questionsWithIds);
         } else {
@@ -1487,19 +1436,22 @@ Forneça a explicação de forma concisa e didática.`;
       } else if (data) {
         if (data.length === 0) {
           // Fallback to samples if DB is empty
-          const questionsWithIds = sampleQuestions.map((q, i) => ({
-            ...q,
-            id: (q as any).id || `sample-${i}`
-          })) as Question[];
+          const questionsWithIds = sampleQuestions.map((q, i) =>
+            normalizeQuestionFromApi({
+              ...(q as Question),
+              id: (q as any).id || `sample-${i}`,
+            })
+          );
           setQuestions(questionsWithIds);
           updateFilters(questionsWithIds);
         } else {
-          setQuestions(data);
-          updateFilters(data);
+          const normalized = (data as Question[]).map(normalizeQuestionFromApi);
+          setQuestions(normalized);
+          updateFilters(normalized);
           
           // Pre-populate aiCommentary from existing data in DB
-          const existingCommentaries: Record<string, any> = {};
-          data.forEach(q => {
+          const existingCommentaries: Record<string, QuestionAiCommentary> = {};
+          normalized.forEach(q => {
             if (q.ai_correction) {
               existingCommentaries[q.id] = q.ai_correction;
             }
@@ -1512,10 +1464,12 @@ Forneça a explicação de forma concisa e didática.`;
     } catch (error) {
       console.error('Error fetching questions:', error);
       // Final fallback
-      const questionsWithIds = sampleQuestions.map((q, i) => ({
-        ...q,
-        id: (q as any).id || `sample-${i}`
-      })) as Question[];
+      const questionsWithIds = sampleQuestions.map((q, i) =>
+        normalizeQuestionFromApi({
+          ...(q as Question),
+          id: (q as any).id || `sample-${i}`,
+        })
+      );
       setQuestions(questionsWithIds);
       updateFilters(questionsWithIds);
     } finally {
@@ -1548,9 +1502,6 @@ Forneça a explicação de forma concisa e didática.`;
 
     const uniqueExamNames = Array.from(new Set(data.map(q => q.exam_name))).filter(Boolean).sort() as string[];
     setExamNames(uniqueExamNames);
-
-    const uniqueModalities = Array.from(new Set(data.map(q => q.modality))).filter(Boolean).sort() as string[];
-    setModalities(uniqueModalities);
 
     const uniqueLegalDiplomas = Array.from(new Set(data.map(q => q.legal_diploma))).filter(Boolean).sort() as string[];
     setLegalDiplomas(uniqueLegalDiplomas);
@@ -1635,14 +1586,14 @@ Forneça a explicação de forma concisa e didática.`;
       // 2. Generate questions with Gemini
       const topics = weakTopics.map(t => t.topic).join(', ');
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
-      const prompt = `Com base nestes temas que o aluno errou muito: ${topics}, gere 5 novas questões inéditas de nível Médio/Difícil para reforçar o aprendizado. Retorne em formato JSON array de objetos com: statement, options (array de 4 strings), correct_answer (index 0-3), explanation, subject, topic, difficulty.`;
+      const prompt = `Com base nestes temas que o aluno errou muito: ${topics}, gere 5 novas questões inéditas de nível Médio/Difícil para reforçar o aprendizado. Retorne em formato JSON array de objetos com: subject, topic, statement, options (array de exatamente 5 strings, alternativas A a E), correct_answer (inteiro 0 a 4), explanation, difficulty (ex: media, dificil), exam_board, year.`;
       
       const response = await ai.models.generateContent({
         model: GEMINI_MODEL,
         contents: prompt
       });
 
-      let newQuestions = [];
+      let newQuestions: unknown[] = [];
       try {
         const cleanedText = (response.text || '').replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
         const firstBracket = cleanedText.indexOf('[');
@@ -1650,24 +1601,60 @@ Forneça a explicação de forma concisa e didática.`;
         const jsonStr = (firstBracket !== -1 && lastBracket !== -1) 
           ? cleanedText.substring(firstBracket, lastBracket + 1) 
           : cleanedText;
-        newQuestions = JSON.parse(jsonStr || '[]');
+        const parsed = JSON.parse(jsonStr || '[]');
+        if (!Array.isArray(parsed)) {
+          showNotification('A IA devolveu um formato inválido (esperada uma lista de questões).', 'error');
+          return;
+        }
+        newQuestions = parsed;
       } catch (e) {
         console.error('Failed to parse AI response as JSON:', e, response.text);
-        throw new Error('Falha ao gerar questões. Tente novamente.');
+        showNotification('Não foi possível ler o JSON da IA. Tente novamente.', 'error');
+        return;
       }
-      
-      // 3. Save new questions with is_reinforcement: true
-      const questionsToSave = newQuestions.map((q: any) => ({
-        ...q,
+
+      const yearStr = new Date().getFullYear().toString();
+      const validated = validateAiQuestionsBatch(newQuestions, 'multipla_escolha', {
+        exam_board: 'Reforço personalizado (IA)',
+        institution: '',
+        exam_name: '',
+        legal_diploma: '',
+        year: yearStr,
+      });
+      if (validated.ok === false) {
+        const head = validated.errors.slice(0, 4).join(' ');
+        const more =
+          validated.errors.length > 4 ? ` … (+${validated.errors.length - 4} erro(s))` : '';
+        showNotification(`Questões rejeitadas na validação: ${head}${more}`, 'error');
+        return;
+      }
+
+      const { kept: keptAfterSimilarity, dropped: droppedSimilar } = dedupeSimilarAiStatements(
+        validated.rows,
+        questions
+      );
+      if (keptAfterSimilarity.length === 0) {
+        showNotification(
+          'Nenhuma questão guardada: os enunciados eram muito parecidos entre si ou com questões já no banco. Tente outro foco ou gere de novo.',
+          'error'
+        );
+        return;
+      }
+      const questionsToSave = keptAfterSimilarity.map((row) => ({
+        ...row,
         user_id: userId,
-        difficulty: 'media',
-        is_reinforcement: true
+        is_reinforcement: true,
       }));
 
       const { error: insertError } = await supabase.from('questions').insert(questionsToSave);
       if (insertError) throw insertError;
 
-      showNotification('Reforço gerado com sucesso!', 'success');
+      showNotification(
+        droppedSimilar.length > 0
+          ? `Reforço: ${questionsToSave.length} questão(ões) guardada(s). ${droppedSimilar.length} omitida(s) por enunciado muito parecido ao acervo ou ao lote.`
+          : 'Reforço gerado com sucesso!',
+        'success'
+      );
       await fetchQuestions(); // Refresh list
 
     } catch (error) {
@@ -1723,13 +1710,23 @@ Forneça a explicação de forma concisa e didática.`;
       const totalQuestions = aiConfig.count;
       const chunkSize = 3;
       const allGeneratedQuestions = [];
+      const isMultipla = aiConfig.modality === 'multipla_escolha';
+      const optionsSchemaDesc = isMultipla
+        ? 'Exatamente 5 strings: alternativas A a E.'
+        : 'Exatamente 2 strings: primeira e segunda alternativa (ex.: Certo e Errado), na mesma ordem usada em correct_answer.';
+      const correctAnswerSchemaDesc = isMultipla
+        ? 'Índice inteiro da alternativa correta: 0 a 4.'
+        : 'Índice inteiro da alternativa correta: 0 ou 1 (alinhar com a ordem do array options).';
+      const explanationSchemaDesc = isMultipla
+        ? 'Explicação detalhada referindo cada alternativa A–E.'
+        : 'Explicação detalhada para Certo e para Errado.';
 
       for (let i = 0; i < totalQuestions; i += chunkSize) {
         const currentBatchSize = Math.min(chunkSize, totalQuestions - i);
         setGeneratingStatus(`Gerando lote ${Math.floor(i / chunkSize) + 1} de ${Math.ceil(totalQuestions / chunkSize)}... (${i + currentBatchSize}/${totalQuestions} concluídas)`);
 
         const prompt = `Crie ${currentBatchSize} questões de nível ${aiConfig.difficulty} sobre a matéria "${aiConfig.subject}" e tópico "${aiConfig.topic}".
-        Modalidade: ${aiConfig.modality}.
+        Modalidade: ${questionModalityLabel(aiConfig.modality)} (código no JSON: ${aiConfig.modality}).
         Estilo de Prova: ${aiConfig.examStyle}.
         Instituição: ${aiConfig.institution || 'Geral'}.
         Nome do Exame/Concurso: ${aiConfig.examName || 'Geral'}.
@@ -1741,7 +1738,7 @@ Forneça a explicação de forma concisa e didática.`;
         ${contextFromFlashcards}
         ${contextFromText}
         
-        ${aiConfig.modality === 'Múltipla Escolha' ? 'Cada questão deve ter 5 alternativas (A, B, C, D, E).' : 'Cada questão deve ser de Certo ou Errado.'}
+        ${aiConfig.modality === 'multipla_escolha' ? 'Cada questão deve ter 5 alternativas (A, B, C, D, E).' : 'Cada questão deve ser de Certo ou Errado (duas alternativas: Certo e Errado).'}
         A explicação deve ser EXTREMAMENTE detalhada, contendo uma análise individual para cada alternativa (ou para o item Certo/Errado), explicando por que a resposta correta está certa e por que as incorretas estão erradas, fundamentando com base no foco jurídico selecionado e no diploma legal mencionado.
         
         IMPORTANTE: Identifique e extraia tags de legislação (ex: "Art. 5, CF", "Código Penal") e jurisprudência (ex: "Súmula 123 STJ", "Informativo 999 STF") associadas a cada questão.
@@ -1764,15 +1761,15 @@ Forneça a explicação de forma concisa e didática.`;
                   options: {
                     type: Type.ARRAY,
                     items: { type: Type.STRING },
-                    description: "As 5 alternativas da questão"
+                    description: optionsSchemaDesc,
                   },
-                  correct_answer: { type: Type.INTEGER, description: "O índice da alternativa correta (0 a 4)" },
-                  explanation: { type: Type.STRING, description: "Explicação detalhada de cada alternativa (A, B, C, D, E)" },
+                  correct_answer: { type: Type.INTEGER, description: correctAnswerSchemaDesc },
+                  explanation: { type: Type.STRING, description: explanationSchemaDesc },
                   difficulty: { type: Type.STRING, description: "A dificuldade: 'facil', 'media' ou 'dificil'" },
                   exam_board: { type: Type.STRING, description: "A banca examinadora (Estilo)" },
                   institution: { type: Type.STRING, description: "A instituição (ex: USP, OAB, TJ-SP)" },
                   exam_name: { type: Type.STRING, description: "O nome do exame/concurso" },
-                  modality: { type: Type.STRING, description: "A modalidade: 'Múltipla Escolha' ou 'Certo ou Errado'" },
+                  modality: { type: Type.STRING, description: "Obrigatório: exatamente 'multipla_escolha' ou 'certo_errado' (código do sistema)" },
                   legal_diploma: { type: Type.STRING, description: "O diploma legal de referência (ex: CPC, CP, CF/88)" },
                   year: { type: Type.STRING, description: "O ano da questão" },
                   legislation_tags: { 
@@ -1793,7 +1790,24 @@ Forneça a explicação de forma concisa e didática.`;
         });
 
         if (response.text) {
-          allGeneratedQuestions.push(...JSON.parse(response.text));
+          let chunkParsed: unknown;
+          try {
+            chunkParsed = JSON.parse(response.text);
+          } catch {
+            showNotification(
+              `Lote ${Math.floor(i / chunkSize) + 1}: resposta da IA não é JSON válido. Gere menos questões por vez ou tente de novo.`,
+              'error'
+            );
+            throw new SyntaxError('Invalid AI JSON chunk');
+          }
+          if (!Array.isArray(chunkParsed)) {
+            showNotification(
+              `Lote ${Math.floor(i / chunkSize) + 1}: a IA devolveu um objeto em vez de uma lista de questões.`,
+              'error'
+            );
+            throw new Error('AI response is not an array');
+          }
+          allGeneratedQuestions.push(...chunkParsed);
         }
 
         if (i + chunkSize < totalQuestions) {
@@ -1802,23 +1816,40 @@ Forneça a explicação de forma concisa e didática.`;
       }
 
       if (allGeneratedQuestions.length > 0) {
-        const sanitizedInitialQuestions = allGeneratedQuestions.map((q: any) => ({
+        const yearStr = new Date().getFullYear().toString();
+        const validated = validateAiQuestionsBatch(
+          allGeneratedQuestions,
+          aiConfig.modality,
+          {
+            exam_board: aiConfig.examStyle,
+            institution: aiConfig.institution || '',
+            exam_name: aiConfig.examName || '',
+            legal_diploma: aiConfig.legalDiploma || '',
+            year: yearStr,
+          }
+        );
+        if (validated.ok === false) {
+          const head = validated.errors.slice(0, 4).join(' ');
+          const more =
+            validated.errors.length > 4 ? ` … (+${validated.errors.length - 4} erro(s))` : '';
+          showNotification(`Validação falhou — nada foi guardado. ${head}${more}`, 'error');
+          return;
+        }
+
+        const { kept: keptAfterSimilarity, dropped: droppedSimilar } = dedupeSimilarAiStatements(
+          validated.rows,
+          questions
+        );
+        if (keptAfterSimilarity.length === 0) {
+          showNotification(
+            'Nada foi guardado: os enunciados gerados eram muito parecidos entre si ou com questões já no banco. Ajuste matéria, tópico ou contexto e tente de novo.',
+            'error'
+          );
+          return;
+        }
+        const sanitizedInitialQuestions = keptAfterSimilarity.map((row) => ({
           user_id: userId,
-          subject: q.subject,
-          topic: q.topic,
-          statement: q.statement,
-          options: q.options,
-          correct_answer: q.correct_answer,
-          explanation: q.explanation,
-          difficulty: q.difficulty,
-          exam_board: q.exam_board || aiConfig.examStyle,
-          institution: q.institution || aiConfig.institution,
-          exam_name: q.exam_name || aiConfig.examName,
-          modality: q.modality || aiConfig.modality,
-          legal_diploma: q.legal_diploma || aiConfig.legalDiploma,
-          year: q.year || new Date().getFullYear().toString(),
-          legislation_tags: q.legislation_tags || [],
-          jurisprudence_tags: q.jurisprudence_tags || []
+          ...row,
         }));
 
         let { data, error } = await supabase
@@ -1851,9 +1882,15 @@ Forneça a explicação de forma concisa e didática.`;
         if (error) throw error;
 
         if (data) {
-          setQuestions([...data, ...questions]);
+          const inserted = (data as Question[]).map(normalizeQuestionFromApi);
+          setQuestions([...inserted, ...questions]);
           setShowAIGenerator(false);
-          showNotification(`${data.length} questões geradas com sucesso!`, 'success');
+          showNotification(
+            droppedSimilar.length > 0
+              ? `${data.length} questão(ões) guardada(s). ${droppedSimilar.length} omitida(s) por enunciado muito parecido (mesmo lote ou acervo).`
+              : `${data.length} questões geradas com sucesso!`,
+            'success'
+          );
           
           const newSubjects = Array.from(new Set([...subjects, ...data.map(q => q.subject)])).filter(Boolean);
           setSubjects(newSubjects);
@@ -1869,6 +1906,11 @@ Forneça a explicação de forma concisa e didática.`;
           
           setViewMode('list');
         }
+      } else {
+        showNotification(
+          'Nenhuma questão foi recebida da IA (resposta vazia em todos os lotes). Tente de novo.',
+          'error'
+        );
       }
     } catch (error: any) {
       console.error('Error generating questions:', error);
@@ -1965,28 +2007,62 @@ Forneça a explicação de forma concisa e didática.`;
       matchStatus = isWrong || isCorrect;
     } else if (questionStatus === 'unresolved') {
       matchStatus = !isWrong && !isCorrect;
+    } else if (questionStatus === 'review_today') {
+      matchStatus = isQuestionDueForReviewToday(q.id, wrongQuestions, questionStats);
     }
 
-    if (hideResolved && (isWrong || isCorrect)) {
+    if (questionStatus !== 'review_today' && hideResolved && (isWrong || isCorrect)) {
       matchStatus = false;
     }
     
     return matchSearch && matchSubject && matchTopic && matchDifficulty && matchExamBoard && matchYear && matchLegislation && matchJurisprudence && matchNotebook && matchStatus && matchInstitution && matchExamName && matchModality && matchLegalDiploma;
   }).sort((a, b) => {
-    if (sortBy === 'newest') return 0; // Already sorted by created_at desc from DB
-    if (sortBy === 'oldest') return -1; // Reverse order
-    
+    const createdMs = (q: Question): number | null => {
+      if (!q.created_at) return null;
+      const t = Date.parse(q.created_at);
+      return Number.isNaN(t) ? null : t;
+    };
+
+    if (sortBy === 'newest') {
+      const na = createdMs(a) ?? 0;
+      const nb = createdMs(b) ?? 0;
+      return nb - na;
+    }
+    if (sortBy === 'oldest') {
+      const na = createdMs(a) ?? Number.POSITIVE_INFINITY;
+      const nb = createdMs(b) ?? Number.POSITIVE_INFINITY;
+      return na - nb;
+    }
+
     const difficultyMap = { 'muito_facil': 1, 'facil': 2, 'media': 3, 'dificil': 4, 'muito_dificil': 5 };
     const diffA = difficultyMap[a.difficulty] || 0;
     const diffB = difficultyMap[b.difficulty] || 0;
-    
+
     if (sortBy === 'difficulty_asc') return diffA - diffB;
     if (sortBy === 'difficulty_desc') return diffB - diffA;
-    
+
     return 0;
   });
 
-  const currentQuestion = filteredQuestions[currentIndex];
+  const handleExportPDF = () => exportQuestionBankPdf(filteredQuestions, { setIsExporting, setExportProgress });
+
+  const getNextUnansweredMockIndex = (from: number): number => {
+    for (let i = from + 1; i < mockQuestions.length; i++) {
+      if (mockAnswers[mockQuestions[i].id] === undefined) return i;
+    }
+    return -1;
+  };
+  const getPrevUnansweredMockIndex = (from: number): number => {
+    for (let i = from - 1; i >= 0; i--) {
+      if (mockAnswers[mockQuestions[i].id] === undefined) return i;
+    }
+    return -1;
+  };
+
+  const currentQuestion =
+    isMockMode && mockQuestions.length > 0
+      ? mockQuestions[Math.min(currentIndex, mockQuestions.length - 1)]
+      : filteredQuestions[currentIndex];
 
   const handleAnswer = (index: number, questionOverride?: Question) => {
     const targetQuestion = questionOverride || currentQuestion;
@@ -2018,15 +2094,32 @@ Forneça a explicação de forma concisa e didática.`;
     if (isMockMode) {
       setMockAnswers(prev => ({ ...prev, [targetQuestion.id]: index }));
       setPendingAnswerIndex(null);
-      
-      // Auto-advance in single view if not the last question
-      if (viewMode === 'single' && currentIndex < filteredQuestions.length - 1) {
-        setTimeout(() => setCurrentIndex(prev => prev + 1), 300);
+
+      if (viewMode === 'single') {
+        setTimeout(() => {
+          setCurrentIndex(prevIdx => {
+            const ans = mockAnswersRef.current;
+            const len = mockQuestions.length;
+            if (len === 0) return prevIdx;
+            if (!mockNavUnansweredOnly) {
+              return Math.min(prevIdx + 1, len - 1);
+            }
+            for (let i = prevIdx + 1; i < len; i++) {
+              if (ans[mockQuestions[i].id] === undefined) return i;
+            }
+            return prevIdx;
+          });
+          setSelectedOption(null);
+          setShowExplanation(false);
+        }, 300);
       }
       return;
     }
     
     setShowExplanation(true);
+
+    const nextGoals = bumpAnswerGoals(answerGoals);
+    setAnswerGoals(nextGoals);
     
     // Trigger Intelligent Correction
     generateIntelligentCorrection(targetQuestion);
@@ -2037,7 +2130,8 @@ Forneça a explicação de forma concisa e didática.`;
     }
 
     if (index === targetQuestion.correct_answer) {
-      supabase.from('questions').update({ status: 'Acertou' }).eq('id', targetQuestion.id).then();
+      // Não atualizar questions.status: a tabela pode ser compartilhada; resultado do usuário fica em
+      // user_progress + user_question_stats (e correctQuestions/wrongQuestions).
       const newCount = correctCount + 1;
       setCorrectCount(newCount);
       
@@ -2071,10 +2165,12 @@ Forneça a explicação de forma concisa e didática.`;
       // Update question stats in new table
       const currentStat = questionStats[targetQuestion.id] || { totalAttempts: 0, correctAttempts: 0, lastAttemptCorrect: false };
       const isCorrect = index === targetQuestion.correct_answer;
-      const newStat = {
+      const attemptNow = new Date().toISOString();
+      const newStat: QuestionStatForReview = {
         totalAttempts: currentStat.totalAttempts + 1,
         correctAttempts: isCorrect ? currentStat.correctAttempts + 1 : currentStat.correctAttempts,
-        lastAttemptCorrect: isCorrect
+        lastAttemptCorrect: isCorrect,
+        updatedAt: attemptNow,
       };
       
       setQuestionStats(prev => ({ ...prev, [targetQuestion.id]: newStat }));
@@ -2085,7 +2181,7 @@ Forneça a explicação de forma concisa e didática.`;
         total_attempts: newStat.totalAttempts,
         correct_attempts: newStat.correctAttempts,
         last_attempt_correct: newStat.lastAttemptCorrect,
-        updated_at: new Date().toISOString()
+        updated_at: attemptNow,
       }, { onConflict: 'user_id, question_id' }).then(({ error }) => {
         if (error) console.error('Error saving question stat:', error);
       });
@@ -2095,10 +2191,11 @@ Forneça a explicação de forma concisa e didática.`;
         wrongQuestions: newWrong, 
         correctQuestions: newCorrect,
         errorMastery: newMastery,
-        confidence_levels: currentConfidenceLevels
+        confidence_levels: currentConfidenceLevels,
+        question_answer_goals: nextGoals,
       });
     } else {
-      supabase.from('questions').update({ status: 'Errado' }).eq('id', targetQuestion.id).then();
+      // Ver comentário no ramo de acerto: não gravar status na linha compartilhada de questions.
       const newCount = wrongCount + 1;
       setWrongCount(newCount);
       
@@ -2118,10 +2215,12 @@ Forneça a explicação de forma concisa e didática.`;
 
       // Update question stats in new table
       const currentStat = questionStats[targetQuestion.id] || { totalAttempts: 0, correctAttempts: 0, lastAttemptCorrect: false };
-      const newStat = {
+      const attemptNowWrong = new Date().toISOString();
+      const newStat: QuestionStatForReview = {
         totalAttempts: currentStat.totalAttempts + 1,
         correctAttempts: currentStat.correctAttempts,
-        lastAttemptCorrect: false
+        lastAttemptCorrect: false,
+        updatedAt: attemptNowWrong,
       };
       
       setQuestionStats(prev => ({ ...prev, [targetQuestion.id]: newStat }));
@@ -2132,7 +2231,7 @@ Forneça a explicação de forma concisa e didática.`;
         total_attempts: newStat.totalAttempts,
         correct_attempts: newStat.correctAttempts,
         last_attempt_correct: newStat.lastAttemptCorrect,
-        updated_at: new Date().toISOString()
+        updated_at: attemptNowWrong,
       }, { onConflict: 'user_id, question_id' }).then(({ error }) => {
         if (error) console.error('Error saving question stat:', error);
       });
@@ -2141,7 +2240,8 @@ Forneça a explicação de forma concisa e didática.`;
         wrongCount: newCount, 
         wrongQuestions: newWrong,
         errorMastery: newMastery,
-        confidence_levels: currentConfidenceLevels
+        confidence_levels: currentConfidenceLevels,
+        question_answer_goals: nextGoals,
       });
     }
     setPendingAnswerIndex(null);
@@ -2169,12 +2269,46 @@ Forneça a explicação de forma concisa e didática.`;
     if (confirm('Deseja realmente zerar suas estatísticas de acertos e erros?')) {
       setCorrectCount(0);
       setWrongCount(0);
-      syncUserProgress({ correctCount: 0, wrongCount: 0 });
+      setCorrectQuestions([]);
+      setWrongQuestions([]);
+      setErrorMastery({});
+      setUserProgress(prev =>
+        prev
+          ? {
+              ...prev,
+              correct_count: 0,
+              wrong_count: 0,
+              correct_questions: [],
+              wrong_questions: [],
+              error_mastery: {},
+              confidence_levels: {},
+            }
+          : null
+      );
+      syncUserProgress({
+        correctCount: 0,
+        wrongCount: 0,
+        correctQuestions: [],
+        wrongQuestions: [],
+        errorMastery: {},
+        confidence_levels: {},
+      });
       showNotification('Estatísticas zeradas', 'success');
     }
   };
 
   const handleNext = () => {
+    if (isMockMode && mockQuestions.length > 0) {
+      if (mockNavUnansweredOnly) {
+        const n = getNextUnansweredMockIndex(currentIndex);
+        if (n >= 0) setCurrentIndex(n);
+      } else if (currentIndex < mockQuestions.length - 1) {
+        setCurrentIndex(prev => prev + 1);
+      }
+      setSelectedOption(null);
+      setShowExplanation(false);
+      return;
+    }
     if (currentIndex < filteredQuestions.length - 1) {
       setCurrentIndex(prev => prev + 1);
       setSelectedOption(null);
@@ -2183,6 +2317,17 @@ Forneça a explicação de forma concisa e didática.`;
   };
 
   const handlePrev = () => {
+    if (isMockMode && mockQuestions.length > 0) {
+      if (mockNavUnansweredOnly) {
+        const p = getPrevUnansweredMockIndex(currentIndex);
+        if (p >= 0) setCurrentIndex(p);
+      } else if (currentIndex > 0) {
+        setCurrentIndex(prev => prev - 1);
+      }
+      setSelectedOption(null);
+      setShowExplanation(false);
+      return;
+    }
     if (currentIndex > 0) {
       setCurrentIndex(prev => prev - 1);
       setSelectedOption(null);
@@ -2207,211 +2352,27 @@ Forneça a explicação de forma concisa e didática.`;
     );
   }
 
-  // Mock Results View
   if (isMockMode && isMockFinished && mockResults) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4 md:p-8 animate-in fade-in duration-500">
-        <div className="max-w-5xl mx-auto space-y-8">
-          <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl">
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-2xl">
-                  <Trophy className="text-emerald-600 dark:text-emerald-400" size={32} />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Resultado do Simulado</h1>
-                  <p className="text-slate-500 dark:text-slate-400 font-medium">Desempenho Geral e Análise por Disciplina</p>
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setIsMockMode(false);
-                  setIsMockFinished(false);
-                  setMockResults(null);
-                  setViewMode('list');
-                }}
-                className="px-6 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
-              >
-                Sair do Simulado
-              </button>
-              <button
-                onClick={() => {
-                  setIsMockFinished(false);
-                  setQuestionStatus('wrong');
-                  setViewMode('list');
-                }}
-                className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-purple-900/20"
-              >
-                Revisar Erros
-              </button>
-            </div>
-          </header>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Main Score Card */}
-            <div className="md:col-span-2 bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl flex flex-col md:flex-row items-center gap-8">
-              <div className="relative w-48 h-48">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={[
-                        { name: 'Certeza', value: mockResults.confidenceStats.certeza },
-                        { name: 'Dúvida', value: mockResults.confidenceStats.duvida },
-                        { name: 'Chute', value: mockResults.confidenceStats.chute }
-                      ]}
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      <Cell fill="#10b981" />
-                      <Cell fill="#f59e0b" />
-                      <Cell fill="#ef4444" />
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-4xl font-black text-slate-900 dark:text-white">
-                    {Math.round((mockResults.score / mockResults.total) * 100)}%
-                  </span>
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Verdadeiro Domínio</span>
-                </div>
-              </div>
-              <div className="flex-1 grid grid-cols-2 gap-6 w-full">
-                <div className="space-y-1">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Acertos</span>
-                  <span className="text-2xl font-black text-emerald-600">{mockResults.score} / {mockResults.total}</span>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Certeza Total</span>
-                  <span className="text-2xl font-black text-emerald-500">{mockResults.confidenceStats.certeza}</span>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Dúvidas (Acertos)</span>
-                  <span className="text-2xl font-black text-amber-500">{mockResults.doubtGuesses.length}</span>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Chutes (Sorte)</span>
-                  <span className="text-2xl font-black text-red-500">{mockResults.luckyGuesses.length}</span>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Status</span>
-                  <span className={`text-2xl font-black ${mockResults.score / mockResults.total >= 0.7 ? 'text-emerald-500' : 'text-amber-500'}`}>
-                    {mockResults.score / mockResults.total >= 0.7 ? 'Aprovado' : 'Em Evolução'}
-                  </span>
-                </div>
-              </div>
-              {mockResults.luckyGuesses.length > 0 && (
-                <div className="mt-6 p-4 bg-red-50 dark:bg-red-900/20 rounded-2xl border border-red-100 dark:border-red-800 text-red-600 dark:text-red-400 font-bold text-sm flex items-center gap-3">
-                  <AlertTriangle size={20} />
-                  Revisar fundamento ({mockResults.luckyGuesses.length} acertos por sorte)
-                </div>
-              )}
-            </div>
-
-            {/* Quick Stats */}
-            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl flex flex-col justify-center items-center text-center space-y-4">
-              <div className="p-4 bg-purple-100 dark:bg-purple-900/30 rounded-full">
-                <BrainCircuit size={40} className="text-purple-600 dark:text-purple-400" />
-              </div>
-              <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tighter">Análise Metacognitiva</h3>
-              {mockResults.luckyGuesses.length > 0 ? (
-                <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-2xl border border-amber-200 dark:border-amber-800">
-                  <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-bold text-xs uppercase tracking-widest mb-2">
-                    <AlertTriangle size={14} /> Alerta de Revisão
-                  </div>
-                  <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
-                    { /* Removed: Você acertou stats */ }
-                  </p>
-                </div>
-              ) : (
-                <p className="text-sm text-slate-500 leading-relaxed">
-                  Seu nível de certeza está alinhado com seus acertos. Continue focando nos temas de dúvida!
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Subject Stats Chart */}
-          <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl">
-            <h3 className="text-xl font-black text-slate-900 dark:text-white mb-8 flex items-center gap-3">
-              <BarChart3 className="text-blue-500" /> Desempenho por Disciplina
-            </h3>
-            <div className="h-[400px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={mockResults.subjectStats} layout="vertical" margin={{ left: 40, right: 40 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
-                  <XAxis type="number" domain={[0, 100]} hide />
-                  <YAxis 
-                    dataKey="subject" 
-                    type="category" 
-                    width={150} 
-                    tick={{ fontSize: 12, fontWeight: 700, fill: '#64748b' }}
-                  />
-                  <Tooltip 
-                    cursor={{ fill: 'transparent' }}
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload;
-                        const percent = Math.round((data.correct / data.total) * 100);
-                        return (
-                          <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-2xl border border-slate-800">
-                            <p className="font-black text-xs uppercase tracking-widest mb-1">{data.subject}</p>
-                            <p className="text-2xl font-black text-blue-400">{percent}%</p>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{data.correct} de {data.total} questões</p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Bar dataKey={(d) => (d.correct / d.total) * 100} radius={[0, 10, 10, 0]} barSize={32}>
-                    {mockResults.subjectStats.map((entry, index) => {
-                      const percent = (entry.correct / entry.total) * 100;
-                      let color = '#ef4444'; // Red
-                      if (percent >= 80) color = '#10b981'; // Green
-                      else if (percent >= 60) color = '#f59e0b'; // Amber
-                      return <Cell key={`cell-${index}`} fill={color} />;
-                    })}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Review Section */}
-          {(mockResults.luckyGuesses.length > 0 || mockResults.doubtGuesses.length > 0) && (
-            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl">
-              <h3 className="text-xl font-black text-slate-900 dark:text-white mb-8 flex items-center gap-3">
-                <BookOpen className="text-amber-500" /> Questões para Revisão
-              </h3>
-              <div className="space-y-4">
-                {[...new Set([...mockResults.luckyGuesses, ...mockResults.doubtGuesses])].map(qId => {
-                  const q = mockQuestions.find(q => q.id === qId);
-                  if (!q) return null;
-                  return (
-                    <div key={q.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700">
-                      <span className="text-sm font-bold text-slate-700 dark:text-slate-300 truncate max-w-[70%]">{q.statement.substring(0, 50)}...</span>
-                      <button 
-                        onClick={() => {
-                          const level = sessionConfidenceStats[q.id] || 'certeza';
-                          handleCreateFlashcardFromError(q, mockAnswers[q.id], mockAnswers[q.id] === q.correct_answer);
-                          showNotification('Flashcard criado!', 'success');
-                        }}
-                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all"
-                      >
-                        Flashcard
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      <MockResultsView
+        mockResults={mockResults}
+        mockQuestions={mockQuestions}
+        mockAnswers={mockAnswers}
+        sessionConfidenceStats={sessionConfidenceStats}
+        onExitMock={() => {
+          setIsMockMode(false);
+          setIsMockFinished(false);
+          setMockResults(null);
+          setViewMode('list');
+        }}
+        onReviewErrors={() => {
+          setIsMockFinished(false);
+          setQuestionStatus('wrong');
+          setViewMode('list');
+        }}
+        onCreateFlashcardFromError={handleCreateFlashcardFromError}
+        showNotification={showNotification}
+      />
     );
   }
 
@@ -2420,29 +2381,38 @@ Forneça a explicação de forma concisa e didática.`;
       {/* Confidence Selection Modal */}
       <AnimatePresence>
         {showConfidenceSelection && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+          <div
+            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm"
+            role="presentation"
+          >
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="qb-confidence-title"
               className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-2xl max-w-md w-full text-center relative"
             >
               <button 
+                type="button"
                 onClick={() => setShowConfidenceSelection(false)}
                 className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                aria-label="Fechar diálogo de nível de confiança"
               >
-                <X size={24} />
+                <X size={24} aria-hidden />
               </button>
-              <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
+              <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-6" aria-hidden>
                 <BrainCircuit className="text-blue-600 dark:text-blue-400" size={32} />
               </div>
-              <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Nível de Confiança</h3>
+              <h3 id="qb-confidence-title" className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Nível de Confiança</h3>
               <p className="text-sm text-slate-500 dark:text-slate-400 mb-8">Como você avalia sua resposta para esta questão?</p>
               
               <div className="grid grid-cols-1 gap-3">
                 <button
+                  type="button"
                   onClick={() => confirmAnswer('certeza')}
-                  className="flex items-center justify-between p-4 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-900/50 rounded-2xl transition-all group"
+                  className="flex items-center justify-between p-4 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-900/50 rounded-2xl transition-all group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/50" />
@@ -2455,8 +2425,9 @@ Forneça a explicação de forma concisa e didática.`;
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => confirmAnswer('duvida')}
-                  className="flex items-center justify-between p-4 bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/20 dark:hover:bg-amber-900/30 border border-amber-200 dark:border-amber-900/50 rounded-2xl transition-all group"
+                  className="flex items-center justify-between p-4 bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/20 dark:hover:bg-amber-900/30 border border-amber-200 dark:border-amber-900/50 rounded-2xl transition-all group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-3 h-3 rounded-full bg-amber-500 shadow-lg shadow-amber-500/50" />
@@ -2469,8 +2440,9 @@ Forneça a explicação de forma concisa e didática.`;
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => confirmAnswer('chute')}
-                  className="flex items-center justify-between p-4 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 border border-red-200 dark:border-red-900/50 rounded-2xl transition-all group"
+                  className="flex items-center justify-between p-4 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 border border-red-200 dark:border-red-900/50 rounded-2xl transition-all group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-3 h-3 rounded-full bg-red-500 shadow-lg shadow-red-500/50" />
@@ -2652,109 +2624,79 @@ Forneça a explicação de forma concisa e didática.`;
         </div>
       )}
 
-      {/* Mock Setup Modal */}
-      {showMockSetup && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[120] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 md:p-10 shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-lg animate-in zoom-in-95 duration-300">
-            <div className="flex justify-between items-center mb-8">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-2xl">
-                  <Timer className="text-emerald-600 dark:text-emerald-400" size={24} />
-                </div>
-                <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Configurar Simulado</h2>
-              </div>
-              <button onClick={() => setShowMockSetup(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all">
-                <X size={24} />
-              </button>
-            </div>
-
-            <div className="space-y-8">
-              <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-200 dark:border-slate-700">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-sm font-black text-slate-400 uppercase tracking-widest">Questões Disponíveis</span>
-                  <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full text-xs font-black">{filteredQuestions.length}</span>
-                </div>
-                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                  O simulado usará as questões baseadas nos seus filtros atuais. Aplique filtros de matéria ou banca antes de começar se desejar um tema específico.
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Duração do Simulado (Minutos)</label>
-                <div className="grid grid-cols-4 gap-3">
-                  {[30, 60, 120, 240].map(mins => (
-                    <button
-                      key={mins}
-                      onClick={() => setMockDurationMinutes(mins)}
-                      className={`py-3 rounded-2xl font-black text-sm transition-all border-2 ${mockDurationMinutes === mins ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-900/20' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-emerald-500'}`}
-                    >
-                      {mins >= 60 ? `${mins/60}h` : `${mins}m`}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex items-center gap-3 pt-2">
-                  <input
-                    type="range"
-                    min="5"
-                    max="300"
-                    step="5"
-                    value={mockDurationMinutes}
-                    onChange={(e) => setMockDurationMinutes(parseInt(e.target.value))}
-                    className="flex-1 h-2 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-600"
-                  />
-                  <span className="text-lg font-black text-slate-900 dark:text-white w-16 text-right">{mockDurationMinutes}m</span>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-100 dark:border-amber-900/30">
-                <AlertTriangle className="text-amber-500 shrink-0" size={20} />
-                <p className="text-[10px] font-bold text-amber-800 dark:text-amber-400 leading-relaxed uppercase tracking-wider">
-                  No modo simulado, o gabarito e as explicações só serão revelados após a finalização. O cronômetro não pode ser pausado.
-                </p>
-              </div>
-
-              <button
-                onClick={() => {
-                  if (filteredQuestions.length === 0) {
-                    showNotification('Não há questões disponíveis com os filtros atuais.', 'error');
-                    return;
-                  }
-                  startMock(filteredQuestions, mockDurationMinutes);
-                }}
-                className="w-full py-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-3xl font-black text-sm uppercase tracking-[0.3em] transition-all shadow-xl shadow-emerald-900/30 active:scale-[0.98]"
-              >
-                Começar Prova Real
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <MockSetupModal
+        open={showMockSetup}
+        onClose={() => setShowMockSetup(false)}
+        filteredQuestionCount={filteredQuestions.length}
+        mockDurationMinutes={mockDurationMinutes}
+        setMockDurationMinutes={setMockDurationMinutes}
+        onStart={() => {
+          if (filteredQuestions.length === 0) {
+            showNotification('Não há questões disponíveis com os filtros atuais.', 'error');
+            return;
+          }
+          startMock(filteredQuestions, mockDurationMinutes);
+        }}
+      />
 
       {isMockMode && !isMockFinished && (
         <div className="max-w-4xl mx-auto pt-24 pb-32 px-4">
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-2xl">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-8">
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-2xl shrink-0">
                 <Target className="text-blue-600 dark:text-blue-400" size={32} />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h2 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Simulado em Curso</h2>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Questão {currentIndex + 1} de {mockQuestions.length}</p>
               </div>
             </div>
-            
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={() => setCurrentIndex(prev => Math.max(0, prev - 1))}
-                disabled={currentIndex === 0}
+
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+              <label className="flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black uppercase tracking-widest text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  checked={mockNavUnansweredOnly}
+                  onChange={(e) => {
+                    const v = e.target.checked;
+                    setMockNavUnansweredOnly(v);
+                    if (v && currentQuestion && mockAnswers[currentQuestion.id] !== undefined) {
+                      const next = getNextUnansweredMockIndex(currentIndex);
+                      if (next >= 0) setCurrentIndex(next);
+                      else {
+                        const first = mockQuestions.findIndex((q) => mockAnswers[q.id] === undefined);
+                        if (first >= 0) setCurrentIndex(first);
+                      }
+                    }
+                  }}
+                />
+                <ListFilter size={16} className="shrink-0 text-slate-400" aria-hidden />
+                Só não respondidas
+              </label>
+              <button
+                type="button"
+                onClick={handlePrev}
+                disabled={
+                  mockNavUnansweredOnly
+                    ? getPrevUnansweredMockIndex(currentIndex) < 0
+                    : currentIndex === 0
+                }
                 className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 disabled:opacity-30 transition-all"
+                aria-label="Questão anterior"
               >
                 <ChevronLeft size={24} />
               </button>
-              <button 
-                onClick={() => setCurrentIndex(prev => Math.min(mockQuestions.length - 1, prev + 1))}
-                disabled={currentIndex === mockQuestions.length - 1}
+              <button
+                type="button"
+                onClick={handleNext}
+                disabled={
+                  mockNavUnansweredOnly
+                    ? getNextUnansweredMockIndex(currentIndex) < 0
+                    : currentIndex === mockQuestions.length - 1
+                }
                 className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 disabled:opacity-30 transition-all"
+                aria-label="Próxima questão"
               >
                 <ChevronRight size={24} />
               </button>
@@ -2766,13 +2708,17 @@ Forneça a explicação de forma concisa e didática.`;
             {mockQuestions.map((q, idx) => (
               <button
                 key={q.id}
+                type="button"
                 onClick={() => setCurrentIndex(idx)}
-                className={`w-10 h-10 rounded-xl font-black text-xs flex items-center justify-center transition-all ${
-                  currentIndex === idx 
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' 
-                    : mockAnswers[q.id] !== undefined
-                      ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-slate-200'
+                title={mockMarkReviewLater[q.id] ? 'Marcada para revisar depois' : undefined}
+                className={`w-10 h-10 rounded-xl font-black text-xs flex items-center justify-center transition-all ring-2 ring-offset-2 ring-offset-white dark:ring-offset-slate-900 ${
+                  currentIndex === idx
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20 ring-blue-400/50'
+                    : mockMarkReviewLater[q.id]
+                      ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 ring-amber-400/60'
+                      : mockAnswers[q.id] !== undefined
+                        ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 ring-transparent'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-slate-200 ring-transparent'
                 }`}
               >
                 {idx + 1}
@@ -2783,284 +2729,17 @@ Forneça a explicação de forma concisa e didática.`;
       )}
 
       <div id="ai-generator-portal">
-        {showAIGenerator && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-2xl animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Sparkles className="text-purple-500" />
-                Gerador com IA
-              </h2>
-              <button onClick={() => setShowAIGenerator(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                <X size={24} />
-              </button>
-            </div>
-            
-            <form onSubmit={handleGenerateAI} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Matéria / Assunto *</label>
-                  <input
-                    type="text"
-                    required={!aiConfig.baseOnFlashcards && !aiConfig.context}
-                    value={aiConfig.subject}
-                    onChange={e => setAiConfig({...aiConfig, subject: e.target.value})}
-                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
-                    placeholder="Ex: Direito Penal"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Tópico Específico</label>
-                  <input
-                    type="text"
-                    value={aiConfig.topic}
-                    onChange={e => setAiConfig({...aiConfig, topic: e.target.value})}
-                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
-                    placeholder="Ex: Crimes contra a vida"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Material de Base / Texto da Aula (Opcional)</label>
-                <textarea
-                  value={aiConfig.context}
-                  onChange={e => setAiConfig({...aiConfig, context: e.target.value})}
-                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none min-h-[120px] text-sm"
-                  placeholder="Cole aqui o texto da aula, anotações ou trechos de livros para que a IA crie questões baseadas exatamente neste conteúdo..."
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Estilo de Prova</label>
-                  <select
-                    value={aiConfig.examStyle}
-                    onChange={e => setAiConfig({...aiConfig, examStyle: e.target.value})}
-                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
-                  >
-                    <optgroup label="Exames de Ordem">
-                      <option value="OAB (FGV)">OAB (FGV)</option>
-                    </optgroup>
-                    <optgroup label="Carreiras Jurídicas">
-                      <option value="Magistratura Estadual">Magistratura Estadual</option>
-                      <option value="Magistratura Federal">Magistratura Federal</option>
-                      <option value="Ministério Público">Ministério Público</option>
-                      <option value="Promotor de Justiça">Promotor de Justiça</option>
-                      <option value="Procurador da República">Procurador da República</option>
-                      <option value="Defensoria Pública">Defensoria Pública</option>
-                      <option value="Defensor Público da União">Defensor Público da União</option>
-                      <option value="Procuradorias (AGU/PGE/PGM)">Procuradorias</option>
-                      <option value="Delegado de Polícia">Delegado de Polícia</option>
-                      <option value="Delegado Federal">Delegado Federal</option>
-                      <option value="Diplomacia (CACD)">Diplomacia (CACD)</option>
-                    </optgroup>
-                    <optgroup label="Tribunais e Outros">
-                      <option value="Analista Judiciário">Analista Judiciário</option>
-                      <option value="Técnico Judiciário">Técnico Judiciário</option>
-                      <option value="Carreiras Policiais (Agente/Escrivão)">Carreiras Policiais</option>
-                      <option value="Cartórios">Cartórios</option>
-                      <option value="Acadêmico (SanFran)">Acadêmico (SanFran)</option>
-                    </optgroup>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Modalidade</label>
-                  <select
-                    value={aiConfig.modality}
-                    onChange={e => setAiConfig({...aiConfig, modality: e.target.value as any})}
-                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
-                  >
-                    <option value="Múltipla Escolha">Múltipla Escolha (ABCDE)</option>
-                    <option value="Certo ou Errado">Certo ou Errado (CESPE)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Instituição</label>
-                  <input
-                    type="text"
-                    value={aiConfig.institution}
-                    onChange={e => setAiConfig({...aiConfig, institution: e.target.value})}
-                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
-                    placeholder="Ex: USP, FGV, VUNESP"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Diploma Legal</label>
-                  <input
-                    type="text"
-                    value={aiConfig.legalDiploma}
-                    onChange={e => setAiConfig({...aiConfig, legalDiploma: e.target.value})}
-                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
-                    placeholder="Ex: CPC, CP, CF/88"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Nome do Exame</label>
-                  <input
-                    type="text"
-                    value={aiConfig.examName}
-                    onChange={e => setAiConfig({...aiConfig, examName: e.target.value})}
-                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
-                    placeholder="Ex: XXXIX Exame OAB"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Tipo de Enunciado</label>
-                  <select
-                    value={aiConfig.statementType}
-                    onChange={e => setAiConfig({...aiConfig, statementType: e.target.value as any})}
-                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
-                  >
-                    <option value="Caso Prático (Situação Hipotética)">Caso Prático</option>
-                    <option value="Enunciado Direto">Enunciado Direto</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Foco Jurídico</label>
-                <div className="flex flex-wrap gap-3">
-                  {['Lei Seca', 'Jurisprudência Atualizada', 'Doutrina Clássica', 'Súmulas STF/STJ', 'Informativos Recentes', 'Ética Profissional', 'Direitos Humanos', 'Direito Comparado', 'Teoria Geral', 'Prática Processual', 'Filosofia do Direito', 'Sociologia Jurídica'].map(focus => (
-                    <label key={focus} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={aiConfig.legalFocus.includes(focus)}
-                        onChange={e => {
-                          const newFocus = e.target.checked 
-                            ? [...aiConfig.legalFocus, focus]
-                            : aiConfig.legalFocus.filter(f => f !== focus);
-                          setAiConfig({...aiConfig, legalFocus: newFocus});
-                        }}
-                        className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
-                      />
-                      <span className="text-sm text-slate-600 dark:text-slate-400">{focus}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {aiConfig.legalFocus.includes('Jurisprudência Atualizada') && (
-                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800/30 space-y-4 animate-in slide-in-from-top-2 duration-300">
-                  <div className="flex items-center gap-2 text-blue-800 dark:text-blue-300 font-bold text-sm mb-2">
-                    <Gavel size={18} /> Configurações de Jurisprudência
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-blue-700 dark:text-blue-400 mb-1 uppercase">Tribunal</label>
-                      <select
-                        value={aiConfig.tribunal}
-                        onChange={e => setAiConfig({...aiConfig, tribunal: e.target.value as any})}
-                        className="w-full p-2 rounded-lg bg-white dark:bg-slate-800 border border-blue-200 dark:border-blue-700 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                      >
-                        <option value="Jurisprudência STF">STF</option>
-                        <option value="Jurisprudência STJ">STJ</option>
-                        <option value="Ambos">Ambos (STF/STJ)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-blue-700 dark:text-blue-400 mb-1 uppercase">Ano / Período</label>
-                      <select
-                        value={aiConfig.yearFilter}
-                        onChange={e => setAiConfig({...aiConfig, yearFilter: e.target.value as any})}
-                        className="w-full p-2 rounded-lg bg-white dark:bg-slate-800 border border-blue-200 dark:border-blue-700 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                      >
-                        <option value="2025-2026">2025-2026</option>
-                        <option value="Últimos 2 anos">Últimos 2 anos</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-2xl border border-purple-100 dark:border-purple-800/30">
-                <label className="flex items-center gap-2 cursor-pointer mb-3">
-                  <input
-                    type="checkbox"
-                    checked={aiConfig.baseOnFlashcards}
-                    onChange={e => setAiConfig({...aiConfig, baseOnFlashcards: e.target.checked})}
-                    className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
-                  />
-                  <span className="text-sm font-bold text-purple-800 dark:text-purple-300">Basear em meus Flashcards</span>
-                </label>
-                
-                {aiConfig.baseOnFlashcards && (
-                  <select
-                    value={aiConfig.selectedFolderId}
-                    onChange={e => setAiConfig({...aiConfig, selectedFolderId: e.target.value})}
-                    className="w-full p-3 rounded-xl bg-white dark:bg-slate-800 border border-purple-200 dark:border-purple-700 focus:ring-2 focus:ring-purple-500 outline-none text-sm"
-                  >
-                    <option value="">Selecione uma pasta do Acervo</option>
-                    {folders.map(f => (
-                      <option key={f.id} value={f.id}>{f.name}</option>
-                    ))}
-                  </select>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Quantidade</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="20"
-                    required
-                    value={aiConfig.count}
-                    onChange={e => setAiConfig({...aiConfig, count: parseInt(e.target.value) || 1})}
-                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Dificuldade</label>
-                  <select
-                    value={aiConfig.difficulty}
-                    onChange={e => setAiConfig({...aiConfig, difficulty: e.target.value as any})}
-                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
-                  >
-                    <option value="muito_facil">Muito Fácil</option>
-                    <option value="facil">Fácil</option>
-                    <option value="media">Média</option>
-                    <option value="dificil">Difícil</option>
-                    <option value="muito_dificil">Muito Difícil</option>
-                  </select>
-                </div>
-              </div>
-              
-              <div className="pt-4">
-                <button
-                  type="submit"
-                  disabled={isGenerating || aiCooldown > 0}
-                  className="w-full py-4 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
-                >
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" /> Gerando...
-                    </>
-                  ) : aiCooldown > 0 ? (
-                    <>
-                      <Timer className="w-5 h-5" /> Aguarde ({aiCooldown}s)
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles size={18} /> Gerar Questões
-                    </>
-                  )}
-                </button>
-                {isGenerating && generatingStatus && (
-                  <p className="text-center text-sm text-purple-300 mt-2">{generatingStatus}</p>
-                )}
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+        <QuestionBankAIGeneratorModal
+          open={showAIGenerator}
+          onClose={() => setShowAIGenerator(false)}
+          aiConfig={aiConfig}
+          setAiConfig={setAiConfig}
+          folders={folders}
+          onSubmit={handleGenerateAI}
+          isGenerating={isGenerating}
+          generatingStatus={generatingStatus}
+          aiCooldown={aiCooldown}
+        />
       </div>
 
       <div id="add-form-portal">
@@ -3086,6 +2765,27 @@ Forneça a explicação de forma concisa e didática.`;
                 <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-1">Aproveit.</span>
               </div>
             </div>
+            {!isMockMode && (
+              <QuestionBankGoalsBar
+                goals={answerGoals}
+                onSaveTargets={(daily, weekly) => {
+                  if (!isProgressLoaded) {
+                    showNotification('Carregando o progresso. Tente de novo em instantes.', 'error');
+                    return;
+                  }
+                  const base = reconcileAnswerGoals(answerGoals);
+                  const next: QuestionAnswerGoalsPersisted = {
+                    ...base,
+                    daily_target: daily,
+                    weekly_target: weekly,
+                  };
+                  setAnswerGoals(next);
+                  void syncUserProgress({ question_answer_goals: next });
+                  showNotification('Metas guardadas.', 'success');
+                }}
+                disabled={!isOnline || !isProgressLoaded}
+              />
+            )}
             {showNotebookCreationMode && (
               <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-row items-center gap-4 bg-orange-50 dark:bg-orange-900/20 animate-in fade-in duration-300">
                 <h3 className="text-lg font-bold text-orange-800 dark:text-orange-200 flex items-center gap-2">
@@ -3154,214 +2854,65 @@ Forneça a explicação de forma concisa e didática.`;
               )}
             </div>
             
-            <div className="p-4 bg-slate-50 dark:bg-slate-800/50">
-              <button 
-                onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-300 mb-4 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-              >
-                <Filter size={16} /> {showFilters ? 'Ocultar Filtros' : 'Filtros Avançados'}
-              </button>
-              {showFilters && (
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4 animate-in slide-in-from-top-2 duration-300">
-                  <select
-                    value={selectedSubject}
-                    onChange={(e) => {
-                      setSelectedSubject(e.target.value);
-                      setSelectedTopic(''); // Reset topic when subject changes
-                    }}
-                    className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
-                  >
-                    <option value="">Disciplina</option>
-                    {subjects.map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={selectedTopic}
-                    onChange={(e) => setSelectedTopic(e.target.value)}
-                    className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
-                  >
-                    <option value="">Assunto</option>
-                    {filteredTopics.map(t => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={selectedExamBoard}
-                    onChange={(e) => setSelectedExamBoard(e.target.value)}
-                    className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
-                  >
-                    <option value="">Estilo de Banca</option>
-                    {examBoards.map(b => (
-                      <option key={b} value={b}>{b}</option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={selectedLegislation}
-                    onChange={(e) => setSelectedLegislation(e.target.value)}
-                    className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
-                  >
-                    <option value="">Legislação</option>
-                    {legislationTags.map(tag => (
-                      <option key={tag} value={tag}>{tag}</option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={selectedJurisprudence}
-                    onChange={(e) => setSelectedJurisprudence(e.target.value)}
-                    className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
-                  >
-                    <option value="">Jurisprudência</option>
-                    {jurisprudenceTags.map(tag => (
-                      <option key={tag} value={tag}>{tag}</option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={selectedInstitution}
-                    onChange={(e) => setSelectedInstitution(e.target.value)}
-                    className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
-                  >
-                    <option value="">Instituição</option>
-                    {institutions.map(inst => (
-                      <option key={inst} value={inst}>{inst}</option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={selectedExamName}
-                    onChange={(e) => setSelectedExamName(e.target.value)}
-                    className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
-                  >
-                    <option value="">Prova</option>
-                    {examNames.map(exam => (
-                      <option key={exam} value={exam}>{exam}</option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={selectedModality}
-                    onChange={(e) => setSelectedModality(e.target.value)}
-                    className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
-                  >
-                    <option value="">Modalidade</option>
-                    <option value="multipla_escolha">Múltipla Escolha</option>
-                    <option value="certo_errado">Certo/Errado</option>
-                  </select>
-
-                  <select
-                    value={selectedLegalDiploma}
-                    onChange={(e) => setSelectedLegalDiploma(e.target.value)}
-                    className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
-                  >
-                    <option value="">Diploma Legal</option>
-                    {legalDiplomas.map(diploma => (
-                      <option key={diploma} value={diploma}>{diploma}</option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={difficultyFilter}
-                    onChange={(e) => setDifficultyFilter(e.target.value)}
-                    className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
-                  >
-                    <option value="">Dificuldade</option>
-                    <option value="muito_facil">Muito Fácil</option>
-                    <option value="facil">Fácil</option>
-                    <option value="media">Média</option>
-                    <option value="dificil">Difícil</option>
-                    <option value="muito_dificil">Muito Difícil</option>
-                  </select>
-                </div>
-              )}
-              
-              {notebooks.length > 0 && (
-                <div className="mb-4">
-                  <select
-                    value={selectedNotebookId}
-                    onChange={(e) => setSelectedNotebookId(e.target.value)}
-                    className="block w-full pl-3 pr-10 py-2 text-base border-orange-200 dark:border-orange-800 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm rounded-md bg-orange-50/50 dark:bg-orange-900/10 text-orange-800 dark:text-orange-200"
-                  >
-                    <option value="">Meus Cadernos</option>
-                    {notebooks.map(n => (
-                      <option key={n.id} value={n.id}>{n.name} ({n.question_ids.length})</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div className="flex flex-col gap-4 mb-12">
-                <div className="flex items-center gap-4 flex-wrap">
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300 min-w-[120px]">Minhas questões:</span>
-                  <div className="flex gap-2 flex-wrap">
-                    <button 
-                      onClick={() => setQuestionStatus('all')}
-                      className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${questionStatus === 'all' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800 shadow-inner' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700 dark:hover:bg-slate-800'}`}
-                    >
-                      Todas
-                    </button>
-                    <button 
-                      onClick={() => setQuestionStatus('correct')}
-                      className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${questionStatus === 'correct' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800 shadow-inner' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700 dark:hover:bg-slate-800'}`}
-                    >
-                      Certas
-                    </button>
-                    <button 
-                      onClick={() => setQuestionStatus('wrong')}
-                      className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${questionStatus === 'wrong' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800 shadow-inner' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700 dark:hover:bg-slate-800'}`}
-                    >
-                      Erradas
-                    </button>
-                    <button 
-                      onClick={() => setHideResolved(!hideResolved)}
-                      className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${hideResolved ? 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800 shadow-inner' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700 dark:hover:bg-slate-800'}`}
-                    >
-                      {hideResolved ? 'Mostrando Ocultas' : 'Ocultar Resolvidas'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900">
-              <div className="text-sm text-slate-500 font-medium">
-                <span className="font-bold text-slate-900 dark:text-white">{filteredQuestions.length}</span> questões encontradas
-              </div>
-              
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => {
-                    setSearchTerm('');
-                    setSelectedSubject('');
-                    setSelectedTopic('');
-                    setDifficultyFilter('');
-                    setQuestionStatus('all');
-                    setSelectedNotebookId('');
-                    setSelectedInstitution('');
-                    setSelectedExamName('');
-                    setSelectedModality('');
-                    setSelectedLegalDiploma('');
-                    setHideResolved(false);
-                  }}
-                  className="text-sm font-medium text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                >
-                  Limpar filtro
-                </button>
-                <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors">
-                  Filtrar questões
-                </button>
-              </div>
-            </div>
+            <QuestionBankFiltersPanel
+              showFilters={showFilters}
+              setShowFilters={setShowFilters}
+              selectedSubject={selectedSubject}
+              setSelectedSubject={setSelectedSubject}
+              setSelectedTopic={setSelectedTopic}
+              subjects={subjects}
+              filteredTopics={filteredTopics}
+              selectedTopic={selectedTopic}
+              selectedExamBoard={selectedExamBoard}
+              setSelectedExamBoard={setSelectedExamBoard}
+              examBoards={examBoards}
+              selectedLegislation={selectedLegislation}
+              setSelectedLegislation={setSelectedLegislation}
+              legislationTags={legislationTags}
+              selectedJurisprudence={selectedJurisprudence}
+              setSelectedJurisprudence={setSelectedJurisprudence}
+              jurisprudenceTags={jurisprudenceTags}
+              selectedInstitution={selectedInstitution}
+              setSelectedInstitution={setSelectedInstitution}
+              institutions={institutions}
+              selectedExamName={selectedExamName}
+              setSelectedExamName={setSelectedExamName}
+              examNames={examNames}
+              selectedModality={selectedModality}
+              setSelectedModality={setSelectedModality}
+              selectedLegalDiploma={selectedLegalDiploma}
+              setSelectedLegalDiploma={setSelectedLegalDiploma}
+              legalDiplomas={legalDiplomas}
+              difficultyFilter={difficultyFilter}
+              setDifficultyFilter={setDifficultyFilter}
+              notebooks={notebooks}
+              selectedNotebookId={selectedNotebookId}
+              setSelectedNotebookId={setSelectedNotebookId}
+              questionStatus={questionStatus}
+              setQuestionStatus={setQuestionStatus}
+              hideResolved={hideResolved}
+              setHideResolved={setHideResolved}
+              filteredQuestionCount={filteredQuestions.length}
+              onClearFilters={() => {
+                setSearchTerm('');
+                setSelectedSubject('');
+                setSelectedTopic('');
+                setDifficultyFilter('');
+                setQuestionStatus('all');
+                setSelectedNotebookId('');
+                setSelectedInstitution('');
+                setSelectedExamName('');
+                setSelectedModality('');
+                setSelectedLegalDiploma('');
+                setHideResolved(false);
+              }}
+            />
           </div>
 
           {/* Question Area */}
           <div key="question-area-container" className="w-full">
             <div className="flex-1">
-              {filteredQuestions.length > 0 && currentQuestion ? (
+              {(isMockMode ? mockQuestions.length > 0 : filteredQuestions.length > 0) && currentQuestion ? (
                 viewMode === 'list' ? (
                 <div className="grid grid-cols-1 gap-8">
                   {filteredQuestions.map((q, idx) => (
@@ -3467,7 +3018,10 @@ Forneça a explicação de forma concisa e didática.`;
                     </div>
                     
                     <div className="p-6">
-                      <div className="text-slate-800 dark:text-slate-200 leading-relaxed mb-4">
+                      <div
+                        id={`qb-statement-${q.id}`}
+                        className="text-slate-800 dark:text-slate-200 leading-relaxed mb-4"
+                      >
                         <GlossaryText text={q.statement} onTermClick={handleTermClick} />
                       </div>
                       {selectedText && (
@@ -3541,14 +3095,29 @@ Forneça a explicação de forma concisa e didática.`;
                       {/* Expanded Accordion Content */}
                       {expandedQuestionId === q.id && (
                         <div className="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-4 duration-300">
-                          <div className="space-y-3">
+                          <div
+                            className="space-y-3"
+                            role="group"
+                            aria-label="Alternativas da questão"
+                            aria-labelledby={`qb-statement-${q.id}`}
+                          >
                             {q.options.map((option, optIdx) => {
                               const isSelected = isMockMode ? mockAnswers[q.id] === optIdx : selectedOption === optIdx;
                               const isCorrect = q.correct_answer === optIdx;
                               const showStatus = isMockMode ? isMockFinished : showExplanation;
                               const isEliminated = (eliminatedOptions[q.id] || []).includes(optIdx);
+                              const letter = String.fromCharCode(65 + optIdx);
+                              const statusHint = showStatus
+                                ? isCorrect
+                                  ? ', gabarito'
+                                  : isSelected
+                                    ? ', sua resposta'
+                                    : ''
+                                : isSelected
+                                  ? ', selecionada'
+                                  : '';
                               
-                              let btnClass = "w-full text-left p-4 rounded-2xl border-2 transition-all duration-200 flex items-start gap-4 relative group ";
+                              let btnClass = `w-full text-left p-4 rounded-2xl border-2 transition-all duration-200 flex items-start gap-4 relative group ${QB_OPTION_FOCUS} `;
                               
                               if (!showStatus) {
                                 if (isSelected) {
@@ -3571,6 +3140,7 @@ Forneça a explicação de forma concisa e didática.`;
                               return (
                                 <div key={optIdx} className="relative">
                                   <button
+                                    type="button"
                                     onClick={() => handleAnswer(optIdx, q)}
                                     onContextMenu={(e) => {
                                       e.preventDefault();
@@ -3578,6 +3148,8 @@ Forneça a explicação de forma concisa e didática.`;
                                     }}
                                     disabled={showStatus && !isMockMode}
                                     className={btnClass}
+                                    aria-label={`Alternativa ${letter}${statusHint}. ${option}`}
+                                    aria-pressed={!showStatus ? isSelected : undefined}
                                   >
                                     <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center font-bold text-sm ${
                                       showStatus && isCorrect ? 'bg-green-500 text-white' :
@@ -3585,7 +3157,7 @@ Forneça a explicação de forma concisa e didática.`;
                                       isSelected && !showStatus ? 'bg-blue-500 text-white' :
                                       'bg-slate-100 dark:bg-slate-800 text-slate-500'
                                     }`}>
-                                      {String.fromCharCode(65 + optIdx)}
+                                      {letter}
                                     </div>
                                     <div className={`flex-1 pt-1 text-slate-700 dark:text-slate-300 ${isEliminated && !showStatus ? 'line-through' : ''}`}>
                                       {option}
@@ -3596,14 +3168,16 @@ Forneça a explicação de forma concisa e didática.`;
                                   
                                   {!showStatus && (
                                     <button
+                                      type="button"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         toggleElimination(q.id, optIdx);
                                       }}
-                                      className={`absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 ${
+                                      className={`absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${
                                         isEliminated ? 'text-orange-500 bg-orange-50 dark:bg-orange-900/20 opacity-100' : 'text-slate-300 hover:text-orange-400'
                                       }`}
                                       title={isEliminated ? "Restaurar alternativa" : "Riscar alternativa (Botão Direito)"}
+                                      aria-label={isEliminated ? `Restaurar alternativa ${letter}` : `Riscar alternativa ${letter}`}
                                     >
                                       {isEliminated ? <Eye size={16} /> : <EyeOff size={16} />}
                                     </button>
@@ -3616,73 +3190,81 @@ Forneça a explicação de forma concisa e didática.`;
                           {showExplanation && (
                             <div className="mt-8 space-y-4 animate-in slide-in-from-bottom-4">
                               {loadingAiCommentary[q.id] ? (
-                                <div className="p-8 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center gap-3">
-                                  <Loader2 className="w-6 h-6 text-purple-500 animate-spin" />
+                                <div
+                                  className="p-8 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center gap-3"
+                                  aria-live="polite"
+                                  aria-busy="true"
+                                >
+                                  <Loader2 className="w-6 h-6 text-purple-500 animate-spin" aria-hidden />
                                   <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Gerando Correção Estratégica...</p>
                                 </div>
                               ) : aiCommentary[q.id] ? (
                                 <>
                                   {typeof aiCommentary[q.id] === 'string' ? (
-                                  <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
+                                  <div
+                                    className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700"
+                                    role="region"
+                                    aria-label="Correção em texto da inteligência artificial"
+                                  >
                                     <div className="prose prose-sm dark:prose-invert max-w-none">
-                                      <Markdown remarkPlugins={[remarkGfm]}>{aiCommentary[q.id]}</Markdown>
+                                      <Markdown remarkPlugins={[remarkGfm]}>{aiCommentary[q.id] as string}</Markdown>
                                     </div>
                                   </div>
                                 ) : (
-                                  <div className="space-y-4">
+                                  (() => {
+                                    const ac = aiCommentary[q.id] as QuestionAiCorrection;
+                                    return (
+                                  <div
+                                    className="space-y-4"
+                                    role="region"
+                                    aria-label="Correção comentada pela inteligência artificial"
+                                  >
                                     {/* Doutrina e Contexto */}
                                     <div className="p-4 bg-indigo-50 dark:bg-indigo-900/10 rounded-xl border border-indigo-100 dark:border-indigo-900/30">
                                     <h4 className="font-black text-indigo-800 dark:text-indigo-400 text-[10px] uppercase tracking-widest mb-2 flex items-center gap-2">
-                                      <BookOpen size={14} /> Doutrina e Contexto
+                                      <BookOpen size={14} aria-hidden /> Doutrina e Contexto
                                     </h4>
                                     <p className="text-indigo-900/80 dark:text-indigo-200/80 text-sm leading-relaxed">
-                                      {aiCommentary[q.id].doctrineAndContext}
+                                      {ac.doctrineAndContext}
                                     </p>
                                   </div>
 
                                   {/* Fundamentação Legal */}
                                   <div className="p-5 bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl border border-emerald-100 dark:border-emerald-900/30">
                                     <h4 className="font-black text-emerald-800 dark:text-emerald-400 text-[10px] uppercase tracking-widest mb-2 flex items-center gap-2">
-                                      <Scale size={14} /> Fundamentação Legal
+                                      <Scale size={14} aria-hidden /> Fundamentação Legal
                                     </h4>
                                     <p className="text-emerald-900/80 dark:text-emerald-200/80 text-sm font-medium">
-                                      {aiCommentary[q.id].legalBasis}
+                                      {ac.legalBasis}
                                     </p>
                                   </div>
 
                                   {/* Análise das Alternativas */}
                                   <div className="space-y-2">
-                                    <h4 className="font-black text-slate-700 dark:text-slate-300 text-[10px] uppercase tracking-widest mb-2 flex items-center gap-2">
-                                      <Gavel size={14} /> Análise das Alternativas
+                                    <h4 id={`qb-alt-h-${q.id}`} className="font-black text-slate-700 dark:text-slate-300 text-[10px] uppercase tracking-widest mb-2 flex items-center gap-2">
+                                      <Gavel size={14} aria-hidden /> Análise das Alternativas
                                     </h4>
-                                    {Array.isArray(aiCommentary[q.id].alternativesAnalysis) ? (
-                                      aiCommentary[q.id].alternativesAnalysis.map((alt: any, idx: number) => (
-                                        <div key={idx} className={`p-4 rounded-xl border ${alt.status === 'Correta' ? 'bg-green-50 dark:bg-green-900/10 border-green-100 dark:border-green-900/30' : 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30'}`}>
-                                          <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                                            <span className="font-black uppercase">[{alt.alternative}] {alt.status}:</span> {alt.explanation}
-                                          </p>
-                                        </div>
-                                      ))
-                                    ) : (
-                                      <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">
-                                        {aiCommentary[q.id].alternativesAnalysis}
-                                      </p>
-                                    )}
+                                    <QuestionAlternativeAnalysisBlocks
+                                      analysis={ac.alternativesAnalysis}
+                                      headingId={`qb-alt-h-${q.id}`}
+                                    />
                                   </div>
 
                                   {/* Pulo do Gato */}
                                   <div className="p-4 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-100 dark:border-amber-900/30 relative overflow-hidden">
-                                    <div className="absolute top-0 right-0 p-2 opacity-10">
+                                    <div className="absolute top-0 right-0 p-2 opacity-10" aria-hidden>
                                       <Zap size={40} className="text-amber-500" />
                                     </div>
                                     <h4 className="font-black text-amber-800 dark:text-amber-400 text-[10px] uppercase tracking-widest mb-2 flex items-center gap-2">
-                                      <Lightbulb size={14} /> Pulo do Gato (Dica de Ouro)
+                                      <Lightbulb size={14} aria-hidden /> Pulo do Gato (Dica de Ouro)
                                     </h4>
                                     <p className="text-amber-900/80 dark:text-amber-200/80 text-sm font-bold italic">
-                                      "{aiCommentary[q.id].mnemonic}"
+                                      "{ac.mnemonic}"
                                     </p>
                                   </div>
                                 </div>
+                                    );
+                                  })()
                                 )}
                                   <div className="mt-6 pt-6 border-t border-slate-100 dark:border-white/5 space-y-4">
                                     <div className="flex items-center gap-2 mb-2">
@@ -3874,7 +3456,10 @@ Forneça a explicação de forma concisa e didática.`;
 
               {/* Question Body */}
               <div className="p-6 md:p-8">
-                <div className="text-lg md:text-xl text-slate-800 dark:text-slate-200 font-medium leading-relaxed mb-4 whitespace-pre-wrap">
+                <div
+                  id={`qb-statement-${currentQuestion.id}`}
+                  className="text-lg md:text-xl text-slate-800 dark:text-slate-200 font-medium leading-relaxed mb-4 whitespace-pre-wrap"
+                >
                   {currentQuestion.statement}
                 </div>
                 {selectedText && (
@@ -3887,14 +3472,29 @@ Forneça a explicação de forma concisa e didática.`;
                   </button>
                 )}
 
-                <div className="space-y-3">
+                <div
+                  className="space-y-3"
+                  role="group"
+                  aria-label="Alternativas da questão"
+                  aria-labelledby={`qb-statement-${currentQuestion.id}`}
+                >
                   {currentQuestion.options.map((option, idx) => {
                     const isSelected = isMockMode ? mockAnswers[currentQuestion.id] === idx : selectedOption === idx;
                     const isCorrect = currentQuestion.correct_answer === idx;
                     const showStatus = isMockMode ? isMockFinished : showExplanation;
                     const isEliminated = (eliminatedOptions[currentQuestion.id] || []).includes(idx);
+                    const letter = String.fromCharCode(65 + idx);
+                    const statusHint = showStatus
+                      ? isCorrect
+                        ? ', gabarito'
+                        : isSelected
+                          ? ', sua resposta'
+                          : ''
+                      : isSelected
+                        ? ', selecionada'
+                        : '';
                     
-                    let btnClass = "w-full text-left p-4 rounded-2xl border-2 transition-all duration-200 flex items-start gap-4 relative group ";
+                    let btnClass = `w-full text-left p-4 rounded-2xl border-2 transition-all duration-200 flex items-start gap-4 relative group ${QB_OPTION_FOCUS} `;
                     
                     if (!showStatus) {
                       if (isSelected) {
@@ -3917,6 +3517,7 @@ Forneça a explicação de forma concisa e didática.`;
                     return (
                       <div key={idx} className="relative">
                         <button
+                          type="button"
                           onClick={() => handleAnswer(idx)}
                           onContextMenu={(e) => {
                             e.preventDefault();
@@ -3924,6 +3525,8 @@ Forneça a explicação de forma concisa e didática.`;
                           }}
                           disabled={showStatus && !isMockMode}
                           className={btnClass}
+                          aria-label={`Alternativa ${letter}${statusHint}. ${option}`}
+                          aria-pressed={!showStatus ? isSelected : undefined}
                         >
                           <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center font-bold text-sm ${
                             showStatus && isCorrect ? 'bg-green-500 text-white' :
@@ -3931,7 +3534,7 @@ Forneça a explicação de forma concisa e didática.`;
                             isSelected && !showStatus ? 'bg-blue-500 text-white' :
                             'bg-slate-100 dark:bg-slate-800 text-slate-500'
                           }`}>
-                            {String.fromCharCode(65 + idx)}
+                            {letter}
                           </div>
                           <div className={`flex-1 pt-1 text-slate-700 dark:text-slate-300 ${isEliminated && !showStatus ? 'line-through' : ''}`}>
                             {option}
@@ -3942,14 +3545,16 @@ Forneça a explicação de forma concisa e didática.`;
                         
                         {!showStatus && (
                           <button
+                            type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               toggleElimination(currentQuestion.id, idx);
                             }}
-                            className={`absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 ${
+                            className={`absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${
                               isEliminated ? 'text-orange-500 bg-orange-50 dark:bg-orange-900/20 opacity-100' : 'text-slate-300 hover:text-orange-400'
                             }`}
                             title={isEliminated ? "Restaurar alternativa" : "Riscar alternativa (Botão Direito)"}
+                            aria-label={isEliminated ? `Restaurar alternativa ${letter}` : `Riscar alternativa ${letter}`}
                           >
                             {isEliminated ? <Eye size={16} /> : <EyeOff size={16} />}
                           </button>
@@ -3963,14 +3568,18 @@ Forneça a explicação de forma concisa e didática.`;
                 {showExplanation && (
                   <div className="mt-8 space-y-4 animate-in slide-in-from-bottom-4">
                     {loadingAiCommentary[currentQuestion.id] ? (
-                      <div className="p-12 bg-slate-50 dark:bg-slate-800/50 rounded-[2rem] border-2 border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center gap-4">
-                        <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+                      <div
+                        className="p-12 bg-slate-50 dark:bg-slate-800/50 rounded-[2rem] border-2 border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center gap-4"
+                        aria-live="polite"
+                        aria-busy="true"
+                      >
+                        <Loader2 className="w-8 h-8 text-purple-500 animate-spin" aria-hidden />
                         <p className="text-xs font-black text-slate-500 uppercase tracking-[0.3em] animate-pulse">Consultando Jurisprudência...</p>
                       </div>
                     ) : aiCommentary[currentQuestion.id] ? (
                       <>
                         {typeof aiCommentary[currentQuestion.id] === 'string' ? (
-                        <div className="space-y-6">
+                        <div className="space-y-6" role="region" aria-label="Correção em texto da inteligência artificial">
                           <div className="flex items-center gap-3 mb-2">
                             <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800"></div>
                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Correção Comentada IA</span>
@@ -3978,12 +3587,19 @@ Forneça a explicação de forma concisa e didática.`;
                           </div>
                           <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-[2rem] border-2 border-slate-200 dark:border-slate-700">
                             <div className="prose prose-sm dark:prose-invert max-w-none">
-                              <Markdown remarkPlugins={[remarkGfm]}>{aiCommentary[currentQuestion.id]}</Markdown>
+                              <Markdown remarkPlugins={[remarkGfm]}>{aiCommentary[currentQuestion.id] as string}</Markdown>
                             </div>
                           </div>
                         </div>
                       ) : (
-                        <div className="space-y-6">
+                        (() => {
+                          const ac = aiCommentary[currentQuestion.id] as QuestionAiCorrection;
+                          return (
+                        <div
+                          className="space-y-6"
+                          role="region"
+                          aria-label="Correção comentada pela inteligência artificial"
+                        >
                           <div className="flex items-center gap-3 mb-2">
                             <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800"></div>
                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Correção Comentada IA</span>
@@ -3994,54 +3610,47 @@ Forneça a explicação de forma concisa e didática.`;
                           {/* Doutrina e Contexto */}
                           <div className="p-6 bg-indigo-50 dark:bg-indigo-900/10 rounded-[2rem] border-2 border-indigo-100 dark:border-indigo-900/30">
                             <h4 className="font-black text-indigo-800 dark:text-indigo-400 text-[11px] uppercase tracking-widest mb-3 flex items-center gap-2">
-                              <BookOpen size={16} /> Doutrina e Contexto
+                              <BookOpen size={16} aria-hidden /> Doutrina e Contexto
                             </h4>
                             <p className="text-indigo-900/80 dark:text-indigo-200/80 text-sm leading-relaxed">
-                              {aiCommentary[currentQuestion.id].doctrineAndContext}
+                              {ac.doctrineAndContext}
                             </p>
                           </div>
 
                           <div className="p-6 bg-emerald-50 dark:bg-emerald-900/10 rounded-[2rem] border-2 border-emerald-100 dark:border-emerald-900/30">
                             <h4 className="font-black text-emerald-800 dark:text-emerald-400 text-[11px] uppercase tracking-widest mb-3 flex items-center gap-2">
-                              <Scale size={16} /> Fundamentação Legal
+                              <Scale size={16} aria-hidden /> Fundamentação Legal
                             </h4>
                             <p className="text-emerald-900/80 dark:text-emerald-200/80 text-sm font-bold leading-relaxed">
-                              {aiCommentary[currentQuestion.id].legalBasis}
+                              {ac.legalBasis}
                             </p>
                           </div>
 
                           <div className="p-6 bg-amber-50 dark:bg-amber-900/10 rounded-[2rem] border-2 border-amber-100 dark:border-amber-900/30 relative overflow-hidden">
-                            <div className="absolute -top-2 -right-2 opacity-10 rotate-12">
+                            <div className="absolute -top-2 -right-2 opacity-10 rotate-12" aria-hidden>
                               <Zap size={80} className="text-amber-500" />
                             </div>
                             <h4 className="font-black text-amber-800 dark:text-amber-400 text-[11px] uppercase tracking-widest mb-3 flex items-center gap-2">
-                              <Lightbulb size={16} /> Pulo do Gato
+                              <Lightbulb size={16} aria-hidden /> Pulo do Gato
                             </h4>
                             <p className="text-amber-900/80 dark:text-amber-200/80 text-sm font-black italic leading-relaxed">
-                              "{aiCommentary[currentQuestion.id].mnemonic}"
+                              "{ac.mnemonic}"
                             </p>
                           </div>
                         </div>
 
                         <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-[2rem] border-2 border-slate-200 dark:border-slate-700 space-y-3">
-                          <h4 className="font-black text-slate-700 dark:text-slate-300 text-[11px] uppercase tracking-widest mb-3 flex items-center gap-2">
-                            <Gavel size={16} /> Análise Técnica das Alternativas
+                          <h4 id={`qb-alt-h-single-${currentQuestion.id}`} className="font-black text-slate-700 dark:text-slate-300 text-[11px] uppercase tracking-widest mb-3 flex items-center gap-2">
+                            <Gavel size={16} aria-hidden /> Análise Técnica das Alternativas
                           </h4>
-                          {Array.isArray(aiCommentary[currentQuestion.id].alternativesAnalysis) ? (
-                            aiCommentary[currentQuestion.id].alternativesAnalysis.map((alt: any, idx: number) => (
-                              <div key={idx} className={`p-4 rounded-xl border ${alt.status === 'Correta' ? 'bg-green-50 dark:bg-green-900/10 border-green-100 dark:border-green-900/30' : 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30'}`}>
-                                <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                                  <span className="font-black uppercase">[{alt.alternative}] {alt.status}:</span> {alt.explanation}
-                                </p>
-                              </div>
-                            ))
-                          ) : (
-                            <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed whitespace-pre-wrap">
-                              {aiCommentary[currentQuestion.id].alternativesAnalysis}
-                            </p>
-                          )}
+                          <QuestionAlternativeAnalysisBlocks
+                            analysis={ac.alternativesAnalysis}
+                            headingId={`qb-alt-h-single-${currentQuestion.id}`}
+                          />
                         </div>
                       </div>
+                          );
+                        })()
                       )}
                         <div className="mt-6 pt-6 border-t border-slate-100 dark:border-white/5 space-y-4">
                           <div className="flex items-center gap-2 mb-2">
@@ -4170,22 +3779,58 @@ Forneça a explicação de forma concisa e didática.`;
               </div>
 
               {/* Footer / Navigation */}
-              <div className="bg-slate-50 dark:bg-slate-800/50 p-4 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center">
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-4 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center flex-wrap gap-2">
                 <button
+                  type="button"
                   onClick={handlePrev}
-                  disabled={currentIndex === 0}
+                  disabled={
+                    isMockMode && mockQuestions.length > 0
+                      ? mockNavUnansweredOnly
+                        ? getPrevUnansweredMockIndex(currentIndex) < 0
+                        : currentIndex === 0
+                      : currentIndex === 0
+                  }
                   className="px-4 py-2 flex items-center gap-2 text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30 transition-colors font-bold text-sm uppercase tracking-wider"
                 >
                   <ChevronLeft size={18} /> Anterior
                 </button>
-                
-                <span className="text-sm font-bold text-slate-400">
-                  {currentIndex + 1} / {filteredQuestions.length}
-                </span>
-                
+
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-sm font-bold text-slate-400">
+                    {currentIndex + 1} /{' '}
+                    {isMockMode && mockQuestions.length > 0 ? mockQuestions.length : filteredQuestions.length}
+                  </span>
+                  {isMockMode && currentQuestion && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setMockMarkReviewLater((prev) => ({
+                          ...prev,
+                          [currentQuestion.id]: !prev[currentQuestion.id],
+                        }))
+                      }
+                      className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest transition-colors ${
+                        mockMarkReviewLater[currentQuestion.id]
+                          ? 'bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-100'
+                          : 'bg-slate-200/80 text-slate-500 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300'
+                      }`}
+                    >
+                      <Bookmark size={12} className={mockMarkReviewLater[currentQuestion.id] ? 'fill-current' : ''} />
+                      Revisar depois
+                    </button>
+                  )}
+                </div>
+
                 <button
+                  type="button"
                   onClick={handleNext}
-                  disabled={currentIndex === filteredQuestions.length - 1}
+                  disabled={
+                    isMockMode && mockQuestions.length > 0
+                      ? mockNavUnansweredOnly
+                        ? getNextUnansweredMockIndex(currentIndex) < 0
+                        : currentIndex === mockQuestions.length - 1
+                      : currentIndex === filteredQuestions.length - 1
+                  }
                   className="px-4 py-2 flex items-center gap-2 text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30 transition-colors font-bold text-sm uppercase tracking-wider"
                 >
                   Próxima <ChevronRight size={18} />
@@ -4227,23 +3872,27 @@ Forneça a explicação de forma concisa e didática.`;
             </div>
           )}
         </div>
-  
-  export default QuestionBank;
+
       {showAiLesson && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[130] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 md:p-10 shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-3xl animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[130] flex items-center justify-center p-4" role="presentation">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="qb-ai-lesson-title"
+            className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 md:p-10 shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-3xl animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-hidden flex flex-col"
+          >
             <div className="flex justify-between items-center mb-8 shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-2xl">
+                <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-2xl" aria-hidden>
                   <Sparkles className="text-purple-600 dark:text-purple-400" size={24} />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Aula Resumida IA</h2>
+                  <h2 id="qb-ai-lesson-title" className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Aula Resumida IA</h2>
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{selectedSubject}</p>
                 </div>
               </div>
-              <button onClick={() => setShowAiLesson(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all">
-                <X size={24} />
+              <button type="button" onClick={() => setShowAiLesson(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all" aria-label="Fechar aula resumida">
+                <X size={24} aria-hidden />
               </button>
             </div>
 
@@ -4270,8 +3919,9 @@ Forneça a explicação de forma concisa e didática.`;
 
             <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 shrink-0">
               <button
+                type="button"
                 onClick={() => setShowAiLesson(false)}
-                className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all hover:scale-[1.02] active:scale-[0.98]"
+                className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
               >
                 Entendido, Vamos Praticar!
               </button>
@@ -4282,15 +3932,20 @@ Forneça a explicação de forma concisa e didática.`;
 
       {/* Juridiquês Translator Modal */}
       {showJuridiquesModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-2xl animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" role="presentation">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="qb-juridiques-title"
+            className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-2xl animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto"
+          >
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <MessageSquareText className="text-blue-500" />
+              <h2 id="qb-juridiques-title" className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <MessageSquareText className="text-blue-500" aria-hidden />
                 Tradutor de Juridiquês
               </h2>
-              <button onClick={() => setShowJuridiquesModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                <X size={24} />
+              <button type="button" onClick={() => setShowJuridiquesModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" aria-label="Fechar tradutor">
+                <X size={24} aria-hidden />
               </button>
             </div>
 
@@ -4319,8 +3974,9 @@ Forneça a explicação de forma concisa e didática.`;
 
             <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800">
               <button
+                type="button"
                 onClick={() => setShowJuridiquesModal(false)}
-                className="w-full py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold transition-colors"
+                className="w-full py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
               >
                 Fechar
               </button>
@@ -4331,15 +3987,20 @@ Forneça a explicação de forma concisa e didática.`;
 
       {/* Manual Glossary Search Modal */}
       {showManualGlossarySearch && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md animate-in zoom-in-95 duration-300">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4" role="presentation">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="qb-glossary-title"
+            className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md animate-in zoom-in-95 duration-300"
+          >
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Book className="text-indigo-500" />
+              <h2 id="qb-glossary-title" className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Book className="text-indigo-500" aria-hidden />
                 Dicionário Jurídico
               </h2>
-              <button onClick={() => setShowManualGlossarySearch(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                <X size={24} />
+              <button type="button" onClick={() => setShowManualGlossarySearch(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" aria-label="Fechar dicionário">
+                <X size={24} aria-hidden />
               </button>
             </div>
             
@@ -4383,7 +4044,7 @@ Forneça a explicação de forma concisa e didática.`;
               setGlossaryData(null);
             }}
             userId={userId}
-            isOnline={true} // Assuming online for AI features
+            isOnline={isOnline}
             position={glossaryPosition}
           />
         )}
@@ -4440,15 +4101,20 @@ Forneça a explicação de forma concisa e didática.`;
       )}
 
       {isDeckModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[120] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md animate-in zoom-in-95 duration-300">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[120] flex items-center justify-center p-4" role="presentation">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="qb-deck-title"
+            className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md animate-in zoom-in-95 duration-300"
+          >
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <BrainCircuit className="text-indigo-500" />
+              <h2 id="qb-deck-title" className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <BrainCircuit className="text-indigo-500" aria-hidden />
                 Escolher Baralho
               </h2>
-              <button onClick={() => setIsDeckModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                <X size={24} />
+              <button type="button" onClick={() => setIsDeckModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" aria-label="Fechar seleção de baralho">
+                <X size={24} aria-hidden />
               </button>
             </div>
 
@@ -4477,8 +4143,9 @@ Forneça a explicação de forma concisa e didática.`;
 
             <div className="mt-8 flex gap-3">
               <button
+                type="button"
                 onClick={() => setIsDeckModalOpen(false)}
-                className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
               >
                 Cancelar
               </button>

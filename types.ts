@@ -1,5 +1,6 @@
 
 import React from 'react';
+import type { QuestionAnswerGoalsPersisted } from './components/question-bank/answerGoals';
 
 export enum View {
   Dashboard = 'dashboard',
@@ -447,6 +448,42 @@ export interface ClassifiedAd {
   created_at: string;
 }
 
+/** Código canônico da modalidade (alinha com coluna `questions.modality` no Supabase). */
+export type QuestionModality = 'multipla_escolha' | 'certo_errado';
+
+export const QUESTION_MODALITY_LABELS: Record<QuestionModality, string> = {
+  multipla_escolha: 'Múltipla Escolha',
+  certo_errado: 'Certo/Errado',
+};
+
+/** Rótulo para prompts e UI. */
+export function questionModalityLabel(m: QuestionModality | undefined): string {
+  return m ? QUESTION_MODALITY_LABELS[m] : '';
+}
+
+/**
+ * Converte valores legados (texto da IA, strings antigas) para o código canônico.
+ */
+export function normalizeQuestionModality(raw: string | null | undefined): QuestionModality | undefined {
+  if (raw == null || raw === '') return undefined;
+  const s = String(raw).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const spaced = s.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+  const underscored = spaced.replace(/\s+/g, '_');
+  if (underscored === 'multipla_escolha' || spaced === 'multipla escolha') {
+    return 'multipla_escolha';
+  }
+  if (
+    underscored === 'certo_errado' ||
+    spaced === 'certo ou errado' ||
+    spaced === 'certo errado' ||
+    spaced === 'certo/errado' ||
+    spaced === 'cespe'
+  ) {
+    return 'certo_errado';
+  }
+  return undefined;
+}
+
 export interface Question {
   id: string;
   subject: string;
@@ -460,7 +497,7 @@ export interface Question {
   exam_board?: string;
   institution?: string;
   exam_name?: string;
-  modality?: 'multipla_escolha' | 'certo_errado';
+  modality?: QuestionModality;
   legal_diploma?: string;
   year?: string;
   created_at?: string;
@@ -476,14 +513,49 @@ export interface Question {
     fundamentação: string;
     jurisprudencia: string;
   };
-  ai_correction?: {
-    doctrineAndContext: string;
-    legalBasis: string;
-    alternativesAnalysis: any;
-    mnemonic: string;
-    doctrineLink?: string;
-    doctrineUrl?: string;
-  };
+  ai_correction?: QuestionAiCorrection;
+}
+
+/** Status devolvido pela IA na análise por alternativa (prompt em QuestionBank). */
+export type QuestionAlternativeAnalysisStatus = 'Correta' | 'Incorreta';
+
+export interface QuestionAlternativeAnalysisItem {
+  alternative: string;
+  status: QuestionAlternativeAnalysisStatus;
+  explanation: string;
+}
+
+/** Lista estruturada ou texto legado quando a IA não retornou array. */
+export type AiCorrectionAlternativesAnalysis =
+  | QuestionAlternativeAnalysisItem[]
+  | string;
+
+export interface QuestionAiCorrection {
+  doctrineAndContext: string;
+  legalBasis: string;
+  alternativesAnalysis: AiCorrectionAlternativesAnalysis;
+  mnemonic: string;
+  doctrineLink?: string;
+  doctrineUrl?: string;
+}
+
+export type QuestionAiCommentary = string | QuestionAiCorrection;
+
+export function isAlternativesAnalysisArray(
+  v: AiCorrectionAlternativesAnalysis | undefined
+): v is QuestionAlternativeAnalysisItem[] {
+  return Array.isArray(v);
+}
+
+/** Texto plano para flashcards / export quando `alternativesAnalysis` é array ou string. */
+export function formatAlternativesAnalysisPlain(
+  v: AiCorrectionAlternativesAnalysis | undefined
+): string {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  return v
+    .map((item) => `[${item.alternative}] ${item.status}: ${item.explanation}`)
+    .join('\n');
 }
 
 export interface Notebook {
@@ -623,6 +695,8 @@ export interface UserProgress {
   error_mastery?: Record<string, number>; // question_id -> consecutive_correct_count
   confidence_levels?: Record<string, 'certeza' | 'duvida' | 'chute'>;
   question_stats?: Record<string, { correctAttempts: number, totalAttempts: number, lastAttemptCorrect: boolean }>;
+  /** Metas diárias/semanais do Banco de Questões (JSONB no Supabase). */
+  question_answer_goals?: QuestionAnswerGoalsPersisted | null;
   updated_at: string;
 }
 
@@ -808,6 +882,12 @@ export interface IracEntry {
   created_at: string;
 }
 
+/** `fixed` = escada Ebbinghaus; `sm2` = intervalo adaptativo (SuperMemo 2 simplificado). */
+export type SrsAlgorithm = 'fixed' | 'sm2';
+
+/** Destaque de atalhos no tópico de revisão espaçada (flashcards, resumidor, banco de questões). */
+export type SpacedMaterialKind = 'none' | 'flashcards' | 'summarizer' | 'both' | 'question_bank';
+
 // Spaced Repetition Types
 export interface SpacedTopic {
   id: string;
@@ -816,9 +896,28 @@ export interface SpacedTopic {
   topic: string;
   study_date: string; // YYYY-MM-DD
   reviews_completed: number[]; // Array of intervals done [1, 7, 15, 30]
+  /** Data (YYYY-MM-DD) em que cada intervalo foi concluído; chaves são o número do intervalo em string (ex.: "1", "7"). */
+  review_completion_dates?: Record<string, string>;
   cycles: number;
   created_at: string;
   content?: string; // New field for document content
+  srs_algorithm?: SrsAlgorithm;
+  /** Fator de facilidade SM-2 (típico 2.5). */
+  srs_ease_factor?: number | null;
+  /** Passagens bem-sucedidas consecutivas no SM-2. */
+  srs_repetitions?: number | null;
+  /** Último intervalo em dias calculado pelo SM-2. */
+  srs_interval_days?: number | null;
+  /** Próxima revisão (YYYY-MM-DD) para tópicos SM-2. */
+  srs_next_review_at?: string | null;
+  /** Modo fixo: adia a revisão de um degrau (ex.: Again) — chave = intervalo em string, valor = data. */
+  review_snoozes?: Record<string, string>;
+  /** Modo fixo: deslocamento em dias aplicado à escada (Hard/Easy). */
+  srs_cumulative_offset_days?: number | null;
+  /** Qual atalho de material enfatizar (ambos continuam disponíveis quando não for `none`). */
+  linked_material_kind?: SpacedMaterialKind | null;
+  /** Texto usado na busca dos flashcards e no pré-preenchimento do resumidor (vazio = matéria + tópico). */
+  linked_material_query?: string | null;
 }
 
 // Attendance Types

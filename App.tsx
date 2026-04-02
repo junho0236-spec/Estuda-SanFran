@@ -362,21 +362,13 @@ const App: React.FC = () => {
     const userId = session.user.id;
 
     const dataChannel = supabase.channel('realtime_data_sync')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'questions' 
-      }, () => {
-        console.log("[Realtime] Questions changed, reloading...");
-        loadUserData();
-      })
+      // questions: não escutar aqui — loadUserData não lê essa tabela; QuestionBank já inscreve em `question_bank_changes`.
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
         table: 'flashcards', 
         filter: `user_id=eq.${userId}` 
       }, () => {
-        console.log("[Realtime] Flashcards changed, reloading...");
         loadUserData();
       })
       .on('postgres_changes', { 
@@ -385,7 +377,6 @@ const App: React.FC = () => {
         table: 'tasks', 
         filter: `user_id=eq.${userId}` 
       }, () => {
-        console.log("[Realtime] Tasks changed, reloading...");
         loadUserData();
       })
       .on('postgres_changes', { 
@@ -394,7 +385,6 @@ const App: React.FC = () => {
         table: 'folders', 
         filter: `user_id=eq.${userId}` 
       }, () => {
-        console.log("[Realtime] Folders changed, reloading...");
         loadUserData();
       })
       .on('postgres_changes', { 
@@ -403,7 +393,6 @@ const App: React.FC = () => {
         table: 'user_progress', 
         filter: `user_id=eq.${userId}` 
       }, () => {
-        console.log("[Realtime] User progress changed, reloading...");
         loadUserData();
       })
       .subscribe();
@@ -483,13 +472,10 @@ const App: React.FC = () => {
       if (error) {
         console.warn("[Auth] Failed to get initial session:", error.message);
         // If refresh token is invalid or not found, force a logout to clear the stale state
-        if (error.message.includes("Refresh Token Not Found") || error.message.includes("Invalid Refresh Token") || error.message.includes("Failed to fetch")) {
-          console.error("[Auth] Stale or invalid session detected. Signing out.");
-          supabase.auth.signOut().catch(() => {});
+        if (error.message.includes("Refresh Token Not Found") || error.message.includes("Invalid Refresh Token")) {
+          supabase.auth.signOut();
           setSession(null);
           setIsAuthenticated(false);
-          // Clear the storage key manually as a last resort
-          localStorage.removeItem('sb-sanfran-auth-token');
         }
         return;
       }
@@ -502,30 +488,19 @@ const App: React.FC = () => {
       }
     }).catch(err => {
       console.warn("[Auth] Unexpected error getting session:", err);
-      if (err.message?.includes("Failed to fetch")) {
-        // Network error, but we might still have a local session
-        console.log("[Auth] Network error during session fetch. Using cached state if available.");
-      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("[Auth] State changed:", event);
+      setSession(session);
+      setIsAuthenticated(!!session);
       
-      if (event === 'TOKEN_REFRESHED') {
-        console.log("[Auth] Token successfully refreshed");
-      }
-      
-      if (event === 'SIGNED_OUT') {
+      if (session?.user) {
+        syncProfile(session.user);
+        clearOldLocalStorage(session.user.id);
+      } else if (event === 'SIGNED_OUT') {
+        // Clear any local state if needed
         setSession(null);
         setIsAuthenticated(false);
-        localStorage.removeItem('sb-sanfran-auth-token');
-      } else {
-        setSession(session);
-        setIsAuthenticated(!!session);
-        if (session?.user) {
-          syncProfile(session.user);
-          clearOldLocalStorage(session.user.id);
-        }
       }
     });
 
@@ -547,7 +522,6 @@ const App: React.FC = () => {
       'sanfran_grades_sim'
     ];
     keysToRemove.forEach(key => localStorage.removeItem(key));
-    console.log("[App] Local storage cleaned up for user:", userId);
   };
 
   const syncProfile = async (user: any) => {
@@ -771,7 +745,9 @@ const App: React.FC = () => {
               syllabusLink: desc.syllabusLink,
               importantCitations: desc.importantCitations,
               revisionStatus: desc.revisionStatus,
-              created_at: t.created_at
+              created_at: t.created_at,
+              google_event_id:
+                (t as { google_event_id?: string }).google_event_id ?? desc.google_event_id,
             };
           });
 
@@ -838,6 +814,59 @@ const App: React.FC = () => {
       setIsLoadingFlashcards(false);
     }
   };
+
+  useEffect(() => {
+    if (!isAuthenticated || !session?.user) return;
+    void (async () => {
+      try {
+        const { auth, getRedirectResult } = await import('./firebase');
+        const { GoogleAuthProvider } = await import('firebase/auth');
+        const { googleCalendarService } = await import('./services/googleCalendarService');
+        const result = await getRedirectResult(auth);
+        if (!result) return;
+        const credential = GoogleAuthProvider.credentialFromResult(result);
+        const token = credential?.accessToken;
+        if (!token) {
+          toast.error(
+            'Login Google concluído, mas o token do Calendar não veio. Ative a Google Calendar API no projeto Google Cloud ligado ao Firebase e confira o ecrã de consentimento OAuth.'
+          );
+          return;
+        }
+        googleCalendarService.setFirebaseToken(token);
+        toast.success('Conectado ao Google Agenda.');
+        sessionStorage.setItem('sanfran_gcal_post_redirect_sync', '1');
+      } catch (err: unknown) {
+        console.error('getRedirectResult:', err);
+        const e = err as { code?: string; message?: string };
+        if (e?.code && e.code !== 'auth/popup-closed-by-user') {
+          toast.error(e.message || 'Não foi possível concluir o login do Google.');
+        }
+      }
+    })();
+  }, [isAuthenticated, session?.user?.id]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !session?.user) return;
+    if (isLoadingFlashcards) return;
+    if (sessionStorage.getItem('sanfran_gcal_post_redirect_sync') !== '1') return;
+    sessionStorage.removeItem('sanfran_gcal_post_redirect_sync');
+
+    void (async () => {
+      try {
+        const { syncDueTasksToGoogleAndSupabase } = await import('./services/googleCalendarTaskSync');
+        const { successCount, withDueCount } = await syncDueTasksToGoogleAndSupabase(tasks, subjects);
+        if (withDueCount === 0) {
+          toast.info('Nenhuma tarefa com prazo para sincronizar.');
+        } else if (successCount > 0) {
+          toast.success(`${successCount} tarefa(s) enviadas ao Google Agenda (novas ou atualizadas).`);
+        } else {
+          toast.error('Não foi possível sincronizar as tarefas com o Google Agenda.');
+        }
+      } finally {
+        await loadUserData();
+      }
+    })();
+  }, [isAuthenticated, session?.user?.id, isLoadingFlashcards, tasks, subjects]);
 
   useEffect(() => {
     if (isDarkMode) document.documentElement.classList.add('dark');
@@ -971,7 +1000,6 @@ const App: React.FC = () => {
           table: 'notifications',
           filter: `user_id=eq.${session.user.id}`
         }, (payload) => {
-          console.log("[App] New notification received:", payload.new);
           const newNotif = payload.new as Notification;
           setNotifications(prev => {
             // Avoid duplicates
@@ -990,9 +1018,7 @@ const App: React.FC = () => {
             });
           }
         })
-        .subscribe((status) => {
-          console.log("[App] Notifications subscription status:", status);
-        });
+        .subscribe();
       
       return () => {
         supabase.removeChannel(channel);
@@ -1019,8 +1045,6 @@ const App: React.FC = () => {
     }
 
     try {
-      console.log("[App] Accepting friend request for notification:", notification.id);
-      
       // Find the friendship record
       let friendshipId = notification.link_task;
       let requesterId = '';
@@ -1100,8 +1124,6 @@ const App: React.FC = () => {
     }
 
     try {
-      console.log("[App] Declining friend request for notification:", notification.id);
-
       // Find the friendship record
       let friendshipId = notification.link_task;
 
@@ -1347,7 +1369,7 @@ const App: React.FC = () => {
           <div className="w-10"></div>
         </header>
 
-        <main className={`flex-1 overflow-y-auto ${isExtremeFocus ? 'p-0' : 'p-4 md:p-10'} relative transition-all duration-700`}>
+        <main className={`flex-1 min-h-0 overflow-y-auto ${isExtremeFocus ? 'p-0' : 'p-4 md:p-10'} relative transition-all duration-700`}>
           {!isExtremeFocus && (
             <div className="flex justify-end mb-6">
               <HeaderActions 
@@ -1382,7 +1404,7 @@ const App: React.FC = () => {
               <span className="text-[10px] font-black uppercase tracking-widest">Sincronizando...</span>
             </div>
           )}
-          <div className={`${isExtremeFocus ? 'max-w-none h-full flex items-center justify-center' : 'max-w-6xl mx-auto h-full'}`}>
+          <div className={`${isExtremeFocus ? 'max-w-none h-full flex items-center justify-center' : 'max-w-6xl mx-auto w-full h-full'}`}>
              <Suspense fallback={<PageLoader />}>
 <ErrorBoundary>
 <Routes>
@@ -1482,7 +1504,7 @@ const App: React.FC = () => {
                 <Route path={getPathFromView(View.PronunciationLab)} element={<PronunciationLab userId={session.user.id} />} />
                 <Route path={getPathFromView(View.LyricalVibes)} element={<LyricalVibes userId={session.user.id} />} />
                 <Route path={getPathFromView(View.TheExchangeStudent)} element={<TheExchangeStudent userId={session.user.id} />} />
-                <Route path={getPathFromView(View.QuestionBank)} element={<QuestionBank userId={session.user.id} folders={folders} flashcards={flashcards} isOnline={isOnline} />} />
+                <Route path={getPathFromView(View.QuestionBank)} element={<QuestionBank userId={session.user.id} folders={folders} flashcards={flashcards} isOnline={isOnline} onUserProgressSynced={loadUserData} />} />
                 <Route path={getPathFromView(View.IntelligentSummarizer)} element={<IntelligentSummarizer userId={session.user.id} />} />
                 <Route path={getPathFromView(View.StudyBuddy)} element={<StudyBuddy userId={session.user.id} />} />
                 <Route path={getPathFromView(View.Certificates)} element={<Certificates userId={session.user.id} userName={session.user.user_metadata?.full_name} />} />
@@ -1492,7 +1514,7 @@ const App: React.FC = () => {
                 <Route path={getPathFromView(View.ErrorLog)} element={<ErrorLog userId={session.user.id} />} />
                 <Route path={getPathFromView(View.CodeTracker)} element={<CodeTracker userId={session.user.id} />} />
                 <Route path={getPathFromView(View.IracMethod)} element={<IracMethod userId={session.user.id} />} />
-                <Route path={getPathFromView(View.SpacedRepetition)} element={<SpacedRepetition userId={session.user.id} />} />
+                <Route path={getPathFromView(View.SpacedRepetition)} element={<SpacedRepetition userId={session.user.id} isOnline={isOnline} />} />
                 <Route path={getPathFromView(View.Connect)} element={<Connect userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} onNavigate={setCurrentView} />} />
                 <Route path={getPathFromView(View.Friends)} element={<Friends userId={session.user.id} userName={userProfile?.full_name || session.user.email || 'Usuário'} onNavigate={setCurrentView} />} />
                 <Route path={getPathFromView(View.AttendanceCalculator)} element={<AttendanceCalculator userId={session.user.id} />} />
@@ -1575,7 +1597,7 @@ const App: React.FC = () => {
                 } />
 
                 <Route path={getPathFromView(View.OralArgument)} element={<OralArgument />} />
-                <Route path={getPathFromView(View.Calendar)} element={<CalendarView subjects={subjects} tasks={tasks} userId={session.user.id} studySessions={studySessions} />} />
+                <Route path={getPathFromView(View.Calendar)} element={<CalendarView subjects={subjects} tasks={tasks} userId={session.user.id} studySessions={studySessions} isOnline={isOnline} onTasksChanged={loadUserData} onAfterGoogleCalendarSync={loadUserData} />} />
                 <Route path={getPathFromView(View.Ranking)} element={<Ranking userId={session.user.id} session={session} flashcards={flashcards} />} />
                 <Route path={getPathFromView(View.Subjects)} element={
                   <Subjects 
@@ -1613,7 +1635,7 @@ const App: React.FC = () => {
                   />
                 } />
 
-                <Route path="/simulados" element={<QuestionBank userId={session.user.id} folders={folders} flashcards={flashcards} isOnline={isOnline} />} />
+                <Route path="/simulados" element={<QuestionBank userId={session.user.id} folders={folders} flashcards={flashcards} isOnline={isOnline} onUserProgressSynced={loadUserData} />} />
 
               </Routes>
 </ErrorBoundary>

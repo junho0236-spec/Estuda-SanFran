@@ -2,6 +2,54 @@ import { supabase } from './supabaseClient';
 import { db, addToSyncQueue } from './offlineService';
 import { Flashcard, Task, StudySession, Note, SubjectFile, Folder, Board, UserProgress, Friendship, Notification } from '../types';
 
+/**
+ * Upsert a note row; strip columns missing from the remote schema (PostgREST PGRST204)
+ * until the payload matches, so sync/backfill still works across Supabase projects.
+ */
+async function upsertNoteToSupabase(payload: Record<string, unknown>) {
+  let current: Record<string, unknown> = { ...payload };
+  const maxStrips = 12;
+  let triedBareMinimum = false;
+
+  for (let i = 0; i < maxStrips; i++) {
+    const { error } = await supabase.from('notes').upsert(current);
+    if (!error) return { error: null };
+
+    const code = (error as { code?: string }).code;
+    const msg = String((error as { message?: string }).message ?? '');
+
+    if (code === 'PGRST204') {
+      const m =
+        msg.match(/find the '([^']+)' column/i) ||
+        msg.match(/find the "([^"]+)" column/i);
+      if (m) {
+        const col = m[1];
+        const next = { ...current };
+        delete next[col];
+        current = next;
+        continue;
+      }
+      if (!triedBareMinimum) {
+        triedBareMinimum = true;
+        current = {
+          id: payload.id,
+          user_id: payload.user_id,
+          subject_id: payload.subject_id,
+          title: (payload.title as string) ?? null,
+          content: (payload.content as string) ?? '',
+          updated_at: payload.updated_at
+        };
+        continue;
+      }
+    }
+
+    return { error };
+  }
+
+  const { error: lastErr } = await supabase.from('notes').upsert(current);
+  return { error: lastErr };
+}
+
 export const dataService = {
   // BOARDS
   async saveBoard(board: Board, userId: string, isOnline: boolean) {
@@ -416,6 +464,7 @@ export const dataService = {
   },
   // TASKS
   async saveTask(task: Task, userId: string, isOnline: boolean) {
+    const previous = await db.tasks.get(task.id);
     // Optimistic update in local DB
     await db.tasks.put(task);
 
@@ -460,27 +509,49 @@ export const dataService = {
         await addToSyncQueue({ table: 'tasks', action: 'update', data: task });
       }
 
-      // Sync to Google Calendar if dueDate exists and user is connected
-      if (task.dueDate) {
+      // Google Agenda: atualizar/criar com prazo; remover evento se o prazo foi limpo
+      if (!error) {
         (async () => {
           try {
             const { googleCalendarService } = await import('./googleCalendarService');
-            const result = await googleCalendarService.syncTaskToGoogle(task);
-            
-            if (result && result.id && result.id !== task.google_event_id) {
-              // Save the event ID back to the task
-              const updatedTask = { ...task, google_event_id: result.id };
-              await db.tasks.put(updatedTask);
-              
-              // Also update in Supabase without triggering another sync
+            const staleEventId = !task.dueDate
+              ? previous?.google_event_id || task.google_event_id
+              : null;
+
+            if (staleEventId) {
+              await googleCalendarService.deleteEvent(staleEventId);
+              const cleared = { ...task, google_event_id: undefined };
+              await db.tasks.put(cleared);
               const desc = JSON.parse(payload.description);
-              desc.google_event_id = result.id;
-              await supabase.from('tasks').update({ 
-                description: JSON.stringify(desc) 
-              }).eq('id', task.id);
+              delete desc.google_event_id;
+              await supabase
+                .from('tasks')
+                .update({
+                  description: JSON.stringify(desc),
+                  google_event_id: null,
+                })
+                .eq('id', task.id);
+              return;
+            }
+
+            if (task.dueDate) {
+              const result = await googleCalendarService.syncTaskToGoogle(task);
+              if (result?.id && result.id !== task.google_event_id) {
+                const updatedTask = { ...task, google_event_id: result.id };
+                await db.tasks.put(updatedTask);
+                const desc = JSON.parse(payload.description);
+                desc.google_event_id = result.id;
+                await supabase
+                  .from('tasks')
+                  .update({
+                    description: JSON.stringify(desc),
+                    google_event_id: result.id,
+                  })
+                  .eq('id', task.id);
+              }
             }
           } catch (e) {
-            console.warn("[dataService] Google Calendar sync failed:", e);
+            console.warn('[dataService] Google Calendar sync failed:', e);
           }
         })();
       }
@@ -526,7 +597,8 @@ export const dataService = {
             parentTaskId: desc.parentTaskId,
             dependencies: desc.dependencies,
             storyPoints: desc.storyPoints,
-            comments: desc.comments || []
+            comments: desc.comments || [],
+            google_event_id: (t as { google_event_id?: string }).google_event_id ?? desc.google_event_id,
           };
         });
         await db.tasks.bulkPut(mappedTasks);
@@ -655,7 +727,19 @@ export const dataService = {
   },
 
   async deleteTask(id: string, userId: string, isOnline: boolean) {
+    const existing = await db.tasks.get(id);
     await db.tasks.delete(id);
+
+    if (existing?.google_event_id && isOnline) {
+      (async () => {
+        try {
+          const { googleCalendarService } = await import('./googleCalendarService');
+          await googleCalendarService.deleteEvent(existing.google_event_id!);
+        } catch (e) {
+          console.warn('[dataService] Google Calendar delete failed:', e);
+        }
+      })();
+    }
 
     if (isOnline) {
       const { error } = await supabase.from('tasks').delete().eq('id', id).eq('user_id', userId);
@@ -764,11 +848,11 @@ export const dataService = {
 
     if (isOnline) {
       try {
-        const { error } = await supabase.from('notes').upsert({
+        const { error } = await upsertNoteToSupabase({
           ...note,
           user_id: userId,
           subject_id: note.subject_id,
-          handwriting_data: note.handwriting_data || null,
+          handwriting_data: note.handwriting_data ?? null,
           is_starred: note.is_starred || false
         });
         
@@ -808,10 +892,76 @@ export const dataService = {
         if (data) {
           const remoteNotes = data as Note[];
           
-          // Simple merge: remote wins but we update local
           if (remoteNotes.length > 0) {
-            await db.notes.bulkPut(remoteNotes);
-            return remoteNotes;
+            const remoteById = new Map(remoteNotes.map((n) => [n.id, n]));
+            const merged: Note[] = [];
+
+            for (const r of remoteNotes) {
+              const loc = localNotes.find((l) => l.id === r.id);
+              if (!loc) {
+                merged.push(r);
+                continue;
+              }
+              const tr = new Date(r.updated_at).getTime();
+              const tl = new Date(loc.updated_at).getTime();
+              merged.push(tl >= tr ? loc : r);
+            }
+
+            for (const loc of localNotes) {
+              if (!remoteById.has(loc.id)) merged.push(loc);
+            }
+
+            merged.sort(
+              (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+            );
+
+            await db.notes.bulkPut(merged);
+
+            if (isOnline) {
+              for (const loc of localNotes) {
+                const r = remoteById.get(loc.id);
+                if (!r || new Date(loc.updated_at).getTime() > new Date(r.updated_at).getTime()) {
+                  void upsertNoteToSupabase({
+                    ...loc,
+                    user_id: userId,
+                    subject_id: loc.subject_id,
+                    handwriting_data: loc.handwriting_data ?? null,
+                    is_starred: loc.is_starred || false
+                  });
+                }
+              }
+            }
+
+            return merged;
+          }
+
+          // Cloud empty but this device has notes (e.g. upsert failed earlier, or only IndexedDB was used).
+          // Push locals so other browsers / Simple Browser see the same list after refetch.
+          if (localNotes.length > 0) {
+            let anySynced = false;
+            for (const n of localNotes) {
+              const { error: upErr } = await upsertNoteToSupabase({
+                ...n,
+                user_id: userId,
+                subject_id: n.subject_id,
+                handwriting_data: n.handwriting_data ?? null,
+                is_starred: n.is_starred || false
+              });
+              if (!upErr) anySynced = true;
+            }
+            if (anySynced) {
+              const { data: data2, error: err2 } = await supabase
+                .from('notes')
+                .select('*')
+                .eq('subject_id', subjectId)
+                .eq('user_id', userId)
+                .order('updated_at', { ascending: false });
+              if (!err2 && data2 && (data2 as Note[]).length > 0) {
+                const merged = data2 as Note[];
+                await db.notes.bulkPut(merged);
+                return merged;
+              }
+            }
           }
         }
       } catch (error) {
@@ -942,8 +1092,11 @@ export const dataService = {
             await db.syncQueue.delete(item.id!);
             continue;
           }
-          
-          const { error } = await supabase.from(item.table as any).upsert(payload);
+
+          const { error } =
+            item.table === 'notes'
+              ? await upsertNoteToSupabase(payload)
+              : await supabase.from(item.table as any).upsert(payload);
           if (error) throw error;
         }
         await db.syncQueue.delete(item.id!);

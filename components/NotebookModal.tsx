@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Loader2, Plus, BookOpen } from 'lucide-react';
 import { Notebook } from '../types';
 
@@ -25,17 +25,31 @@ export const NotebookModal: React.FC<NotebookModalProps> = ({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-md shadow-xl">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="presentation">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="notebook-modal-title"
+        className="bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-md shadow-xl"
+      >
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <BookOpen size={20} /> Adicionar ao Caderno
+          <h2 id="notebook-modal-title" className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <BookOpen size={20} aria-hidden /> Adicionar ao Caderno
           </h2>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-700">
-            <X size={20} />
+          <button type="button" onClick={onClose} className="text-slate-500 hover:text-slate-700" aria-label="Fechar">
+            <X size={20} aria-hidden />
           </button>
         </div>
 

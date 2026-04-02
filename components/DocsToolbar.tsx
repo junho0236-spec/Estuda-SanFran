@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Quill from 'quill';
 import { 
   Undo2, Redo2, Printer, SpellCheck, Paintbrush, Type, Bold, Italic, 
@@ -15,6 +15,8 @@ import { toast } from 'sonner';
 
 interface DocsToolbarProps {
   quillRef: React.MutableRefObject<any>;
+  /** Preenchido em NoteView no mesmo `selection-change` do Quill; usado para restaurar seleção após blur dos menus. */
+  savedQuillRangeRef: React.MutableRefObject<{ index: number; length: number } | null>;
   onImageUpload: () => void;
   onExportPdf: () => void;
   onExportDocx: () => void;
@@ -38,7 +40,6 @@ interface DocsToolbarProps {
   onDetails: () => void;
   onLanguageChange: (lang: string) => void;
   onPageSetup: () => void;
-  onLegalCitation: () => void;
   zoom: string;
   onZoomChange: (zoom: string) => void;
   editMode: 'editing' | 'suggesting' | 'viewing';
@@ -60,10 +61,10 @@ interface DocsToolbarProps {
 }
 
 const DocsToolbar: React.FC<DocsToolbarProps> = ({ 
-  quillRef, onImageUpload, onExportPdf, onExportDocx, onExportTxt, onPrint, 
+  quillRef, savedQuillRangeRef, onImageUpload, onExportPdf, onExportDocx, onExportTxt, onPrint, 
   isMaximized, setIsMaximized, title, onRename, isStarred, onToggleStar,
   onNew, onOpen, onCopy, onShare, onEmail, onDelete, onVersionHistory,
-  onOfflineToggle, isOfflineAvailable, onDetails, onLanguageChange, onPageSetup, onLegalCitation,
+  onOfflineToggle, isOfflineAvailable, onDetails, onLanguageChange, onPageSetup,
   zoom, onZoomChange,
   editMode, setEditMode, showComments, setShowComments, showPrintLayout, setShowPrintLayout,
   showRuler, setShowRuler, showEquationToolbar, setShowEquationToolbar,
@@ -71,7 +72,6 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
   pageOrientation, setPageOrientation, isPageless, setIsPageless
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
-  const [promptModal, setPromptModal] = useState<{ isOpen: boolean; title: string; defaultValue: string; onConfirm: (value: string) => void } | null>(null);
   const [localTitle, setLocalTitle] = useState(title);
   const [formatPainter, setFormatPainter] = useState<any>(null);
   const [showFindReplace, setShowFindReplace] = useState(false);
@@ -95,6 +95,65 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
     alignRight: false,
     alignJustify: false
   });
+
+  // #region agent log
+  const debugNoteIngest = (message: string, data: Record<string, unknown>, hypothesisId: string) => {
+    fetch('http://127.0.0.1:7500/ingest/14377f85-3e80-4332-81ce-d786a32723ce', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'bcb56d' },
+      body: JSON.stringify({
+        sessionId: 'bcb56d',
+        location: 'DocsToolbar.tsx',
+        message,
+        data,
+        timestamp: Date.now(),
+        hypothesisId,
+      }),
+    }).catch(() => {});
+  };
+  // #endregion
+
+  const ensureQuillSelection = useCallback((): boolean => {
+    const q = quillRef.current;
+    if (!q) {
+      debugNoteIngest('ensureQuillSelection', { outcome: 'no-quill' }, 'H6');
+      return false;
+    }
+    if (editMode === 'viewing') {
+      debugNoteIngest('ensureQuillSelection', { outcome: 'viewing-skip', editMode }, 'H6');
+      return false;
+    }
+    if (q.getSelection()) return true;
+    const saved = savedQuillRangeRef.current;
+    debugNoteIngest('ensureQuillSelection-attempt', {
+      editMode,
+      isEnabled: q.isEnabled(),
+      hasSaved: !!saved,
+      saved,
+    }, 'H6');
+    if (!saved) {
+      debugNoteIngest('ensureQuillSelection-result', { ok: false, reason: 'no-saved-range' }, 'H6');
+      return false;
+    }
+    try {
+      if (!q.isEnabled()) {
+        q.enable();
+        debugNoteIngest('ensureQuillSelection', { recovered: 'enable-called' }, 'H6');
+      }
+      q.focus();
+      const maxIndex = Math.max(0, q.getLength() - 1);
+      const index = Math.min(saved.index, maxIndex);
+      const maxLen = Math.max(0, q.getLength() - index);
+      const length = Math.min(saved.length, maxLen);
+      q.setSelection(index, length, 'api');
+      const ok = q.getSelection() != null;
+      debugNoteIngest('ensureQuillSelection-result', { ok, index, length }, 'H6');
+      return ok;
+    } catch (e) {
+      debugNoteIngest('ensureQuillSelection-error', { err: String(e) }, 'H6');
+      return false;
+    }
+  }, [savedQuillRangeRef, editMode]);
 
   useEffect(() => {
     setLocalTitle(title);
@@ -179,6 +238,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
     const applyFormat = () => {
       if (quillRef.current) {
+        ensureQuillSelection();
         const selection = quillRef.current.getSelection();
         if (selection && selection.length > 0) {
           // Apply styles
@@ -199,16 +259,31 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
     document.addEventListener('mouseup', applyFormat);
     return () => document.removeEventListener('mouseup', applyFormat);
-  }, [formatPainter]);
+  }, [formatPainter, ensureQuillSelection]);
 
   const handleFormat = (format: string, value: any = true) => {
     if (quillRef.current) {
+      ensureQuillSelection();
       quillRef.current.format(format, value === '' ? false : value);
+    }
+  };
+
+  /**
+   * Quill loses the text selection when focus moves to chrome buttons. mousedown preventDefault
+   * keeps the editor selection. Applied on the whole .docs-chrome (menus + #docs-toolbar), because
+   * Formatar / Editar submenus live above #docs-toolbar and were not covered by toolbar-only capture.
+   */
+  const preserveQuillSelectionMouseDownCapture = (e: React.MouseEvent<HTMLDivElement>) => {
+    const el = e.target as HTMLElement;
+    if (el.closest('input:not([type=button]):not([type=submit]), textarea, select')) return;
+    if (el.closest('button, .ql-picker-label, .ql-picker-item, .ql-picker-options')) {
+      e.preventDefault();
     }
   };
 
   const handleToggleFormat = (format: string) => {
     if (quillRef.current) {
+      ensureQuillSelection();
       const current = quillRef.current.getFormat()[format];
       quillRef.current.format(format, !current);
     }
@@ -216,18 +291,21 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
   const handleTextColor = (color: string) => {
     if (quillRef.current) {
+      ensureQuillSelection();
       quillRef.current.format('color', color);
     }
   };
 
   const handleHighlightColor = (color: string) => {
     if (quillRef.current) {
+      ensureQuillSelection();
       quillRef.current.format('background', color);
     }
   };
 
   const handleAlign = (align: string) => {
     if (quillRef.current) {
+      ensureQuillSelection();
       let value: string | boolean = false;
       if (align === 'justifyCenter') value = 'center';
       if (align === 'justifyRight') value = 'right';
@@ -238,6 +316,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
   const handleList = (type: string) => {
     if (quillRef.current) {
+      ensureQuillSelection();
       const value = type === 'insertOrderedList' ? 'ordered' : 'bullet';
       const current = quillRef.current.getFormat().list;
       quillRef.current.format('list', current === value ? false : value);
@@ -246,6 +325,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
   const handleIndent = () => {
     if (quillRef.current) {
+      ensureQuillSelection();
       const current = quillRef.current.getFormat().indent || 0;
       quillRef.current.format('indent', current + 1);
     }
@@ -253,6 +333,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
   const handleOutdent = () => {
     if (quillRef.current) {
+      ensureQuillSelection();
       const current = quillRef.current.getFormat().indent || 0;
       if (current > 0) {
         quillRef.current.format('indent', current - 1);
@@ -262,6 +343,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
   const handleChecklist = () => {
     if (quillRef.current) {
+      ensureQuillSelection();
       const current = quillRef.current.getFormat().list;
       quillRef.current.format('list', current === 'unchecked' ? false : 'unchecked');
     }
@@ -269,6 +351,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
   const handleLineSpacing = (value: string) => {
     if (quillRef.current) {
+      ensureQuillSelection();
       quillRef.current.format('lineheight', value === '1.15' ? false : value);
     }
   };
@@ -276,6 +359,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
   const handleFontSizeChange = (size: string) => {
     setFontSize(size);
     if (quillRef.current) {
+      ensureQuillSelection();
       quillRef.current.format('size', size === '11' ? false : `${size}px`);
     }
   };
@@ -303,6 +387,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
     };
     setFontFamily(labels[value] || "Arial");
     if (quillRef.current) {
+      ensureQuillSelection();
       quillRef.current.format('font', value === 'sans-serif' ? false : value);
     }
   };
@@ -316,6 +401,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
     };
     setHeadingStyle(labels[value] || "Texto normal");
     if (quillRef.current) {
+      ensureQuillSelection();
       quillRef.current.format('header', value === "" ? false : parseInt(value));
     }
   };
@@ -326,6 +412,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
       document.body.style.cursor = 'default';
     } else {
       if (quillRef.current) {
+        ensureQuillSelection();
         const format = quillRef.current.getFormat();
         setFormatPainter(format);
         document.body.style.cursor = 'crosshair';
@@ -336,20 +423,14 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
   const handleAddComment = () => {
     if (quillRef.current) {
+      ensureQuillSelection();
       const selection = quillRef.current.getSelection();
       if (selection && selection.length > 0) {
-        setPromptModal({
-          isOpen: true,
-          title: 'Digite seu comentário:',
-          defaultValue: '',
-          onConfirm: (comment) => {
-            if (comment && quillRef.current) {
-              quillRef.current.formatText(selection.index, selection.length, 'comment', comment);
-              toast.success('Comentário adicionado.');
-            }
-            setPromptModal(null);
-          }
-        });
+        const comment = window.prompt('Digite seu comentário:');
+        if (comment) {
+          quillRef.current.format('comment', comment);
+          toast.success('Comentário adicionado.');
+        }
       } else {
         toast.error('Selecione um texto para comentar.');
       }
@@ -358,39 +439,59 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
   const handleUndo = () => {
     if (quillRef.current) {
+      ensureQuillSelection();
       quillRef.current.history.undo();
     }
   };
   
   const handleRedo = () => {
     if (quillRef.current) {
+      ensureQuillSelection();
       quillRef.current.history.redo();
     }
   };
 
   const handleLink = () => {
     if (quillRef.current) {
+      ensureQuillSelection();
       const selection = quillRef.current.getSelection();
       if (selection && selection.length > 0) {
-        setPromptModal({
-          isOpen: true,
-          title: 'Digite a URL do link:',
-          defaultValue: '',
-          onConfirm: (url) => {
-            if (url && quillRef.current) {
-              quillRef.current.formatText(selection.index, selection.length, 'link', url);
-            }
-            setPromptModal(null);
-          }
-        });
+        const url = window.prompt('Digite a URL do link:');
+        if (url) {
+          quillRef.current.format('link', url);
+        }
       } else {
         toast.error('Selecione um texto para adicionar um link.');
       }
     }
   };
 
+  const handleImage = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e: any) => {
+      const file = e.target.files[0];
+      if (file && quillRef.current) {
+        const reader = new FileReader();
+        reader.onload = (readerEvent: any) => {
+          const base64 = readerEvent.target.result;
+          ensureQuillSelection();
+          const range = quillRef.current?.getSelection(true);
+          if (range) {
+            quillRef.current?.insertEmbed(range.index, 'image', base64);
+            quillRef.current?.setSelection(range.index + 1, 0);
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+    input.click();
+  };
+
   const handleClearFormatting = () => {
     if (quillRef.current) {
+      ensureQuillSelection();
       const selection = quillRef.current.getSelection();
       if (selection && selection.length > 0) {
         quillRef.current.removeFormat(selection.index, selection.length);
@@ -408,6 +509,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
   const handleCut = () => {
     if (quillRef.current) {
+      ensureQuillSelection();
       const selection = quillRef.current.getSelection();
       if (selection && selection.length > 0) {
         const text = quillRef.current.getText(selection.index, selection.length);
@@ -424,6 +526,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
   const handleCopy = () => {
     if (quillRef.current) {
+      ensureQuillSelection();
       const selection = quillRef.current.getSelection();
       if (selection && selection.length > 0) {
         const text = quillRef.current.getText(selection.index, selection.length);
@@ -440,6 +543,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
     try {
       const text = await navigator.clipboard.readText();
       if (quillRef.current) {
+        ensureQuillSelection();
         const range = quillRef.current.getSelection();
         if (range) {
           quillRef.current.insertText(range.index, text);
@@ -456,6 +560,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
     try {
       const text = await navigator.clipboard.readText();
       if (quillRef.current) {
+        ensureQuillSelection();
         const range = quillRef.current.getSelection();
         if (range) {
           quillRef.current.insertText(range.index, text, 'api');
@@ -470,6 +575,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
   const handleFind = () => {
     if (!findText || !quillRef.current) return;
+    ensureQuillSelection();
     const quill = quillRef.current;
     const text = quill.getText();
     const currentSelection = quill.getSelection();
@@ -491,6 +597,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
   const handleReplace = () => {
     if (!findText || !quillRef.current) return;
+    ensureQuillSelection();
     const quill = quillRef.current;
     const range = quill.getSelection();
     if (range && quill.getText(range.index, range.length) === findText) {
@@ -531,56 +638,36 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
   const [isListening, setIsListening] = useState(false);
 
   const handleInsertTable = () => {
-    if (quillRef.current) {
-      const selection = quillRef.current.getSelection();
-      setPromptModal({
-        isOpen: true,
-        title: 'Número de linhas:',
-        defaultValue: '3',
-        onConfirm: (rowsStr) => {
-          const rows = parseInt(rowsStr || '0', 10);
-          if (rows > 0) {
-            setPromptModal({
-              isOpen: true,
-              title: 'Número de colunas:',
-              defaultValue: '3',
-              onConfirm: (colsStr) => {
-                const cols = parseInt(colsStr || '0', 10);
-                if (cols > 0 && quillRef.current) {
-                  const quill = quillRef.current;
-                  const table = quill.getModule('table');
-                  if (table) {
-                    table.insertTable(rows, cols);
-                    toast.success('Tabela inserida.');
-                  } else {
-                    let tableHtml = '<table style="width: 100%; border-collapse: collapse;" border="1">';
-                    for (let i = 0; i < rows; i++) {
-                      tableHtml += '<tr>';
-                      for (let j = 0; j < cols; j++) {
-                        tableHtml += '<td style="border: 1px solid #ccc; padding: 8px;">&nbsp;</td>';
-                      }
-                      tableHtml += '</tr>';
-                    }
-                    tableHtml += '</table><p><br></p>';
-                    const range = selection || { index: quill.getLength(), length: 0 };
-                    const delta = quill.clipboard.convert({ html: tableHtml });
-                    quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
-                    toast.success('Tabela inserida.');
-                  }
-                }
-                setPromptModal(null);
-              }
-            });
-          } else {
-            setPromptModal(null);
+    const rows = parseInt(prompt('Número de linhas:', '3') || '0', 10);
+    const cols = parseInt(prompt('Número de colunas:', '3') || '0', 10);
+    if (rows > 0 && cols > 0 && quillRef.current) {
+      const quill = quillRef.current;
+      ensureQuillSelection();
+      const table = quill.getModule('table');
+      if (table) {
+        table.insertTable(rows, cols);
+        toast.success('Tabela inserida.');
+      } else {
+        let tableHtml = '<table style="width: 100%; border-collapse: collapse;" border="1">';
+        for (let i = 0; i < rows; i++) {
+          tableHtml += '<tr>';
+          for (let j = 0; j < cols; j++) {
+            tableHtml += '<td style="border: 1px solid #ccc; padding: 8px;">&nbsp;</td>';
           }
+          tableHtml += '</tr>';
         }
-      });
+        tableHtml += '</table><p><br></p>';
+        const range = quill.getSelection(true);
+        const delta = quill.clipboard.convert({ html: tableHtml });
+        quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
+        toast.success('Tabela inserida.');
+      }
     }
   };
 
   const handleInsertMeetingNotes = () => {
     if (quillRef.current) {
+      ensureQuillSelection();
       const date = new Date().toLocaleDateString();
       const html = `<h2>Notas de Reunião - ${date}</h2><p><strong>Participantes:</strong> </p><p><strong>Pauta:</strong></p><ul><li></li></ul><p><strong>Ações:</strong></p><ul><li>[ ] </li></ul><p><br></p>`;
       const quill = quillRef.current;
@@ -593,6 +680,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
   const handleInsertTracker = () => {
     if (quillRef.current) {
+      ensureQuillSelection();
       const html = `<table style="width: 100%; border-collapse: collapse;" border="1"><tr style="background-color: #f3f4f6;"><th style="border: 1px solid #ccc; padding: 8px;">Tarefa</th><th style="border: 1px solid #ccc; padding: 8px;">Status</th><th style="border: 1px solid #ccc; padding: 8px;">Responsável</th><th style="border: 1px solid #ccc; padding: 8px;">Prazo</th></tr><tr><td style="border: 1px solid #ccc; padding: 8px;">Nova Tarefa</td><td style="border: 1px solid #ccc; padding: 8px;">Não Iniciado</td><td style="border: 1px solid #ccc; padding: 8px;">@Nome</td><td style="border: 1px solid #ccc; padding: 8px;">dd/mm/aaaa</td></tr></table><p><br></p>`;
       const quill = quillRef.current;
       const range = quill.getSelection(true);
@@ -603,29 +691,21 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
   };
 
   const handleInsertPerson = () => {
-    if (quillRef.current) {
-      const selection = quillRef.current.getSelection();
-      setPromptModal({
-        isOpen: true,
-        title: 'Nome da pessoa:',
-        defaultValue: '',
-        onConfirm: (name) => {
-          if (name && quillRef.current) {
-            const quill = quillRef.current;
-            const range = selection || { index: quill.getLength(), length: 0 };
-            const html = `<span style="background-color: #e2e8f0; padding: 2px 6px; border-radius: 12px; font-size: 0.9em;">@${name}</span>&nbsp;`;
-            const delta = quill.clipboard.convert({ html });
-            quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
-            toast.success('Pessoa marcada.');
-          }
-          setPromptModal(null);
-        }
-      });
+    const name = prompt('Nome da pessoa:');
+    if (name && quillRef.current) {
+      ensureQuillSelection();
+      const quill = quillRef.current;
+      const range = quill.getSelection(true);
+      const html = `<span style="background-color: #e2e8f0; padding: 2px 6px; border-radius: 12px; font-size: 0.9em;">@${name}</span>&nbsp;`;
+      const delta = quill.clipboard.convert({ html });
+      quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
+      toast.success('Pessoa marcada.');
     }
   };
 
   const handleInsertDate = () => {
     if (quillRef.current) {
+      ensureQuillSelection();
       const date = new Date().toLocaleDateString();
       const quill = quillRef.current;
       const range = quill.getSelection(true);
@@ -638,6 +718,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
   const handlePageBreak = () => {
     if (quillRef.current) {
+      ensureQuillSelection();
       const html = `<hr style="page-break-after: always; border: 0; border-top: 2px dashed #ccc; margin: 20px 0;" title="Quebra de página" /><p><br></p>`;
       const quill = quillRef.current;
       const range = quill.getSelection(true);
@@ -649,6 +730,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
   const handleSectionBreak = () => {
     if (quillRef.current) {
+      ensureQuillSelection();
       const html = `<hr style="border: 0; border-top: 2px dotted #3b82f6; margin: 20px 0;" title="Quebra de seção" /><p><br></p>`;
       const quill = quillRef.current;
       const range = quill.getSelection(true);
@@ -693,6 +775,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
       if (quillRef.current) {
         const transcript = event.results[event.results.length - 1][0].transcript;
         const quill = quillRef.current;
+        ensureQuillSelection();
         const range = quill.getSelection(true) || { index: quill.getLength() };
         quill.insertText(range.index, transcript + ' ');
         quill.setSelection(range.index + transcript.length + 1);
@@ -714,26 +797,20 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
   };
 
   const handleColumns = () => {
-    setPromptModal({
-      isOpen: true,
-      title: 'Número de colunas (1, 2 ou 3):',
-      defaultValue: '2',
-      onConfirm: (cols) => {
-        if (cols && ['1', '2', '3'].includes(cols) && quillRef.current) {
-          const root = quillRef.current.root;
-          root.style.columnCount = cols;
-          root.style.columnGap = '40px';
-          toast.success(`Layout alterado para ${cols} coluna(s).`);
-        } else if (cols) {
-          toast.error('Número de colunas inválido.');
-        }
-        setPromptModal(null);
-      }
-    });
+    const cols = prompt('Número de colunas (1, 2 ou 3):', '2');
+    if (cols && ['1', '2', '3'].includes(cols) && quillRef.current) {
+      const root = quillRef.current.root;
+      root.style.columnCount = cols;
+      root.style.columnGap = '40px';
+      toast.success(`Layout alterado para ${cols} coluna(s).`);
+    } else if (cols) {
+      toast.error('Número de colunas inválido.');
+    }
   };
 
   const handleInsertChart = () => {
     if (quillRef.current) {
+      ensureQuillSelection();
       const html = `<div style="padding: 20px; background: #f8fafc; border: 1px solid #e2e8f0; text-align: center; color: #64748b;">[ Gráfico Reservado - Edite os dados na planilha vinculada ]</div><p><br></p>`;
       const quill = quillRef.current;
       const range = quill.getSelection(true);
@@ -745,6 +822,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
   const handleInsertDrawing = () => {
     if (quillRef.current) {
+      ensureQuillSelection();
       const html = `<div style="padding: 40px; background: #f8fafc; border: 1px dashed #cbd5e1; text-align: center; color: #64748b;">[ Área de Desenho ]</div><p><br></p>`;
       const quill = quillRef.current;
       const range = quill.getSelection(true);
@@ -756,23 +834,16 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
   const handleInsertBookmark = () => {
     if (quillRef.current) {
-      const selection = quillRef.current.getSelection();
-      setPromptModal({
-        isOpen: true,
-        title: 'Nome do favorito:',
-        defaultValue: '',
-        onConfirm: (name) => {
-          if (name && quillRef.current) {
-            const html = `<a name="${name.replace(/\s+/g, '-').toLowerCase()}" style="border-left: 2px solid #3b82f6; padding-left: 4px;">[Favorito: ${name}]</a>&nbsp;`;
-            const quill = quillRef.current;
-            const range = selection || { index: quill.getLength(), length: 0 };
-            const delta = quill.clipboard.convert({ html });
-            quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
-            toast.success('Favorito adicionado.');
-          }
-          setPromptModal(null);
-        }
-      });
+      const name = prompt('Nome do favorito:');
+      if (name) {
+        ensureQuillSelection();
+        const html = `<a name="${name.replace(/\s+/g, '-').toLowerCase()}" style="border-left: 2px solid #3b82f6; padding-left: 4px;">[Favorito: ${name}]</a>&nbsp;`;
+        const quill = quillRef.current;
+        const range = quill.getSelection(true);
+        const delta = quill.clipboard.convert({ html });
+        quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
+        toast.success('Favorito adicionado.');
+      }
     }
   };
 
@@ -788,18 +859,11 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
   };
 
   const handleTranslate = () => {
-    setPromptModal({
-      isOpen: true,
-      title: 'Para qual idioma deseja traduzir? (ex: en, es, fr)',
-      defaultValue: 'en',
-      onConfirm: (lang) => {
-        if (lang && quillRef.current) {
-          toast.info(`Iniciando tradução para ${lang}...`);
-          setTimeout(() => toast.success('Tradução concluída! (Simulação)'), 2000);
-        }
-        setPromptModal(null);
-      }
-    });
+    const lang = prompt('Para qual idioma deseja traduzir? (ex: en, es, fr)', 'en');
+    if (lang && quillRef.current) {
+      toast.info(`Iniciando tradução para ${lang}...`);
+      setTimeout(() => toast.success('Tradução concluída! (Simulação)'), 2000);
+    }
   };
 
   const handleDictionary = () => {
@@ -811,25 +875,31 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
     }
   };
 
+  const handleCitation = () => {
+    if (quillRef.current) {
+      const citation = prompt('Digite a citação (ex: SILVA, 2023):');
+      if (citation) {
+        ensureQuillSelection();
+        const quill = quillRef.current;
+        const range = quill.getSelection(true);
+        quill.insertText(range.index, `(${citation})`);
+        toast.success('Citação inserida.');
+      }
+    }
+  };
+
   const handleSignature = () => {
     if (quillRef.current) {
-      const selection = quillRef.current.getSelection();
-      setPromptModal({
-        isOpen: true,
-        title: 'Nome para assinatura:',
-        defaultValue: '',
-        onConfirm: (name) => {
-          if (name && quillRef.current) {
-            const html = `<div style="margin-top: 40px; text-align: center; width: 300px;"><hr style="border-top: 1px solid #000;" /><p>${name}</p></div><p><br></p>`;
-            const quill = quillRef.current;
-            const range = selection || { index: quill.getLength(), length: 0 };
-            const delta = quill.clipboard.convert({ html });
-            quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
-            toast.success('Assinatura inserida.');
-          }
-          setPromptModal(null);
-        }
-      });
+      const name = prompt('Nome para assinatura:');
+      if (name) {
+        ensureQuillSelection();
+        const html = `<div style="margin-top: 40px; text-align: center; width: 300px;"><hr style="border-top: 1px solid #000;" /><p>${name}</p></div><p><br></p>`;
+        const quill = quillRef.current;
+        const range = quill.getSelection(true);
+        const delta = quill.clipboard.convert({ html });
+        quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
+        toast.success('Assinatura inserida.');
+      }
     }
   };
 
@@ -851,7 +921,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
     { name: 'Negrito', icon: <Bold size={16} />, action: () => handleToggleFormat('bold') },
     { name: 'Itálico', icon: <Italic size={16} />, action: () => handleToggleFormat('italic') },
     { name: 'Sublinhado', icon: <Underline size={16} />, action: () => handleToggleFormat('underline') },
-    { name: 'Alinhar à esquerda', icon: <AlignLeft size={16} />, action: () => handleFormat('align', false) },
+    { name: 'Alinhar à esquerda', icon: <AlignLeft size={16} />, action: () => handleFormat('align', '') },
     { name: 'Centralizar', icon: <AlignCenter size={16} />, action: () => handleFormat('align', 'center') },
     { name: 'Alinhar à direita', icon: <AlignRight size={16} />, action: () => handleFormat('align', 'right') },
     { name: 'Justificar', icon: <AlignJustify size={16} />, action: () => handleFormat('align', 'justify') },
@@ -872,7 +942,9 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     
     const handleClickOutside = (e: MouseEvent) => {
-      if (!(e.target as HTMLElement).closest('.menu-container')) {
+      const t = e.target as HTMLElement;
+      if (t.closest('[data-docs-menu-panel]')) return;
+      if (!t.closest('.menu-container')) {
         setActiveMenu(null);
       }
     };
@@ -885,23 +957,19 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
   }, []);
 
   return (
-    <div 
-      className="flex flex-col border-b border-slate-200 dark:border-white/10 bg-[#f9fbfd] dark:bg-slate-900 rounded-t-xl transition-all shadow-sm select-none relative z-[150]"
-      onMouseDown={(e) => {
-        const target = e.target as HTMLElement;
-        if (target.tagName !== 'INPUT' && target.tagName !== 'SELECT' && target.tagName !== 'TEXTAREA') {
-          e.preventDefault();
-        }
-      }}
+    <div
+      className={`docs-chrome flex w-full min-w-0 shrink-0 flex-col overflow-visible border-b border-[#dadce0] dark:border-white/10 bg-[#f8f9fa] dark:bg-slate-900/95 transition-all select-none relative z-[60] ${isMaximized ? 'rounded-none' : 'rounded-t-[1.5rem]'}`}
+      onMouseDownCapture={preserveQuillSelectionMouseDownCapture}
     >
-      {/* Top Row: Title & Main Actions */}
-      <div className="flex items-center justify-between px-4 py-2 bg-white dark:bg-slate-900">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 bg-blue-600 rounded text-white">
+      {/* Top Row: Title & Main Actions (Google Docs–style chrome) */}
+      <div className={`px-3 sm:px-4 py-2 bg-white dark:bg-slate-900 gap-2 min-w-0 ${isMaximized ? 'flex flex-col sm:flex-row sm:items-start sm:justify-between' : 'flex flex-col lg:flex-row lg:items-start lg:justify-between'}`}>
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <div className="flex items-center gap-2 min-w-0">
+          <div className="shrink-0 p-1.5 bg-[#1a73e8] rounded-md text-white shadow-sm">
             <FileText size={18} />
           </div>
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2">
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <div className="flex items-center gap-2 min-w-0">
               <input 
                 type="text"
                 value={localTitle}
@@ -912,29 +980,41 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                 placeholder="Documento sem título"
               />
               <button 
+                type="button"
                 onClick={onToggleStar}
                 className={`p-1 rounded hover:bg-slate-100 dark:hover:bg-white/5 transition-colors ${isStarred ? 'text-yellow-500' : 'text-slate-400'}`}
               >
                 <Star size={18} fill={isStarred ? 'currentColor' : 'none'} />
               </button>
-              <button className="p-1 rounded hover:bg-slate-100 dark:hover:bg-white/5 transition-colors text-slate-400">
+              <button
+                type="button"
+                title="Abrir na barra lateral"
+                className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-100 dark:hover:bg-white/5"
+                onClick={onOpen}
+              >
                 <Folder size={18} />
               </button>
-              <button className="p-1 rounded hover:bg-slate-100 dark:hover:bg-white/5 transition-colors text-slate-400">
+              <button
+                type="button"
+                title="Salvo na nuvem"
+                className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-100 dark:hover:bg-white/5"
+                onClick={() => toast.success('Documento sincronizado (Supabase).')}
+              >
                 <CloudCheck size={18} />
               </button>
             </div>
             {/* Menus Row */}
-            <div className="flex items-center gap-0.5 text-[13px] font-medium text-slate-800 dark:text-slate-200 ml-1">
-              <div className="relative menu-container">
+            <div className="flex w-full min-w-0 flex-wrap items-center gap-x-0.5 gap-y-1 pb-0.5 text-[13px] font-medium text-slate-800 dark:text-slate-200">
+              <div className="relative menu-container z-[70]">
                 <button 
-                  className={`px-2 py-0.5 rounded transition-colors ${activeMenu === 'arquivo' ? 'bg-slate-100 dark:hover:bg-white/10' : 'hover:bg-slate-100 dark:hover:bg-white/5'}`}
+                  type="button"
+                  className={`shrink-0 rounded px-2 py-0.5 transition-colors ${activeMenu === 'arquivo' ? 'bg-slate-100 dark:hover:bg-white/10' : 'hover:bg-slate-100 dark:hover:bg-white/5'}`}
                   onClick={() => setActiveMenu(activeMenu === 'arquivo' ? null : 'arquivo')}
                   onMouseEnter={() => activeMenu && setActiveMenu('arquivo')}
                 >
                   Arquivo
                 </button>
-                <div className={`absolute left-0 top-full mt-1 w-72 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[200] ${activeMenu === 'arquivo' ? 'block' : 'hidden'}`} onClick={() => setActiveMenu(null)}>
+                <div data-docs-menu-panel className={`absolute left-0 top-full z-[400] mt-1 w-72 rounded-lg border border-slate-200 bg-white py-2 shadow-2xl dark:border-white/10 dark:bg-slate-800 ${activeMenu === 'arquivo' ? 'block' : 'hidden'}`} onClick={() => setActiveMenu(null)}>
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => { onNew(); setActiveMenu(null); }}>
                     <Plus size={16} className="text-slate-400" /> Novo
                   </button>
@@ -957,7 +1037,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                       <div className="flex items-center gap-3"><Download size={16} className="text-slate-400" /> Baixar</div>
                       <ChevronDown size={14} className="-rotate-90 text-slate-400" />
                     </button>
-                    <div className="absolute left-full top-0 hidden group-hover/sub:block w-48 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
+                    <div className="absolute left-full top-0 z-[450] hidden group-hover/sub:block w-48 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
                       <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={onExportDocx}>Microsoft Word (.docx)</button>
                       <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={onExportPdf}>Documento PDF (.pdf)</button>
                       <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={onExportTxt}>Texto sem formatação (.txt)</button>
@@ -989,7 +1069,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                       <div className="flex items-center gap-3"><Baseline size={16} className="text-slate-400" /> Idioma</div>
                       <ChevronDown size={14} className="-rotate-90 text-slate-400" />
                     </button>
-                    <div className="absolute left-full top-0 hidden group-hover/sub:block w-48 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
+                    <div className="absolute left-full top-0 z-[450] hidden group-hover/sub:block w-48 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
                       <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={() => onLanguageChange('pt-BR')}>Português (Brasil)</button>
                       <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={() => onLanguageChange('en-US')}>English (US)</button>
                     </div>
@@ -1003,15 +1083,16 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                   </button>
                 </div>
               </div>
-              <div className="relative menu-container">
+              <div className="relative menu-container z-[70]">
                 <button 
-                  className={`px-2 py-0.5 rounded transition-colors ${activeMenu === 'editar' ? 'bg-slate-100 dark:hover:bg-white/10' : 'hover:bg-slate-100 dark:hover:bg-white/5'}`}
+                  type="button"
+                  className={`shrink-0 rounded px-2 py-0.5 transition-colors ${activeMenu === 'editar' ? 'bg-slate-100 dark:hover:bg-white/10' : 'hover:bg-slate-100 dark:hover:bg-white/5'}`}
                   onClick={() => setActiveMenu(activeMenu === 'editar' ? null : 'editar')}
                   onMouseEnter={() => activeMenu && setActiveMenu('editar')}
                 >
                   Editar
                 </button>
-                <div className={`absolute left-0 top-full mt-1 w-72 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[200] ${activeMenu === 'editar' ? 'block' : 'hidden'}`} onClick={() => setActiveMenu(null)}>
+                <div data-docs-menu-panel className={`absolute left-0 top-full z-[400] mt-1 w-72 rounded-lg border border-slate-200 bg-white py-2 shadow-2xl dark:border-white/10 dark:bg-slate-800 ${activeMenu === 'editar' ? 'block' : 'hidden'}`} onClick={() => setActiveMenu(null)}>
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex justify-between" onClick={() => { handleUndo(); setActiveMenu(null); }}><span>Desfazer</span><span className="text-slate-400">Ctrl+Z</span></button>
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex justify-between" onClick={() => { handleRedo(); setActiveMenu(null); }}><span>Refazer</span><span className="text-slate-400">Ctrl+Y</span></button>
                   <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
@@ -1024,21 +1105,22 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex justify-between" onClick={() => { setShowFindReplace(true); setActiveMenu(null); }}><span>Localizar e substituir</span><span className="text-slate-400">Ctrl+H</span></button>
                 </div>
               </div>
-              <div className="relative menu-container">
+              <div className="relative menu-container z-[70]">
                 <button 
-                  className={`px-2 py-0.5 rounded transition-colors ${activeMenu === 'ver' ? 'bg-slate-100 dark:hover:bg-white/10' : 'hover:bg-slate-100 dark:hover:bg-white/5'}`}
+                  type="button"
+                  className={`shrink-0 rounded px-2 py-0.5 transition-colors ${activeMenu === 'ver' ? 'bg-slate-100 dark:hover:bg-white/10' : 'hover:bg-slate-100 dark:hover:bg-white/5'}`}
                   onClick={() => setActiveMenu(activeMenu === 'ver' ? null : 'ver')}
                   onMouseEnter={() => activeMenu && setActiveMenu('ver')}
                 >
                   Ver
                 </button>
-                <div className={`absolute left-0 top-full mt-1 w-72 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[200] ${activeMenu === 'ver' ? 'block' : 'hidden'}`} onClick={() => setActiveMenu(null)}>
+                <div data-docs-menu-panel className={`absolute left-0 top-full z-[400] mt-1 w-72 rounded-lg border border-slate-200 bg-white py-2 shadow-2xl dark:border-white/10 dark:bg-slate-800 ${activeMenu === 'ver' ? 'block' : 'hidden'}`} onClick={() => setActiveMenu(null)}>
                   <div className="relative group/sub">
                     <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-3"><Edit3 size={16} className="text-slate-400" /> Modo</div>
                       <ChevronDown size={14} className="-rotate-90 text-slate-400" />
                     </button>
-                    <div className="absolute left-full top-0 hidden group-hover/sub:block w-64 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
+                    <div className="absolute left-full top-0 z-[450] hidden group-hover/sub:block w-64 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
                       <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between" onClick={() => setEditMode('editing')}>
                         <div className="flex flex-col">
                           <span className="font-medium flex items-center gap-2">
@@ -1099,15 +1181,16 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                   </button>
                 </div>
               </div>
-              <div className="relative menu-container">
+              <div className="relative menu-container z-[70]">
                 <button 
-                  className={`px-2 py-0.5 rounded transition-colors ${activeMenu === 'inserir' ? 'bg-slate-100 dark:hover:bg-white/10' : 'hover:bg-slate-100 dark:hover:bg-white/5'}`}
+                  type="button"
+                  className={`shrink-0 rounded px-2 py-0.5 transition-colors ${activeMenu === 'inserir' ? 'bg-slate-100 dark:hover:bg-white/10' : 'hover:bg-slate-100 dark:hover:bg-white/5'}`}
                   onClick={() => setActiveMenu(activeMenu === 'inserir' ? null : 'inserir')}
                   onMouseEnter={() => activeMenu && setActiveMenu('inserir')}
                 >
                   Inserir
                 </button>
-                <div className={`absolute left-0 top-full mt-1 w-72 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[200] ${activeMenu === 'inserir' ? 'block' : 'hidden'}`} onClick={() => setActiveMenu(null)}>
+                <div data-docs-menu-panel className={`absolute left-0 top-full z-[400] mt-1 w-72 rounded-lg border border-slate-200 bg-white py-2 shadow-2xl dark:border-white/10 dark:bg-slate-800 ${activeMenu === 'inserir' ? 'block' : 'hidden'}`} onClick={() => setActiveMenu(null)}>
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={onImageUpload}>
                     <Image size={16} className="text-slate-400" /> Imagem
                   </button>
@@ -1120,7 +1203,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                       <div className="flex items-center gap-3"><Layout size={16} className="text-slate-400" /> Elementos básicos</div>
                       <ChevronDown size={14} className="-rotate-90 text-slate-400" />
                     </button>
-                    <div className="absolute left-full top-0 hidden group-hover/sub:block w-64 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
+                    <div className="absolute left-full top-0 z-[450] hidden group-hover/sub:block w-64 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
                       <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleInsertMeetingNotes}>
                         <FileText size={16} className="text-slate-400" /> Notas de reunião
                       </button>
@@ -1136,7 +1219,10 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                       </button>
                     </div>
                   </div>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleLink}>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => {
+                    const url = window.prompt('Digite a URL do link:');
+                    if (url) handleFormat('link', url);
+                  }}>
                     <LinkIcon size={16} className="text-slate-400" /> Link
                   </button>
                   <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
@@ -1152,6 +1238,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                   </button>
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => {
                     if (quillRef.current) {
+                      ensureQuillSelection();
                       const range = quillRef.current.getSelection() || { index: quillRef.current.getLength() };
                       quillRef.current.insertEmbed(range.index, 'hr', true);
                       quillRef.current.setSelection(range.index + 1);
@@ -1164,7 +1251,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                       <div className="flex items-center gap-3"><Scissors size={16} className="text-slate-400" /> Quebra</div>
                       <ChevronDown size={14} className="-rotate-90 text-slate-400" />
                     </button>
-                    <div className="absolute left-full top-0 hidden group-hover/sub:block w-48 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
+                    <div className="absolute left-full top-0 z-[450] hidden group-hover/sub:block w-48 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
                       <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={handlePageBreak}>Quebra de página</button>
                       <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={handleSectionBreak}>Quebra de seção</button>
                     </div>
@@ -1178,7 +1265,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                       <div className="flex items-center gap-3"><Hash size={16} className="text-slate-400" /> Elementos de página</div>
                       <ChevronDown size={14} className="-rotate-90 text-slate-400" />
                     </button>
-                    <div className="absolute left-full top-0 hidden group-hover/sub:block w-48 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
+                    <div className="absolute left-full top-0 z-[450] hidden group-hover/sub:block w-48 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
                       <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={() => toast.success('Números de página inseridos no rodapé.')}>Números de página</button>
                       <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={() => toast.success('Cabeçalho ativado.')}>Cabeçalho</button>
                       <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={() => toast.success('Rodapé ativado.')}>Rodapé</button>
@@ -1186,21 +1273,22 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                   </div>
                 </div>
               </div>
-              <div className="relative menu-container">
+              <div className="relative menu-container z-[70]">
                 <button 
-                  className={`px-2 py-0.5 rounded transition-colors ${activeMenu === 'formatar' ? 'bg-slate-100 dark:hover:bg-white/10' : 'hover:bg-slate-100 dark:hover:bg-white/5'}`}
+                  type="button"
+                  className={`shrink-0 rounded px-2 py-0.5 transition-colors ${activeMenu === 'formatar' ? 'bg-slate-100 dark:hover:bg-white/10' : 'hover:bg-slate-100 dark:hover:bg-white/5'}`}
                   onClick={() => setActiveMenu(activeMenu === 'formatar' ? null : 'formatar')}
                   onMouseEnter={() => activeMenu && setActiveMenu('formatar')}
                 >
                   Formatar
                 </button>
-                <div className={`absolute left-0 top-full mt-1 w-72 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[200] ${activeMenu === 'formatar' ? 'block' : 'hidden'}`} onClick={() => setActiveMenu(null)}>
+                <div data-docs-menu-panel className={`absolute left-0 top-full z-[400] mt-1 w-72 rounded-lg border border-slate-200 bg-white py-2 shadow-2xl dark:border-white/10 dark:bg-slate-800 ${activeMenu === 'formatar' ? 'block' : 'hidden'}`} onClick={() => setActiveMenu(null)}>
                   <div className="relative group/sub">
                     <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-3"><Type size={16} className="text-slate-400" /> Texto</div>
                       <ChevronDown size={14} className="-rotate-90 text-slate-400" />
                     </button>
-                    <div className="absolute left-full top-0 hidden group-hover/sub:block w-64 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
+                    <div className="absolute left-full top-0 z-[450] hidden group-hover/sub:block w-64 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
                       <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => handleToggleFormat('bold')}>
                         <Bold size={16} className="text-slate-400" /> Negrito <span className="ml-auto text-[10px] text-slate-400">Ctrl+B</span>
                       </button>
@@ -1227,8 +1315,8 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                       <div className="flex items-center gap-3"><AlignCenter size={16} className="text-slate-400" /> Alinhar e recuar</div>
                       <ChevronDown size={14} className="-rotate-90 text-slate-400" />
                     </button>
-                    <div className="absolute left-full top-0 hidden group-hover/sub:block w-64 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
-                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => handleFormat('align', false)}>
+                    <div className="absolute left-full top-0 z-[450] hidden group-hover/sub:block w-64 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
+                      <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => handleFormat('align', '')}>
                         <AlignLeft size={16} className="text-slate-400" /> Esquerda
                       </button>
                       <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => handleFormat('align', 'center')}>
@@ -1250,7 +1338,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                       <div className="flex items-center gap-3"><List size={16} className="text-slate-400" /> Marcadores e numeração</div>
                       <ChevronDown size={14} className="-rotate-90 text-slate-400" />
                     </button>
-                    <div className="absolute left-full top-0 hidden group-hover/sub:block w-64 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
+                    <div className="absolute left-full top-0 z-[450] hidden group-hover/sub:block w-64 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
                       <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => handleFormat('list', 'bullet')}>
                         <List size={16} className="text-slate-400" /> Lista com marcadores
                       </button>
@@ -1265,7 +1353,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                       <div className="flex items-center gap-3"><RotateCcw size={16} className="text-slate-400" /> Orientação da página</div>
                       <ChevronDown size={14} className="-rotate-90 text-slate-400" />
                     </button>
-                    <div className="absolute left-full top-0 hidden group-hover/sub:block w-64 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
+                    <div className="absolute left-full top-0 z-[450] hidden group-hover/sub:block w-64 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
                       <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between" onClick={() => setPageOrientation('portrait')}>
                         Retrato {pageOrientation === 'portrait' && <Check size={14} className="text-blue-600" />}
                       </button>
@@ -1279,15 +1367,16 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                   </button>
                 </div>
               </div>
-              <div className="relative menu-container">
+              <div className="relative menu-container z-[70]">
                 <button 
-                  className={`px-2 py-0.5 rounded transition-colors ${activeMenu === 'ferramentas' ? 'bg-slate-100 dark:hover:bg-white/10' : 'hover:bg-slate-100 dark:hover:bg-white/5'}`}
+                  type="button"
+                  className={`shrink-0 rounded px-2 py-0.5 transition-colors ${activeMenu === 'ferramentas' ? 'bg-slate-100 dark:hover:bg-white/10' : 'hover:bg-slate-100 dark:hover:bg-white/5'}`}
                   onClick={() => setActiveMenu(activeMenu === 'ferramentas' ? null : 'ferramentas')}
                   onMouseEnter={() => activeMenu && setActiveMenu('ferramentas')}
                 >
                   Ferramentas
                 </button>
-                <div className={`absolute left-0 top-full mt-1 w-72 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[200] ${activeMenu === 'ferramentas' ? 'block' : 'hidden'}`} onClick={() => setActiveMenu(null)}>
+                <div data-docs-menu-panel className={`absolute left-0 top-full z-[400] mt-1 w-72 rounded-lg border border-slate-200 bg-white py-2 shadow-2xl dark:border-white/10 dark:bg-slate-800 ${activeMenu === 'ferramentas' ? 'block' : 'hidden'}`} onClick={() => setActiveMenu(null)}>
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleToggleSpellcheck}>
                     <SpellCheck2 size={16} className="text-slate-400" /> Ortografia e gramática
                   </button>
@@ -1301,7 +1390,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleCompareDocuments}>
                     <FileSearch size={16} className="text-slate-400" /> Comparar documentos
                   </button>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={onLegalCitation}>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleCitation}>
                     <Quote size={16} className="text-slate-400" /> Citações
                   </button>
                   <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
@@ -1320,21 +1409,22 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                   </button>
                 </div>
               </div>
-              <div className="relative menu-container">
+              <div className="relative menu-container z-[70]">
                 <button 
-                  className={`px-2 py-0.5 rounded transition-colors ${activeMenu === 'extensoes' ? 'bg-slate-100 dark:hover:bg-white/10' : 'hover:bg-slate-100 dark:hover:bg-white/5'}`}
+                  type="button"
+                  className={`shrink-0 rounded px-2 py-0.5 transition-colors ${activeMenu === 'extensoes' ? 'bg-slate-100 dark:hover:bg-white/10' : 'hover:bg-slate-100 dark:hover:bg-white/5'}`}
                   onClick={() => setActiveMenu(activeMenu === 'extensoes' ? null : 'extensoes')}
                   onMouseEnter={() => activeMenu && setActiveMenu('extensoes')}
                 >
                   Extensões
                 </button>
-                <div className={`absolute left-0 top-full mt-1 w-72 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[200] ${activeMenu === 'extensoes' ? 'block' : 'hidden'}`} onClick={() => setActiveMenu(null)}>
+                <div data-docs-menu-panel className={`absolute left-0 top-full z-[400] mt-1 w-72 rounded-lg border border-slate-200 bg-white py-2 shadow-2xl dark:border-white/10 dark:bg-slate-800 ${activeMenu === 'extensoes' ? 'block' : 'hidden'}`} onClick={() => setActiveMenu(null)}>
                   <div className="relative group/sub">
                     <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-3"><Puzzle size={16} className="text-slate-400" /> Complementos</div>
                       <ChevronDown size={14} className="-rotate-90 text-slate-400" />
                     </button>
-                    <div className="absolute left-full top-0 hidden group-hover/sub:block w-64 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
+                    <div className="absolute left-full top-0 z-[450] hidden group-hover/sub:block w-64 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2">
                       <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={() => window.open('https://workspace.google.com/marketplace', '_blank')}>Instalar complementos</button>
                       <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm" onClick={() => window.open('https://workspace.google.com/marketplace', '_blank')}>Gerenciar complementos</button>
                     </div>
@@ -1344,15 +1434,16 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                   </button>
                 </div>
               </div>
-              <div className="relative menu-container">
+              <div className="relative menu-container z-[70]">
                 <button 
-                  className={`px-2 py-0.5 rounded transition-colors ${activeMenu === 'ajuda' ? 'bg-slate-100 dark:hover:bg-white/10' : 'hover:bg-slate-100 dark:hover:bg-white/5'}`}
+                  type="button"
+                  className={`shrink-0 rounded px-2 py-0.5 transition-colors ${activeMenu === 'ajuda' ? 'bg-slate-100 dark:hover:bg-white/10' : 'hover:bg-slate-100 dark:hover:bg-white/5'}`}
                   onClick={() => setActiveMenu(activeMenu === 'ajuda' ? null : 'ajuda')}
                   onMouseEnter={() => activeMenu && setActiveMenu('ajuda')}
                 >
                   Ajuda
                 </button>
-                <div className={`absolute left-0 top-full mt-1 w-72 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-2 z-[200] ${activeMenu === 'ajuda' ? 'block' : 'hidden'}`} onClick={() => setActiveMenu(null)}>
+                <div data-docs-menu-panel className={`absolute left-0 top-full z-[400] mt-1 w-72 rounded-lg border border-slate-200 bg-white py-2 shadow-2xl dark:border-white/10 dark:bg-slate-800 ${activeMenu === 'ajuda' ? 'block' : 'hidden'}`} onClick={() => setActiveMenu(null)}>
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center justify-between" onClick={() => { setShowMenuSearch(true); setActiveMenu(null); }}>
                     <div className="flex items-center gap-3"><Search size={16} className="text-slate-400" /> Pesquisar nos menus</div>
                     <span className="text-slate-400">Alt+/</span>
@@ -1369,31 +1460,51 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
               </div>
             </div>
           </div>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
-            <MessageSquareText size={20} />
-          </button>
-          <button className="flex items-center gap-1 p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
-            <Video size={20} />
-            <ChevronDown size={12} />
-          </button>
-          <button className="flex items-center gap-2 px-4 py-1.5 bg-[#c2e7ff] hover:bg-[#b3d9f2] text-[#001d35] rounded-full font-medium text-sm transition-colors whitespace-nowrap">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0 justify-start lg:justify-end pt-0.5 lg:pt-0">
+          <div className={`items-center gap-3 ${isMaximized ? 'flex' : 'hidden md:flex'}`}>
+            <button
+              type="button"
+              title="Comentários"
+              className="rounded-full p-2 text-slate-500 transition-colors hover:bg-slate-100 dark:hover:bg-white/5"
+              onClick={() => {
+                setShowComments(true);
+                toast.info('Painel de comentários à direita.');
+              }}
+            >
+              <MessageSquareText size={20} />
+            </button>
+            <button
+              type="button"
+              title="Chamada de vídeo"
+              className="flex items-center gap-1 rounded-full p-2 text-slate-500 transition-colors hover:bg-slate-100 dark:hover:bg-white/5"
+              onClick={() => toast.info('Chamadas de vídeo: use Compartilhar para enviar o link.')}
+            >
+              <Video size={20} />
+              <ChevronDown size={12} />
+            </button>
+          </div>
+          <button
+            type="button"
+            className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full bg-[#c2e7ff] px-4 py-1.5 text-sm font-medium text-[#001d35] transition-colors hover:bg-[#b3d9f2]"
+            onClick={onShare}
+          >
             <Lock size={16} />
             Compartilhar
           </button>
-          <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
+          <div className={`w-8 h-8 shrink-0 bg-purple-600 rounded-full items-center justify-center text-white text-xs font-bold ${isMaximized ? 'flex' : 'hidden md:flex'}`}>
             J
           </div>
         </div>
       </div>
 
-      {/* Toolbar Row */}
-      <div 
-        id="docs-toolbar" 
-        className={`flex flex-wrap items-center gap-1.5 px-3 py-1 bg-[#edf2fa] dark:bg-slate-800/50 border-t border-slate-200 dark:border-white/10 transition-all ${isExpanded ? '' : 'h-0 overflow-hidden py-0 border-t-0'}`}
+      {/* Formatting row — #docs-toolbar gets ql-toolbar from Quill; flex + float overrides in index.css */}
+      <div
+        id="docs-toolbar"
+        className={`ql-snow transition-[min-height,opacity,padding] duration-200 ${isExpanded ? '' : 'docs-toolbar-collapsed !min-h-0 h-0 max-h-0 overflow-hidden !p-0 !border-t-0 pointer-events-none opacity-0'}`}
       >
-        <div className="flex items-center bg-white dark:bg-slate-900 rounded-full px-3 py-1.5 mr-2 shadow-sm border border-slate-200 dark:border-white/10 w-48">
+        <div className="flex shrink-0 items-center bg-white dark:bg-slate-900 rounded-full px-3 py-1.5 mr-2 shadow-sm border border-slate-200 dark:border-white/10 w-48">
           <Search size={16} strokeWidth={2.5} className="text-slate-700 dark:text-slate-300 mr-2" />
           <input 
             type="text" 
@@ -1404,25 +1515,26 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
           />
         </div>
         <button 
-          className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
+          type="button"
+          className="ql-undo rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
           data-tooltip="Desfazer (Ctrl+Z)"
-          onClick={handleUndo}
         >
           <Undo2 size={18}/>
         </button>
         <button 
-          className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
+          type="button"
+          className="ql-redo rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
           data-tooltip="Refazer (Ctrl+Y)"
-          onClick={handleRedo}
         >
           <Redo2 size={18}/>
         </button>
-        <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" onClick={onPrint} data-tooltip="Imprimir (Ctrl+P)"><Printer size={18}/></button>
-        <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Verificação ortográfica" onClick={handleToggleSpellcheck}><SpellCheck size={18}/></button>
+        <button type="button" className="rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" onClick={(e) => { e.preventDefault(); onPrint(); }} data-tooltip="Imprimir (Ctrl+P)"><Printer size={18}/></button>
+        <button type="button" className="rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" data-tooltip="Verificação ortográfica" onClick={(e) => { e.preventDefault(); handleToggleSpellcheck(); }}><SpellCheck size={18}/></button>
         <button 
-          className={`p-1.5 rounded transition-colors has-tooltip ${formatPainter ? 'bg-blue-100 text-blue-600' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
+          type="button"
+          className={`rounded p-1.5 transition-colors has-tooltip ${formatPainter ? 'bg-[#d3e3fd] text-[#001d35] dark:bg-blue-900/40 dark:text-blue-100' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
           data-tooltip="Pintar formatação" 
-          onClick={handlePaintbrushClick}
+          onClick={(e) => { e.preventDefault(); handlePaintbrushClick(); }}
         >
           <Paintbrush size={18}/>
         </button>
@@ -1437,6 +1549,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
             <div className="absolute top-full left-0 mt-1 w-24 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-white/10 rounded-lg py-1 z-[210]">
               {['50%', '75%', '100%', '125%', '150%', '200%'].map((level) => (
                 <button
+                  type="button"
                   key={level}
                   className="w-full text-left px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm font-medium text-slate-700 dark:text-slate-200 flex items-center justify-between"
                   onClick={(e) => {
@@ -1524,28 +1637,32 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
         <button 
-          className={`p-1.5 rounded transition-colors has-tooltip ${activeFormats.bold ? 'bg-slate-300 dark:bg-white/20' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
+          type="button"
+          className={`rounded p-1.5 transition-colors has-tooltip ${activeFormats.bold ? 'bg-[#d3e3fd] text-[#001d35] dark:bg-blue-900/40 dark:text-blue-100' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
           data-tooltip="Negrito (Ctrl+B)"
           onClick={() => handleToggleFormat('bold')}
         >
           <Bold size={18}/>
         </button>
         <button 
-          className={`p-1.5 rounded transition-colors has-tooltip ${activeFormats.italic ? 'bg-slate-300 dark:bg-white/20' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
+          type="button"
+          className={`rounded p-1.5 transition-colors has-tooltip ${activeFormats.italic ? 'bg-[#d3e3fd] text-[#001d35] dark:bg-blue-900/40 dark:text-blue-100' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
           data-tooltip="Itálico (Ctrl+I)"
           onClick={() => handleToggleFormat('italic')}
         >
           <Italic size={18}/>
         </button>
         <button 
-          className={`p-1.5 rounded transition-colors has-tooltip ${activeFormats.underline ? 'bg-slate-300 dark:bg-white/20' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
+          type="button"
+          className={`rounded p-1.5 transition-colors has-tooltip ${activeFormats.underline ? 'bg-[#d3e3fd] text-[#001d35] dark:bg-blue-900/40 dark:text-blue-100' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
           data-tooltip="Sublinhado (Ctrl+U)"
           onClick={() => handleToggleFormat('underline')}
         >
           <Underline size={18}/>
         </button>
         <button 
-          className={`p-1.5 rounded transition-colors has-tooltip ${activeFormats.strikeThrough ? 'bg-slate-300 dark:bg-white/20' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
+          type="button"
+          className={`rounded p-1.5 transition-colors has-tooltip ${activeFormats.strikeThrough ? 'bg-[#d3e3fd] text-[#001d35] dark:bg-blue-900/40 dark:text-blue-100' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
           data-tooltip="Tachado"
           onClick={() => handleToggleFormat('strike')}
         >
@@ -1577,41 +1694,41 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
-        <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Inserir link (Ctrl+K)" onClick={handleLink}><Link size={18}/></button>
-        <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Adicionar comentário" onClick={handleAddComment}><MessageSquarePlus size={18}/></button>
-        <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" data-tooltip="Inserir imagem" onClick={onImageUpload}><Image size={18}/></button>
+        <button type="button" className="ql-link rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" data-tooltip="Inserir link (Ctrl+K)"><Link size={18}/></button>
+        <button type="button" className="rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" data-tooltip="Adicionar comentário" onClick={(e) => { e.preventDefault(); handleAddComment(); }}><MessageSquarePlus size={18}/></button>
+        <button type="button" className="ql-image rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" data-tooltip="Inserir imagem"><Image size={18}/></button>
         
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
         <button 
-          className={`p-1.5 rounded transition-colors has-tooltip ${activeFormats.alignLeft ? 'bg-slate-300 dark:bg-white/20' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
+          type="button"
+          className="ql-align rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
           value="" 
           data-tooltip="Alinhar à esquerda (Ctrl+Shift+L)"
-          onClick={() => handleAlign('justifyLeft')}
         >
           <AlignLeft size={18}/>
         </button>
         <button 
-          className={`p-1.5 rounded transition-colors has-tooltip ${activeFormats.alignCenter ? 'bg-slate-300 dark:bg-white/20' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
+          type="button"
+          className="ql-align rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
           value="center" 
           data-tooltip="Centralizar (Ctrl+Shift+E)"
-          onClick={() => handleAlign('justifyCenter')}
         >
           <AlignCenter size={18}/>
         </button>
         <button 
-          className={`p-1.5 rounded transition-colors has-tooltip ${activeFormats.alignRight ? 'bg-slate-300 dark:bg-white/20' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
+          type="button"
+          className="ql-align rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
           value="right" 
           data-tooltip="Alinhar à direita (Ctrl+Shift+R)"
-          onClick={() => handleAlign('justifyRight')}
         >
           <AlignRight size={18}/>
         </button>
         <button 
-          className={`p-1.5 rounded transition-colors has-tooltip ${activeFormats.alignJustify ? 'bg-slate-300 dark:bg-white/20' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
+          type="button"
+          className="ql-align rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
           value="justify" 
           data-tooltip="Justificar (Ctrl+Shift+J)"
-          onClick={() => handleAlign('justifyFull')}
         >
           <AlignJustify size={18}/>
         </button>
@@ -1638,10 +1755,10 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
 
         <div className="flex items-center gap-0.5">
           <button 
-            className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
-            value="check" 
+            type="button"
+            className="ql-list rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
+            value="unchecked" 
             data-tooltip="Checklist"
-            onClick={handleChecklist}
           >
             <ListTodo size={18}/>
           </button>
@@ -1649,10 +1766,10 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         </div>
         <div className="flex items-center gap-0.5">
           <button 
-            className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
+            type="button"
+            className="ql-list rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
             value="bullet" 
             data-tooltip="Lista com marcadores (Ctrl+Shift+8)"
-            onClick={() => handleList('insertUnorderedList')}
           >
             <List size={18}/>
           </button>
@@ -1660,10 +1777,10 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         </div>
         <div className="flex items-center gap-0.5">
           <button 
-            className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
+            type="button"
+            className="ql-list rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
             value="ordered" 
             data-tooltip="Lista numerada (Ctrl+Shift+7)"
-            onClick={() => handleList('insertOrderedList')}
           >
             <ListOrdered size={18}/>
           </button>
@@ -1671,18 +1788,18 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         </div>
         
         <button 
-          className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
+          type="button"
+          className="ql-indent rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
           value="-1" 
           data-tooltip="Diminuir recuo (Ctrl+[)"
-          onClick={handleOutdent}
         >
           <IndentDecrease size={18}/>
         </button>
         <button 
-          className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
+          type="button"
+          className="ql-indent rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
           value="+1" 
           data-tooltip="Aumentar recuo (Ctrl+])"
-          onClick={handleIndent}
         >
           <IndentIncrease size={18}/>
         </button>
@@ -1690,15 +1807,15 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
         <button 
-          className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors has-tooltip" 
+          type="button"
+          className="ql-clean rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
           data-tooltip="Limpar formatação (Ctrl+\)"
-          onClick={handleClearFormatting}
         >
           <Eraser size={18}/>
         </button>
 
-        <div className="ml-auto flex items-center gap-1">
-          <button className="flex items-center px-3 py-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full text-sm font-medium text-slate-700 dark:text-slate-200 transition-colors whitespace-nowrap flex-shrink-0">
+        <div className={`flex items-center gap-1 shrink-0 ${isMaximized ? 'ml-auto' : ''}`}>
+          <button type="button" className="flex items-center px-3 py-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full text-sm font-medium text-slate-700 dark:text-slate-200 transition-colors whitespace-nowrap flex-shrink-0">
             <div className="flex flex-row items-center gap-1 whitespace-nowrap">
               <Pencil size={16} className="text-blue-600" />
               <span>Edição</span>
@@ -1867,44 +1984,6 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
               <button onClick={() => setShowShortcuts(false)} className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm transition-all">
                 Entendido
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Prompt Modal */}
-      {promptModal && (
-        <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10 animate-in slide-in-from-bottom-8 duration-500">
-            <div className="p-8 space-y-6">
-              <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">{promptModal.title}</h3>
-              <input 
-                type="text" 
-                autoFocus
-                defaultValue={promptModal.defaultValue}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    promptModal.onConfirm(e.currentTarget.value);
-                  }
-                }}
-                className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-blue-500 transition-all"
-              />
-              <div className="flex gap-3 pt-2">
-                <button 
-                  onClick={() => {
-                    const input = document.querySelector('.fixed.inset-0.z-\\[400\\] input') as HTMLInputElement;
-                    promptModal.onConfirm(input?.value || '');
-                  }}
-                  className="flex-1 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-blue-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                >
-                  Confirmar
-                </button>
-                <button 
-                  onClick={() => setPromptModal(null)}
-                  className="px-8 py-4 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 rounded-2xl font-black uppercase tracking-widest transition-all hover:bg-slate-200"
-                >
-                  Cancelar
-                </button>
-              </div>
             </div>
           </div>
         </div>

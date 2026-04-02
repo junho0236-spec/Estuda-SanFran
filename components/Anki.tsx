@@ -280,6 +280,19 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
   const [studyHistory, setStudyHistory] = useState<Record<string, number>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [isGlobalSearch, setIsGlobalSearch] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const q = params.get('q')?.trim();
+    if (!q) return;
+    setSearchQuery(q);
+    setIsGlobalSearch(true);
+    setMode('browse');
+    const next = new URLSearchParams(location.search);
+    next.delete('q');
+    const qs = next.toString();
+    window.history.replaceState({}, '', `${location.pathname}${qs ? `?${qs}` : ''}`);
+  }, [location.search, location.pathname]);
   const [isCramMode, setIsCramMode] = useState(false);
   const [isAdvanceMode, setIsAdvanceMode] = useState(false);
   const [isAudioMode, setIsAudioMode] = useState(false);
