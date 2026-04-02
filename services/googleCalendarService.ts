@@ -1,6 +1,5 @@
 
 import { supabase } from './supabaseClient';
-import { auth } from '../firebase';
 import { Task } from '../types';
 
 export interface GoogleCalendarEvent {
@@ -14,6 +13,75 @@ export interface GoogleCalendarEvent {
     dateTime: string;
     timeZone?: string;
   };
+}
+
+/** Evento da agenda primária já normalizado (leitura na UI). */
+export interface GoogleExternalEvent {
+  id: string;
+  summary: string;
+  start: Date;
+  end: Date;
+  allDay: boolean;
+}
+
+function parseDateOnly(ymd: string): Date {
+  const [y, m, d] = ymd.split('-').map((x) => parseInt(x, 10));
+  return new Date(y, m - 1, d);
+}
+
+/** Converte item da API Calendar v3; retorna null se não houver início válido. */
+export function parseGoogleCalendarListItem(raw: {
+  id?: string;
+  summary?: string;
+  start?: { date?: string; dateTime?: string; timeZone?: string };
+  end?: { date?: string; dateTime?: string; timeZone?: string };
+}): GoogleExternalEvent | null {
+  const id = raw.id;
+  if (!id) return null;
+
+  const summary = (raw.summary || '(Sem título)').trim();
+
+  if (raw.start?.dateTime) {
+    const start = new Date(raw.start.dateTime);
+    const end = raw.end?.dateTime ? new Date(raw.end.dateTime) : new Date(start.getTime() + 60 * 60 * 1000);
+    if (Number.isNaN(start.getTime())) return null;
+    return { id, summary, start, end, allDay: false };
+  }
+
+  if (raw.start?.date) {
+    const start = parseDateOnly(raw.start.date);
+    let end: Date;
+    if (raw.end?.date) {
+      const endExclusive = parseDateOnly(raw.end.date);
+      end = new Date(endExclusive.getTime() - 1);
+    } else {
+      end = new Date(start);
+      end.setHours(23, 59, 59, 999);
+    }
+    return { id, summary, start, end, allDay: true };
+  }
+
+  return null;
+}
+
+function shouldSkipExternalEvent(ev: GoogleExternalEvent, skipEventIds: Set<string>): boolean {
+  if (skipEventIds.has(ev.id)) return true;
+  if (/\[SanFran\]/i.test(ev.summary)) return true;
+  return false;
+}
+
+export function parseExternalEventsFromListResponse(
+  data: { items?: unknown[] } | null | undefined,
+  skipEventIds: Set<string>
+): GoogleExternalEvent[] {
+  if (!data?.items?.length) return [];
+  const out: GoogleExternalEvent[] = [];
+  for (const item of data.items) {
+    const ev = parseGoogleCalendarListItem(item as Parameters<typeof parseGoogleCalendarListItem>[0]);
+    if (!ev || shouldSkipExternalEvent(ev, skipEventIds)) continue;
+    out.push(ev);
+  }
+  return out;
 }
 
 // Store token in memory or localStorage for the session
@@ -124,22 +192,59 @@ export const googleCalendarService = {
     }
   },
 
-  async listEvents() {
+  /**
+   * Lista eventos do calendário primário. Recomenda-se sempre passar timeMin/timeMax (RFC3339)
+   * para `singleEvents` + `orderBy=startTime` funcionarem de forma previsível.
+   */
+  async listEvents(options?: { timeMin?: string; timeMax?: string; maxResults?: number }) {
     const token = await this.getAccessToken();
     if (!token) return null;
 
+    const params = new URLSearchParams({
+      singleEvents: 'true',
+      orderBy: 'startTime',
+      maxResults: String(Math.min(250, options?.maxResults ?? 250)),
+    });
+    if (options?.timeMin) params.set('timeMin', options.timeMin);
+    if (options?.timeMax) params.set('timeMax', options.timeMax);
+
     try {
-      const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params.toString()}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.status === 401) {
+        localStorage.removeItem('fb_google_token');
+        firebaseGoogleToken = null;
+        return null;
+      }
 
       if (!response.ok) return null;
       return await response.json();
-    } catch (err) {
+    } catch {
       return null;
     }
+  },
+
+  /** Eventos externos (exclui espelhos SanFran e ids já ligados a tarefas). `null` = sem token; `[]` = sem dados ou erro de API. */
+  async fetchExternalEventsInRange(
+    timeMin: Date,
+    timeMax: Date,
+    skipEventIds: Set<string>
+  ): Promise<GoogleExternalEvent[] | null> {
+    const token = await this.getAccessToken();
+    if (!token) return null;
+    const raw = await this.listEvents({
+      timeMin: timeMin.toISOString(),
+      timeMax: timeMax.toISOString(),
+    });
+    if (!raw) return [];
+    return parseExternalEventsFromListResponse(raw, skipEventIds);
   },
 
   async syncTaskToGoogle(task: Task, subjectName?: string) {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Sparkles, FileText, BookOpen, Brain, Copy, Check, History, Trash2, X, Loader2, Zap, ArrowRight, Key } from 'lucide-react';
 import { summarizeText, extractKeyPoints, generateMindMap } from '../services/geminiService';
 import Markdown from 'react-markdown';
@@ -19,6 +20,7 @@ interface SummaryHistory {
 }
 
 export const IntelligentSummarizer: React.FC<IntelligentSummarizerProps> = ({ userId }) => {
+  const location = useLocation();
   const [inputText, setInputText] = useState('');
   const [outputText, setOutputText] = useState('');
   const [loading, setLoading] = useState(false);
@@ -32,6 +34,17 @@ export const IntelligentSummarizer: React.FC<IntelligentSummarizerProps> = ({ us
       loadHistory();
     }
   }, [userId]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const pre = params.get('prefill')?.trim();
+    if (!pre) return;
+    setInputText(pre);
+    const next = new URLSearchParams(location.search);
+    next.delete('prefill');
+    const qs = next.toString();
+    window.history.replaceState({}, '', `${location.pathname}${qs ? `?${qs}` : ''}`);
+  }, [location.search, location.pathname]);
 
   const loadHistory = async () => {
     try {

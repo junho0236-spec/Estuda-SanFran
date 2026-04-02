@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Task, Subject, Board, BoardColumn, SubTask, StudySession, UserProfile, TaskPriority, TaskCategory, Notification, Friendship, SubjectFile } from '../types';
 import { 
   Plus, Layout, List, MoreVertical, Trash2, CheckSquare, 
@@ -105,6 +106,10 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [mentionSuggestions, setMentionSuggestions] = useState<Friendship[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  /** Prazo vindo da Agenda (`/tasks?due=YYYY-MM-DD`) para o próximo Quick Entry. Deep link: `task` ou `taskId` com UUID. */
+  const [pendingCalendarDue, setPendingCalendarDue] = useState<string | null>(null);
+  const quickEntryInputRef = useRef<HTMLInputElement>(null);
 
   const currentViewMode: 'list' | 'kanban' = userProfile?.viewPreferences?.[activeTab] || (boards.find(b => b.id === activeTab) ? 'kanban' : 'list');
 
@@ -217,6 +222,42 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     }
   };
 
+  useEffect(() => {
+    const due = searchParams.get('due');
+    if (!due || !/^\d{4}-\d{2}-\d{2}$/.test(due)) return;
+    setPendingCalendarDue(due);
+    const [yy, mm, dd] = due.split('-');
+    toast.info(`Prazo sugerido: ${dd}/${mm}/${yy}. Digite o título no campo rápido e pressione Enter.`);
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        p.delete('due');
+        return p;
+      },
+      { replace: true }
+    );
+    requestAnimationFrame(() => {
+      quickEntryInputRef.current?.focus();
+    });
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    const taskParam = searchParams.get('task') ?? searchParams.get('taskId');
+    if (!taskParam || tasks.length === 0) return;
+    const found = tasks.some((t) => t.id === taskParam);
+    if (!found) return;
+    setSelectedTaskId(taskParam);
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        p.delete('task');
+        p.delete('taskId');
+        return p;
+      },
+      { replace: true }
+    );
+  }, [searchParams, tasks, setSearchParams]);
+
   const TABS = [
     { id: 'Geral', name: 'Geral' },
     { id: 'Leituras', name: 'Leituras' },
@@ -277,6 +318,11 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       title = title.replace(/hoje/gi, '');
     }
 
+    const calendarDueFallback = pendingCalendarDue;
+    if (!dueDate && calendarDueFallback) {
+      dueDate = calendarDueFallback;
+    }
+
     const board = boards.find(b => b.id === activeTab);
     const boardId = board ? board.id : undefined;
     const columnId = board ? board.columns[0]?.id : undefined;
@@ -303,6 +349,9 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
 
     setTasks(prev => [newTask, ...prev]);
     setQuickEntryInput('');
+    if (calendarDueFallback && dueDate === calendarDueFallback) {
+      setPendingCalendarDue(null);
+    }
     await dataService.saveTask(newTask, userId, isOnline);
 
     if (delegatedTo) {
@@ -1395,6 +1444,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                 {/* NLP Quick Entry */}
                 <div className="relative">
                   <input 
+                    ref={quickEntryInputRef}
                     type="text" 
                     value={quickEntryInput}
                     onChange={e => {
@@ -1407,11 +1457,31 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                         setMentionSuggestions([]);
                       }
                     }}
-                    onKeyDown={e => e.key === 'Enter' && handleAddTask(quickEntryInput)}
-                    placeholder="Adicionar nova tarefa..."
+                    onKeyDown={(e) => {
+                      if (e.key !== 'Enter') return;
+                      e.preventDefault();
+                      void handleNLPAddTask(quickEntryInput);
+                    }}
+                    placeholder={
+                      pendingCalendarDue
+                        ? `Título da tarefa (prazo ${pendingCalendarDue.slice(8, 10)}/${pendingCalendarDue.slice(5, 7)})…`
+                        : 'Adicionar nova tarefa…'
+                    }
                     className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#800000]/20 font-medium"
                   />
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-300 uppercase tracking-tighter">Quick Entry</div>
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                    {pendingCalendarDue && (
+                      <button
+                        type="button"
+                        onClick={() => setPendingCalendarDue(null)}
+                        className="text-[9px] font-black uppercase text-[#800000] hover:underline"
+                        title="Remover prazo sugerido pelo calendário"
+                      >
+                        Prazo {pendingCalendarDue.slice(8, 10)}/{pendingCalendarDue.slice(5, 7)} ✕
+                      </button>
+                    )}
+                    <span className="text-[10px] font-black text-slate-300 uppercase tracking-tighter">Quick</span>
+                  </div>
                   
                   <AnimatePresence>
                     {mentionSuggestions.length > 0 && (
