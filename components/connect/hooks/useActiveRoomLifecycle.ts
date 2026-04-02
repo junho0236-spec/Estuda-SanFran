@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
-import type { ChatParticipant } from '../../../types';
 
 interface UseActiveRoomLifecycleParams {
   activeRoomId: string | null;
-  participants: Record<string, ChatParticipant[]>;
-  userId: string;
+  /** Outro utilizador na DM (só para presença); estável enquanto os membros da sala não mudam. */
+  activeRoomOtherUserId: string | null;
+  /** Membro com join pendente: não carrega mensagens nem subscreve canais. */
+  joinBlocked?: boolean;
   setInternalSearchQuery: (value: string) => void;
   setShowInternalSearch: (value: boolean) => void;
   fetchMessages: (roomId: string) => void;
@@ -20,8 +21,8 @@ interface UseActiveRoomLifecycleParams {
 
 export function useActiveRoomLifecycle({
   activeRoomId,
-  participants,
-  userId,
+  activeRoomOtherUserId,
+  joinBlocked = false,
   setInternalSearchQuery,
   setShowInternalSearch,
   fetchMessages,
@@ -39,6 +40,11 @@ export function useActiveRoomLifecycle({
 
     setInternalSearchQuery('');
     setShowInternalSearch(false);
+
+    if (joinBlocked) {
+      return;
+    }
+
     fetchMessages(activeRoomId);
     fetchReactions(activeRoomId);
     fetchStarredMessages();
@@ -48,9 +54,8 @@ export function useActiveRoomLifecycle({
     const unsubscribePolls = subscribeToPolls(activeRoomId);
     markAsRead(activeRoomId);
 
-    const otherId = participants[activeRoomId]?.find((p) => p.user_id !== userId)?.user_id;
-    if (otherId) {
-      fetchOtherUserLastSeen(otherId);
+    if (activeRoomOtherUserId) {
+      fetchOtherUserLastSeen(activeRoomOtherUserId);
     }
 
     return () => {
@@ -58,5 +63,5 @@ export function useActiveRoomLifecycle({
       if (unsubscribeReactions) unsubscribeReactions();
       if (unsubscribePolls) unsubscribePolls();
     };
-  }, [activeRoomId, participants]);
+  }, [activeRoomId, activeRoomOtherUserId, joinBlocked]);
 }

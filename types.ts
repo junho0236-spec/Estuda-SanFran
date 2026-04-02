@@ -1137,7 +1137,37 @@ export interface ChatRoom {
   created_by?: string;
   avatar_url?: string;
   category?: 'Estudos' | 'Estágio' | 'Social' | 'Privadas' | 'Tudo';
+  /** Quando true, novos membros entram como join_status pending até aprovação. */
+  require_join_approval?: boolean;
+  /** Permissões de moderação (JSON no Supabase). */
+  moderation_settings?: Record<string, unknown> | null;
 }
+
+/** Metadados só no cliente para reenvio manual após falha. */
+export type ChatMessagePendingSendText = {
+  kind: 'text';
+  content: string;
+  replyToId: string | null;
+  replyToContent: string | null;
+  replyToSenderName: string | null;
+  linkPreview?: {
+    title?: string;
+    description?: string;
+    image?: string;
+    url: string;
+  } | null;
+  isVanish: boolean;
+  expiresAt: string | null;
+  threadRootId: string | null;
+};
+
+export type ChatMessagePendingSendFile = {
+  kind: 'file';
+  fileName: string;
+  fileType: string;
+};
+
+export type ChatMessagePendingSend = ChatMessagePendingSendText | ChatMessagePendingSendFile;
 
 export interface ChatMessage {
   id: string;
@@ -1148,13 +1178,19 @@ export interface ChatMessage {
   attachment_url?: string;
   attachment_name?: string;
   attachment_type?: string;
-  status: 'sent' | 'delivered' | 'read';
+  status: 'sent' | 'delivered' | 'read' | 'sending' | 'failed';
   created_at: string;
+  /** Só cliente: último erro ao enviar. */
+  send_error?: string;
+  /** Só cliente: dados para reenviar texto ou ficheiro (ficheiro em memória via ref no Connect). */
+  pending_send?: ChatMessagePendingSend;
   is_edited?: boolean;
   is_deleted?: boolean;
   reply_to_id?: string;
   reply_to_content?: string;
   reply_to_sender_name?: string;
+  /** Se preenchido, a mensagem pertence ao tópico cuja mensagem raiz tem este id. */
+  thread_root_id?: string | null;
   is_forwarded?: boolean;
   forwarded_from_name?: string;
   message_type?: 'text' | 'gif' | 'sticker' | 'audio' | 'file';
@@ -1170,6 +1206,25 @@ export interface ChatMessage {
   updated_at?: string;
   is_vanish?: boolean;
   expires_at?: string;
+}
+
+export type ChatScheduledItemKind = 'scheduled_message' | 'reminder';
+
+export interface ChatScheduledItem {
+  id: string;
+  room_id: string;
+  user_id: string;
+  user_name?: string | null;
+  kind: ChatScheduledItemKind;
+  content: string;
+  scheduled_at: string;
+  status: 'pending' | 'sent' | 'cancelled' | 'failed';
+  reply_to_id?: string | null;
+  reply_to_content?: string | null;
+  reply_to_sender_name?: string | null;
+  context_text?: string | null;
+  created_at: string;
+  error_text?: string | null;
 }
 
 export interface ChatStory {
@@ -1208,6 +1263,10 @@ export interface ChatParticipant {
   category?: 'Estudos' | 'Estágio' | 'Social' | 'Privadas';
   last_read_at?: string;
   created_at: string;
+  /** Grupos: member | co_admin | admin (admin = dono na linha do criador). */
+  group_role?: 'member' | 'co_admin' | 'admin';
+  /** Grupos: active = membro pleno; pending = aguardando aprovação. */
+  join_status?: 'active' | 'pending';
 }
 
 // Internship Counter Types

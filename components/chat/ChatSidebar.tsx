@@ -30,6 +30,8 @@ interface ChatSidebarProps {
   activeCategory: string;
   setActiveCategory: (cat: any) => void;
   loading: boolean;
+  /** Nomes a digitar por sala — Realtime Presence (fonte única). */
+  typingStatus: Record<string, string[]>;
   showStarredOnly: boolean;
   setShowStarredOnly: (show: boolean) => void;
   notificationPermission: NotificationPermission;
@@ -54,7 +56,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
   participants, pinnedRooms, togglePin, searchQuery, setSearchQuery,
   viewMode, setViewMode, callHistory, stories, setActiveStory,
   setShowStoryModal, setShowCreateStoryModal, activeCategory, setActiveCategory,
-  loading, showStarredOnly, setShowStarredOnly, notificationPermission,
+  loading, typingStatus, showStarredOnly, setShowStarredOnly, notificationPermission,
   requestNotificationPermission, setShowGlobalSearch, setShowProfileSettings,
   fetchAvailableUsers, setShowNewChatModal, onNavigate, getChatName, getChatAvatar,
   startCall, archivedRooms, toggleArchive, showArchived, setShowArchived,
@@ -243,7 +245,13 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                   const chatName = getChatName(room);
                   const avatar = getChatAvatar(room);
                   const unreadCount = participants[room.id]?.find(p => p.user_id === userId)?.unread_count || 0;
-                  const typingUser = participants[room.id]?.find(p => p.user_id !== userId && p.is_typing);
+                  const typingNames = typingStatus[room.id] || [];
+                  const typingPreview =
+                    typingNames.length > 0
+                      ? typingNames.length === 1
+                        ? `${typingNames[0]} está digitando…`
+                        : `${typingNames.slice(0, 2).join(', ')}${typingNames.length > 2 ? ` +${typingNames.length - 2}` : ''} estão digitando…`
+                      : null;
                   const isPinned = pinnedRooms.includes(room.id);
 
                   return (
@@ -283,8 +291,8 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                         </div>
                         <div className="flex justify-between items-center">
                           <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                            {typingUser ? (
-                              <span className="text-blue-500 italic">digitando...</span>
+                            {typingPreview ? (
+                              <span className="text-blue-500 italic">{typingPreview}</span>
                             ) : (
                               room.last_message || 'Inicie uma conversa'
                             )}

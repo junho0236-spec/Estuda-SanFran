@@ -1,6 +1,6 @@
 
 import { create } from 'zustand';
-import { ChatRoom, ChatMessage, ChatParticipant, PresenceUser } from '../../types';
+import { ChatRoom, ChatMessage, ChatParticipant } from '../../types';
 
 interface ChatState {
   activeRoomId: string | null;
@@ -20,11 +20,14 @@ interface ChatState {
   setMessages: (roomId: string, messages: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
   addMessage: (roomId: string, message: ChatMessage) => void;
   updateMessage: (roomId: string, message: ChatMessage) => void;
+  patchMessage: (roomId: string, messageId: string, patch: Partial<ChatMessage>) => void;
   removeMessage: (roomId: string, messageId: string) => void;
   setParticipants: (participants: Record<string, ChatParticipant[]> | ((prev: Record<string, ChatParticipant[]>) => Record<string, ChatParticipant[]>)) => void;
   setRoomParticipants: (roomId: string, participants: ChatParticipant[]) => void;
   setUserPresence: (presence: Record<string, { is_online: boolean; last_seen: string }>) => void;
   updateUserPresence: (userId: string, status: { is_online: boolean; last_seen: string }) => void;
+  /** Substitui o mapa de “a digitar” vindo só do Presence (fonte única). */
+  setTypingStatusFromPresence: (map: Record<string, string[]>) => void;
   setTypingStatus: (roomId: string, userNames: string[]) => void;
   addTypingUser: (roomId: string, userName: string) => void;
   removeTypingUser: (roomId: string, userName: string) => void;
@@ -68,6 +71,15 @@ export const useChatStore = create<ChatState>((set) => ({
       [roomId]: (state.messages[roomId] || []).map((m) => (m.id === message.id ? message : m)),
     },
   })),
+  patchMessage: (roomId, messageId, patch) =>
+    set((state) => ({
+      messages: {
+        ...state.messages,
+        [roomId]: (state.messages[roomId] || []).map((m) =>
+          m.id === messageId ? { ...m, ...patch } : m
+        ),
+      },
+    })),
   removeMessage: (roomId, messageId) => set((state) => ({
     messages: {
       ...state.messages,
@@ -84,6 +96,7 @@ export const useChatStore = create<ChatState>((set) => ({
   updateUserPresence: (userId, status) => set((state) => ({
     userPresence: { ...state.userPresence, [userId]: status },
   })),
+  setTypingStatusFromPresence: (map) => set({ typingStatus: map }),
   setTypingStatus: (roomId, userNames) => set((state) => ({
     typingStatus: { ...state.typingStatus, [roomId]: userNames },
   })),

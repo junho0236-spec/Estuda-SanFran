@@ -1,12 +1,18 @@
-
-import React from 'react';
+import React, { useEffect } from 'react';
 import { 
   CornerUpLeft, Edit2, X, Trash, Pause, Send, 
   Mic, Ghost, ImageIcon, Loader2, Paperclip, 
-  UserPlus, Search 
+  UserPlus, Search, Bell, CalendarClock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChatMessage } from '../../types';
+import {
+  type VanishDurationId,
+  VANISH_DURATION_LABEL,
+  VANISH_DURATION_ORDER,
+} from '../connect/vanishModeUtils';
+import { FOCUS_RING, FOCUS_RING_ROUND } from '../connect/a11yClasses';
+import { MAX_CHAT_MESSAGE_CHARS } from '../connect/chatContentLimits';
 
 interface ChatInputProps {
   newMessage: string;
@@ -29,6 +35,8 @@ interface ChatInputProps {
   sendAudioMessage: () => void;
   isVanishMode: boolean;
   setIsVanishMode: (mode: boolean) => void;
+  vanishDurationId: VanishDurationId;
+  setVanishDurationId: (id: VanishDurationId) => void;
   showGifPicker: boolean;
   setShowGifPicker: (show: boolean) => void;
   gifType: 'gifs' | 'stickers';
@@ -43,6 +51,8 @@ interface ChatInputProps {
   fetchUsers: () => void;
   setShowShareProfileModal: (show: boolean) => void;
   startRecording: () => void;
+  onOpenScheduleMessage: () => void;
+  onOpenReminder: () => void;
 }
 
 const ChatInput: React.FC<ChatInputProps> = ({
@@ -50,11 +60,22 @@ const ChatInput: React.FC<ChatInputProps> = ({
   setReplyingTo, editingMessage, setEditingMessage, userName,
   isRecording, recordingTime, formatTime, canvasRef, cancelRecording,
   stopRecording, audioUrl, setAudioUrl, sendAudioMessage, isVanishMode,
-  setIsVanishMode, showGifPicker, setShowGifPicker, gifType, setGifType,
+  setIsVanishMode, vanishDurationId, setVanishDurationId, showGifPicker, setShowGifPicker, gifType, setGifType,
   gifSearch, setGifSearch, searchGifs, gifs, sendGif, uploading,
-  handleFileUpload, fetchUsers, setShowShareProfileModal, startRecording
+  handleFileUpload, fetchUsers, setShowShareProfileModal, startRecording,
+  onOpenScheduleMessage, onOpenReminder
 }) => {
-  
+  useEffect(() => {
+    if (!showGifPicker) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowGifPicker(false);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showGifPicker, setShowGifPicker]);
+
   return (
     <div className="p-3 md:p-4 bg-white dark:bg-[#1a1a1a] border-t border-slate-200 dark:border-white/5">
       
@@ -81,11 +102,17 @@ const ChatInput: React.FC<ChatInputProps> = ({
                 </p>
               </div>
             </div>
-            <button 
-              onClick={() => { setReplyingTo(null); setEditingMessage(null); if(editingMessage) setNewMessage(''); }}
-              className="p-1 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-colors"
+            <button
+              type="button"
+              onClick={() => {
+                setReplyingTo(null);
+                setEditingMessage(null);
+                if (editingMessage) setNewMessage('');
+              }}
+              className={`p-1 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-colors ${FOCUS_RING_ROUND}`}
+              aria-label="Fechar resposta ou edição"
             >
-              <X size={16} />
+              <X size={16} aria-hidden />
             </button>
           </motion.div>
         )}
@@ -102,11 +129,21 @@ const ChatInput: React.FC<ChatInputProps> = ({
               <canvas ref={canvasRef} width={300} height={32} className="w-full h-full" />
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <button onClick={cancelRecording} className="p-2 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-all">
-                <Trash size={18} />
+              <button
+                type="button"
+                onClick={cancelRecording}
+                className={`p-2 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-all ${FOCUS_RING_ROUND}`}
+                aria-label="Descartar gravação"
+              >
+                <Trash size={18} aria-hidden />
               </button>
-              <button onClick={stopRecording} className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-500/20 rounded-full transition-all">
-                <Pause size={18} />
+              <button
+                type="button"
+                onClick={stopRecording}
+                className={`p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-500/20 rounded-full transition-all ${FOCUS_RING_ROUND}`}
+                aria-label="Parar gravação"
+              >
+                <Pause size={18} aria-hidden />
               </button>
             </div>
           </div>
@@ -118,33 +155,75 @@ const ChatInput: React.FC<ChatInputProps> = ({
               <audio src={audioUrl} controls className="h-8 max-w-[150px]" />
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => setAudioUrl(null)} className="p-2 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-all">
-                <X size={18} />
+              <button
+                type="button"
+                onClick={() => setAudioUrl(null)}
+                className={`p-2 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-all ${FOCUS_RING_ROUND}`}
+                aria-label="Descartar áudio gravado"
+              >
+                <X size={18} aria-hidden />
               </button>
-              <button onClick={sendAudioMessage} className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20">
-                <Send size={18} />
+              <button
+                type="button"
+                onClick={sendAudioMessage}
+                className={`p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 ${FOCUS_RING_ROUND}`}
+                aria-label="Enviar mensagem de voz"
+              >
+                <Send size={18} aria-hidden />
               </button>
             </div>
           </div>
         ) : (
           <>
             <div className="flex items-center gap-2">
-              <button 
-                onClick={() => setIsVanishMode(!isVanishMode)}
-                className={`p-3 rounded-xl transition-all ${isVanishMode ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-indigo-500'}`}
-                title="Modo Vanish"
-              >
-                <Ghost size={20} />
-              </button>
-              <button 
+              <div className="flex flex-col gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsVanishMode(!isVanishMode)}
+                  className={`p-3 rounded-xl transition-all ${FOCUS_RING} ${isVanishMode ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-indigo-500'}`}
+                  title="Modo Vanish — mensagem some após o tempo escolhido"
+                  aria-label={isVanishMode ? 'Desativar modo mensagem temporária' : 'Ativar modo mensagem temporária (vanish)'}
+                  aria-pressed={isVanishMode}
+                >
+                  <Ghost size={20} aria-hidden />
+                </button>
+                {isVanishMode && (
+                  <div
+                    className="flex rounded-lg overflow-hidden border border-indigo-400/50 bg-indigo-600/25 dark:bg-indigo-500/20"
+                    role="group"
+                    aria-label="Tempo até a mensagem expirar"
+                  >
+                    {VANISH_DURATION_ORDER.map((id) => (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setVanishDurationId(id)}
+                        className={`px-1.5 py-1 text-[9px] font-black uppercase tracking-tight min-w-[1.75rem] transition-colors ${FOCUS_RING} ${
+                          vanishDurationId === id
+                            ? 'bg-white text-indigo-600 dark:bg-white dark:text-indigo-700'
+                            : 'text-indigo-100 hover:bg-white/10'
+                        }`}
+                        title={`Expira em ${VANISH_DURATION_LABEL[id]}`}
+                        aria-label={`Tempo até expirar: ${VANISH_DURATION_LABEL[id]}`}
+                      >
+                        {VANISH_DURATION_LABEL[id]}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
                 onClick={() => {
                   setShowGifPicker(!showGifPicker);
                   if (!showGifPicker && gifs.length === 0) searchGifs('');
                 }}
-                className={`p-3 rounded-xl transition-all ${showGifPicker ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-blue-600'}`}
-                title="GIFs"
+                className={`p-3 rounded-xl transition-all ${FOCUS_RING} ${showGifPicker ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-blue-600'}`}
+                title="GIFs e stickers"
+                aria-label={showGifPicker ? 'Fechar seletor de GIF' : 'Abrir seletor de GIF e stickers'}
+                aria-expanded={showGifPicker}
               >
-                <ImageIcon size={20} />
+                <ImageIcon size={20} aria-hidden />
               </button>
               <div className="relative">
                 <input 
@@ -153,20 +232,26 @@ const ChatInput: React.FC<ChatInputProps> = ({
                   className="hidden" 
                   onChange={handleFileUpload}
                 />
-                <label 
+                <label
                   htmlFor="file-upload"
-                  className="p-3 bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-blue-600 rounded-xl cursor-pointer transition-all block"
+                  className={`p-3 bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-blue-600 rounded-xl cursor-pointer transition-all inline-flex ${FOCUS_RING}`}
+                  aria-label={uploading ? 'A carregar ficheiro' : 'Anexar ficheiro'}
                 >
-                  {uploading ? <Loader2 className="animate-spin" size={20} /> : <Paperclip size={20} />}
+                  {uploading ? <Loader2 className="animate-spin" size={20} aria-hidden /> : <Paperclip size={20} aria-hidden />}
                 </label>
               </div>
               
-              <button 
-                onClick={() => { fetchUsers(); setShowShareProfileModal(true); }}
-                className="p-3 bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-blue-600 rounded-xl transition-all"
-                title="Compartilhar Perfil"
+              <button
+                type="button"
+                onClick={() => {
+                  fetchUsers();
+                  setShowShareProfileModal(true);
+                }}
+                className={`p-3 bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-blue-600 rounded-xl transition-all ${FOCUS_RING}`}
+                title="Compartilhar perfil"
+                aria-label="Compartilhar perfil"
               >
-                <UserPlus size={20} />
+                <UserPlus size={20} aria-hidden />
               </button>
             </div>
             
@@ -182,15 +267,19 @@ const ChatInput: React.FC<ChatInputProps> = ({
                   >
                     <div className="p-4 border-b border-slate-100 dark:border-white/5">
                       <div className="flex gap-2 mb-3">
-                        <button 
+                        <button
+                          type="button"
                           onClick={() => setGifType('gifs')}
-                          className={`flex-1 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${gifType === 'gifs' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10'}`}
+                          className={`flex-1 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${FOCUS_RING} ${gifType === 'gifs' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10'}`}
+                          aria-pressed={gifType === 'gifs'}
                         >
                           GIFs
                         </button>
-                        <button 
+                        <button
+                          type="button"
                           onClick={() => setGifType('stickers')}
-                          className={`flex-1 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${gifType === 'stickers' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10'}`}
+                          className={`flex-1 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${FOCUS_RING} ${gifType === 'stickers' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10'}`}
+                          aria-pressed={gifType === 'stickers'}
                         >
                           Stickers
                         </button>
@@ -210,13 +299,19 @@ const ChatInput: React.FC<ChatInputProps> = ({
                       </div>
                     </div>
                     <div className="flex-1 overflow-y-auto p-2 grid grid-cols-2 gap-2 custom-scrollbar">
-                      {gifs.map(gif => (
-                        <button 
+                      {gifs.map((gif, i) => (
+                        <button
                           key={gif.id}
+                          type="button"
                           onClick={() => sendGif(gif.images.fixed_height.url, gifType === 'gifs' ? 'gif' : 'sticker')}
-                          className="rounded-lg overflow-hidden hover:scale-105 transition-transform"
+                          className={`rounded-lg overflow-hidden hover:scale-105 transition-transform ${FOCUS_RING}`}
+                          aria-label={`Enviar ${gifType === 'gifs' ? 'GIF' : 'figurinha'} ${i + 1}`}
                         >
-                          <img src={gif.images.fixed_height.url} alt="Media" className="w-full h-24 object-cover" />
+                          <img
+                            src={gif.images.fixed_height.url}
+                            alt=""
+                            className="w-full h-24 object-cover"
+                          />
                         </button>
                       ))}
                     </div>
@@ -234,26 +329,58 @@ const ChatInput: React.FC<ChatInputProps> = ({
                   }
                 }}
                 placeholder="Digite uma mensagem..."
-                className="w-full p-3 bg-slate-100 dark:bg-black/40 border border-slate-200 dark:border-white/5 rounded-2xl outline-none focus:border-blue-500 transition-all text-sm resize-none max-h-32 min-h-[48px]"
+                maxLength={MAX_CHAT_MESSAGE_CHARS}
+                className={`w-full p-3 bg-slate-100 dark:bg-black/40 border border-slate-200 dark:border-white/5 rounded-2xl outline-none focus:border-blue-500 transition-all text-sm resize-none max-h-32 min-h-[48px] ${FOCUS_RING}`}
                 rows={1}
+                aria-label="Mensagem"
               />
             </div>
             
-            {newMessage.trim() ? (
-              <button 
-                onClick={sendMessage}
-                className="p-3 bg-blue-600 text-white rounded-xl transition-all shadow-lg shadow-blue-600/20 hover:scale-105 active:scale-95"
-              >
-                <Send size={20} />
-              </button>
-            ) : (
-              <button 
-                onClick={startRecording}
-                className="p-3 bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-blue-600 rounded-xl transition-all"
-              >
-                <Mic size={20} />
-              </button>
-            )}
+            <div className="flex items-end gap-1 shrink-0">
+              {!editingMessage && (
+                <>
+                  <button
+                    type="button"
+                    onClick={onOpenReminder}
+                    className={`p-3 bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-amber-600 rounded-xl transition-all ${FOCUS_RING}`}
+                    title="Lembrete (ex.: amanhã)"
+                    aria-label="Agendar lembrete"
+                  >
+                    <Bell size={20} aria-hidden />
+                  </button>
+                  {newMessage.trim() !== '' && (
+                    <button
+                      type="button"
+                      onClick={onOpenScheduleMessage}
+                      className={`p-3 bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-blue-600 rounded-xl transition-all ${FOCUS_RING}`}
+                      title="Agendar envio desta mensagem"
+                      aria-label="Agendar envio desta mensagem"
+                    >
+                      <CalendarClock size={20} aria-hidden />
+                    </button>
+                  )}
+                </>
+              )}
+              {newMessage.trim() ? (
+                <button
+                  type="button"
+                  onClick={sendMessage}
+                  className={`p-3 bg-blue-600 text-white rounded-xl transition-all shadow-lg shadow-blue-600/20 hover:scale-105 active:scale-95 ${FOCUS_RING}`}
+                  aria-label="Enviar mensagem"
+                >
+                  <Send size={20} aria-hidden />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={startRecording}
+                  className={`p-3 bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-blue-600 rounded-xl transition-all ${FOCUS_RING}`}
+                  aria-label="Gravar mensagem de voz"
+                >
+                  <Mic size={20} aria-hidden />
+                </button>
+              )}
+            </div>
           </>
         )}
       </div>

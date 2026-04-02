@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   Search, Plus, Paperclip, Send, MoreVertical, 
   Check, CheckCheck, User, Image as ImageIcon, 
@@ -8,12 +8,13 @@ import {
   Link, File, Play, Pause, Trash, Bell, BellOff,
   Smile, Forward, Star, BarChart2, VolumeX, Volume2,
   Clock, Folder, History, UserPlus, Phone, Video, PhoneOff, VideoOff, Ghost, Eye, EyeOff, MicOff, Palette, Users,
-  Settings, LogOut, Shield, ChevronRight, LayoutGrid, Archive
+  Settings, LogOut, Shield, ChevronRight, LayoutGrid, Archive, Filter
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../services/supabaseClient';
 import ChatSidebar from './chat/ChatSidebar';
 import MessageList from './chat/MessageList';
+import MessageItem from './chat/MessageItem';
 import ChatInput from './chat/ChatInput';
 import MediaGallery from './chat/MediaGallery';
 import GroupInfoModal from './connect/GroupInfoModal';
@@ -22,6 +23,29 @@ import GlobalSearchModal from './connect/GlobalSearchModal';
 import ProfileModals from './connect/ProfileModals';
 import UserDiscoveryModal from './connect/UserDiscoveryModal';
 import { getChatAvatarForRoom, getChatNameForRoom, getTypingUsersForRoom } from './connect/chatUtils';
+import { loadComposerDrafts, persistComposerDrafts } from './connect/composerDraftStorage';
+import {
+  escapeIlikePattern,
+  filterMessagesByConversationCriteria,
+  hasActiveConversationSearchCriteria,
+  localDateYmdToUtcIsoEnd,
+  localDateYmdToUtcIsoStart,
+  messageMatchesConversationCriteria,
+  type ChatConversationSearchCriteria,
+} from './connect/chatSearchUtils';
+import {
+  joinStatusForUser,
+  canCreateGroupPoll,
+  type GroupModerationSettings,
+} from './connect/groupModerationUtils';
+import { withChatSendRetries } from './connect/messageSendRetry';
+import { vanishExpiresAtIso, type VanishDurationId } from './connect/vanishModeUtils';
+import { FOCUS_RING_ROUND, FOCUS_RING } from './connect/a11yClasses';
+import {
+  MESSAGES_PER_PAGE,
+  latestRealMessageIso,
+  type RoomMessageCacheMeta,
+} from './connect/messageRoomCache';
 import WallpaperModal from './connect/WallpaperModal';
 import MediaGalleryModal from './connect/MediaGalleryModal';
 import ForwardModal from './connect/ForwardModal';
@@ -29,17 +53,40 @@ import PollModal from './connect/PollModal';
 import CreateStoryModal from './connect/CreateStoryModal';
 import ViewStoryModal from './connect/ViewStoryModal';
 import ShareProfileModal from './connect/ShareProfileModal';
-import { useOnlineUsersPresence } from './connect/hooks/useOnlineUsersPresence';
+import ScheduleChatModal, { type ScheduleChatSubmitPayload } from './connect/ScheduleChatModal';
+import ChatThreadPanel from './connect/ChatThreadPanel';
+import {
+  MAX_ATTACHMENT_BYTES,
+  MAX_CHAT_MESSAGE_CHARS,
+  MAX_REPLY_SNIPPET_CHARS,
+  applyYoutubePreviewImage,
+  attachmentTooLarge,
+  clampUtf16,
+  formatMaxMegabytes,
+  normalizeLinkPreviewForStorage,
+  sanitizeAttachmentDisplayName,
+  sanitizeChatHttpUrl,
+  sanitizeLinkPreviewForRpc,
+  stripControlChars,
+} from './connect/chatContentLimits';
+import { logConnectError } from './connect/chatFeatureLog';
+import { useGlobalChatPresence } from './connect/hooks/useGlobalChatPresence';
 import { useConnectInit } from './connect/hooks/useConnectInit';
-import { usePresenceHeartbeat } from './connect/hooks/usePresenceHeartbeat';
 import { useActiveRoomLifecycle } from './connect/hooks/useActiveRoomLifecycle';
-import { useTypingIndicator } from './connect/hooks/useTypingIndicator';
 import { useChatStore } from '../src/store/useChatStore';
-import { ChatRoom, ChatMessage, ChatParticipant, UserProfile, ChatStory } from '../types';
+import {
+  ChatRoom,
+  ChatMessage,
+  ChatParticipant,
+  UserProfile,
+  ChatStory,
+  ChatScheduledItem,
+  ChatScheduledItemKind,
+  type ChatMessagePendingSendText,
+} from '../types';
 import { dataService } from '../services/dataService';
 import { toast } from 'sonner';
 import { GoogleGenAI, Type } from "@google/genai";
-import Markdown from 'react-markdown';
 
 interface ConnectProps {
   userId: string;
@@ -58,11 +105,14 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     setMessages: setStoreMessages,
     addMessage,
     updateMessage,
+    patchMessage,
     removeMessage,
     participants,
     setParticipants,
     userPresence,
     updateUserPresence,
+    typingStatus,
+    setTypingStatusFromPresence,
     pinnedRooms,
     setPinnedRooms,
     archivedRooms,
@@ -72,11 +122,67 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   const activeRoom = rooms.find(r => r.id === activeRoomId) || null;
   const messages = activeRoomId ? (storeMessages[activeRoomId] || []) : [];
 
+  const groupJoinBlocked = useMemo(() => {
+    if (!activeRoom?.is_group || !userId || !activeRoomId) return false;
+    return joinStatusForUser(activeRoomId, userId, participants) === 'pending';
+  }, [activeRoom?.is_group, activeRoomId, userId, participants]);
+
+  const activeRoomParticipantIdsKey =
+    activeRoomId != null
+      ? (participants[activeRoomId]?.map((p) => p.user_id).sort().join('|') ?? '')
+      : '';
+
+  const activeRoomOtherUserId = useMemo(() => {
+    if (!activeRoomId || groupJoinBlocked || activeRoom?.is_group) return null;
+    const ids = activeRoomParticipantIdsKey.split('|').filter(Boolean);
+    if (ids.length !== 2) return null;
+    return ids.find((id) => id !== userId) ?? null;
+  }, [activeRoomId, userId, groupJoinBlocked, activeRoomParticipantIdsKey, activeRoom?.is_group]);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [showArchived, setShowArchived] = useState(false);
-  const [newMessage, setNewMessage] = useState('');
+  const [messageDraftsByRoom, setMessageDraftsByRoom] = useState<Record<string, string>>(() =>
+    loadComposerDrafts(userId)
+  );
   const [loading, setLoading] = useState(true);
-  const getTypingUsers = (roomId: string) => getTypingUsersForRoom(participants, roomId, userId);
+
+  useEffect(() => {
+    setMessageDraftsByRoom(loadComposerDrafts(userId));
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    const t = window.setTimeout(() => persistComposerDrafts(userId, messageDraftsByRoom), 350);
+    return () => clearTimeout(t);
+  }, [messageDraftsByRoom, userId]);
+
+  const newMessage = activeRoomId ? (messageDraftsByRoom[activeRoomId] ?? '') : '';
+
+  const setNewMessage = useCallback(
+    (value: React.SetStateAction<string>) => {
+      if (!activeRoomId) return;
+      setMessageDraftsByRoom((prev) => {
+        const current = prev[activeRoomId] ?? '';
+        const next = typeof value === 'function' ? (value as (c: string) => string)(current) : value;
+        if (next === current) return prev;
+        const copy = { ...prev };
+        if (next === '') delete copy[activeRoomId];
+        else copy[activeRoomId] = next;
+        return copy;
+      });
+    },
+    [activeRoomId]
+  );
+  const getTypingUsers = (roomId: string) => getTypingUsersForRoom(typingStatus, roomId);
+
+  const { handleTyping } = useGlobalChatPresence({
+    userId,
+    userName,
+    activeRoomId: activeRoom?.id || null,
+    updateUserPresence,
+    setTypingStatusFromPresence,
+  });
+
   const getChatName = (room: ChatRoom) => getChatNameForRoom(room, participants, userId);
   const getChatAvatar = (room: ChatRoom) => getChatAvatarForRoom(room, participants, userId);
   const setMessages = (msgs: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => {
@@ -89,7 +195,111 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     }
   };
 
-  useOnlineUsersPresence(userId, userName, updateUserPresence);
+  const fetchPendingScheduled = useCallback(async () => {
+    if (!activeRoomId || !userId) {
+      setPendingScheduled([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from('chat_scheduled_items')
+      .select('*')
+      .eq('room_id', activeRoomId)
+      .eq('user_id', userId)
+      .eq('status', 'pending')
+      .order('scheduled_at', { ascending: true });
+    if (error) {
+      console.warn('chat_scheduled_items:', error.message);
+      return;
+    }
+    setPendingScheduled((data as ChatScheduledItem[]) || []);
+  }, [activeRoomId, userId]);
+
+  useEffect(() => {
+    void fetchPendingScheduled();
+  }, [fetchPendingScheduled]);
+
+  useEffect(() => {
+    if (!activeRoomId || !userId) return;
+    const ch = supabase
+      .channel(`sched:${activeRoomId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'chat_scheduled_items',
+          filter: `room_id=eq.${activeRoomId}`,
+        },
+        () => {
+          void fetchPendingScheduled();
+        }
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(ch);
+    };
+  }, [activeRoomId, userId, fetchPendingScheduled]);
+
+  const cancelScheduledItem = async (id: string) => {
+    if (!userId) return;
+    const { error } = await supabase
+      .from('chat_scheduled_items')
+      .update({ status: 'cancelled' })
+      .eq('id', id)
+      .eq('user_id', userId)
+      .eq('status', 'pending');
+    if (error) {
+      toast.error('Não foi possível cancelar');
+      return;
+    }
+    toast.success('Agendamento cancelado');
+    void fetchPendingScheduled();
+  };
+
+  const handleScheduleSubmit = async (payload: ScheduleChatSubmitPayload) => {
+    if (!activeRoom) return;
+    const schedBody = stripControlChars(payload.content.trim());
+    if (schedBody.length > MAX_CHAT_MESSAGE_CHARS) {
+      toast.error(`Texto demasiado longo (máx. ${MAX_CHAT_MESSAGE_CHARS} caracteres).`);
+      return;
+    }
+    setScheduleSubmitting(true);
+    try {
+      const { error } = await supabase.from('chat_scheduled_items').insert({
+        room_id: activeRoom.id,
+        user_id: userId,
+        user_name: userName,
+        kind: payload.kind,
+        content: schedBody,
+        scheduled_at: payload.scheduledAtIso,
+        reply_to_id: payload.replyToId,
+        reply_to_content: payload.replyToContent,
+        reply_to_sender_name: payload.replyToSenderName,
+        context_text: payload.contextText,
+        status: 'pending',
+      });
+      if (error) throw error;
+      if (
+        payload.kind === 'reminder' &&
+        typeof Notification !== 'undefined' &&
+        Notification.permission === 'default'
+      ) {
+        void Notification.requestPermission();
+      }
+      toast.success(payload.kind === 'reminder' ? 'Lembrete agendado!' : 'Mensagem agendada!');
+      setShowScheduleModal(false);
+      if (payload.kind === 'scheduled_message') {
+        setNewMessage('');
+        setReplyingTo(null);
+      }
+      void fetchPendingScheduled();
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao salvar. Execute scripts/supabase-chat-scheduled.sql no Supabase.');
+    } finally {
+      setScheduleSubmitting(false);
+    }
+  };
 
   const markAsRead = async (roomId: string) => {
     if (!userId) return;
@@ -105,13 +315,79 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
         return {
           ...prev,
           [roomId]: roomParticipants.map(p => 
-            p.user_id === userId ? { ...p, unread_count: 0 } : p
+            p.user_id === userId
+              ? { ...p, unread_count: 0, last_read_at: new Date().toISOString() }
+              : p
           )
         };
       });
     } catch (error) {
       console.error('Error marking messages as read:', error);
     }
+  };
+
+  const rpcChatMessageRow = (data: unknown): ChatMessage | null => {
+    if (data == null) return null;
+    if (Array.isArray(data)) return (data[0] as ChatMessage) ?? null;
+    return data as ChatMessage;
+  };
+
+  const postChatMessageDb = async (params: {
+    roomId: string;
+    content?: string | null;
+    messageType?: string;
+    status?: string;
+    replyToId?: string | null;
+    replyToContent?: string | null;
+    replyToSenderName?: string | null;
+    linkPreview?: ChatMessage['link_preview'] | null;
+    isVanish?: boolean;
+    expiresAt?: string | null;
+    attachmentUrl?: string | null;
+    attachmentName?: string | null;
+    attachmentType?: string | null;
+    sharedProfileId?: string | null;
+    isForwarded?: boolean;
+    forwardedFromName?: string | null;
+    threadRootId?: string | null;
+  }): Promise<ChatMessage | null> => {
+    const safeContent = clampUtf16(stripControlChars(params.content ?? ''), MAX_CHAT_MESSAGE_CHARS);
+    const safeReplyContent =
+      params.replyToContent != null && params.replyToContent !== ''
+        ? clampUtf16(stripControlChars(params.replyToContent), MAX_REPLY_SNIPPET_CHARS)
+        : null;
+    const safeLinkPreview = params.linkPreview
+      ? sanitizeLinkPreviewForRpc(params.linkPreview)
+      : null;
+    const safeAttachmentUrl = params.attachmentUrl
+      ? sanitizeChatHttpUrl(params.attachmentUrl)
+      : null;
+    const safeAttachmentName = params.attachmentName
+      ? sanitizeAttachmentDisplayName(params.attachmentName)
+      : null;
+    const { data, error } = await supabase.rpc('post_chat_message', {
+      p_room_id: params.roomId,
+      p_sender_id: userId,
+      p_sender_name: userName,
+      p_content: safeContent,
+      p_message_type: params.messageType ?? 'text',
+      p_status: params.status ?? 'sent',
+      p_reply_to_id: params.replyToId ?? null,
+      p_reply_to_content: safeReplyContent,
+      p_reply_to_sender_name: params.replyToSenderName ?? null,
+      p_link_preview: safeLinkPreview,
+      p_is_vanish: params.isVanish ?? false,
+      p_expires_at: params.expiresAt ?? null,
+      p_attachment_url: safeAttachmentUrl,
+      p_attachment_name: safeAttachmentName,
+      p_attachment_type: params.attachmentType ?? null,
+      p_shared_profile_id: params.sharedProfileId ?? null,
+      p_is_forwarded: params.isForwarded ?? false,
+      p_forwarded_from_name: params.forwardedFromName ?? null,
+      p_thread_root_id: params.threadRootId ?? null,
+    });
+    if (error) throw error;
+    return rpcChatMessageRow(data);
   };
 
   const [showGroupInfoModal, setShowGroupInfoModal] = useState(false);
@@ -128,6 +404,12 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   const [editingGroupAvatar, setEditingGroupAvatar] = useState('');
   const [internalSearchQuery, setInternalSearchQuery] = useState('');
   const [showInternalSearch, setShowInternalSearch] = useState(false);
+  const [internalSearchSenderId, setInternalSearchSenderId] = useState('');
+  const [internalSearchDateFrom, setInternalSearchDateFrom] = useState('');
+  const [internalSearchDateTo, setInternalSearchDateTo] = useState('');
+  const [internalSearchOnlyAttachment, setInternalSearchOnlyAttachment] = useState(false);
+  const [internalSearchWordMatchMode, setInternalSearchWordMatchMode] = useState<'all' | 'any'>('all');
+  const [internalSearchShowAdvanced, setInternalSearchShowAdvanced] = useState(false);
   const [showMediaGallery, setShowMediaGallery] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -135,15 +417,20 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const [messageReactions, setMessageReactions] = useState<Record<string, any[]>>({});
   const [forwardingMessage, setForwardingMessage] = useState<ChatMessage | null>(null);
+  const [pendingScheduled, setPendingScheduled] = useState<ChatScheduledItem[]>([]);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [scheduleModalKind, setScheduleModalKind] = useState<ChatScheduledItemKind>('scheduled_message');
+  const [scheduleSubmitting, setScheduleSubmitting] = useState(false);
+  const [activeThreadRoot, setActiveThreadRoot] = useState<ChatMessage | null>(null);
+  const [threadComposerDraft, setThreadComposerDraft] = useState('');
+  const [threadReplyingTo, setThreadReplyingTo] = useState<ChatMessage | null>(null);
   const [availableUsers, setAvailableUsers] = useState<UserProfile[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
-  const [page, setPage] = useState(0);
   const [viewMode, setViewMode] = useState<'chats' | 'calls' | 'stories'>('chats');
   const [callHistory, setCallHistory] = useState<any[]>([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const MESSAGES_PER_PAGE = 30;
 
   const [showForwardModal, setShowForwardModal] = useState(false);
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
@@ -152,11 +439,16 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [globalSearchResults, setGlobalSearchResults] = useState<any[]>([]);
   const [searchingGlobal, setSearchingGlobal] = useState(false);
+  const [globalSearchSenderName, setGlobalSearchSenderName] = useState('');
+  const [globalSearchDateFrom, setGlobalSearchDateFrom] = useState('');
+  const [globalSearchDateTo, setGlobalSearchDateTo] = useState('');
+  const [globalSearchOnlyAttachment, setGlobalSearchOnlyAttachment] = useState(false);
+  const globalSearchQueryRef = useRef(globalSearchQuery);
+  globalSearchQueryRef.current = globalSearchQuery;
   const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
   const [starredMessages, setStarredMessages] = useState<string[]>([]);
   const [showStarredOnly, setShowStarredOnly] = useState(false);
   const [showPollModal, setShowPollModal] = useState(false);
-  const [showMuteOptions, setShowMuteOptions] = useState(false);
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState(['', '']);
   const [polls, setPolls] = useState<Record<string, any>>({});
@@ -169,6 +461,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   const [showShareProfileModal, setShowShareProfileModal] = useState(false);
   const [sharingToRoomId, setSharingToRoomId] = useState<string | null>(null);
   const [isVanishMode, setIsVanishMode] = useState(false);
+  const [vanishDurationId, setVanishDurationId] = useState<VanishDurationId>('m1');
   const [activeCall, setActiveCall] = useState<any>(null);
   const [incomingCall, setIncomingCall] = useState<any>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -177,6 +470,48 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [showCallModal, setShowCallModal] = useState(false);
   const [callStatus, setCallStatus] = useState<'idle' | 'calling' | 'incoming' | 'connected' | 'ended'>('idle');
+
+  const conversationSearchCriteria = useMemo((): ChatConversationSearchCriteria => {
+    return {
+      textQuery: internalSearchQuery,
+      senderId: internalSearchSenderId || null,
+      dateFrom: internalSearchDateFrom || null,
+      dateTo: internalSearchDateTo || null,
+      onlyWithAttachment: internalSearchOnlyAttachment,
+      wordMatchMode: internalSearchWordMatchMode,
+    };
+  }, [
+    internalSearchQuery,
+    internalSearchSenderId,
+    internalSearchDateFrom,
+    internalSearchDateTo,
+    internalSearchOnlyAttachment,
+    internalSearchWordMatchMode,
+  ]);
+
+  const mainTimelineForSearch = useMemo(
+    () => messages.filter((m) => !m.thread_root_id),
+    [messages]
+  );
+
+  const internalSearchResultCount = useMemo(() => {
+    if (!hasActiveConversationSearchCriteria(conversationSearchCriteria)) return 0;
+    return filterMessagesByConversationCriteria(mainTimelineForSearch, conversationSearchCriteria).length;
+  }, [mainTimelineForSearch, conversationSearchCriteria]);
+
+  const threadReplyMessages = useMemo(() => {
+    if (!activeThreadRoot?.id) return [];
+    return messages
+      .filter((m) => m.thread_root_id === activeThreadRoot.id)
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  }, [messages, activeThreadRoot]);
+
+  useEffect(() => {
+    setActiveThreadRoot(null);
+    setThreadComposerDraft('');
+    setThreadReplyingTo(null);
+  }, [activeRoomId]);
+
   const handleCreateTaskFromMessage = async (msg: ChatMessage) => {
     if (!setTasks) return;
     
@@ -217,7 +552,166 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [giphyApiKey] = useState('dc6zaTOxFJmzC'); // Public beta key for demo, should be replaced with real key
 
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      const tag = t.tagName;
+      const inField =
+        tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || t.isContentEditable;
+
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+        if (inField) return;
+        e.preventDefault();
+        if (activeRoomId) {
+          setShowInternalSearch(true);
+        } else {
+          setShowGlobalSearch(true);
+        }
+        return;
+      }
+
+      if (e.key !== 'Escape') return;
+
+      if (scheduleSubmitting) return;
+
+      if (showScheduleModal) {
+        e.preventDefault();
+        setShowScheduleModal(false);
+        return;
+      }
+      if (showForwardModal) {
+        e.preventDefault();
+        setShowForwardModal(false);
+        setForwardingMessage(null);
+        return;
+      }
+      if (showPollModal) {
+        e.preventDefault();
+        setShowPollModal(false);
+        return;
+      }
+      if (showWallpaperModal) {
+        e.preventDefault();
+        setShowWallpaperModal(false);
+        return;
+      }
+      if (showMediaGallery) {
+        e.preventDefault();
+        setShowMediaGallery(false);
+        return;
+      }
+      if (showGlobalSearch) {
+        e.preventDefault();
+        setShowGlobalSearch(false);
+        return;
+      }
+      if (showGroupInfoModal) {
+        e.preventDefault();
+        setShowGroupInfoModal(false);
+        return;
+      }
+      if (showCreateStoryModal) {
+        e.preventDefault();
+        setShowCreateStoryModal(false);
+        return;
+      }
+      if (showStoryModal) {
+        e.preventDefault();
+        setShowStoryModal(false);
+        setActiveStory(null);
+        return;
+      }
+      if (showShareProfileModal) {
+        e.preventDefault();
+        setShowShareProfileModal(false);
+        return;
+      }
+      if (showNewChatModal) {
+        e.preventDefault();
+        setShowNewChatModal(false);
+        return;
+      }
+      if (showProfileSettings) {
+        e.preventDefault();
+        setShowProfileSettings(false);
+        return;
+      }
+      if (showUserProfileModal) {
+        e.preventDefault();
+        setShowUserProfileModal(null);
+        return;
+      }
+      if (showCallModal) {
+        e.preventDefault();
+        setShowCallModal(false);
+        return;
+      }
+      if (activeThreadRoot) {
+        e.preventDefault();
+        setActiveThreadRoot(null);
+        return;
+      }
+      if (showInternalSearch) {
+        e.preventDefault();
+        setShowInternalSearch(false);
+        setInternalSearchQuery('');
+        setInternalSearchSenderId('');
+        setInternalSearchDateFrom('');
+        setInternalSearchDateTo('');
+        setInternalSearchOnlyAttachment(false);
+        setInternalSearchWordMatchMode('all');
+        setInternalSearchShowAdvanced(false);
+        return;
+      }
+      if (internalSearchShowAdvanced) {
+        e.preventDefault();
+        setInternalSearchShowAdvanced(false);
+        return;
+      }
+      if (showReactionPicker) {
+        e.preventDefault();
+        setShowReactionPicker(null);
+        return;
+      }
+      if (showGifPicker) {
+        e.preventDefault();
+        setShowGifPicker(false);
+        return;
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [
+    scheduleSubmitting,
+    showScheduleModal,
+    showForwardModal,
+    showPollModal,
+    showWallpaperModal,
+    showMediaGallery,
+    showGlobalSearch,
+    showGroupInfoModal,
+    showCreateStoryModal,
+    showStoryModal,
+    showShareProfileModal,
+    showNewChatModal,
+    showProfileSettings,
+    showUserProfileModal,
+    showCallModal,
+    activeThreadRoot,
+    showInternalSearch,
+    internalSearchShowAdvanced,
+    showReactionPicker,
+    showGifPicker,
+    activeRoomId,
+  ]);
+
+  const pendingFileByClientIdRef = useRef<Map<string, File>>(new Map());
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messageRoomMetaRef = useRef<Record<string, RoomMessageCacheMeta>>({});
   const isInitialLoadMessages = useRef(true);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -228,12 +722,10 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { handleTyping } = useTypingIndicator(activeRoom?.id || null, userId);
-
   useConnectInit({
     userId,
     setNotificationPermission,
-    fetchRooms: () => fetchRooms(),
+    fetchRooms: () => fetchRooms({ showLoading: true }),
     fetchUserProfile: () => fetchUserProfile(),
     fetchStarredMessages: () => fetchStarredMessages(),
     fetchStories: () => fetchStories(),
@@ -364,18 +856,12 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     if (!activeRoom) return;
     
     try {
-      const { error } = await supabase
-        .from('chat_messages')
-        .insert({
-          room_id: activeRoom.id,
-          sender_id: userId,
-          sender_name: userName,
-          attachment_url: gifUrl,
-          message_type: type,
-          status: 'sent'
-        });
-
-      if (error) throw error;
+      await postChatMessageDb({
+        roomId: activeRoom.id,
+        content: '',
+        messageType: type,
+        attachmentUrl: gifUrl,
+      });
       setShowGifPicker(false);
     } catch (error) {
       console.error(`Error sending ${type}:`, error);
@@ -458,8 +944,8 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
 
   useActiveRoomLifecycle({
     activeRoomId: activeRoom?.id || null,
-    participants,
-    userId,
+    activeRoomOtherUserId,
+    joinBlocked: groupJoinBlocked,
     setInternalSearchQuery,
     setShowInternalSearch,
     fetchMessages: (roomId) => fetchMessages(roomId),
@@ -494,6 +980,17 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   };
 
   const lastMessageId = useRef<string | null>(null);
+
+  useEffect(() => {
+    isInitialLoadMessages.current = true;
+    lastMessageId.current = null;
+    if (activeRoomId) {
+      const m = messageRoomMetaRef.current[activeRoomId];
+      setHasMoreMessages(m?.hasMore ?? true);
+    } else {
+      setHasMoreMessages(true);
+    }
+  }, [activeRoomId]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -557,36 +1054,108 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     }
   };
 
-  const searchGlobalMessages = async (query: string) => {
-    if (!query.trim() || !userId) {
-      setGlobalSearchResults([]);
-      return;
-    }
+  const searchGlobalMessages = useCallback(
+    async (queryText?: string) => {
+      const q = (queryText ?? globalSearchQueryRef.current).trim();
+      const hasFilters = Boolean(
+        globalSearchSenderName.trim() ||
+          globalSearchDateFrom ||
+          globalSearchDateTo ||
+          globalSearchOnlyAttachment
+      );
+      if (!userId || (!q && !hasFilters)) {
+        setGlobalSearchResults([]);
+        return;
+      }
 
-    setSearchingGlobal(true);
-    try {
-      // Get all rooms where user is a participant
-      const myRoomIds = rooms.map(r => r.id);
+      setSearchingGlobal(true);
+      try {
+        const myRoomIds = rooms.map((r) => r.id);
+        if (myRoomIds.length === 0) {
+          setGlobalSearchResults([]);
+          return;
+        }
 
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .select('*')
-        .in('room_id', myRoomIds)
-        .ilike('content', `%${query}%`)
-        .order('created_at', { ascending: false })
-        .limit(50);
+        let request = supabase
+          .from('chat_messages')
+          .select('*')
+          .in('room_id', myRoomIds)
+          .order('created_at', { ascending: false })
+          .limit(q ? 280 : 420);
 
-      if (error) throw error;
-      setGlobalSearchResults(data || []);
-    } catch (error) {
-      console.error('Error searching global messages:', error);
-    } finally {
-      setSearchingGlobal(false);
-    }
-  };
+        if (q) {
+          const esc = escapeIlikePattern(q);
+          const p = `%${esc}%`;
+          request = request.or(`content.ilike.${p},attachment_name.ilike.${p}`);
+        }
 
-  const fetchRooms = async () => {
-    setLoading(true);
+        if (globalSearchSenderName.trim()) {
+          const esc = escapeIlikePattern(globalSearchSenderName.trim());
+          request = request.ilike('sender_name', `%${esc}%`);
+        }
+
+        if (globalSearchDateFrom) {
+          const iso = localDateYmdToUtcIsoStart(globalSearchDateFrom);
+          if (iso) request = request.gte('created_at', iso);
+        }
+        if (globalSearchDateTo) {
+          const iso = localDateYmdToUtcIsoEnd(globalSearchDateTo);
+          if (iso) request = request.lte('created_at', iso);
+        }
+
+        if (globalSearchOnlyAttachment) {
+          request = request.not('attachment_url', 'is', null);
+        }
+
+        const { data, error } = await request;
+        if (error) throw error;
+        let rows = (data || []) as ChatMessage[];
+
+        if (q) {
+          const crit: ChatConversationSearchCriteria = {
+            textQuery: q,
+            senderId: null,
+            dateFrom: globalSearchDateFrom || null,
+            dateTo: globalSearchDateTo || null,
+            onlyWithAttachment: globalSearchOnlyAttachment,
+            wordMatchMode: 'all',
+          };
+          rows = rows.filter((m) => messageMatchesConversationCriteria(m, crit));
+        }
+
+        setGlobalSearchResults(rows.slice(0, 80));
+      } catch (error) {
+        console.error('Error searching global messages:', error);
+        setGlobalSearchResults([]);
+      } finally {
+        setSearchingGlobal(false);
+      }
+    },
+    [
+      userId,
+      rooms,
+      globalSearchSenderName,
+      globalSearchDateFrom,
+      globalSearchDateTo,
+      globalSearchOnlyAttachment,
+    ]
+  );
+
+  useEffect(() => {
+    if (!showGlobalSearch) return;
+    void searchGlobalMessages(undefined);
+  }, [
+    showGlobalSearch,
+    globalSearchSenderName,
+    globalSearchDateFrom,
+    globalSearchDateTo,
+    globalSearchOnlyAttachment,
+    searchGlobalMessages,
+  ]);
+
+  const fetchRooms = async (options?: { showLoading?: boolean }) => {
+    const showLoading = options?.showLoading ?? false;
+    if (showLoading) setLoading(true);
     try {
       // Get rooms where user is a participant
       const { data: participantData, error: participantError } = await supabase
@@ -633,12 +1202,16 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
           }, {});
           setParticipants(grouped);
         }
+      } else {
+        setRooms([]);
+        setPinnedRooms([]);
+        setParticipants({});
       }
     } catch (error: any) {
       console.error('Error fetching rooms:', error);
       toast.error(`Erro ao carregar conversas: ${error.message || 'Verifique o console'}`);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
@@ -701,8 +1274,6 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
       toast.error('Erro ao arquivar conversa');
     }
   };
-
-  usePresenceHeartbeat(userId, userName);
 
   const fetchAvailableUsers = async () => {
     if (!userId) return;
@@ -781,39 +1352,88 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     }
   };
 
-  const fetchMessages = async (roomId: string, loadMore = false) => {
-    if (loadMore) setIsLoadingMore(true);
-    const currentPage = loadMore ? page : 0;
-    const start = currentPage * MESSAGES_PER_PAGE;
-    const end = start + MESSAGES_PER_PAGE - 1;
+  const fetchMessages = useCallback(
+    async (roomId: string, loadMore = false) => {
+      if (loadMore) setIsLoadingMore(true);
 
-    const { data, error } = await supabase
-      .from('chat_messages')
-      .select('*')
-      .eq('room_id', roomId)
-      .order('created_at', { ascending: false })
-      .range(start, end);
-    
-    if (error) {
-      console.error('Error fetching messages:', error);
+      const cached = useChatStore.getState().messages[roomId] || [];
+      const lastIso = latestRealMessageIso(cached);
+
+      if (!loadMore && cached.length > 0 && !lastIso) {
+        const m = messageRoomMetaRef.current[roomId];
+        if (roomId === activeRoomId) {
+          setHasMoreMessages(m?.hasMore ?? true);
+        }
+        setIsLoadingMore(false);
+        return;
+      }
+
+      if (!loadMore && cached.length > 0 && lastIso) {
+        try {
+          const { data, error } = await supabase
+            .from('chat_messages')
+            .select('*')
+            .eq('room_id', roomId)
+            .gt('created_at', lastIso)
+            .order('created_at', { ascending: true });
+          if (error) throw error;
+          for (const row of data || []) {
+            addMessage(roomId, row as ChatMessage);
+          }
+        } catch (e) {
+          logConnectError('messages', 'sync_new_failed', e, { roomId });
+        }
+        const meta = messageRoomMetaRef.current[roomId];
+        if (roomId === activeRoomId) {
+          setHasMoreMessages(meta?.hasMore ?? true);
+        }
+        setIsLoadingMore(false);
+        return;
+      }
+
+      const prevMeta = messageRoomMetaRef.current[roomId];
+      const pageIndex = loadMore ? (prevMeta?.nextPageIndex ?? 1) : 0;
+      const start = pageIndex * MESSAGES_PER_PAGE;
+      const end = start + MESSAGES_PER_PAGE - 1;
+
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('room_id', roomId)
+        .order('created_at', { ascending: false })
+        .range(start, end);
+
+      if (error) {
+        logConnectError('messages', 'fetch_page_failed', error, { roomId, loadMore });
+        setIsLoadingMore(false);
+        return;
+      }
+
+      const rows = data || [];
+      const fetchedMessages = [...rows].reverse();
+      const hasMore = rows.length === MESSAGES_PER_PAGE;
+
+      if (loadMore) {
+        setStoreMessages(roomId, (prev) => [...fetchedMessages, ...(prev || [])]);
+        messageRoomMetaRef.current[roomId] = {
+          nextPageIndex: pageIndex + 1,
+          hasMore,
+        };
+      } else {
+        setStoreMessages(roomId, fetchedMessages);
+        messageRoomMetaRef.current[roomId] = {
+          nextPageIndex: 1,
+          hasMore,
+        };
+      }
+
+      if (roomId === activeRoomId) {
+        setHasMoreMessages(hasMore);
+      }
       setIsLoadingMore(false);
-      return;
-    }
-
-    const fetchedMessages = [...data].reverse();
-    
-    if (loadMore) {
-      setMessages(prev => [...fetchedMessages, ...prev]);
-      setPage(prev => prev + 1);
-    } else {
-      setMessages(fetchedMessages);
-      setPage(1);
-      isInitialLoadMessages.current = true;
-    }
-
-    setHasMoreMessages(data.length === MESSAGES_PER_PAGE);
-    setIsLoadingMore(false);
-  };
+    },
+    [activeRoomId, addMessage, setStoreMessages]
+  );
 
   const [starredRoomIds, setStarredRoomIds] = useState<Set<string>>(new Set());
 
@@ -996,18 +1616,11 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
 
       if (profileError) throw profileError;
 
-      const { error } = await supabase
-        .from('chat_messages')
-        .insert({
-          room_id: activeRoom.id,
-          sender_id: userId,
-          sender_name: userName,
-          content: `Compartilhou o contato de ${targetProfile.full_name || 'Colega'}`,
-          shared_profile_id: targetUserId,
-          status: 'sent'
-        });
-
-      if (error) throw error;
+      await postChatMessageDb({
+        roomId: activeRoom.id,
+        content: `Compartilhou o contato de ${targetProfile.full_name || 'Colega'}`,
+        sharedProfileId: targetUserId,
+      });
       setShowShareProfileModal(false);
       toast.success('Contato compartilhado!');
     } catch (error: any) {
@@ -1020,40 +1633,32 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
       toast.error('Preencha a pergunta e pelo menos 2 opções');
       return;
     }
+    if (activeRoom.is_group && !canCreateGroupPoll(activeRoom, userId, participants)) {
+      toast.error('Não tem permissão para criar enquetes neste grupo');
+      return;
+    }
 
     try {
-      // 1. Create message
-      const { data: msgData, error: msgError } = await supabase
-        .from('chat_messages')
-        .insert({
-          room_id: activeRoom.id,
-          sender_id: userId,
-          sender_name: userName,
-          content: `📊 ENQUETE: ${pollQuestion}`,
-          status: 'sent'
-        })
-        .select()
-        .single();
-      
-      if (msgError) throw msgError;
-
-      // 2. Create poll
-      const { error: pollError } = await supabase
-        .from('chat_polls')
-        .insert({
-          message_id: msgData.id,
-          question: pollQuestion,
-          options: pollOptions.filter(o => o.trim())
-        });
-      
-      if (pollError) throw pollError;
+      const { error: pollRpcError } = await supabase.rpc('create_chat_poll_message', {
+        p_room_id: activeRoom.id,
+        p_sender_id: userId,
+        p_sender_name: userName,
+        p_question: pollQuestion,
+        p_options: pollOptions.filter((o) => o.trim()),
+      });
+      if (pollRpcError) throw pollRpcError;
 
       toast.success('Enquete criada!');
       setShowPollModal(false);
       setPollQuestion('');
       setPollOptions(['', '']);
     } catch (error: any) {
-      toast.error('Erro ao criar enquete');
+      logConnectError('poll', 'create_poll_failed', error, { roomId: activeRoom.id });
+      toast.error(
+        String(error?.message || '').includes('not allowed to create poll')
+          ? 'Sem permissão para criar enquete'
+          : 'Erro ao criar enquete'
+      );
     }
   };
 
@@ -1069,6 +1674,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
       
       if (error) throw error;
     } catch (error: any) {
+      logConnectError('poll', 'vote_failed', error, { pollId });
       toast.error('Erro ao votar');
     }
   };
@@ -1159,21 +1765,15 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     if (!forwardingMessage) return;
     
     try {
-      const { error } = await supabase
-        .from('chat_messages')
-        .insert([{
-          room_id: targetRoomId,
-          sender_id: userId,
-          sender_name: userName,
-          content: forwardingMessage.content,
-          attachment_url: forwardingMessage.attachment_url,
-          attachment_name: forwardingMessage.attachment_name,
-          attachment_type: forwardingMessage.attachment_type,
-          is_forwarded: true,
-          forwarded_from_name: forwardingMessage.sender_name
-        }]);
-
-      if (error) throw error;
+      await postChatMessageDb({
+        roomId: targetRoomId,
+        content: clampUtf16(stripControlChars(forwardingMessage.content ?? ''), MAX_CHAT_MESSAGE_CHARS),
+        attachmentUrl: forwardingMessage.attachment_url ?? null,
+        attachmentName: forwardingMessage.attachment_name ?? null,
+        attachmentType: forwardingMessage.attachment_type ?? null,
+        isForwarded: true,
+        forwardedFromName: forwardingMessage.sender_name,
+      });
       toast.success('Mensagem encaminhada');
       setShowForwardModal(false);
       setForwardingMessage(null);
@@ -1193,7 +1793,28 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
       }, async (payload) => {
         const newMsg = payload.new as ChatMessage;
         addMessage(roomId, newMsg);
-        
+
+        if (
+          newMsg.sender_id === userId &&
+          typeof newMsg.content === 'string' &&
+          newMsg.content.startsWith('🔔 Lembrete')
+        ) {
+          try {
+            if (
+              typeof Notification !== 'undefined' &&
+              Notification.permission === 'granted' &&
+              document.visibilityState === 'hidden'
+            ) {
+              new Notification('Lembrete', {
+                body: newMsg.content.slice(0, 200),
+                tag: newMsg.id,
+              });
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+
         if (newMsg.sender_id !== userId) {
           // Mark as delivered if we received it
           if (newMsg.status === 'sent') {
@@ -1325,7 +1946,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
         setRecordingTime(prev => prev + 1);
       }, 1000);
     } catch (error) {
-      console.error('Error starting recording:', error);
+      logConnectError('upload', 'recording_start_failed', error, {});
       toast.error('Erro ao acessar microfone');
     }
   };
@@ -1355,6 +1976,10 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     setUploading(true);
     try {
       const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+      if (audioBlob.size > MAX_ATTACHMENT_BYTES) {
+        toast.error(`Áudio demasiado grande. Tamanho máximo: ${formatMaxMegabytes()} MB.`);
+        return;
+      }
       const fileName = `audio_${Date.now()}.webm`;
       const filePath = `${userId}/${activeRoom.id}/${fileName}`;
 
@@ -1368,27 +1993,21 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
         .from('chat_attachments')
         .getPublicUrl(filePath);
 
-      const { error: msgError } = await supabase
-        .from('chat_messages')
-        .insert([{
-          room_id: activeRoom.id,
-          sender_id: userId,
-          sender_name: userName,
-          content: 'Mensagem de voz',
-          attachment_url: publicUrl,
-          attachment_name: 'audio_message.webm',
-          attachment_type: 'audio',
-          status: 'sent',
-          is_vanish: isVanishMode,
-          expires_at: isVanishMode ? new Date(Date.now() + 60000).toISOString() : null
-        }]);
-
-      if (msgError) throw msgError;
+      await postChatMessageDb({
+        roomId: activeRoom.id,
+        content: 'Mensagem de voz',
+        messageType: 'audio',
+        attachmentUrl: publicUrl,
+        attachmentName: 'audio_message.webm',
+        attachmentType: 'audio',
+        isVanish: isVanishMode,
+        expiresAt: isVanishMode ? vanishExpiresAtIso(vanishDurationId) : null,
+      });
 
       setAudioUrl(null);
       audioChunksRef.current = [];
     } catch (error: any) {
-      console.error('Error sending audio:', error);
+      logConnectError('upload', 'audio_send_failed', error, { roomId: activeRoom.id });
       toast.error('Erro ao enviar áudio');
     } finally {
       setUploading(false);
@@ -1401,12 +2020,14 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const generateLinkPreview = async (url: string) => {
+  const generateLinkPreview = async (url: string): Promise<ChatMessage['link_preview'] | null> => {
+    const canonical = sanitizeChatHttpUrl(url);
+    if (!canonical) return null;
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       const response = await ai.models.generateContent({
         model: "gemini-3.1-flash-lite-preview",
-        contents: `Extraia metadados para este link: ${url}. Retorne um JSON com title, description e image (URL da imagem). Se for um site jurídico brasileiro (STF, Jusbrasil, etc), forneça uma descrição técnica e formal.`,
+        contents: `Extraia metadados para este link: ${canonical}. Retorne um JSON com title, description e image (URL https da imagem, ou vazio). Se for um site jurídico brasileiro (STF, Jusbrasil, etc), forneça uma descrição técnica e formal.`,
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -1420,19 +2041,17 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
           }
         }
       });
-      
-      const metadata = JSON.parse(response.text || '{}');
-      metadata.url = url;
-      
-      // Special handling for YouTube
-      if (url.includes('youtube.com') || url.includes('youtu.be')) {
-        const videoId = url.includes('v=') ? url.split('v=')[1]?.split('&')[0] : url.split('/').pop();
-        if (videoId) {
-          metadata.image = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
-        }
+
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = JSON.parse(response.text || '{}') as Record<string, unknown>;
+      } catch {
+        return null;
       }
-      
-      return metadata;
+
+      let preview = normalizeLinkPreviewForStorage(parsed, canonical);
+      preview = applyYoutubePreviewImage(preview, canonical);
+      return preview;
     } catch (error) {
       console.error('Erro ao gerar preview do link:', error);
       return null;
@@ -1440,25 +2059,34 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   };
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !activeRoom) return;
+    if (!activeRoom) return;
 
-    const messageContent = newMessage.trim();
-    
-    // Detect URL for preview
+    const inThread = Boolean(activeThreadRoot);
+    const messageContent = stripControlChars((inThread ? threadComposerDraft : newMessage).trim());
+    if (!messageContent) return;
+    if (messageContent.length > MAX_CHAT_MESSAGE_CHARS) {
+      toast.error(`Mensagem demasiado longa (máx. ${MAX_CHAT_MESSAGE_CHARS} caracteres).`);
+      return;
+    }
+
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const urls = messageContent.match(urlRegex);
-    let linkPreview = null;
-    if (urls && urls.length > 0) {
-      linkPreview = await generateLinkPreview(urls[0]);
+    let linkPreview: ChatMessage['link_preview'] | null = null;
+    if (urls?.length) {
+      const safeFirst = sanitizeChatHttpUrl(urls[0]);
+      if (safeFirst) {
+        linkPreview = await generateLinkPreview(safeFirst);
+      }
     }
-    
+
     if (editingMessage) {
       try {
+        const safePreviewUpdate = linkPreview ? sanitizeLinkPreviewForRpc(linkPreview) : null;
         const { error } = await supabase
           .from('chat_messages')
           .update({ 
-            content: messageContent,
-            link_preview: linkPreview
+            content: clampUtf16(messageContent, MAX_CHAT_MESSAGE_CHARS),
+            link_preview: safePreviewUpdate
           })
           .eq('id', editingMessage.id);
         
@@ -1475,6 +2103,8 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
 
     // OPTIMISTIC UPDATE
     const tempId = `temp-${Date.now()}`;
+    const currentReply = inThread ? threadReplyingTo : replyingTo;
+
     const optimisticMsg: ChatMessage = {
       id: tempId,
       room_id: activeRoom.id,
@@ -1482,72 +2112,163 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
       sender_name: userName,
       content: messageContent,
       message_type: 'text',
-      status: 'sending' as any,
+      status: 'sending',
       created_at: new Date().toISOString(),
-      reply_to_id: replyingTo?.id || null,
-      reply_to_content: replyingTo?.content || null,
-      reply_to_sender_name: replyingTo?.sender_name || null,
+      reply_to_id: currentReply?.id || null,
+      reply_to_content: currentReply?.content || null,
+      reply_to_sender_name: currentReply?.sender_name || null,
       link_preview: linkPreview,
       is_vanish: isVanishMode,
-      expires_at: isVanishMode ? new Date(Date.now() + 60000).toISOString() : null
-    } as any;
+      expires_at: isVanishMode ? vanishExpiresAtIso(vanishDurationId) : null,
+      thread_root_id: inThread ? activeThreadRoot!.id : null,
+    };
 
     addMessage(activeRoom.id, optimisticMsg);
-    setNewMessage('');
-    const currentReply = replyingTo;
-    setReplyingTo(null);
+    if (inThread) {
+      setThreadComposerDraft('');
+      setThreadReplyingTo(null);
+    } else {
+      setNewMessage('');
+      setReplyingTo(null);
+    }
+
+    const pendingText: ChatMessagePendingSendText = {
+      kind: 'text',
+      content: messageContent,
+      replyToId: currentReply?.id || null,
+      replyToContent: currentReply?.content || null,
+      replyToSenderName: currentReply?.sender_name || null,
+      linkPreview: linkPreview ?? null,
+      isVanish: isVanishMode,
+      expiresAt: isVanishMode ? vanishExpiresAtIso(vanishDurationId) : null,
+      threadRootId: inThread ? activeThreadRoot!.id : null,
+    };
 
     try {
-      const { data: insertedMsg, error } = await supabase
-        .from('chat_messages')
-        .insert({
-          room_id: activeRoom.id,
-          sender_id: userId,
-          sender_name: userName,
+      const insertedMsg = await withChatSendRetries(() =>
+        postChatMessageDb({
+          roomId: activeRoom.id,
           content: messageContent,
-          message_type: 'text',
-          status: 'sent',
-          reply_to_id: currentReply?.id || null,
-          reply_to_content: currentReply?.content || null,
-          reply_to_sender_name: currentReply?.sender_name || null,
-          link_preview: linkPreview,
-          is_vanish: isVanishMode,
-          expires_at: isVanishMode ? new Date(Date.now() + 60000).toISOString() : null
+          messageType: 'text',
+          replyToId: currentReply?.id || null,
+          replyToContent: currentReply?.content || null,
+          replyToSenderName: currentReply?.sender_name || null,
+          linkPreview: linkPreview ?? null,
+          isVanish: isVanishMode,
+          expiresAt: isVanishMode ? vanishExpiresAtIso(vanishDurationId) : null,
+          threadRootId: inThread ? activeThreadRoot!.id : null,
         })
-        .select()
-        .single();
+      );
 
-      if (error) throw error;
-
-      // Replace optimistic message with real one
       removeMessage(activeRoom.id, tempId);
       if (insertedMsg) {
-        addMessage(activeRoom.id, insertedMsg as ChatMessage);
+        addMessage(activeRoom.id, insertedMsg);
       }
+    } catch (error: any) {
+      logConnectError('messages', 'send_text_failed', error, { roomId: activeRoom.id });
+      patchMessage(activeRoom.id, tempId, {
+        status: 'failed',
+        send_error: error?.message || 'Erro ao enviar',
+        pending_send: pendingText,
+      });
+      toast.error('Não foi possível enviar após várias tentativas. Pode reenviar.');
+    }
+  };
 
-      // Update room last message
-      await supabase
-        .from('chat_rooms')
-        .update({ 
-          last_message: messageContent, 
-          updated_at: new Date().toISOString() 
-        })
-        .eq('id', activeRoom.id);
+  const resendChatMessage = async (msg: ChatMessage) => {
+    if (!activeRoomId || msg.sender_id !== userId) return;
+    if (msg.room_id !== activeRoomId) return;
+    if (msg.status !== 'failed' || !msg.pending_send) return;
+    const roomId = activeRoomId;
 
-      // Increment unread count for other participants
-      const otherParticipants = participants[activeRoom.id]?.filter(p => p.user_id !== userId) || [];
-      for (const p of otherParticipants) {
-        await supabase.rpc('increment_unread_count', { 
-          p_room_id: activeRoom.id, 
-          p_user_id: p.user_id 
+    if (msg.pending_send.kind === 'text') {
+      const p = msg.pending_send;
+      patchMessage(roomId, msg.id, { status: 'sending', send_error: undefined });
+      try {
+        const insertedMsg = await withChatSendRetries(() =>
+          postChatMessageDb({
+            roomId,
+            content: p.content,
+            messageType: 'text',
+            replyToId: p.replyToId,
+            replyToContent: p.replyToContent,
+            replyToSenderName: p.replyToSenderName,
+            linkPreview: p.linkPreview ?? null,
+            isVanish: p.isVanish,
+            expiresAt: p.expiresAt,
+            threadRootId: p.threadRootId,
+          })
+        );
+        removeMessage(roomId, msg.id);
+        if (insertedMsg) addMessage(roomId, insertedMsg);
+        toast.success('Mensagem enviada');
+      } catch (error: any) {
+        logConnectError('messages', 'resend_text_failed', error, { roomId });
+        patchMessage(roomId, msg.id, {
+          status: 'failed',
+          send_error: error?.message || 'Falha ao reenviar',
         });
+        toast.error('Não foi possível reenviar');
       }
+      return;
+    }
 
-    } catch (error) {
-      // Rollback optimistic update
-      setMessages(prev => prev.filter(m => m.id !== tempId));
-      console.error('Error sending message:', error);
-      toast.error('Erro ao enviar mensagem');
+    const file = pendingFileByClientIdRef.current.get(msg.id);
+    if (!file) {
+      toast.error('Não é possível reenviar: o ficheiro já não está em memória. Envie outra vez pelo clipe.');
+      return;
+    }
+
+    if (attachmentTooLarge(file)) {
+      toast.error(`Ficheiro demasiado grande. Tamanho máximo: ${formatMaxMegabytes()} MB.`);
+      return;
+    }
+    const resendDisplayName = sanitizeAttachmentDisplayName(file.name);
+
+    patchMessage(roomId, msg.id, {
+      status: 'sending',
+      send_error: undefined,
+      content: `Enviando arquivo: ${resendDisplayName}`,
+    });
+    setUploading(true);
+    try {
+      const insertedMsg = await withChatSendRetries(async () => {
+        const fileExt = file.name.split('.').pop();
+        const storageName = `${Math.random()}.${fileExt}`;
+        const filePath = `chat/${roomId}/${storageName}`;
+        const { error: uploadError } = await supabase.storage
+          .from('chat_attachments')
+          .upload(filePath, file);
+        if (uploadError) throw uploadError;
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from('chat_attachments').getPublicUrl(filePath);
+        const ins = await postChatMessageDb({
+          roomId,
+          content: `Enviou um arquivo: ${resendDisplayName}`,
+          attachmentUrl: publicUrl,
+          attachmentName: resendDisplayName,
+          attachmentType: file.type,
+        });
+        if (!ins) throw new Error('Resposta vazia');
+        return ins;
+      });
+      pendingFileByClientIdRef.current.delete(msg.id);
+      removeMessage(roomId, msg.id);
+      addMessage(roomId, insertedMsg);
+      toast.success('Arquivo enviado!');
+    } catch (error: any) {
+      logConnectError('upload', 'resend_file_failed', error, { roomId, fileName: resendDisplayName });
+      pendingFileByClientIdRef.current.set(msg.id, file);
+      patchMessage(roomId, msg.id, {
+        status: 'failed',
+        send_error: error?.message || 'Falha',
+        content: `Falha ao enviar: ${resendDisplayName}`,
+        pending_send: { kind: 'file', fileName: resendDisplayName, fileType: file.type },
+      });
+      toast.error('Erro ao reenviar arquivo');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -1629,7 +2350,11 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
         .eq('id', call.id);
 
     } catch (error) {
-      console.error('Error starting call:', error);
+      logConnectError('call', 'start_call_failed', error, {
+        roomId: activeRoom.id,
+        receiverId,
+        type,
+      });
       toast.error('Erro ao iniciar chamada');
     }
   };
@@ -1670,7 +2395,10 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
       setShowCallModal(true);
       setCallStatus('connected');
     } catch (error) {
-      console.error('Error accepting call:', error);
+      logConnectError('call', 'accept_call_failed', error, {
+        callId: incomingCall.id,
+        type: incomingCall.type,
+      });
       toast.error('Erro ao aceitar chamada');
     }
   };
@@ -1779,6 +2507,13 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   };
 
   const deleteMessage = async (msgId: string) => {
+    if (msgId.startsWith('temp-')) {
+      if (activeRoomId) {
+        pendingFileByClientIdRef.current.delete(msgId);
+        removeMessage(activeRoomId, msgId);
+      }
+      return;
+    }
     try {
       const { error } = await supabase
         .from('chat_messages')
@@ -1923,90 +2658,81 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !activeRoom) return;
+    e.target.value = '';
 
-    setUploading(true);
-    setUploadProgress(0);
+    if (attachmentTooLarge(file)) {
+      toast.error(`Ficheiro demasiado grande. Tamanho máximo: ${formatMaxMegabytes()} MB.`);
+      return;
+    }
 
-    // Optimistic message for file
+    const displayName = sanitizeAttachmentDisplayName(file.name);
+
     const tempId = `temp-${Date.now()}`;
+    pendingFileByClientIdRef.current.set(tempId, file);
+
     const optimisticMsg: ChatMessage = {
       id: tempId,
       room_id: activeRoom.id,
       sender_id: userId,
       sender_name: userName,
-      content: `Enviando arquivo: ${file.name}`,
-      attachment_name: file.name,
+      content: `Enviando arquivo: ${displayName}`,
+      attachment_name: displayName,
       attachment_type: file.type,
       message_type: 'file',
-      status: 'sending' as any,
+      status: 'sending',
       created_at: new Date().toISOString(),
-    } as any;
+    };
 
     addMessage(activeRoom.id, optimisticMsg);
+    setUploading(true);
+    setUploadProgress(0);
+
+    const progressInterval = setInterval(() => {
+      setUploadProgress((prev) => (prev >= 90 ? prev : prev + 8));
+    }, 200);
 
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `chat/${activeRoom.id}/${fileName}`;
-
-      // Simulate progress since Supabase standard upload doesn't provide it easily
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return 90;
-          }
-          return prev + 10;
+      const insertedMsg = await withChatSendRetries(async () => {
+        const fileExt = file.name.split('.').pop();
+        const storageName = `${Math.random()}.${fileExt}`;
+        const filePath = `chat/${activeRoom.id}/${storageName}`;
+        const { error: uploadError } = await supabase.storage
+          .from('chat_attachments')
+          .upload(filePath, file);
+        if (uploadError) throw uploadError;
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from('chat_attachments').getPublicUrl(filePath);
+        const ins = await postChatMessageDb({
+          roomId: activeRoom.id,
+          content: `Enviou um arquivo: ${displayName}`,
+          attachmentUrl: publicUrl,
+          attachmentName: displayName,
+          attachmentType: file.type,
         });
-      }, 200);
+        if (!ins) throw new Error('Resposta vazia');
+        return ins;
+      });
 
-      const { error: uploadError } = await supabase.storage
-        .from('chat_attachments')
-        .upload(filePath, file);
-
-      clearInterval(progressInterval);
-      setUploadProgress(100);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('chat_attachments')
-        .getPublicUrl(filePath);
-
-      const { data: insertedMsg, error: insertError } = await supabase.from('chat_messages').insert({
-        room_id: activeRoom.id,
-        sender_id: userId,
-        sender_name: userName,
-        content: `Enviou um arquivo: ${file.name}`,
-        attachment_url: publicUrl,
-        attachment_name: file.name,
-        attachment_type: file.type,
-        status: 'sent'
-      }).select().single();
-
-      if (insertError) throw insertError;
-
-      // Replace optimistic message
       removeMessage(activeRoom.id, tempId);
-      if (insertedMsg) {
-        addMessage(activeRoom.id, insertedMsg as ChatMessage);
-      }
-
-      // Update room last message
-      await supabase
-        .from('chat_rooms')
-        .update({ 
-          last_message: `Arquivo: ${file.name}`, 
-          updated_at: new Date().toISOString() 
-        })
-        .eq('id', activeRoom.id);
-
+      pendingFileByClientIdRef.current.delete(tempId);
+      addMessage(activeRoom.id, insertedMsg);
+      setUploadProgress(100);
       toast.success('Arquivo enviado!');
     } catch (error: any) {
-      console.error('Error uploading file:', error);
-      removeMessage(activeRoom.id, tempId);
-      toast.error(`Erro ao enviar arquivo: ${error.message || 'Verifique as permissões de Storage'}`);
+      logConnectError('upload', 'file_upload_failed', error, {
+        roomId: activeRoom.id,
+        fileName: file.name,
+      });
+      patchMessage(activeRoom.id, tempId, {
+        status: 'failed',
+        send_error: error?.message || 'Erro',
+        pending_send: { kind: 'file', fileName: displayName, fileType: file.type },
+        content: `Falha ao enviar: ${displayName}`,
+      });
+      toast.error('Não foi possível enviar o arquivo após várias tentativas. Pode reenviar.');
     } finally {
+      clearInterval(progressInterval);
       setUploading(false);
       setUploadProgress(0);
     }
@@ -2016,21 +2742,17 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   const updateGroupInfo = async () => {
     if (!activeRoom || !activeRoom.is_group) return;
     try {
-      const { error } = await supabase
-        .from('chat_rooms')
-        .update({ 
-          name: editingGroupName, 
-          avatar_url: editingGroupAvatar,
-          updated_at: new Date().toISOString() 
-        })
-        .eq('id', activeRoom.id);
-      
+      const { error } = await supabase.rpc('group_update_room_info', {
+        p_room_id: activeRoom.id,
+        p_name: editingGroupName,
+        p_avatar_url: editingGroupAvatar,
+      });
       if (error) throw error;
       toast.success('Grupo atualizado!');
-      setActiveRoom({ ...activeRoom, name: editingGroupName, avatar_url: editingGroupAvatar });
       fetchRooms();
     } catch (error: any) {
-      toast.error('Erro ao atualizar grupo');
+      console.error(error);
+      toast.error(error?.message?.includes('not allowed') ? 'Sem permissão para editar o grupo' : 'Erro ao atualizar grupo');
     }
   };
 
@@ -2057,64 +2779,147 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   };
 
   const deleteGroup = async () => {
-    if (!activeRoom || activeRoom.created_by !== userId) return;
+    if (!activeRoom || !activeRoom.is_group) return;
 
     if (!confirm('Tem certeza que deseja excluir este grupo permanentemente?')) return;
 
     try {
-      const { error } = await supabase
-        .from('chat_rooms')
-        .delete()
-        .eq('id', activeRoom.id);
-
+      const { error } = await supabase.rpc('group_delete_room', { p_room_id: activeRoom.id });
       if (error) throw error;
 
       toast.success('Grupo excluído com sucesso');
       setActiveRoom(null);
       setShowGroupInfoModal(false);
       fetchRooms();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting group:', error);
-      toast.error('Erro ao excluir grupo');
+      toast.error(
+        error?.message?.includes('only owner') ? 'Apenas o dono pode excluir o grupo' : 'Erro ao excluir grupo'
+      );
     }
   };
 
   const removeParticipant = async (pUserId: string) => {
-    if (!activeRoom) return;
+    if (!activeRoom?.is_group) return;
     try {
-      const { error } = await supabase
-        .from('chat_participants')
-        .delete()
-        .eq('room_id', activeRoom.id)
-        .eq('user_id', pUserId);
-      
+      const { error } = await supabase.rpc('group_remove_member', {
+        p_room_id: activeRoom.id,
+        p_target_user_id: pUserId,
+      });
       if (error) throw error;
       toast.success('Participante removido');
-      setParticipants(prev => ({
+      setParticipants((prev) => ({
         ...prev,
-        [activeRoom.id]: prev[activeRoom.id].filter(p => p.user_id !== pUserId)
+        [activeRoom.id]: (prev[activeRoom.id] || []).filter((p) => p.user_id !== pUserId),
       }));
+      fetchRooms();
     } catch (error: any) {
-      toast.error('Erro ao remover participante');
+      console.error(error);
+      toast.error(
+        error?.message?.includes('not allowed') ? 'Sem permissão para remover este membro' : 'Erro ao remover participante'
+      );
     }
   };
 
   const addParticipant = async (targetUser: any) => {
-    if (!activeRoom) return;
+    if (!activeRoom?.is_group) return;
     try {
-      const { error } = await supabase
-        .from('chat_participants')
-        .insert({
-          room_id: activeRoom.id,
-          user_id: targetUser.id,
-          user_name: targetUser.persona_data?.nome || 'Usuário'
-        });
-      
+      const { error } = await supabase.rpc('group_add_member', {
+        p_room_id: activeRoom.id,
+        p_target_user_id: targetUser.id,
+        p_target_user_name: targetUser.persona_data?.nome || 'Usuário',
+      });
       if (error) throw error;
-      toast.success('Participante adicionado');
-      fetchRooms(); // To refresh participant list
+      toast.success(
+        activeRoom.require_join_approval ? 'Pedido de entrada enviado ao grupo' : 'Participante adicionado'
+      );
+      fetchRooms();
     } catch (error: any) {
-      toast.error('Erro ao adicionar participante');
+      console.error(error);
+      toast.error(
+        error?.message?.includes('not allowed')
+          ? 'Sem permissão para adicionar membros'
+          : 'Erro ao adicionar participante'
+      );
+    }
+  };
+
+  const approveGroupJoin = async (targetUserId: string) => {
+    if (!activeRoom?.is_group) return;
+    try {
+      const { error } = await supabase.rpc('group_approve_join', {
+        p_room_id: activeRoom.id,
+        p_target_user_id: targetUserId,
+      });
+      if (error) throw error;
+      toast.success('Entrada aprovada');
+      fetchRooms();
+    } catch (error: any) {
+      console.error(error);
+      toast.error('Não foi possível aprovar');
+    }
+  };
+
+  const rejectGroupJoin = async (targetUserId: string) => {
+    if (!activeRoom?.is_group) return;
+    try {
+      const { error } = await supabase.rpc('group_reject_join', {
+        p_room_id: activeRoom.id,
+        p_target_user_id: targetUserId,
+      });
+      if (error) throw error;
+      toast.success('Pedido rejeitado');
+      fetchRooms();
+    } catch (error: any) {
+      console.error(error);
+      toast.error('Não foi possível rejeitar');
+    }
+  };
+
+  const setParticipantGroupRole = async (targetUserId: string, role: 'member' | 'co_admin') => {
+    if (!activeRoom?.is_group) return;
+    try {
+      const { error } = await supabase.rpc('group_set_participant_role', {
+        p_room_id: activeRoom.id,
+        p_target_user_id: targetUserId,
+        p_role: role,
+      });
+      if (error) throw error;
+      toast.success(role === 'co_admin' ? 'Co-admin promovido' : 'Membro rebaixado');
+      fetchRooms();
+    } catch (error: any) {
+      console.error(error);
+      toast.error('Não foi possível alterar o papel');
+    }
+  };
+
+  const patchGroupModeration = async (patch: Partial<GroupModerationSettings>) => {
+    if (!activeRoom?.is_group) return;
+    try {
+      const { error } = await supabase.rpc('group_update_moderation_settings', {
+        p_room_id: activeRoom.id,
+        p_patch: patch as Record<string, unknown>,
+      });
+      if (error) throw error;
+      fetchRooms();
+    } catch (error: any) {
+      console.error(error);
+      toast.error('Erro ao guardar permissões');
+    }
+  };
+
+  const setGroupRequireJoinApproval = async (value: boolean) => {
+    if (!activeRoom?.is_group) return;
+    try {
+      const { error } = await supabase.rpc('group_set_require_join_approval', {
+        p_room_id: activeRoom.id,
+        p_require: value,
+      });
+      if (error) throw error;
+      fetchRooms();
+    } catch (error: any) {
+      console.error(error);
+      toast.error('Erro ao atualizar política de entrada');
     }
   };
 
@@ -2157,6 +2962,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
         startCall={startCall}
         onNavigate={onNavigate}
         loading={loading}
+        typingStatus={typingStatus}
         userProfile={userProfile}
         setActiveStory={setActiveStory}
         setShowStoryModal={setShowStoryModal}
@@ -2174,17 +2980,22 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
       )}
 
       {/* CHAT AREA */}
-      <div className={`flex-1 flex flex-col bg-white dark:bg-[#0a0a0a] ${activeRoom ? 'flex' : 'hidden md:flex'}`}>
+      <div className={`flex-1 flex flex-col bg-white dark:bg-[#0a0a0a] relative min-h-0 ${activeRoom ? 'flex' : 'hidden md:flex'}`}>
         {activeRoom ? (
           <>
             {/* CHAT HEADER */}
             <div className="p-3 md:p-4 border-b border-slate-200 dark:border-white/5 flex items-center justify-between bg-white dark:bg-[#1a1a1a]">
-              <div className="flex items-center gap-2 md:gap-3 overflow-hidden">
-                <button onClick={() => setActiveRoom(null)} className="md:hidden p-2 -ml-2 text-slate-500">
-                  <ChevronLeft size={24} />
+              <div className="flex items-center gap-2 md:gap-3 overflow-hidden min-w-0 flex-1">
+                <button
+                  type="button"
+                  onClick={() => setActiveRoom(null)}
+                  className={`md:hidden p-2 -ml-2 text-slate-500 ${FOCUS_RING_ROUND}`}
+                  aria-label="Voltar à lista de conversas"
+                >
+                  <ChevronLeft size={24} aria-hidden />
                 </button>
-                <div 
-                  className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center overflow-hidden cursor-pointer shrink-0 border-2 border-transparent hover:border-blue-500 transition-all"
+                <button
+                  type="button"
                   onClick={() => {
                     if (activeRoom.is_group) {
                       setEditingGroupName(activeRoom.name || '');
@@ -2195,128 +3006,150 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
                       if (otherId) openUserProfile(otherId);
                     }
                   }}
+                  className={`flex items-center gap-2 md:gap-3 min-w-0 overflow-hidden rounded-xl p-0.5 -m-0.5 text-left ${FOCUS_RING}`}
+                  aria-label={
+                    activeRoom.is_group
+                      ? `Abrir informações do grupo ${getChatName(activeRoom)}`
+                      : `Ver perfil de ${getChatName(activeRoom)}`
+                  }
                 >
-                  {getChatAvatar(activeRoom) ? (
-                    <img src={getChatAvatar(activeRoom)} alt={getChatName(activeRoom)} className="w-full h-full object-cover" />
-                  ) : (
-                    <User className="text-slate-400" size={20} />
-                  )}
-                </div>
-                <div 
-                  className="flex flex-col min-w-0 cursor-pointer"
-                  onClick={() => {
-                    if (activeRoom.is_group) {
-                      setEditingGroupName(activeRoom.name || '');
-                      setEditingGroupAvatar(activeRoom.avatar_url || '');
-                      setShowGroupInfoModal(true);
-                    } else {
-                      const otherId = participants[activeRoom.id]?.find(p => p.user_id !== userId)?.user_id;
-                      if (otherId) openUserProfile(otherId);
-                    }
-                  }}
-                >
-                  <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-tight text-xs md:text-sm truncate">
-                    {getChatName(activeRoom)}
-                  </h3>
-                  <p className="text-[9px] md:text-[10px] text-blue-500 font-black uppercase tracking-widest truncate">
-                    {getTypingUsers(activeRoom.id).length > 0 ? (
-                      <span className="text-blue-500 italic">
-                        {getTypingUsers(activeRoom.id).join(', ')} {getTypingUsers(activeRoom.id).length > 1 ? 'estão digitando...' : 'está digitando...'}
-                      </span>
+                  <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center overflow-hidden shrink-0 border-2 border-transparent hover:border-blue-500 transition-all pointer-events-none">
+                    {getChatAvatar(activeRoom) ? (
+                      <img src={getChatAvatar(activeRoom)} alt="" className="w-full h-full object-cover" />
                     ) : (
-                      (() => {
-                        const otherId = participants[activeRoom.id]?.find(p => p.user_id !== userId)?.user_id;
-                        if (!otherId) return 'Offline';
-                        const presence = userPresence[otherId];
-                        if (presence?.is_online) return 'Online';
-                        if (presence?.last_seen) {
-                          const date = new Date(presence.last_seen);
-                          const now = new Date();
-                          const isToday = date.toDateString() === now.toDateString();
-                          return `Visto ${isToday ? '' : 'em ' + date.toLocaleDateString()} às ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-                        }
-                        return 'Offline';
-                      })()
+                      <User className="text-slate-400" size={20} aria-hidden />
                     )}
-                  </p>
-                </div>
+                  </div>
+                  <div className="flex flex-col min-w-0 pointer-events-none">
+                    <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-tight text-xs md:text-sm truncate">
+                      {getChatName(activeRoom)}
+                    </h3>
+                    <p className="text-[9px] md:text-[10px] text-blue-500 font-black uppercase tracking-widest truncate">
+                      {getTypingUsers(activeRoom.id).length > 0 ? (
+                        <span className="text-blue-500 italic">
+                          {getTypingUsers(activeRoom.id).join(', ')} {getTypingUsers(activeRoom.id).length > 1 ? 'estão digitando...' : 'está digitando...'}
+                        </span>
+                      ) : (
+                        (() => {
+                          const otherId = participants[activeRoom.id]?.find(p => p.user_id !== userId)?.user_id;
+                          if (!otherId) return 'Offline';
+                          const presence = userPresence[otherId];
+                          if (presence?.is_online) return 'Online';
+                          if (presence?.last_seen) {
+                            const date = new Date(presence.last_seen);
+                            const now = new Date();
+                            const isToday = date.toDateString() === now.toDateString();
+                            return `Visto ${isToday ? '' : 'em ' + date.toLocaleDateString()} às ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                          }
+                          return 'Offline';
+                        })()
+                      )}
+                    </p>
+                  </div>
+                </button>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 shrink-0">
                 {!activeRoom.is_group && (
                   <>
-                    <button 
+                    <button
+                      type="button"
                       onClick={() => startCall('audio')}
-                      className="p-2 text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-all"
-                      title="Chamada de Áudio"
+                      className={`p-2 text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-all ${FOCUS_RING_ROUND}`}
+                      title="Chamada de áudio"
+                      aria-label="Iniciar chamada de áudio"
                     >
-                      <Phone size={20} />
+                      <Phone size={20} aria-hidden />
                     </button>
-                    <button 
+                    <button
+                      type="button"
                       onClick={() => startCall('video')}
-                      className="p-2 text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-all"
-                      title="Chamada de Vídeo"
+                      className={`p-2 text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-all ${FOCUS_RING_ROUND}`}
+                      title="Chamada de vídeo"
+                      aria-label="Iniciar chamada de vídeo"
                     >
-                      <Video size={20} />
+                      <Video size={20} aria-hidden />
                     </button>
                   </>
                 )}
-                <button 
+                <button
+                  type="button"
                   onClick={() => setShowInternalSearch(!showInternalSearch)}
-                  className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors ${showInternalSearch ? 'text-blue-500 bg-blue-50 dark:bg-blue-500/10' : 'text-slate-400'}`}
-                  title="Buscar na conversa"
+                  className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors ${FOCUS_RING_ROUND} ${showInternalSearch ? 'text-blue-500 bg-blue-50 dark:bg-blue-500/10' : 'text-slate-400'}`}
+                  title="Buscar na conversa (Ctrl+K ou Cmd+K)"
+                  aria-label="Buscar na conversa. Atalho: Control K ou Command K"
                 >
-                  <Search size={20} />
+                  <Search size={20} aria-hidden />
                 </button>
 
-                <button 
+                <button
+                  type="button"
                   onClick={() => setShowStarredOnly(!showStarredOnly)}
-                  className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors ${showStarredOnly ? 'text-yellow-500 bg-yellow-50 dark:bg-yellow-500/10' : 'text-slate-400'}`}
-                  title="Mensagens Favoritas"
+                  className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors ${FOCUS_RING_ROUND} ${showStarredOnly ? 'text-yellow-500 bg-yellow-50 dark:bg-yellow-500/10' : 'text-slate-400'}`}
+                  title="Só mensagens favoritas"
+                  aria-label={showStarredOnly ? 'Mostrar todas as mensagens' : 'Mostrar só mensagens favoritas'}
                 >
-                  <Star size={20} fill={showStarredOnly ? "currentColor" : "none"} />
+                  <Star size={20} fill={showStarredOnly ? 'currentColor' : 'none'} aria-hidden />
                 </button>
 
-                {/* POLL BUTTON */}
-                {activeRoom.is_group && (
-                  <button 
+                {activeRoom.is_group && canCreateGroupPoll(activeRoom, userId, participants) && (
+                  <button
+                    type="button"
                     onClick={() => setShowPollModal(true)}
-                    className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-slate-400"
-                    title="Criar Enquete"
+                    className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-slate-400 ${FOCUS_RING_ROUND}`}
+                    title="Criar enquete"
+                    aria-label="Criar enquete"
                   >
-                    <BarChart2 size={20} />
+                    <BarChart2 size={20} aria-hidden />
                   </button>
                 )}
 
-                {/* MEDIA GALLERY BUTTON */}
-                <button 
+                <button
+                  type="button"
                   onClick={() => setShowMediaGallery(true)}
-                  className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-slate-400"
-                  title="Galeria de Mídia"
+                  className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-slate-400 ${FOCUS_RING_ROUND}`}
+                  title="Galeria de mídia"
+                  aria-label="Abrir galeria de mídia"
                 >
-                  <LayoutGrid size={20} />
+                  <LayoutGrid size={20} aria-hidden />
                 </button>
 
-                {/* MUTE BUTTON */}
                 <div className="relative group/mute">
-                  <button 
-                    className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors ${participants[activeRoom.id]?.find(p => p.user_id === userId)?.muted_until ? 'text-red-500 bg-red-50 dark:bg-red-500/10' : 'text-slate-400'}`}
-                    title="Silenciar Notificações"
+                  <button
+                    type="button"
+                    className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors ${FOCUS_RING_ROUND} ${participants[activeRoom.id]?.find(p => p.user_id === userId)?.muted_until ? 'text-red-500 bg-red-50 dark:bg-red-500/10' : 'text-slate-400'}`}
+                    title="Silenciar notificações"
+                    aria-label={
+                      participants[activeRoom.id]?.find(p => p.user_id === userId)?.muted_until
+                        ? 'Conversa silenciada. Abrir opções de duração do silêncio'
+                        : 'Silenciar notificações desta conversa'
+                    }
+                    aria-haspopup="menu"
                   >
-                    {participants[activeRoom.id]?.find(p => p.user_id === userId)?.muted_until ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                    {participants[activeRoom.id]?.find(p => p.user_id === userId)?.muted_until ? (
+                      <VolumeX size={20} aria-hidden />
+                    ) : (
+                      <Volume2 size={20} aria-hidden />
+                    )}
                   </button>
-                  <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/5 rounded-2xl shadow-2xl opacity-0 invisible group-hover/mute:opacity-100 group-hover/mute:visible transition-all z-50 overflow-hidden">
+                  <div
+                    role="menu"
+                    aria-label="Duração do silêncio"
+                    className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/5 rounded-2xl shadow-2xl opacity-0 invisible pointer-events-none group-hover/mute:opacity-100 group-hover/mute:visible group-hover/mute:pointer-events-auto group-focus-within/mute:opacity-100 group-focus-within/mute:visible group-focus-within/mute:pointer-events-auto transition-all z-50 overflow-hidden"
+                  >
                     <div className="p-2">
                       <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest p-2">Silenciar por...</p>
                       {[
                         { label: '8 Horas', value: '8h' },
                         { label: '1 Semana', value: '1w' },
                         { label: 'Sempre', value: 'forever' },
-                        { label: 'Desativar', value: null }
-                      ].map(opt => (
+                        { label: 'Desativar', value: null },
+                      ].map((opt) => (
                         <button
                           key={opt.label}
+                          type="button"
+                          role="menuitem"
                           onClick={() => muteChat(activeRoom.id, opt.value as any)}
-                          className="w-full text-left p-2 text-sm hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-colors"
+                          className={`w-full text-left p-2 text-sm hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-colors ${FOCUS_RING}`}
                         >
                           {opt.label}
                         </button>
@@ -2325,21 +3158,26 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
                   </div>
                 </div>
 
-                <button 
+                <button
+                  type="button"
                   onClick={() => setShowMediaGallery(true)}
-                  className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-slate-400"
-                  title="Galeria de mídia"
+                  className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-slate-400 ${FOCUS_RING_ROUND}`}
+                  title="Fotos e imagens"
+                  aria-label="Abrir fotos e imagens da conversa"
                 >
-                  <ImageIcon size={20} />
+                  <ImageIcon size={20} aria-hidden />
                 </button>
-                <button 
+                <button
+                  type="button"
                   onClick={() => setShowWallpaperModal(true)}
-                  className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-slate-400"
-                  title="Papel de Parede"
+                  className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-slate-400 ${FOCUS_RING_ROUND}`}
+                  title="Papel de parede"
+                  aria-label="Alterar papel de parede do chat"
                 >
-                  <Palette size={20} />
+                  <Palette size={20} aria-hidden />
                 </button>
-                <button 
+                <button
+                  type="button"
                   onClick={() => {
                     if (activeRoom.is_group) {
                       setEditingGroupName(activeRoom.name || '');
@@ -2347,13 +3185,21 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
                       setShowGroupInfoModal(true);
                     }
                   }}
-                  className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-slate-400"
+                  className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-slate-400 ${FOCUS_RING_ROUND}`}
+                  title="Mais opções"
+                  aria-label={activeRoom.is_group ? 'Mais opções do grupo' : 'Mais opções'}
                 >
-                  <MoreVertical size={20} />
+                  <MoreVertical size={20} aria-hidden />
                 </button>
               </div>
             </div>
 
+            <div className="flex flex-col flex-1 min-h-0 relative">
+              <div
+                className={`relative flex flex-col flex-1 min-h-0 overflow-hidden ${
+                  activeThreadRoot ? 'opacity-50 pointer-events-none select-none' : ''
+                }`}
+              >
             {/* UPLOAD PROGRESS BAR */}
             {uploading && (
               <div className="h-1 bg-slate-100 dark:bg-white/5 z-50">
@@ -2372,25 +3218,123 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: 'auto', opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
-                  className="px-4 py-2 bg-slate-50 dark:bg-black/20 border-b border-slate-200 dark:border-white/5 flex items-center gap-2"
+                  className="bg-slate-50 dark:bg-black/20 border-b border-slate-200 dark:border-white/5"
                 >
-                  <Search size={16} className="text-slate-400" />
-                  <input 
-                    type="text"
-                    placeholder="Buscar na conversa..."
-                    value={internalSearchQuery}
-                    onChange={(e) => setInternalSearchQuery(e.target.value)}
-                    className="flex-1 bg-transparent border-none outline-none text-sm text-slate-700 dark:text-slate-200"
-                    autoFocus
-                  />
-                  {internalSearchQuery && (
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest whitespace-nowrap">
-                      {messages.filter(msg => msg.content.toLowerCase().includes(internalSearchQuery.toLowerCase())).length} resultados
-                    </span>
-                  )}
-                  <button onClick={() => { setShowInternalSearch(false); setInternalSearchQuery(''); }} className="p-1 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full">
-                    <X size={16} className="text-slate-500" />
-                  </button>
+                  <div className="px-4 py-2 flex items-center gap-2">
+                    <Search size={16} className="text-slate-400 shrink-0" />
+                    <input 
+                      type="text"
+                      placeholder="Texto (conteúdo, anexo, preview de link, nome do autor)…"
+                      value={internalSearchQuery}
+                      onChange={(e) => setInternalSearchQuery(e.target.value)}
+                      className="flex-1 min-w-0 bg-transparent border-none outline-none text-sm text-slate-700 dark:text-slate-200"
+                      autoFocus
+                    />
+                    {hasActiveConversationSearchCriteria(conversationSearchCriteria) && (
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest whitespace-nowrap shrink-0">
+                        {internalSearchResultCount} resultado(s)
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setInternalSearchShowAdvanced((v) => !v)}
+                      className={`p-1.5 rounded-lg shrink-0 ${FOCUS_RING} ${internalSearchShowAdvanced ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-600' : 'hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500'}`}
+                      title="Filtros avançados"
+                      aria-expanded={internalSearchShowAdvanced}
+                      aria-label="Filtros avançados da busca na conversa"
+                    >
+                      <Filter size={16} aria-hidden />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowInternalSearch(false);
+                        setInternalSearchQuery('');
+                        setInternalSearchSenderId('');
+                        setInternalSearchDateFrom('');
+                        setInternalSearchDateTo('');
+                        setInternalSearchOnlyAttachment(false);
+                        setInternalSearchWordMatchMode('all');
+                        setInternalSearchShowAdvanced(false);
+                      }}
+                      className={`p-1 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full shrink-0 ${FOCUS_RING_ROUND}`}
+                      aria-label="Fechar busca na conversa"
+                    >
+                      <X size={16} className="text-slate-500" aria-hidden />
+                    </button>
+                  </div>
+                  <AnimatePresence>
+                    {internalSearchShowAdvanced && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="px-4 pb-3 pt-0 space-y-2 border-t border-slate-200/80 dark:border-white/5"
+                      >
+                        <div className="flex flex-wrap items-center gap-2 pt-2">
+                          <label className="text-[9px] font-black uppercase text-slate-500 shrink-0">Autor</label>
+                          <select
+                            value={internalSearchSenderId}
+                            onChange={(e) => setInternalSearchSenderId(e.target.value)}
+                            className="flex-1 min-w-[140px] text-xs py-1.5 px-2 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 outline-none focus:border-blue-500"
+                          >
+                            <option value="">Qualquer pessoa</option>
+                            {(participants[activeRoom.id] || []).map((p) => (
+                              <option key={p.user_id} value={p.user_id}>
+                                {p.user_name || p.user_id}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <label className="text-[9px] font-black uppercase text-slate-500 w-full sm:w-auto">Período</label>
+                          <input
+                            type="date"
+                            value={internalSearchDateFrom}
+                            onChange={(e) => setInternalSearchDateFrom(e.target.value)}
+                            className="text-xs py-1.5 px-2 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10"
+                          />
+                          <span className="text-[10px] text-slate-400">até</span>
+                          <input
+                            type="date"
+                            value={internalSearchDateTo}
+                            onChange={(e) => setInternalSearchDateTo(e.target.value)}
+                            className="text-xs py-1.5 px-2 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10"
+                          />
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <label className="flex items-center gap-2 text-[10px] font-bold text-slate-600 dark:text-slate-300 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={internalSearchOnlyAttachment}
+                              onChange={(e) => setInternalSearchOnlyAttachment(e.target.checked)}
+                              className="rounded border-slate-300"
+                            />
+                            Só mensagens com anexo / mídia
+                          </label>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-[9px] font-black uppercase text-slate-500">Palavras no texto</span>
+                          <div className="flex rounded-xl overflow-hidden border border-slate-200 dark:border-white/10 text-[10px] font-black uppercase">
+                            <button
+                              type="button"
+                              onClick={() => setInternalSearchWordMatchMode('all')}
+                              className={`px-3 py-1.5 ${internalSearchWordMatchMode === 'all' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-black/40 text-slate-600'}`}
+                            >
+                              Todas
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setInternalSearchWordMatchMode('any')}
+                              className={`px-3 py-1.5 ${internalSearchWordMatchMode === 'any' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-black/40 text-slate-600'}`}
+                            >
+                              Qualquer
+                            </button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -2400,11 +3344,12 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
               userId={userId}
               userName={userName}
               activeRoom={activeRoom}
+              roomParticipants={participants[activeRoom.id] || []}
               roomSettings={roomSettings}
               hasMoreMessages={hasMoreMessages}
               isLoadingMore={isLoadingMore}
               fetchMessages={fetchMessages}
-              internalSearchQuery={internalSearchQuery}
+              conversationSearchCriteria={conversationSearchCriteria}
               showStarredOnly={showStarredOnly}
               starredMessages={starredMessages}
               messagesEndRef={messagesEndRef}
@@ -2425,9 +3370,68 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
               votePoll={votePoll}
               typingUsers={getTypingUsers(activeRoom.id)}
               createTaskFromMessage={handleCreateTaskFromMessage}
+              onOpenThread={setActiveThreadRoot}
+              resendMessage={resendChatMessage}
             />
 
+            {groupJoinBlocked && (
+              <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-white/92 dark:bg-[#0a0a0a]/92 backdrop-blur-sm px-8 text-center">
+                <Clock className="w-11 h-11 text-amber-500 shrink-0" strokeWidth={1.5} />
+                <p className="text-sm font-black uppercase tracking-tight text-slate-900 dark:text-white">
+                  Aguardando aprovação
+                </p>
+                <p className="text-xs text-slate-600 dark:text-slate-400 max-w-xs leading-relaxed">
+                  Um administrador precisa aprovar sua entrada para você ver e enviar mensagens neste grupo.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingGroupName(activeRoom.name || '');
+                    setEditingGroupAvatar(activeRoom.avatar_url || '');
+                    setShowGroupInfoModal(true);
+                  }}
+                  className="mt-1 text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  Abrir info do grupo
+                </button>
+              </div>
+            )}
+
+            {pendingScheduled.length > 0 && !groupJoinBlocked && (
+              <div className="shrink-0 px-3 py-2 border-t border-amber-200/60 dark:border-amber-500/20 bg-amber-50/90 dark:bg-amber-500/10 max-h-28 overflow-y-auto custom-scrollbar">
+                <p className="text-[9px] font-black uppercase tracking-widest text-amber-800 dark:text-amber-200 mb-1.5">
+                  Agendamentos nesta conversa
+                </p>
+                <ul className="space-y-1.5">
+                  {pendingScheduled.map((s) => (
+                    <li
+                      key={s.id}
+                      className="flex items-start justify-between gap-2 text-[10px] text-slate-700 dark:text-slate-200"
+                    >
+                      <span className="min-w-0 leading-snug">
+                        <span className="mr-1">{s.kind === 'reminder' ? '🔔' : '⏰'}</span>
+                        {new Date(s.scheduled_at).toLocaleString(undefined, {
+                          dateStyle: 'short',
+                          timeStyle: 'short',
+                        })}
+                        {' — '}
+                        <span className="opacity-90">{s.content.slice(0, 80)}{s.content.length > 80 ? '…' : ''}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => void cancelScheduledItem(s.id)}
+                        className="shrink-0 font-bold text-red-600 dark:text-red-400 hover:underline"
+                      >
+                        Cancelar
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {/* INPUT AREA */}
+            {!activeThreadRoot && !groupJoinBlocked && (
             <ChatInput
               newMessage={newMessage}
               setNewMessage={setNewMessage}
@@ -2449,6 +3453,8 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
               sendAudioMessage={sendAudioMessage}
               isVanishMode={isVanishMode}
               setIsVanishMode={setIsVanishMode}
+              vanishDurationId={vanishDurationId}
+              setVanishDurationId={setVanishDurationId}
               showGifPicker={showGifPicker}
               setShowGifPicker={setShowGifPicker}
               gifType={gifType}
@@ -2463,7 +3469,74 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
               fetchUsers={fetchUsers}
               setShowShareProfileModal={setShowShareProfileModal}
               startRecording={startRecording}
+              onOpenScheduleMessage={() => {
+                setScheduleModalKind('scheduled_message');
+                setShowScheduleModal(true);
+              }}
+              onOpenReminder={() => {
+                setScheduleModalKind('reminder');
+                setShowScheduleModal(true);
+              }}
             />
+            )}
+              </div>
+
+              {activeThreadRoot && (
+                <ChatThreadPanel
+                  root={activeThreadRoot}
+                  rootAuthorLabel={
+                    activeThreadRoot.sender_id === userId ? 'Você' : activeThreadRoot.sender_name
+                  }
+                  onClose={() => {
+                    setActiveThreadRoot(null);
+                    setThreadComposerDraft('');
+                    setThreadReplyingTo(null);
+                  }}
+                  replyMessages={threadReplyMessages}
+                  renderReply={(msg) => (
+                    <MessageItem
+                      msg={msg}
+                      userId={userId}
+                      userName={userName}
+                      isMe={msg.sender_id === userId}
+                      isDeleted={!!msg.is_deleted}
+                      activeRoom={activeRoom}
+                      roomParticipants={participants[activeRoom.id] || []}
+                      starredMessages={starredMessages}
+                      toggleStarMessage={toggleStarMessage}
+                      showReactionPicker={showReactionPicker}
+                      setShowReactionPicker={setShowReactionPicker}
+                      addReaction={addReaction}
+                      removeReaction={removeReaction}
+                      messageReactions={messageReactions}
+                      startReplying={(m) => setThreadReplyingTo(m)}
+                      setForwardingMessage={setForwardingMessage}
+                      setShowForwardModal={setShowForwardModal}
+                      startEditing={startEditing}
+                      deleteMessage={deleteMessage}
+                      openUserProfile={openUserProfile}
+                      onNavigate={onNavigate}
+                      polls={polls}
+                      votePoll={votePoll}
+                      createTaskFromMessage={handleCreateTaskFromMessage}
+                      threadUiMode="thread"
+                      resendMessage={resendChatMessage}
+                    />
+                  )}
+                  threadDraft={threadComposerDraft}
+                  setThreadDraft={setThreadComposerDraft}
+                  threadReplyingTo={threadReplyingTo}
+                  setThreadReplyingTo={setThreadReplyingTo}
+                  sendThreadMessage={() => void sendMessage()}
+                  handleTyping={handleTyping}
+                  isVanishMode={isVanishMode}
+                  setIsVanishMode={setIsVanishMode}
+                  vanishDurationId={vanishDurationId}
+                  setVanishDurationId={setVanishDurationId}
+                  userName={userName}
+                />
+              )}
+            </div>
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center opacity-40">
@@ -2520,6 +3593,11 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
         leaveGroup={leaveGroup}
         deleteGroup={deleteGroup}
         onNavigate={onNavigate}
+        onApproveJoin={approveGroupJoin}
+        onRejectJoin={rejectGroupJoin}
+        onSetParticipantRole={setParticipantGroupRole}
+        onPatchModeration={patchGroupModeration}
+        onSetRequireJoinApproval={setGroupRequireJoinApproval}
       />
 
       <ForwardModal
@@ -2563,6 +3641,18 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
         onClose={() => setShowShareProfileModal(false)}
         onShare={shareProfile}
       />
+
+      <ScheduleChatModal
+        show={showScheduleModal}
+        onClose={() => setShowScheduleModal(false)}
+        kind={scheduleModalKind}
+        roomLabel={activeRoom ? getChatName(activeRoom) : undefined}
+        initialMessageText={newMessage}
+        replyingTo={replyingTo}
+        submitting={scheduleSubmitting}
+        onSubmit={handleScheduleSubmit}
+      />
+
         <CallOverlay
           incomingCall={incomingCall}
           showCallModal={showCallModal}
@@ -2587,14 +3677,26 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
           results={globalSearchResults}
           searching={searchingGlobal}
           rooms={rooms}
-          onSearch={searchGlobalMessages}
+          onSearch={(q) => void searchGlobalMessages(q)}
           onClose={() => {
             setShowGlobalSearch(false);
             setGlobalSearchQuery('');
             setGlobalSearchResults([]);
+            setGlobalSearchSenderName('');
+            setGlobalSearchDateFrom('');
+            setGlobalSearchDateTo('');
+            setGlobalSearchOnlyAttachment(false);
           }}
           onSelectRoom={setActiveRoom}
           getChatName={getChatName}
+          senderNameFilter={globalSearchSenderName}
+          setSenderNameFilter={setGlobalSearchSenderName}
+          dateFrom={globalSearchDateFrom}
+          setDateFrom={setGlobalSearchDateFrom}
+          dateTo={globalSearchDateTo}
+          setDateTo={setGlobalSearchDateTo}
+          onlyAttachment={globalSearchOnlyAttachment}
+          setOnlyAttachment={setGlobalSearchOnlyAttachment}
         />
 
         <ProfileModals

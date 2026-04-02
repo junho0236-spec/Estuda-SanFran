@@ -1,18 +1,24 @@
-import React, { useEffect, useRef } from 'react';
-import { ChatMessage, ChatRoom } from '../../types';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { ChatMessage, ChatParticipant, ChatRoom } from '../../types';
 import MessageItem from './MessageItem';
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
+import type { ChatConversationSearchCriteria } from '../connect/chatSearchUtils';
+import {
+  hasActiveConversationSearchCriteria,
+  messageMatchesConversationCriteria,
+} from '../connect/chatSearchUtils';
 
 interface MessageListProps {
   messages: ChatMessage[];
   userId: string;
   userName: string;
   activeRoom: ChatRoom;
+  roomParticipants: ChatParticipant[];
   roomSettings: Record<string, any>;
   hasMoreMessages: boolean;
   isLoadingMore: boolean;
   fetchMessages: (roomId: string, loadMore?: boolean) => void;
-  internalSearchQuery: string;
+  conversationSearchCriteria: ChatConversationSearchCriteria;
   showStarredOnly: boolean;
   starredMessages: string[];
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
@@ -33,25 +39,46 @@ interface MessageListProps {
   votePoll: (pollId: string, optionIdx: number) => void;
   typingUsers: string[];
   createTaskFromMessage?: (msg: ChatMessage) => void;
+  onOpenThread?: (msg: ChatMessage) => void;
+  resendMessage?: (msg: ChatMessage) => void;
 }
 
 const MessageList: React.FC<MessageListProps> = ({
-  messages, userId, userName, activeRoom, roomSettings, hasMoreMessages,
-  isLoadingMore, fetchMessages, internalSearchQuery, showStarredOnly,
+  messages, userId, userName, activeRoom, roomParticipants, roomSettings, hasMoreMessages,
+  isLoadingMore, fetchMessages, conversationSearchCriteria, showStarredOnly,
   starredMessages, messagesEndRef, toggleStarMessage, showReactionPicker,
   setShowReactionPicker, addReaction, removeReaction, messageReactions,
   startReplying, setForwardingMessage, setShowForwardModal, startEditing,
   deleteMessage, openUserProfile, onNavigate, polls, votePoll, typingUsers,
-  createTaskFromMessage
+  createTaskFromMessage, onOpenThread, resendMessage
 }) => {
   const virtuosoRef = useRef<VirtuosoHandle>(null);
+
+  const mainTimelineMessages = useMemo(
+    () => messages.filter((m) => !m.thread_root_id),
+    [messages]
+  );
+
+  const threadReplyCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const msg of messages) {
+      if (msg.thread_root_id) {
+        m.set(msg.thread_root_id, (m.get(msg.thread_root_id) || 0) + 1);
+      }
+    }
+    return m;
+  }, [messages]);
   
-  const filteredMessages = messages.filter(msg => {
-    const matchesSearch = !internalSearchQuery || msg.content.toLowerCase().includes(internalSearchQuery.toLowerCase());
-    const matchesStarred = showStarredOnly ? starredMessages.includes(msg.id) : true;
-    const isExpired = msg.is_vanish && msg.expires_at && new Date(msg.expires_at) < new Date();
-    return matchesSearch && matchesStarred && !isExpired;
-  });
+  const filteredMessages = useMemo(() => {
+    const searchActive = hasActiveConversationSearchCriteria(conversationSearchCriteria);
+    return mainTimelineMessages.filter((msg) => {
+      const matchesSearch =
+        !searchActive || messageMatchesConversationCriteria(msg, conversationSearchCriteria);
+      const matchesStarred = showStarredOnly ? starredMessages.includes(msg.id) : true;
+      const isExpired = msg.is_vanish && msg.expires_at && new Date(msg.expires_at) < new Date();
+      return matchesSearch && matchesStarred && !isExpired;
+    });
+  }, [mainTimelineMessages, conversationSearchCriteria, showStarredOnly, starredMessages]);
 
   const settings = roomSettings[activeRoom.id] || {};
 
@@ -129,6 +156,7 @@ const MessageList: React.FC<MessageListProps> = ({
               isMe={msg.sender_id === userId}
               isDeleted={msg.is_deleted}
               activeRoom={activeRoom}
+              roomParticipants={roomParticipants}
               starredMessages={starredMessages}
               toggleStarMessage={toggleStarMessage}
               showReactionPicker={showReactionPicker}
@@ -146,6 +174,10 @@ const MessageList: React.FC<MessageListProps> = ({
               polls={polls}
               votePoll={votePoll}
               createTaskFromMessage={createTaskFromMessage}
+              threadUiMode="main"
+              threadReplyCount={threadReplyCounts.get(msg.id) ?? 0}
+              onOpenThread={onOpenThread}
+              resendMessage={resendMessage}
             />
           </div>
         )}
