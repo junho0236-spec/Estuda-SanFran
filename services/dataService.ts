@@ -470,6 +470,7 @@ export const dataService = {
   },
   // TASKS
   async saveTask(task: Task, userId: string, isOnline: boolean) {
+    const previous = await db.tasks.get(task.id);
     // Optimistic update in local DB
     await db.tasks.put(task);
 
@@ -514,27 +515,49 @@ export const dataService = {
         await addToSyncQueue({ table: 'tasks', action: 'update', data: task });
       }
 
-      // Sync to Google Calendar if dueDate exists and user is connected
-      if (task.dueDate) {
+      // Google Agenda: atualizar/criar com prazo; remover evento se o prazo foi limpo
+      if (!error) {
         (async () => {
           try {
             const { googleCalendarService } = await import('./googleCalendarService');
-            const result = await googleCalendarService.syncTaskToGoogle(task);
-            
-            if (result && result.id && result.id !== task.google_event_id) {
-              // Save the event ID back to the task
-              const updatedTask = { ...task, google_event_id: result.id };
-              await db.tasks.put(updatedTask);
-              
-              // Also update in Supabase without triggering another sync
+            const staleEventId = !task.dueDate
+              ? previous?.google_event_id || task.google_event_id
+              : null;
+
+            if (staleEventId) {
+              await googleCalendarService.deleteEvent(staleEventId);
+              const cleared = { ...task, google_event_id: undefined };
+              await db.tasks.put(cleared);
               const desc = JSON.parse(payload.description);
-              desc.google_event_id = result.id;
-              await supabase.from('tasks').update({ 
-                description: JSON.stringify(desc) 
-              }).eq('id', task.id);
+              delete desc.google_event_id;
+              await supabase
+                .from('tasks')
+                .update({
+                  description: JSON.stringify(desc),
+                  google_event_id: null,
+                })
+                .eq('id', task.id);
+              return;
+            }
+
+            if (task.dueDate) {
+              const result = await googleCalendarService.syncTaskToGoogle(task);
+              if (result?.id && result.id !== task.google_event_id) {
+                const updatedTask = { ...task, google_event_id: result.id };
+                await db.tasks.put(updatedTask);
+                const desc = JSON.parse(payload.description);
+                desc.google_event_id = result.id;
+                await supabase
+                  .from('tasks')
+                  .update({
+                    description: JSON.stringify(desc),
+                    google_event_id: result.id,
+                  })
+                  .eq('id', task.id);
+              }
             }
           } catch (e) {
-            console.warn("[dataService] Google Calendar sync failed:", e);
+            console.warn('[dataService] Google Calendar sync failed:', e);
           }
         })();
       }
@@ -580,7 +603,8 @@ export const dataService = {
             parentTaskId: desc.parentTaskId,
             dependencies: desc.dependencies,
             storyPoints: desc.storyPoints,
-            comments: desc.comments || []
+            comments: desc.comments || [],
+            google_event_id: (t as { google_event_id?: string }).google_event_id ?? desc.google_event_id,
           };
         });
         await db.tasks.bulkPut(mappedTasks);
@@ -709,7 +733,19 @@ export const dataService = {
   },
 
   async deleteTask(id: string, userId: string, isOnline: boolean) {
+    const existing = await db.tasks.get(id);
     await db.tasks.delete(id);
+
+    if (existing?.google_event_id && isOnline) {
+      (async () => {
+        try {
+          const { googleCalendarService } = await import('./googleCalendarService');
+          await googleCalendarService.deleteEvent(existing.google_event_id!);
+        } catch (e) {
+          console.warn('[dataService] Google Calendar delete failed:', e);
+        }
+      })();
+    }
 
     if (isOnline) {
       const { error } = await supabase.from('tasks').delete().eq('id', id).eq('user_id', userId);
