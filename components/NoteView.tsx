@@ -173,7 +173,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     if (range && range.length > 0) {
       text = quill.getText(range.index, range.length);
       const url = `https://www.google.com/search?q=site:planalto.gov.br+${encodeURIComponent(text)}`;
-      quill.format('link', url);
+      quill.formatText(range.index, range.length, 'link', url);
     } else {
       setPromptModal({
         isOpen: true,
@@ -251,18 +251,24 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
 
   // Sync content from state to editor when note is loaded or changed
   useEffect(() => {
-    if (quillRef.current && selectedNote && !isLoading) {
-      // Only update if the content is actually different to avoid cursor jumping
-      if (quillRef.current.root.innerHTML !== selectedNote.content) {
-        const delta = quillRef.current.clipboard.convert({ html: selectedNote.content });
-        quillRef.current.setContents(delta, 'silent');
-      }
-      
-      // Handle viewing mode
-      if (editMode === 'viewing') {
-        quillRef.current.disable();
+    if (quillRef.current && !isLoading) {
+      if (selectedNote) {
+        // Only update if the content is actually different to avoid cursor jumping
+        if (quillRef.current.root.innerHTML !== selectedNote.content) {
+          const delta = quillRef.current.clipboard.convert({ html: selectedNote.content });
+          quillRef.current.setContents(delta, 'silent');
+        }
+        
+        // Handle viewing mode
+        if (editMode === 'viewing') {
+          quillRef.current.disable();
+        } else {
+          quillRef.current.enable();
+        }
       } else {
-        quillRef.current.enable();
+        // Clear editor if no note is selected
+        quillRef.current.setContents([]);
+        setNoteContent('');
       }
     }
   }, [selectedNote?.id, isLoading, isVadeMecumMode, editMode]);
@@ -661,33 +667,60 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   };
 
   const handleExportPdf = () => {
+    if (!selectedNote) return;
     setIsExportMenuOpen(false);
     const element = document.createElement('div');
-    element.innerHTML = noteContent;
-    html2pdf().from(element).save('anotacao.pdf');
+    element.innerHTML = `
+      <div style="padding: 40px; font-family: sans-serif;">
+        <h1 style="color: #1e293b; margin-bottom: 20px;">${selectedNote.title || 'Sem título'}</h1>
+        <div style="color: #334155; line-height: 1.6;">${noteContent}</div>
+      </div>
+    `;
+    const opt = {
+      margin: 1,
+      filename: `${selectedNote.title || 'anotacao'}.pdf`,
+      image: { type: 'jpeg' as const, quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' as const }
+    };
+    html2pdf().set(opt).from(element).save();
+    toast.success('PDF gerado com sucesso!');
   };
 
   const handleExportDocx = async () => {
+    if (!selectedNote) return;
     setIsExportMenuOpen(false);
-    const plainText = new DOMParser().parseFromString(noteContent, 'text/html').body.textContent || '';
-    const doc = new Document({
-      sections: [{
-        properties: {},
-        children: [
-          new Paragraph({
-            children: [new TextRun(plainText)],
-          }),
-        ],
-      }],
-    });
+    toast.info('Gerando documento Word...');
+    
+    try {
+      const plainText = new DOMParser().parseFromString(noteContent, 'text/html').body.textContent || '';
+      const doc = new Document({
+        sections: [{
+          properties: {},
+          children: [
+            new Paragraph({
+              text: selectedNote.title || 'Sem título',
+              heading: 'Heading1',
+            }),
+            new Paragraph({
+              children: [new TextRun(plainText)],
+            }),
+          ],
+        }],
+      });
 
-    const buffer = await Packer.toBuffer(doc);
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'anotacao.docx';
-    link.click();
-    URL.revokeObjectURL(link.href);
+      const buffer = await Packer.toBuffer(doc);
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${selectedNote.title || 'anotacao'}.docx`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+      toast.success('Documento Word gerado!');
+    } catch (error) {
+      console.error('Error exporting DOCX:', error);
+      toast.error('Erro ao exportar para Word.');
+    }
   };
 
   const handleSummarize = async () => {

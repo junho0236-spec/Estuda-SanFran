@@ -732,6 +732,34 @@ export const geminiService = {
     });
     
     return JSON.parse(response.text || '{}');
+  },
+
+  suggestSubtasks: async (taskTitle: string, category?: string) => {
+    const prompt = `
+      Sugira uma lista de 3 a 5 subtarefas práticas para a seguinte tarefa de estudo ou trabalho jurídico:
+      Tarefa: ${taskTitle}
+      Categoria: ${category || 'Geral'}
+      
+      Retorne um JSON com:
+      - subtasks: Array de strings
+    `;
+    
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            subtasks: { type: Type.ARRAY, items: { type: Type.STRING } }
+          },
+          required: ["subtasks"]
+        }
+      }
+    });
+    
+    return JSON.parse(response.text || '{"subtasks": []}');
   }
 };
 
@@ -751,3 +779,4 @@ export const generatePracticalCase = geminiService.generatePracticalCase;
 export const generateFlashcardFromHighlight = geminiService.generateFlashcardFromHighlight;
 export const generateClozeCards = geminiService.generateClozeCards;
 export const checkJurisprudence = geminiService.checkJurisprudence;
+export const suggestSubtasks = geminiService.suggestSubtasks;

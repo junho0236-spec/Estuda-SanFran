@@ -4,7 +4,7 @@ import {
   Plus, Layout, List, MoreVertical, Trash2, CheckSquare, 
   Clock, Paperclip, ChevronRight, X, Calendar, AlertCircle,
   Play, Pause, RotateCcw, Save, Quote, ThumbsUp, ExternalLink, Link as LinkIcon, Globe, Bell,
-  CheckCircle2, User, Zap, Trello, BookOpen, Download
+  CheckCircle2, User, Zap, Trello, BookOpen, Download, Sparkles, Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -35,6 +35,7 @@ import ical from 'ical-generator';
 import { saveAs } from 'file-saver';
 import { dataService } from '../services/dataService';
 import { supabase } from '../services/supabaseClient';
+import { suggestSubtasks } from '../services/geminiService';
 
 const STORY_POINTS = [1, 2, 3, 5, 8];
 
@@ -97,7 +98,10 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   const [filter, setFilter] = useState<'all' | 'today' | 'tomorrow' | 'overdue' | 'high'>('all');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [isAddingBoard, setIsAddingBoard] = useState(false);
+  const [isSuggestingSubtasks, setIsSuggestingSubtasks] = useState(false);
   const [newBoardName, setNewBoardName] = useState('');
+  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void } | null>(null);
+  const [promptModal, setPromptModal] = useState<{ isOpen: boolean; title: string; defaultValue: string; onConfirm: (value: string) => void } | null>(null);
   const [splitScreenUrl, setSplitScreenUrl] = useState<string | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [quickEntryInput, setQuickEntryInput] = useState('');
@@ -120,9 +124,9 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   };
 
   const DEFAULT_KANBAN_COLUMNS = [
-    { id: 'Pendente', name: 'Pendente' },
-    { id: 'Fazendo', name: 'Fazendo' },
-    { id: 'Concluido', name: 'Concluído' }
+    { id: 'Pendente', name: 'Pendente', order: 0 },
+    { id: 'Fazendo', name: 'Fazendo', order: 1 },
+    { id: 'Concluido', name: 'Concluído', order: 2 }
   ];
 
   // Mark all as read when closing notifications
@@ -191,11 +195,14 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       for (const board of boards) {
         const column = board.columns.find(c => c.id === overId);
         if (column) {
+          const isDone = column.name.toLowerCase().includes('concluído') || column.name.toLowerCase().includes('concluido') || column.name.toLowerCase().includes('done');
           const updatedTask = { 
             ...task, 
             boardId: board.id, 
             columnId: column.id,
-            status: undefined // Clear general status if moved to a board
+            status: undefined, // Clear general status if moved to a board
+            completed: isDone,
+            completedAt: isDone ? (task.completedAt || new Date().toISOString()) : undefined
           };
           setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t));
           await dataService.saveTask(updatedTask, userId, isOnline);
@@ -238,18 +245,22 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     const priorityMatch = title.match(/!(\w+)/);
     if (priorityMatch) {
       const p = priorityMatch[1].toLowerCase();
-      if (['baixa', 'media', 'alta', 'urgente'].includes(p)) {
-        priority = p as TaskPriority;
-        title = title.replace(priorityMatch[0], '');
-      }
+      if (['baixa', 'low'].includes(p)) priority = 'baixa';
+      else if (['media', 'medium', 'média'].includes(p)) priority = 'media';
+      else if (['alta', 'high'].includes(p)) priority = 'alta';
+      else if (['urgente', 'urgent'].includes(p)) priority = 'urgente';
+      else priority = 'normal';
+      title = title.replace(priorityMatch[0], '');
     }
 
     // Parse Category (#)
     const categoryMatch = title.match(/#(\w+)/);
     if (categoryMatch) {
       const c = categoryMatch[1].toLowerCase();
-      if (c.includes('leitura')) category = 'estudo';
-      else if (c.includes('gest') || c.includes('entidade')) category = 'admin';
+      if (c.includes('leitura') || c.includes('estudo')) category = 'estudo';
+      else if (c.includes('gest') || c.includes('entidade') || c.includes('admin')) category = 'admin';
+      else if (c.includes('peti') || c.includes('jurid')) category = 'peticao';
+      else if (c.includes('audio') || c.includes('tribunal')) category = 'audiencia';
       else category = 'geral';
       title = title.replace(categoryMatch[0], '');
     }
@@ -266,15 +277,47 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       }
     }
 
-    // Parse Date (simple)
+    // Parse Date (improved)
+    const now = new Date();
+    const daysOfWeek = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+    
     if (title.toLowerCase().includes('amanhã')) {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       dueDate = tomorrow.toISOString().split('T')[0];
       title = title.replace(/amanhã/gi, '');
     } else if (title.toLowerCase().includes('hoje')) {
-      dueDate = new Date().toISOString().split('T')[0];
+      dueDate = now.toISOString().split('T')[0];
       title = title.replace(/hoje/gi, '');
+    } else {
+      // Check for days of the week
+      for (let i = 0; i < daysOfWeek.length; i++) {
+        const day = daysOfWeek[i];
+        if (title.toLowerCase().includes(day)) {
+          const targetDay = i;
+          const currentDay = now.getDay();
+          let daysUntil = targetDay - currentDay;
+          if (daysUntil <= 0) daysUntil += 7;
+          
+          const futureDate = new Date();
+          futureDate.setDate(now.getDate() + daysUntil);
+          dueDate = futureDate.toISOString().split('T')[0];
+          title = title.replace(new RegExp(day, 'gi'), '');
+          break;
+        }
+      }
+    }
+
+    // Parse Date formats like DD/MM
+    const dateMatch = title.match(/(\d{1,2})\/(\d{1,2})/);
+    if (dateMatch && !dueDate) {
+      const day = parseInt(dateMatch[1]);
+      const month = parseInt(dateMatch[2]) - 1;
+      const year = now.getFullYear();
+      const d = new Date(year, month, day);
+      if (d < now) d.setFullYear(year + 1); // Assume next year if date passed
+      dueDate = d.toISOString().split('T')[0];
+      title = title.replace(dateMatch[0], '');
     }
 
     const board = boards.find(b => b.id === activeTab);
@@ -313,6 +356,28 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         newTask.id,
         'delegated'
       );
+    }
+  };
+
+  const handleSuggestSubtasks = async () => {
+    if (!selectedTask) return;
+    setIsSuggestingSubtasks(true);
+    try {
+      const { subtasks: suggested } = await suggestSubtasks(selectedTask.title, selectedTask.category);
+      const newSubtasks: SubTask[] = suggested.map(title => ({
+        id: crypto.randomUUID(),
+        title,
+        completed: false
+      }));
+      const updatedSubtasks = [...subtasks, ...newSubtasks];
+      setSubtasks(updatedSubtasks);
+      handleUpdateTask({ subtasks: updatedSubtasks });
+      toast.success("Subtarefas sugeridas com sucesso!");
+    } catch (error) {
+      console.error("Error suggesting subtasks:", error);
+      toast.error("Erro ao sugerir subtarefas.");
+    } finally {
+      setIsSuggestingSubtasks(false);
     }
   };
 
@@ -653,9 +718,44 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         { id: 'st-3', title: 'Redigir ata', completed: false }
       ];
     } else {
-      const promptTitle = prompt("Título da tarefa:");
-      if (!promptTitle) return;
-      title = promptTitle;
+      setPromptModal({
+        isOpen: true,
+        title: "Nova Tarefa",
+        defaultValue: "",
+        onConfirm: async (title) => {
+          if (!title.trim()) {
+            setPromptModal(null);
+            return;
+          }
+          
+          let category: TaskCategory = 'geral';
+          if (activeTab === 'Leituras') category = 'estudo';
+          else if (activeTab === 'Entidades') category = 'admin';
+
+          const board = boards.find(b => b.id === activeTab);
+          const boardIdToSet = board ? board.id : undefined;
+          const columnIdToSet = columnId || (board?.columns[0].id);
+
+          const newTask: Task = {
+            id: crypto.randomUUID(),
+            title,
+            completed: false,
+            category,
+            status: (columnIdToSet && ['Pendente', 'Fazendo', 'Concluido'].includes(columnIdToSet)) ? columnIdToSet as any : 'Pendente',
+            boardId: boardId || boardIdToSet,
+            columnId: columnIdToSet,
+            subtasks: [],
+            created_at: new Date().toISOString()
+          } as any;
+
+          await dataService.saveTask(newTask, userId, isOnline);
+          setTasks(prev => [newTask, ...prev]);
+          setSelectedTaskId(newTask.id);
+          setShowTemplatesMenu(false);
+          setPromptModal(null);
+        }
+      });
+      return;
     }
 
     let category: TaskCategory = 'geral';
@@ -797,16 +897,23 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   };
 
   const handleDeleteTask = async (id: string) => {
-    // Removido confirm nativo para evitar travamento em iframe
-    try {
-      await dataService.deleteTask(id, userId, isOnline);
-      setTasks(prev => prev.filter(t => t.id !== id));
-      if (selectedTaskId === id) setSelectedTaskId(null);
-      toast.success("Tarefa excluída");
-    } catch (error) {
-      console.error("Failed to delete task:", error);
-      toast.error("Erro ao excluir tarefa");
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: "Excluir Tarefa",
+      message: "Tem certeza que deseja excluir esta tarefa permanentemente?",
+      onConfirm: async () => {
+        try {
+          await dataService.deleteTask(id, userId, isOnline);
+          setTasks(prev => prev.filter(t => t.id !== id));
+          if (selectedTaskId === id) setSelectedTaskId(null);
+          toast.success("Tarefa excluída");
+        } catch (error) {
+          console.error("Failed to delete task:", error);
+          toast.error("Erro ao excluir tarefa");
+        }
+        setConfirmModal(null);
+      }
+    });
   };
 
   const handleAddBoard = async () => {
@@ -831,43 +938,58 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
 
   const handleAddColumn = async () => {
     if (activeTab === 'inbox') return;
-    const name = prompt("Nome da nova coluna:");
-    if (!name) return;
-
     const board = boards.find(b => b.id === activeTab);
     if (!board) return;
 
-    const newColumn: BoardColumn = {
-      id: crypto.randomUUID(),
-      name,
-      order: board.columns.length
-    };
+    setPromptModal({
+      isOpen: true,
+      title: "Nova Coluna",
+      defaultValue: "",
+      onConfirm: async (name) => {
+        if (!name.trim()) {
+          setPromptModal(null);
+          return;
+        }
 
-    const updatedBoard = {
-      ...board,
-      columns: [...board.columns, newColumn]
-    };
+        const newColumn: BoardColumn = {
+          id: crypto.randomUUID(),
+          name,
+          order: board.columns.length
+        };
 
-    await dataService.saveBoard(updatedBoard, userId, isOnline);
-    setBoards(prev => prev.map(b => b.id === activeTab ? updatedBoard : b));
+        const updatedBoard = {
+          ...board,
+          columns: [...board.columns, newColumn]
+        };
+
+        await dataService.saveBoard(updatedBoard, userId, isOnline);
+        setBoards(prev => prev.map(b => b.id === activeTab ? updatedBoard : b));
+        setPromptModal(null);
+        toast.success("Coluna adicionada");
+      }
+    });
   };
 
   const handleDeleteBoard = async (boardId: string) => {
-    // Custom confirmation logic could be added here if needed, but for now we'll use a simple state or just proceed
-    // Since we can't use confirm(), we'll just do it for now or add a small UI confirmation later.
-    // To be safe and follow instructions, I'll add a simple confirmation state.
-    
-    await dataService.deleteBoard(boardId, userId, isOnline);
-    setBoards(prev => prev.filter(b => b.id !== boardId));
-    
-    // Unassign tasks from this board
-    const updatedTasks = tasks.map(t => t.boardId === boardId ? { ...t, boardId: undefined, columnId: undefined } : t);
-    setTasks(updatedTasks);
-    
-    if (activeTab === boardId) {
-      setActiveTab('inbox');
-    }
-    toast.success("Quadro excluído com sucesso");
+    setConfirmModal({
+      isOpen: true,
+      title: "Excluir Quadro",
+      message: "Tem certeza que deseja excluir este quadro? Todas as tarefas associadas ficarão sem quadro.",
+      onConfirm: async () => {
+        await dataService.deleteBoard(boardId, userId, isOnline);
+        setBoards(prev => prev.filter(b => b.id !== boardId));
+        
+        // Unassign tasks from this board
+        const updatedTasks = tasks.map(t => t.boardId === boardId ? { ...t, boardId: undefined, columnId: undefined } : t);
+        setTasks(updatedTasks);
+        
+        if (activeTab === boardId) {
+          setActiveTab('inbox');
+        }
+        setConfirmModal(null);
+        toast.success("Quadro excluído com sucesso");
+      }
+    });
   };
 
   const handleDeleteColumn = async (columnId: string) => {
@@ -880,17 +1002,25 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       return;
     }
 
-    const updatedColumns = board.columns.filter(c => c.id !== columnId);
-    const updatedBoard = { ...board, columns: updatedColumns };
-    
-    await dataService.saveBoard(updatedBoard, userId, isOnline);
-    setBoards(prev => prev.map(b => b.id === activeTab ? updatedBoard : b));
-    
-    // Move tasks to the first column
-    const firstColumnId = updatedColumns[0].id;
-    const updatedTasks = tasks.map(t => (t.boardId === activeTab && t.columnId === columnId) ? { ...t, columnId: firstColumnId } : t);
-    setTasks(updatedTasks);
-    toast.success("Coluna excluída com sucesso");
+    setConfirmModal({
+      isOpen: true,
+      title: "Excluir Coluna",
+      message: "Tem certeza que deseja excluir esta coluna? As tarefas serão movidas para a primeira coluna.",
+      onConfirm: async () => {
+        const updatedColumns = board.columns.filter(c => c.id !== columnId);
+        const updatedBoard = { ...board, columns: updatedColumns };
+        
+        await dataService.saveBoard(updatedBoard, userId, isOnline);
+        setBoards(prev => prev.map(b => b.id === activeTab ? updatedBoard : b));
+        
+        // Move tasks to the first column
+        const firstColumnId = updatedColumns[0].id;
+        const updatedTasks = tasks.map(t => (t.boardId === activeTab && t.columnId === columnId) ? { ...t, columnId: firstColumnId } : t);
+        setTasks(updatedTasks);
+        setConfirmModal(null);
+        toast.success("Coluna excluída com sucesso");
+      }
+    });
   };
 
   const hasUrgentTasks = (boardId: string | 'inbox') => {
@@ -1015,18 +1145,18 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       : tasks;
 
     const getDensity = (date: string) => {
-      const count = filteredTasks.filter(t => t.dueDate === date && !t.completed).length;
+      const count = filteredTasks.filter(t => t.completedAt?.startsWith(date)).length;
       if (count === 0) return 'bg-slate-100';
-      if (count < 2) return 'bg-[#800000]/20';
-      if (count < 4) return 'bg-[#800000]/40';
-      if (count < 6) return 'bg-[#800000]/70';
-      return 'bg-[#800000]';
+      if (count < 2) return 'bg-emerald-500/20';
+      if (count < 4) return 'bg-emerald-500/40';
+      if (count < 6) return 'bg-emerald-500/70';
+      return 'bg-emerald-500';
     };
 
     return (
       <div className="flex flex-col gap-2 p-3 bg-white rounded-2xl border border-slate-100 shadow-sm mb-4">
         <div className="flex items-center justify-between">
-          <div className="text-[8px] font-black uppercase tracking-widest text-slate-400">Carga de Trabalho</div>
+          <div className="text-[8px] font-black uppercase tracking-widest text-slate-400">Atividade Recente</div>
           <div className="flex bg-slate-50 p-0.5 rounded-lg border border-slate-100">
             <button 
               onClick={() => setView('me')}
@@ -1046,7 +1176,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
           {days.map(date => (
             <div 
               key={date}
-              title={`${date}: ${filteredTasks.filter(t => t.dueDate === date && !t.completed).length} tarefas`}
+              title={`${date}: ${filteredTasks.filter(t => t.completedAt?.startsWith(date)).length} tarefas concluídas`}
               className={`w-3 h-3 rounded-sm transition-all hover:scale-125 cursor-help ${getDensity(date)} ${date === today.toISOString().split('T')[0] ? 'ring-2 ring-amber-400 ring-offset-1' : ''}`}
             />
           ))}
@@ -1798,8 +1928,18 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
 
                         {/* Subtasks Section */}
                         <section>
-                          <div className="flex items-center gap-2 mb-3 text-slate-400 font-bold text-[10px] uppercase tracking-widest">
-                            <CheckSquare size={14} /> Checklists / Etapas
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2 text-slate-400 font-bold text-[10px] uppercase tracking-widest">
+                              <CheckSquare size={14} /> Checklists / Etapas
+                            </div>
+                            <button
+                              onClick={handleSuggestSubtasks}
+                              disabled={isSuggestingSubtasks}
+                              className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-600 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-amber-100 transition-all disabled:opacity-50"
+                            >
+                              {isSuggestingSubtasks ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles size={12} />}
+                              Sugerir com IA
+                            </button>
                           </div>
                           <div className="space-y-2">
                             {subtasks.map((st, i) => (
@@ -2293,6 +2433,76 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
               />
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+      {/* Custom Modals */}
+      <AnimatePresence>
+        {confirmModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-sm">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white dark:bg-slate-900 rounded-[2rem] p-8 max-w-sm w-full shadow-2xl border border-slate-200 dark:border-white/10"
+            >
+              <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">{confirmModal.title}</h3>
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">{confirmModal.message}</p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setConfirmModal(null)}
+                  className="flex-1 py-3 px-4 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-white/10 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={confirmModal.onConfirm}
+                  className="flex-1 py-3 px-4 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-all shadow-lg shadow-red-500/20"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {promptModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-sm">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white dark:bg-slate-900 rounded-[2rem] p-8 max-w-sm w-full shadow-2xl border border-slate-200 dark:border-white/10"
+            >
+              <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-6">{promptModal.title}</h3>
+              <input 
+                autoFocus
+                type="text"
+                defaultValue={promptModal.defaultValue}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') promptModal.onConfirm(e.currentTarget.value);
+                  if (e.key === 'Escape') setPromptModal(null);
+                }}
+                className="w-full p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl mb-8 focus:ring-2 focus:ring-[#800000] outline-none font-bold"
+              />
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setPromptModal(null)}
+                  className="flex-1 py-3 px-4 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-white/10 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={() => {
+                    const input = document.querySelector('input[type="text"]') as HTMLInputElement;
+                    promptModal.onConfirm(input?.value || '');
+                  }}
+                  className="flex-1 py-3 px-4 bg-[#800000] text-white rounded-xl font-bold hover:bg-[#600000] transition-all shadow-lg shadow-[#800000]/20"
+                >
+                  Salvar
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </DndContext>

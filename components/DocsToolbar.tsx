@@ -603,22 +603,25 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
   };
 
   const handleInsertPerson = () => {
-    setPromptModal({
-      isOpen: true,
-      title: 'Nome da pessoa:',
-      defaultValue: '',
-      onConfirm: (name) => {
-        if (name && quillRef.current) {
-          const quill = quillRef.current;
-          const range = quill.getSelection(true);
-          const html = `<span style="background-color: #e2e8f0; padding: 2px 6px; border-radius: 12px; font-size: 0.9em;">@${name}</span>&nbsp;`;
-          const delta = quill.clipboard.convert({ html });
-          quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
-          toast.success('Pessoa marcada.');
+    if (quillRef.current) {
+      const selection = quillRef.current.getSelection();
+      setPromptModal({
+        isOpen: true,
+        title: 'Nome da pessoa:',
+        defaultValue: '',
+        onConfirm: (name) => {
+          if (name && quillRef.current) {
+            const quill = quillRef.current;
+            const range = selection || { index: quill.getLength(), length: 0 };
+            const html = `<span style="background-color: #e2e8f0; padding: 2px 6px; border-radius: 12px; font-size: 0.9em;">@${name}</span>&nbsp;`;
+            const delta = quill.clipboard.convert({ html });
+            quill.updateContents(new (Quill.import('delta') as any)().retain(range.index).concat(delta), 'user');
+            toast.success('Pessoa marcada.');
+          }
+          setPromptModal(null);
         }
-        setPromptModal(null);
-      }
-    });
+      });
+    }
   };
 
   const handleInsertDate = () => {

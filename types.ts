@@ -170,7 +170,7 @@ export interface Subject {
   content?: string; // New field for document content
 }
 
-export type TaskPriority = 'urgente' | 'alta' | 'normal';
+export type TaskPriority = 'urgente' | 'alta' | 'media' | 'normal' | 'baixa';
 export type TaskCategory = 'peticao' | 'estudo' | 'audiencia' | 'admin' | 'geral';
 
 export interface SubTask {
