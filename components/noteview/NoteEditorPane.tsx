@@ -82,6 +82,7 @@ const NoteEditorPane: React.FC<NoteEditorPaneProps> = ({
             </div>
             <div className="pointer-events-none absolute right-[72px] top-0 z-10 flex flex-col items-center">
               <div className="h-0 w-0 border-l-[4px] border-r-[4px] border-t-[6px] border-l-transparent border-r-transparent border-t-[#1a73e8]" />
+              <div className="h-2 w-0.5 bg-[#1a73e8]" />
             </div>
           </div>
         </div>

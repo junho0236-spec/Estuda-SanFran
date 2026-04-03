@@ -9,6 +9,7 @@ import html2pdf from 'html2pdf.js';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { SmartText } from './SmartVadeMecum';
 import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { CheckCircle2 } from 'lucide-react';
 import HandwritingCanvas from './HandwritingCanvas';
 import DocsToolbar from './DocsToolbar';
@@ -57,7 +58,7 @@ CommentBlot.tagName = 'span';
 Quill.register(CommentBlot);
 
 // Set up pdfjs worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 interface NoteViewProps {
   subjectId: string; // Initial subject ID, can be changed
@@ -180,8 +181,19 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
 
   const modules = useMemo(() => ({
     history: { delay: 1000, maxStack: 500 },
-    table: true,
   }), []);
+
+  const editModeRef = useRef(editMode);
+  useEffect(() => {
+    editModeRef.current = editMode;
+  }, [editMode]);
+
+  useEffect(() => {
+    if (editMode === 'viewing') {
+      setFloatingMenuPos(null);
+      setSelectionRange(null);
+    }
+  }, [editMode]);
 
   const contentInitializedRef = useRef(false);
 
@@ -202,6 +214,11 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
         quillRef.current.on('selection-change', (range: any) => {
           if (range) {
             quillSavedRangeRef.current = { index: range.index, length: range.length };
+          }
+          if (editModeRef.current === 'viewing') {
+            setFloatingMenuPos(null);
+            setSelectionRange(null);
+            return;
           }
           if (range && range.length > 0) {
             const quill = quillRef.current;
@@ -448,10 +465,15 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
 
   const duplicateNote = async () => {
     if (!selectedNote) return;
+    const htmlFromEditor =
+      quillRef.current?.root.innerHTML ?? noteContentRef.current ?? selectedNote.content;
+    const hw = handwritingDataRef.current ?? selectedNote.handwriting_data;
     const newNote: Note = {
       ...selectedNote,
       id: crypto.randomUUID(),
       title: `${selectedNote.title} (Cópia)`,
+      content: htmlFromEditor,
+      handwriting_data: hw,
       updated_at: new Date().toISOString(),
     };
     try {
@@ -504,6 +526,9 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   useEffect(() => {
     handwritingDataRef.current = handwritingData;
   }, [handwritingData]);
+
+  const getEditorHtml = () =>
+    quillRef.current?.root.innerHTML ?? noteContentRef.current ?? noteContent;
 
   const saveNoteContent = useCallback(async (isAuto: boolean = false) => {
     const currentNote = selectedNoteRef.current;
@@ -586,7 +611,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     toast.success("Traços de escrita salvos!");
   };
   const applyTemplate = (template: keyof typeof templates) => {
-    const newContent = noteContent + templates[template];
+    const newContent = getEditorHtml() + templates[template];
     setNoteContent(newContent);
     if (quillRef.current) {
       const delta = quillRef.current.clipboard.convert({ html: newContent });
@@ -682,7 +707,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
 
   const handleGenerateFlashcards = () => {
     const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = noteContent;
+    tempDiv.innerHTML = getEditorHtml();
     const plainText = tempDiv.textContent || tempDiv.innerText || "";
     
     if (plainText.trim().length < 50) {
@@ -703,13 +728,14 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   const handleExportPdf = () => {
     setIsExportMenuOpen(false);
     const element = document.createElement('div');
-    element.innerHTML = noteContent;
-    html2pdf().from(element).save('anotacao.pdf');
+    element.innerHTML = getEditorHtml();
+    const base = selectedNote?.title?.replace(/[^\w\s-]/g, '')?.trim() || 'anotacao';
+    html2pdf().from(element).save(`${base}.pdf`);
   };
 
   const handleExportDocx = async () => {
     setIsExportMenuOpen(false);
-    const plainText = new DOMParser().parseFromString(noteContent, 'text/html').body.textContent || '';
+    const plainText = new DOMParser().parseFromString(getEditorHtml(), 'text/html').body.textContent || '';
     const doc = new Document({
       sections: [{
         properties: {},
@@ -725,14 +751,15 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     const blob = new Blob([new Uint8Array(buffer)], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = 'anotacao.docx';
+    const base = selectedNote?.title?.replace(/[^\w\s-]/g, '')?.trim() || 'anotacao';
+    link.download = `${base}.docx`;
     link.click();
     URL.revokeObjectURL(link.href);
   };
 
   const handleSummarize = async () => {
     const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = noteContent;
+    tempDiv.innerHTML = getEditorHtml();
     const plainText = tempDiv.textContent || tempDiv.innerText || "";
 
     if (plainText.trim().length < 200) {
@@ -757,7 +784,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   };
 
   const handleTransformToFlashcard = async () => {
-    if (!selectionRange || !quillRef.current) return;
+    if (editMode === 'viewing' || !selectionRange || !quillRef.current) return;
     const selectedText = quillRef.current.getText(selectionRange.index, selectionRange.length);
     if (!selectedText.trim()) return;
 
@@ -1210,19 +1237,33 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                       }
                     }} 
                     title={selectedNote.title || 'Documento sem título'}
-                    onRename={(newTitle) => {
+                    onRename={async (newTitle) => {
                       if (!selectedNote) return;
                       const updatedNote = { ...selectedNote, title: newTitle, updated_at: new Date().toISOString() };
                       setSelectedNote(updatedNote);
-                      dataService.saveNote(updatedNote, userId, isOnline);
                       setNotes(prev => prev.map(n => n.id === updatedNote.id ? updatedNote : n));
+                      try {
+                        await dataService.saveNote(updatedNote, userId, isOnline);
+                      } catch (e) {
+                        console.error(e);
+                        setSelectedNote(selectedNote);
+                        setNotes(prev => prev.map(n => n.id === selectedNote.id ? selectedNote : n));
+                        toast.error('Erro ao renomear no servidor.');
+                      }
                     }}
                     isStarred={!!selectedNote.is_starred}
-                    onToggleStar={() => {
+                    onToggleStar={async () => {
                       const updatedNote = { ...selectedNote, is_starred: !selectedNote.is_starred, updated_at: new Date().toISOString() };
                       setSelectedNote(updatedNote);
-                      dataService.saveNote(updatedNote, userId, isOnline);
                       setNotes(prev => prev.map(n => n.id === updatedNote.id ? updatedNote : n));
+                      try {
+                        await dataService.saveNote(updatedNote, userId, isOnline);
+                      } catch (e) {
+                        console.error(e);
+                        setSelectedNote(selectedNote);
+                        setNotes(prev => prev.map(n => n.id === selectedNote.id ? selectedNote : n));
+                        toast.error('Erro ao atualizar estrela.');
+                      }
                     }}
                     onNew={openNewNoteTitleModal}
                     onOpen={() => {
