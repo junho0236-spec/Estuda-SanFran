@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import {
   ChevronDown,
   Info,
-  Loader2,
   Minus,
   Moon,
   Plus,
@@ -16,11 +15,7 @@ import {
   type Notebook,
   type QuestionModality,
 } from '../../types';
-import type {
-  QuestionBankCommentaryFilter,
-  QuestionBankSavedFilterPreset,
-  QuestionBankUnseenFilter,
-} from './types';
+import type { QuestionBankSavedFilterPreset, QuestionBankUnseenFilter } from './types';
 
 const MOD_KEYS: QuestionModality[] = ['multipla_escolha', 'certo_errado'];
 
@@ -128,13 +123,6 @@ export interface QuestionBankFiltersPanelProps {
   notebooks: Notebook[];
   selectedNotebookId: string;
   setSelectedNotebookId: (v: string) => void;
-  includeAnnulled: boolean;
-  setIncludeAnnulled: (v: boolean) => void;
-  includeOutdated: boolean;
-  setIncludeOutdated: (v: boolean) => void;
-  commentaryFilter: QuestionBankCommentaryFilter;
-  setCommentaryFilter: (v: QuestionBankCommentaryFilter) => void;
-  commentaryMetaLoading: boolean;
   unseenFilter: QuestionBankUnseenFilter;
   setUnseenFilter: (v: QuestionBankUnseenFilter) => void;
   questionStatus: 'all' | 'resolved' | 'unresolved' | 'correct' | 'wrong' | 'review_today';
@@ -213,13 +201,6 @@ export const QuestionBankFiltersPanel: React.FC<QuestionBankFiltersPanelProps> =
   notebooks,
   selectedNotebookId,
   setSelectedNotebookId,
-  includeAnnulled,
-  setIncludeAnnulled,
-  includeOutdated,
-  setIncludeOutdated,
-  commentaryFilter,
-  setCommentaryFilter,
-  commentaryMetaLoading,
   unseenFilter,
   setUnseenFilter,
   questionStatus,
@@ -544,54 +525,6 @@ export const QuestionBankFiltersPanel: React.FC<QuestionBankFiltersPanelProps> =
           )}
 
           <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-800">
-            <PillRow label="Comentários">
-              {commentaryMetaLoading && (
-                <Loader2 className="w-4 h-4 animate-spin text-slate-400 mt-2" />
-              )}
-              <Pill
-                active={commentaryFilter === 'none'}
-                onClick={() => setCommentaryFilter('none')}
-              >
-                Todos
-              </Pill>
-              <Pill
-                active={commentaryFilter === 'professors'}
-                onClick={() => setCommentaryFilter('professors')}
-              >
-                Professores
-              </Pill>
-              <Pill
-                active={commentaryFilter === 'students'}
-                onClick={() => setCommentaryFilter('students')}
-              >
-                Alunos
-              </Pill>
-              <Pill
-                active={commentaryFilter === 'mine'}
-                onClick={() => setCommentaryFilter('mine')}
-              >
-                Meus comentários
-              </Pill>
-              <Pill
-                active={commentaryFilter === 'video'}
-                onClick={() => setCommentaryFilter('video')}
-              >
-                Vídeo
-              </Pill>
-              <Pill active={commentaryFilter === 'ai'} onClick={() => setCommentaryFilter('ai')}>
-                IA
-              </Pill>
-            </PillRow>
-
-            <PillRow label="Incluir questões">
-              <Pill active={includeAnnulled} onClick={() => setIncludeAnnulled(!includeAnnulled)}>
-                Anuladas
-              </Pill>
-              <Pill active={includeOutdated} onClick={() => setIncludeOutdated(!includeOutdated)}>
-                Desatualizadas
-              </Pill>
-            </PillRow>
-
             <PillRow label="Minhas questões">
               <Pill active={questionStatus === 'all'} onClick={() => setQuestionStatus('all')}>
                 Todas

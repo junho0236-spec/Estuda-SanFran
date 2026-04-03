@@ -92,7 +92,6 @@ import type {
   SyncUserProgressUpdates,
   QuestionBankMockResults,
   QuestionBankAiConfig,
-  QuestionBankCommentaryFilter,
   QuestionBankSavedFilterPreset,
   QuestionBankUnseenFilter,
 } from './question-bank/types';
@@ -229,15 +228,8 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
   const [selectedFormationArea, setSelectedFormationArea] = useState('');
   const [selectedEducationLevel, setSelectedEducationLevel] = useState('');
   const [selectedJobPosition, setSelectedJobPosition] = useState('');
-  const [includeAnnulled, setIncludeAnnulled] = useState(false);
-  const [includeOutdated, setIncludeOutdated] = useState(false);
-  const [commentaryFilter, setCommentaryFilter] = useState<QuestionBankCommentaryFilter>('none');
   const [unseenFilter, setUnseenFilter] = useState<QuestionBankUnseenFilter>('all');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [commentProfessorIds, setCommentProfessorIds] = useState<Set<string>>(new Set());
-  const [commentStudentIds, setCommentStudentIds] = useState<Set<string>>(new Set());
-  const [commentMyIds, setCommentMyIds] = useState<Set<string>>(new Set());
-  const [commentaryMetaLoading, setCommentaryMetaLoading] = useState(false);
   const [listPage, setListPage] = useState(1);
   const [listPageSize, setListPageSize] = useState(20);
   const [listFontScalePercent, setListFontScalePercent] = useState(100);
@@ -344,41 +336,6 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
     if (!userId) return;
     localStorage.setItem(`qb_font_pct_${userId}`, String(listFontScalePercent));
   }, [listFontScalePercent, userId]);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      if (!userId) {
-        setCommentProfessorIds(new Set());
-        setCommentStudentIds(new Set());
-        setCommentMyIds(new Set());
-        return;
-      }
-      setCommentaryMetaLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('question_comments')
-          .select('question_id, user_id, author_kind');
-        if (cancelled || error || !data) return;
-        const prof = new Set<string>();
-        const stud = new Set<string>();
-        const mine = new Set<string>();
-        for (const row of data as { question_id: string; user_id: string; author_kind?: string }[]) {
-          if (row.author_kind === 'professor' || row.author_kind === 'staff') prof.add(row.question_id);
-          if (row.author_kind === 'student' || !row.author_kind) stud.add(row.question_id);
-          if (row.user_id === userId) mine.add(row.question_id);
-        }
-        setCommentProfessorIds(prof);
-        setCommentStudentIds(stud);
-        setCommentMyIds(mine);
-      } finally {
-        if (!cancelled) setCommentaryMetaLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [userId]);
 
   useEffect(() => {
     setQbDarkSynced(document.documentElement.classList.contains('dark'));
@@ -2266,17 +2223,8 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
 
         const ann = !!q.is_annulled;
         const out = !!q.is_outdated;
-        const matchAnnulled = includeAnnulled || !ann;
-        const matchOutdated = includeOutdated || !out;
-
-        let matchCommentary = true;
-        if (commentaryFilter === 'professors') matchCommentary = commentProfessorIds.has(q.id);
-        else if (commentaryFilter === 'students') matchCommentary = commentStudentIds.has(q.id);
-        else if (commentaryFilter === 'mine') matchCommentary = commentMyIds.has(q.id);
-        else if (commentaryFilter === 'video')
-          matchCommentary = !!(q.video_url && String(q.video_url).trim());
-        else if (commentaryFilter === 'ai')
-          matchCommentary = !!(q.ai_correction || q.texto_gabarito_ia);
+        const matchAnnulled = !ann;
+        const matchOutdated = !out;
 
         const isWrong = wrongQuestions.includes(q.id);
         const isCorrect = correctQuestions.includes(q.id);
@@ -2331,7 +2279,6 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
           matchJob &&
           matchAnnulled &&
           matchOutdated &&
-          matchCommentary &&
           matchUnseen
         );
       })
@@ -2380,13 +2327,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
     selectedFormationArea,
     selectedEducationLevel,
     selectedJobPosition,
-    includeAnnulled,
-    includeOutdated,
-    commentaryFilter,
     unseenFilter,
-    commentProfessorIds,
-    commentStudentIds,
-    commentMyIds,
     wrongQuestions,
     correctQuestions,
     selectedNotebookId,
@@ -2430,9 +2371,6 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
     selectedJobPosition,
     questionStatus,
     hideResolved,
-    includeAnnulled,
-    includeOutdated,
-    commentaryFilter,
     unseenFilter,
     sortBy,
     isErrorNotebookMode,
@@ -2471,9 +2409,6 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
       setSelectedJobPosition(p.selectedJobPosition);
       setQuestionStatus(p.questionStatus);
       setHideResolved(p.hideResolved);
-      setIncludeAnnulled(p.includeAnnulled);
-      setIncludeOutdated(p.includeOutdated);
-      setCommentaryFilter(p.commentaryFilter);
       setUnseenFilter(p.unseenFilter);
       showNotification('Filtro carregado.', 'success');
     },
@@ -2510,20 +2445,14 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
         selectedJobPosition,
         questionStatus,
         hideResolved,
-        includeAnnulled,
-        includeOutdated,
-        commentaryFilter,
         unseenFilter,
       };
       persistSavedPresets([...savedFilterPresets, preset]);
       showNotification('Filtro guardado.', 'success');
     },
     [
-      commentaryFilter,
       difficultyFilter,
       hideResolved,
-      includeAnnulled,
-      includeOutdated,
       persistSavedPresets,
       questionStatus,
       savedFilterPresets,
@@ -2642,24 +2571,6 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
         label: 'Caderno',
         onRemove: () => setSelectedNotebookId(''),
       });
-    if (includeAnnulled)
-      c.push({
-        id: 'ann',
-        label: 'Incluir anuladas',
-        onRemove: () => setIncludeAnnulled(false),
-      });
-    if (includeOutdated)
-      c.push({
-        id: 'out',
-        label: 'Incluir desatualizadas',
-        onRemove: () => setIncludeOutdated(false),
-      });
-    if (commentaryFilter !== 'none')
-      c.push({
-        id: 'com',
-        label: `Comentários: ${commentaryFilter}`,
-        onRemove: () => setCommentaryFilter('none'),
-      });
     if (unseenFilter !== 'all')
       c.push({
         id: 'unseen',
@@ -2668,10 +2579,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
       });
     return c;
   }, [
-    commentaryFilter,
     difficultyFilter,
-    includeAnnulled,
-    includeOutdated,
     searchTerm,
     selectedCareer,
     selectedEducationLevel,
@@ -3037,9 +2945,6 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
     selectedFormationArea,
     selectedEducationLevel,
     selectedJobPosition,
-    includeAnnulled,
-    includeOutdated,
-    commentaryFilter,
     unseenFilter,
     hideResolved,
   ]);
@@ -3592,13 +3497,6 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
               notebooks={notebooks}
               selectedNotebookId={selectedNotebookId}
               setSelectedNotebookId={setSelectedNotebookId}
-              includeAnnulled={includeAnnulled}
-              setIncludeAnnulled={setIncludeAnnulled}
-              includeOutdated={includeOutdated}
-              setIncludeOutdated={setIncludeOutdated}
-              commentaryFilter={commentaryFilter}
-              setCommentaryFilter={setCommentaryFilter}
-              commentaryMetaLoading={commentaryMetaLoading}
               unseenFilter={unseenFilter}
               setUnseenFilter={setUnseenFilter}
               questionStatus={questionStatus}
@@ -3627,9 +3525,6 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
                 setSelectedEducationLevel('');
                 setSelectedJobPosition('');
                 setHideResolved(false);
-                setIncludeAnnulled(false);
-                setIncludeOutdated(false);
-                setCommentaryFilter('none');
                 setUnseenFilter('all');
               }}
               onApplyFilters={() => {

@@ -61,9 +61,6 @@ export type QuestionBankAiConfig = {
   jobPosition: string;
 };
 
-/** Filtro de comentários (uma opção ativa por vez no painel Gran). */
-export type QuestionBankCommentaryFilter = 'none' | 'professors' | 'students' | 'mine' | 'video' | 'ai';
-
 export type QuestionBankUnseenFilter = 'all' | 'unseen_only' | 'exclude_unseen';
 
 /** Snapshot serializável para filtros guardados (localStorage). */
@@ -90,9 +87,6 @@ export type QuestionBankSavedFilterPreset = {
   selectedJobPosition: string;
   questionStatus: 'all' | 'resolved' | 'unresolved' | 'correct' | 'wrong' | 'review_today';
   hideResolved: boolean;
-  includeAnnulled: boolean;
-  includeOutdated: boolean;
-  commentaryFilter: QuestionBankCommentaryFilter;
   unseenFilter: QuestionBankUnseenFilter;
 };
 
