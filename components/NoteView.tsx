@@ -178,47 +178,10 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     };
   }, [userId]);
 
-  const legalCitationHandler = useCallback(() => {
-    const quill = quillRef.current;
-    if (!quill) return;
-
-    const range = quill.getSelection();
-    let text = '';
-    
-    if (range && range.length > 0) {
-      text = quill.getText(range.index, range.length);
-    } else {
-      text = prompt('Digite a citação legal (ex: Art. 5, CF):') || '';
-    }
-
-    if (text) {
-      const url = `https://www.google.com/search?q=site:planalto.gov.br+${encodeURIComponent(text)}`;
-      if (range && range.length > 0) {
-        quill.format('link', url);
-      } else {
-        const index = range ? range.index : quill.getLength();
-        quill.insertText(index, text, 'link', url);
-      }
-    }
-  }, []);
-
   const modules = useMemo(() => ({
     history: { delay: 1000, maxStack: 500 },
     table: true,
-    toolbar: {
-      container: '#docs-toolbar',
-      handlers: {
-        'image': imageHandler,
-        'legal-citation': legalCitationHandler,
-        'undo': function() {
-          if (quillRef.current) quillRef.current.history.undo();
-        },
-        'redo': function() {
-          if (quillRef.current) quillRef.current.history.redo();
-        }
-      }
-    },
-  }), [imageHandler, legalCitationHandler]);
+  }), []);
 
   const contentInitializedRef = useRef(false);
 
@@ -230,23 +193,6 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
           modules: modules,
           formats: formats,
         });
-
-        // Toolbar lives in #docs-toolbar (not a DOM parent of the editor mount)
-        const toolbar = document.querySelector('#docs-toolbar');
-        if (toolbar) {
-          const legalButton = toolbar.querySelector('.ql-legal-citation');
-          if (legalButton) {
-            legalButton.innerHTML = `
-              <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                <path d="m14 5 3 3L7 18l-3-3L14 5Z"></path>
-                <path d="m14 5 3 3-3-3Z"></path>
-                <path d="M16 16v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"></path>
-                <path d="m8 14 3 3"></path>
-              </svg>
-            `;
-            legalButton.setAttribute('title', 'Citação Legal');
-          }
-        }
 
         quillRef.current.on('text-change', () => {
           const html = node.querySelector('.ql-editor')?.innerHTML || '';

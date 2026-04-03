@@ -83,6 +83,7 @@
   min-height: 100%;
   padding: 72px;
   background-color: #ffffff;
+  overflow-y: visible !important;
 }
 
 .dark .quill-editor-custom .ql-editor {

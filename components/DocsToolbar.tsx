@@ -93,7 +93,8 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
     alignLeft: false,
     alignCenter: false,
     alignRight: false,
-    alignJustify: false
+    alignJustify: false,
+    listType: null as string | null
   });
 
   // #region agent log
@@ -183,7 +184,8 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
           alignLeft: !format.align,
           alignCenter: format.align === 'center',
           alignRight: format.align === 'right',
-          alignJustify: format.align === 'justify'
+          alignJustify: format.align === 'justify',
+          listType: format.list || null
         });
         
         if (format.size) {
@@ -467,26 +469,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
   };
 
   const handleImage = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = (e: any) => {
-      const file = e.target.files[0];
-      if (file && quillRef.current) {
-        const reader = new FileReader();
-        reader.onload = (readerEvent: any) => {
-          const base64 = readerEvent.target.result;
-          ensureQuillSelection();
-          const range = quillRef.current?.getSelection(true);
-          if (range) {
-            quillRef.current?.insertEmbed(range.index, 'image', base64);
-            quillRef.current?.setSelection(range.index + 1, 0);
-          }
-        };
-        reader.readAsDataURL(file);
-      }
-    };
-    input.click();
+    onImageUpload();
   };
 
   const handleClearFormatting = () => {
@@ -1502,7 +1485,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
       {/* Formatting row — #docs-toolbar gets ql-toolbar from Quill; flex + float overrides in index.css */}
       <div
         id="docs-toolbar"
-        className={`ql-snow transition-[min-height,opacity,padding] duration-200 ${isExpanded ? '' : 'docs-toolbar-collapsed !min-h-0 h-0 max-h-0 overflow-hidden !p-0 !border-t-0 pointer-events-none opacity-0'}`}
+        className={`ql-toolbar ql-snow transition-[min-height,opacity,padding] duration-200 ${isExpanded ? '' : 'docs-toolbar-collapsed !min-h-0 h-0 max-h-0 overflow-hidden !p-0 !border-t-0 pointer-events-none opacity-0'}`}
       >
         <div className="flex shrink-0 items-center bg-white dark:bg-slate-900 rounded-full px-3 py-1.5 mr-2 shadow-sm border border-slate-200 dark:border-white/10 w-48">
           <Search size={16} strokeWidth={2.5} className="text-slate-700 dark:text-slate-300 mr-2" />
@@ -1516,15 +1499,17 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         </div>
         <button 
           type="button"
-          className="ql-undo rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
+          className="rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
           data-tooltip="Desfazer (Ctrl+Z)"
+          onClick={handleUndo}
         >
           <Undo2 size={18}/>
         </button>
         <button 
           type="button"
-          className="ql-redo rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
+          className="rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
           data-tooltip="Refazer (Ctrl+Y)"
+          onClick={handleRedo}
         >
           <Redo2 size={18}/>
         </button>
@@ -1694,41 +1679,41 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
-        <button type="button" className="ql-link rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" data-tooltip="Inserir link (Ctrl+K)"><Link size={18}/></button>
+        <button type="button" className="rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" data-tooltip="Inserir link (Ctrl+K)" onClick={handleLink}><Link size={18}/></button>
         <button type="button" className="rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" data-tooltip="Adicionar comentário" onClick={(e) => { e.preventDefault(); handleAddComment(); }}><MessageSquarePlus size={18}/></button>
-        <button type="button" className="ql-image rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" data-tooltip="Inserir imagem"><Image size={18}/></button>
+        <button type="button" className="rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" data-tooltip="Inserir imagem" onClick={handleImage}><Image size={18}/></button>
         
         <div className="w-px h-6 bg-slate-300 dark:bg-white/20 mx-1"></div>
         
         <button 
           type="button"
-          className="ql-align rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
-          value="" 
+          className={`rounded p-1.5 transition-colors has-tooltip ${activeFormats.alignLeft ? 'bg-[#d3e3fd] text-[#001d35] dark:bg-blue-900/40 dark:text-blue-100' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
           data-tooltip="Alinhar à esquerda (Ctrl+Shift+L)"
+          onClick={() => handleAlign('')}
         >
           <AlignLeft size={18}/>
         </button>
         <button 
           type="button"
-          className="ql-align rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
-          value="center" 
+          className={`rounded p-1.5 transition-colors has-tooltip ${activeFormats.alignCenter ? 'bg-[#d3e3fd] text-[#001d35] dark:bg-blue-900/40 dark:text-blue-100' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
           data-tooltip="Centralizar (Ctrl+Shift+E)"
+          onClick={() => handleAlign('center')}
         >
           <AlignCenter size={18}/>
         </button>
         <button 
           type="button"
-          className="ql-align rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
-          value="right" 
+          className={`rounded p-1.5 transition-colors has-tooltip ${activeFormats.alignRight ? 'bg-[#d3e3fd] text-[#001d35] dark:bg-blue-900/40 dark:text-blue-100' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
           data-tooltip="Alinhar à direita (Ctrl+Shift+R)"
+          onClick={() => handleAlign('right')}
         >
           <AlignRight size={18}/>
         </button>
         <button 
           type="button"
-          className="ql-align rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
-          value="justify" 
+          className={`rounded p-1.5 transition-colors has-tooltip ${activeFormats.alignJustify ? 'bg-[#d3e3fd] text-[#001d35] dark:bg-blue-900/40 dark:text-blue-100' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
           data-tooltip="Justificar (Ctrl+Shift+J)"
+          onClick={() => handleAlign('justify')}
         >
           <AlignJustify size={18}/>
         </button>
@@ -1756,9 +1741,9 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         <div className="flex items-center gap-0.5">
           <button 
             type="button"
-            className="ql-list rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
-            value="unchecked" 
+            className={`rounded p-1.5 transition-colors has-tooltip ${activeFormats.listType === 'unchecked' || activeFormats.listType === 'checked' ? 'bg-[#d3e3fd] text-[#001d35] dark:bg-blue-900/40 dark:text-blue-100' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
             data-tooltip="Checklist"
+            onClick={() => handleList('unchecked')}
           >
             <ListTodo size={18}/>
           </button>
@@ -1767,9 +1752,9 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         <div className="flex items-center gap-0.5">
           <button 
             type="button"
-            className="ql-list rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
-            value="bullet" 
+            className={`rounded p-1.5 transition-colors has-tooltip ${activeFormats.listType === 'bullet' ? 'bg-[#d3e3fd] text-[#001d35] dark:bg-blue-900/40 dark:text-blue-100' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
             data-tooltip="Lista com marcadores (Ctrl+Shift+8)"
+            onClick={() => handleList('bullet')}
           >
             <List size={18}/>
           </button>
@@ -1778,9 +1763,9 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         <div className="flex items-center gap-0.5">
           <button 
             type="button"
-            className="ql-list rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
-            value="ordered" 
+            className={`rounded p-1.5 transition-colors has-tooltip ${activeFormats.listType === 'ordered' ? 'bg-[#d3e3fd] text-[#001d35] dark:bg-blue-900/40 dark:text-blue-100' : 'hover:bg-slate-200 dark:hover:bg-white/10'}`} 
             data-tooltip="Lista numerada (Ctrl+Shift+7)"
+            onClick={() => handleList('ordered')}
           >
             <ListOrdered size={18}/>
           </button>
@@ -1789,17 +1774,17 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         
         <button 
           type="button"
-          className="ql-indent rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
-          value="-1" 
+          className="rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
           data-tooltip="Diminuir recuo (Ctrl+[)"
+          onClick={handleOutdent}
         >
           <IndentDecrease size={18}/>
         </button>
         <button 
           type="button"
-          className="ql-indent rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
-          value="+1" 
+          className="rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
           data-tooltip="Aumentar recuo (Ctrl+])"
+          onClick={handleIndent}
         >
           <IndentIncrease size={18}/>
         </button>
@@ -1808,8 +1793,9 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
         
         <button 
           type="button"
-          className="ql-clean rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
+          className="rounded p-1.5 transition-colors has-tooltip hover:bg-slate-200 dark:hover:bg-white/10" 
           data-tooltip="Limpar formatação (Ctrl+\)"
+          onClick={handleClearFormatting}
         >
           <Eraser size={18}/>
         </button>

@@ -111,7 +111,7 @@ const NoteEditorPane: React.FC<NoteEditorPaneProps> = ({
         >
           <div className="flex min-h-0 min-w-0 w-full flex-1 justify-center">
             <div
-              className={`box-border w-full min-w-0 shrink-0 ${showPrintLayout && !isPageless ? `shadow-[0_1px_3px_rgba(0,0,0,0.12),0_4px_12px_rgba(60,64,67,0.08)] ${pageOrientation === 'portrait' ? 'min-h-[min(1056px,70dvh)]' : 'min-h-[min(816px,65dvh)]'} border border-[#dadce0] bg-white dark:border-white/10 dark:bg-[#1a1a1a]` : 'max-w-[1200px] min-h-[240px] bg-white dark:bg-[#1a1a1a]'}`}
+              className={`box-border w-full min-w-0 shrink-0 flex flex-col ${showPrintLayout && !isPageless ? `shadow-[0_1px_3px_rgba(0,0,0,0.12),0_4px_12px_rgba(60,64,67,0.08)] ${pageOrientation === 'portrait' ? 'min-h-[min(1056px,70dvh)]' : 'min-h-[min(816px,65dvh)]'} border border-[#dadce0] bg-white dark:border-white/10 dark:bg-[#1a1a1a]` : 'max-w-[1200px] min-h-[240px] bg-white dark:bg-[#1a1a1a]'}`}
               style={{
                 maxWidth:
                   showPrintLayout && !isPageless
@@ -122,7 +122,7 @@ const NoteEditorPane: React.FC<NoteEditorPaneProps> = ({
                 zoom: zoomScale !== 1 ? zoomScale : undefined,
               }}
             >
-              <div ref={onEditorRef} className="note-quill-mount min-h-[200px] w-full min-w-0" />
+              <div ref={onEditorRef} className="note-quill-mount flex-1 min-h-[200px] w-full min-w-0 flex flex-col" />
             </div>
           </div>
         </div>
