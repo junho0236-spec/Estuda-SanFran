@@ -16,7 +16,6 @@ import {
   type AiCorrectionAlternativesAnalysis,
 } from '../types';
 import { dataService } from '../services/dataService';
-import { mergeGranSampleQuestion, sampleQuestions } from './sampleQuestions';
 import { NotebookModal } from './NotebookModal';
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { GEMINI_MODEL, extractPrecedent } from '../services/geminiService';
@@ -1542,30 +1541,18 @@ Forneça a explicação de forma concisa e didática.`;
         .order('created_at', { ascending: false });
 
       if (error) {
-        // If table doesn't exist yet, we'll use samples
         if (error.code === '42P01') {
-          const questionsWithIds = sampleQuestions.map((q, i) =>
-            normalizeQuestionFromApi({
-              ...(mergeGranSampleQuestion(q as Record<string, unknown>) as unknown as Question),
-              id: (q as any).id || `sample-${i}`,
-            })
-          );
-          setQuestions(questionsWithIds);
-          updateFilters(questionsWithIds);
+          setQuestions([]);
+          updateFilters([]);
+          setAiCommentary({});
         } else {
           throw error;
         }
       } else if (data) {
         if (data.length === 0) {
-          // Fallback to samples if DB is empty
-          const questionsWithIds = sampleQuestions.map((q, i) =>
-            normalizeQuestionFromApi({
-              ...(mergeGranSampleQuestion(q as Record<string, unknown>) as unknown as Question),
-              id: (q as any).id || `sample-${i}`,
-            })
-          );
-          setQuestions(questionsWithIds);
-          updateFilters(questionsWithIds);
+          setQuestions([]);
+          updateFilters([]);
+          setAiCommentary({});
         } else {
           const normalized = (data as Question[]).map(normalizeQuestionFromApi);
           setQuestions(normalized);
@@ -1585,15 +1572,8 @@ Forneça a explicação de forma concisa e didática.`;
       }
     } catch (error) {
       console.error('Error fetching questions:', error);
-      // Final fallback
-      const questionsWithIds = sampleQuestions.map((q, i) =>
-        normalizeQuestionFromApi({
-          ...(mergeGranSampleQuestion(q as Record<string, unknown>) as unknown as Question),
-          id: (q as any).id || `sample-${i}`,
-        })
-      );
-      setQuestions(questionsWithIds);
-      updateFilters(questionsWithIds);
+      setQuestions([]);
+      updateFilters([]);
     } finally {
       setLoading(false);
     }
