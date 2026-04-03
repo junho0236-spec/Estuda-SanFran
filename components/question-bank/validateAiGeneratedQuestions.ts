@@ -25,6 +25,13 @@ export type ValidatedAiQuestionInsert = {
   legislation_tags: string[];
   jurisprudence_tags: string[];
   is_reinforcement?: boolean;
+  career?: string;
+  formation_area?: string;
+  education_level?: string;
+  job_position?: string;
+  is_annulled?: boolean;
+  is_outdated?: boolean;
+  video_url?: string;
 };
 
 function trimStr(v: unknown): string {
@@ -71,6 +78,10 @@ export function validateOneAiGeneratedQuestion(
     exam_name: string;
     legal_diploma: string;
     year: string;
+    career?: string;
+    formation_area?: string;
+    education_level?: string;
+    job_position?: string;
   }
 ): { ok: true; row: Omit<ValidatedAiQuestionInsert, 'user_id'> } | { ok: false; message: string } {
   const label = `Questão ${indexOneBased}`;
@@ -168,6 +179,16 @@ export function validateOneAiGeneratedQuestion(
     ? (q.jurisprudence_tags as unknown[]).map((t) => trimStr(t)).filter(Boolean)
     : [];
 
+  const parseBool = (v: unknown, fallback: boolean): boolean => {
+    if (typeof v === 'boolean') return v;
+    if (v === 'true' || v === 1) return true;
+    if (v === 'false' || v === 0) return false;
+    return fallback;
+  };
+
+  const is_annulled = parseBool(q.is_annulled, false);
+  const is_outdated = parseBool(q.is_outdated, false);
+
   return {
     ok: true,
     row: {
@@ -186,6 +207,13 @@ export function validateOneAiGeneratedQuestion(
       year,
       legislation_tags,
       jurisprudence_tags,
+      career: trimStr(q.career) || trimStr(defaults.career),
+      formation_area: trimStr(q.formation_area) || trimStr(defaults.formation_area),
+      education_level: trimStr(q.education_level) || trimStr(defaults.education_level),
+      job_position: trimStr(q.job_position) || trimStr(defaults.job_position),
+      is_annulled,
+      is_outdated,
+      video_url: trimStr(q.video_url),
     },
   };
 }
@@ -202,6 +230,10 @@ export function validateAiQuestionsBatch(
     exam_name: string;
     legal_diploma: string;
     year: string;
+    career?: string;
+    formation_area?: string;
+    education_level?: string;
+    job_position?: string;
   }
 ): { ok: true; rows: Omit<ValidatedAiQuestionInsert, 'user_id'>[] } | { ok: false; errors: string[] } {
   if (!Array.isArray(items) || items.length === 0) {

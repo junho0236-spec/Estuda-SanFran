@@ -55,6 +55,45 @@ export type QuestionBankAiConfig = {
   examName: string;
   modality: QuestionModality;
   legalDiploma: string;
+  career: string;
+  formationArea: string;
+  educationLevel: string;
+  jobPosition: string;
+};
+
+/** Filtro de comentários (uma opção ativa por vez no painel Gran). */
+export type QuestionBankCommentaryFilter = 'none' | 'professors' | 'students' | 'mine' | 'video' | 'ai';
+
+export type QuestionBankUnseenFilter = 'all' | 'unseen_only' | 'exclude_unseen';
+
+/** Snapshot serializável para filtros guardados (localStorage). */
+export type QuestionBankSavedFilterPreset = {
+  id: string;
+  name: string;
+  createdAt: string;
+  searchTerm: string;
+  selectedSubject: string;
+  selectedTopic: string;
+  selectedExamBoard: string;
+  selectedYear: string;
+  selectedLegislation: string;
+  selectedJurisprudence: string;
+  selectedInstitution: string;
+  selectedExamName: string;
+  selectedModality: string;
+  selectedLegalDiploma: string;
+  difficultyFilter: string;
+  selectedNotebookId: string;
+  selectedCareer: string;
+  selectedFormationArea: string;
+  selectedEducationLevel: string;
+  selectedJobPosition: string;
+  questionStatus: 'all' | 'resolved' | 'unresolved' | 'correct' | 'wrong' | 'review_today';
+  hideResolved: boolean;
+  includeAnnulled: boolean;
+  includeOutdated: boolean;
+  commentaryFilter: QuestionBankCommentaryFilter;
+  unseenFilter: QuestionBankUnseenFilter;
 };
 
 export type QuestionBankAiConfigSetter = Dispatch<SetStateAction<QuestionBankAiConfig>>;

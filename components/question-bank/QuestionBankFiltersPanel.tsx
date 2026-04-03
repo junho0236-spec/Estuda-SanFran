@@ -1,12 +1,85 @@
-import React from 'react';
-import { Filter } from 'lucide-react';
-import { QUESTION_MODALITY_LABELS, type Notebook, type QuestionModality } from '../../types';
+import React, { useMemo, useState } from 'react';
+import {
+  ChevronDown,
+  Info,
+  Loader2,
+  Minus,
+  Moon,
+  Plus,
+  Save,
+  Search,
+  SlidersHorizontal,
+  Sun,
+} from 'lucide-react';
+import {
+  QUESTION_MODALITY_LABELS,
+  type Notebook,
+  type QuestionModality,
+} from '../../types';
+import type {
+  QuestionBankCommentaryFilter,
+  QuestionBankSavedFilterPreset,
+  QuestionBankUnseenFilter,
+} from './types';
 
-const QUESTION_MODALITY_FILTER_KEYS: QuestionModality[] = ['multipla_escolha', 'certo_errado'];
+const MOD_KEYS: QuestionModality[] = ['multipla_escolha', 'certo_errado'];
+
+const selectCls =
+  'block w-full pl-3 pr-10 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500';
+
+function PillRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-4">
+      <span className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider shrink-0 pt-2 min-w-[140px]">
+        {label}
+      </span>
+      <div className="flex flex-wrap gap-2 flex-1">{children}</div>
+    </div>
+  );
+}
+
+function Pill({
+  active,
+  children,
+  onClick,
+  disabled,
+}: {
+  active: boolean;
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+        active
+          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
+      } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+export interface ActiveFilterChip {
+  id: string;
+  label: string;
+  onRemove: () => void;
+}
 
 export interface QuestionBankFiltersPanelProps {
-  showFilters: boolean;
-  setShowFilters: React.Dispatch<React.SetStateAction<boolean>>;
+  searchTerm: string;
+  setSearchTerm: (v: string) => void;
   selectedSubject: string;
   setSelectedSubject: (v: string) => void;
   setSelectedTopic: (v: string) => void;
@@ -16,15 +89,34 @@ export interface QuestionBankFiltersPanelProps {
   selectedExamBoard: string;
   setSelectedExamBoard: (v: string) => void;
   examBoards: string[];
+  selectedInstitution: string;
+  setSelectedInstitution: (v: string) => void;
+  institutions: string[];
+  selectedJobPosition: string;
+  setSelectedJobPosition: (v: string) => void;
+  jobPositions: string[];
+  selectedYear: string;
+  setSelectedYear: (v: string) => void;
+  years: string[];
+  showAdvanced: boolean;
+  setShowAdvanced: (v: boolean) => void;
+  selectedCareer: string;
+  setSelectedCareer: (v: string) => void;
+  careers: string[];
+  selectedFormationArea: string;
+  setSelectedFormationArea: (v: string) => void;
+  formationAreas: string[];
+  selectedEducationLevel: string;
+  setSelectedEducationLevel: (v: string) => void;
+  educationLevels: string[];
+  difficultyFilter: string;
+  setDifficultyFilter: (v: string) => void;
   selectedLegislation: string;
   setSelectedLegislation: (v: string) => void;
   legislationTags: string[];
   selectedJurisprudence: string;
   setSelectedJurisprudence: (v: string) => void;
   jurisprudenceTags: string[];
-  selectedInstitution: string;
-  setSelectedInstitution: (v: string) => void;
-  institutions: string[];
   selectedExamName: string;
   setSelectedExamName: (v: string) => void;
   examNames: string[];
@@ -33,22 +125,46 @@ export interface QuestionBankFiltersPanelProps {
   selectedLegalDiploma: string;
   setSelectedLegalDiploma: (v: string) => void;
   legalDiplomas: string[];
-  difficultyFilter: string;
-  setDifficultyFilter: (v: string) => void;
   notebooks: Notebook[];
   selectedNotebookId: string;
   setSelectedNotebookId: (v: string) => void;
+  includeAnnulled: boolean;
+  setIncludeAnnulled: (v: boolean) => void;
+  includeOutdated: boolean;
+  setIncludeOutdated: (v: boolean) => void;
+  commentaryFilter: QuestionBankCommentaryFilter;
+  setCommentaryFilter: (v: QuestionBankCommentaryFilter) => void;
+  commentaryMetaLoading: boolean;
+  unseenFilter: QuestionBankUnseenFilter;
+  setUnseenFilter: (v: QuestionBankUnseenFilter) => void;
   questionStatus: 'all' | 'resolved' | 'unresolved' | 'correct' | 'wrong' | 'review_today';
-  setQuestionStatus: (v: 'all' | 'resolved' | 'unresolved' | 'correct' | 'wrong' | 'review_today') => void;
+  setQuestionStatus: (
+    v: 'all' | 'resolved' | 'unresolved' | 'correct' | 'wrong' | 'review_today'
+  ) => void;
   hideResolved: boolean;
   setHideResolved: (v: boolean) => void;
   filteredQuestionCount: number;
+  activeFilterChips: ActiveFilterChip[];
   onClearFilters: () => void;
+  onApplyFilters: () => void;
+  savedPresets: QuestionBankSavedFilterPreset[];
+  onLoadPreset: (preset: QuestionBankSavedFilterPreset) => void;
+  onSaveCurrentFilter: (name: string) => void;
+  onOpenMockSetup: () => void;
+  sortBy: 'newest' | 'oldest' | 'difficulty_asc' | 'difficulty_desc';
+  setSortBy: (v: 'newest' | 'oldest' | 'difficulty_asc' | 'difficulty_desc') => void;
+  listPageSize: number;
+  setListPageSize: (v: number) => void;
+  listFontScalePercent: number;
+  onFontIncrease: () => void;
+  onFontDecrease: () => void;
+  isDarkMode: boolean;
+  onToggleDarkMode: () => void;
 }
 
 export const QuestionBankFiltersPanel: React.FC<QuestionBankFiltersPanelProps> = ({
-  showFilters,
-  setShowFilters,
+  searchTerm,
+  setSearchTerm,
   selectedSubject,
   setSelectedSubject,
   setSelectedTopic,
@@ -58,15 +174,34 @@ export const QuestionBankFiltersPanel: React.FC<QuestionBankFiltersPanelProps> =
   selectedExamBoard,
   setSelectedExamBoard,
   examBoards,
+  selectedInstitution,
+  setSelectedInstitution,
+  institutions,
+  selectedJobPosition,
+  setSelectedJobPosition,
+  jobPositions,
+  selectedYear,
+  setSelectedYear,
+  years,
+  showAdvanced,
+  setShowAdvanced,
+  selectedCareer,
+  setSelectedCareer,
+  careers,
+  selectedFormationArea,
+  setSelectedFormationArea,
+  formationAreas,
+  selectedEducationLevel,
+  setSelectedEducationLevel,
+  educationLevels,
+  difficultyFilter,
+  setDifficultyFilter,
   selectedLegislation,
   setSelectedLegislation,
   legislationTags,
   selectedJurisprudence,
   setSelectedJurisprudence,
   jurisprudenceTags,
-  selectedInstitution,
-  setSelectedInstitution,
-  institutions,
   selectedExamName,
   setSelectedExamName,
   examNames,
@@ -75,275 +210,598 @@ export const QuestionBankFiltersPanel: React.FC<QuestionBankFiltersPanelProps> =
   selectedLegalDiploma,
   setSelectedLegalDiploma,
   legalDiplomas,
-  difficultyFilter,
-  setDifficultyFilter,
   notebooks,
   selectedNotebookId,
   setSelectedNotebookId,
+  includeAnnulled,
+  setIncludeAnnulled,
+  includeOutdated,
+  setIncludeOutdated,
+  commentaryFilter,
+  setCommentaryFilter,
+  commentaryMetaLoading,
+  unseenFilter,
+  setUnseenFilter,
   questionStatus,
   setQuestionStatus,
   hideResolved,
   setHideResolved,
   filteredQuestionCount,
+  activeFilterChips,
   onClearFilters,
+  onApplyFilters,
+  savedPresets,
+  onLoadPreset,
+  onSaveCurrentFilter,
+  onOpenMockSetup,
+  sortBy,
+  setSortBy,
+  listPageSize,
+  setListPageSize,
+  listFontScalePercent,
+  onFontIncrease,
+  onFontDecrease,
+  isDarkMode,
+  onToggleDarkMode,
 }) => {
+  const [saveName, setSaveName] = useState('');
+  const [showSavedMenu, setShowSavedMenu] = useState(false);
+
+  const helpText = useMemo(
+    () =>
+      'Os filtros aplicam-se em tempo real. Use chips para remover critérios. Comentários: escolha um modo (professor, alunos, seus, vídeo ou IA). Por defeito, questões anuladas ou desatualizadas ficam de fora até marcar Incluir.',
+    []
+  );
+
   return (
     <>
-    <div className="p-4 bg-slate-50 dark:bg-slate-800/50">
-      <button
-        type="button"
-        onClick={() => setShowFilters(!showFilters)}
-        className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-300 mb-4 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-      >
-        <Filter size={16} /> {showFilters ? 'Ocultar Filtros' : 'Filtros Avançados'}
-      </button>
-      {showFilters && (
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4 animate-in slide-in-from-top-2 duration-300">
-          <select
-            value={selectedSubject}
-            onChange={e => {
-              setSelectedSubject(e.target.value);
-              setSelectedTopic('');
-            }}
-            className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/40 overflow-hidden shadow-sm">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60">
+          <span
+            className="inline-flex items-center justify-center rounded-full p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-help"
+            title={helpText}
           >
-            <option value="">Disciplina</option>
-            {subjects.map(s => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={selectedTopic}
-            onChange={e => setSelectedTopic(e.target.value)}
-            className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
-          >
-            <option value="">Assunto</option>
-            {filteredTopics.map(t => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={selectedExamBoard}
-            onChange={e => setSelectedExamBoard(e.target.value)}
-            className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
-          >
-            <option value="">Estilo de Banca</option>
-            {examBoards.map(b => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={selectedLegislation}
-            onChange={e => setSelectedLegislation(e.target.value)}
-            className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
-          >
-            <option value="">Legislação</option>
-            {legislationTags.map(tag => (
-              <option key={tag} value={tag}>
-                {tag}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={selectedJurisprudence}
-            onChange={e => setSelectedJurisprudence(e.target.value)}
-            className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
-          >
-            <option value="">Jurisprudência</option>
-            {jurisprudenceTags.map(tag => (
-              <option key={tag} value={tag}>
-                {tag}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={selectedInstitution}
-            onChange={e => setSelectedInstitution(e.target.value)}
-            className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
-          >
-            <option value="">Instituição</option>
-            {institutions.map(inst => (
-              <option key={inst} value={inst}>
-                {inst}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={selectedExamName}
-            onChange={e => setSelectedExamName(e.target.value)}
-            className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
-          >
-            <option value="">Prova</option>
-            {examNames.map(exam => (
-              <option key={exam} value={exam}>
-                {exam}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={selectedModality}
-            onChange={e => setSelectedModality(e.target.value)}
-            className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
-          >
-            <option value="">Modalidade</option>
-            {QUESTION_MODALITY_FILTER_KEYS.map(key => (
-              <option key={key} value={key}>
-                {QUESTION_MODALITY_LABELS[key]}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={selectedLegalDiploma}
-            onChange={e => setSelectedLegalDiploma(e.target.value)}
-            className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
-          >
-            <option value="">Diploma Legal</option>
-            {legalDiplomas.map(diploma => (
-              <option key={diploma} value={diploma}>
-                {diploma}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={difficultyFilter}
-            onChange={e => setDifficultyFilter(e.target.value)}
-            className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-slate-900"
-          >
-            <option value="">Dificuldade</option>
-            <option value="muito_facil">Muito Fácil</option>
-            <option value="facil">Fácil</option>
-            <option value="media">Média</option>
-            <option value="dificil">Difícil</option>
-            <option value="muito_dificil">Muito Difícil</option>
-          </select>
+            <Info size={18} aria-hidden />
+            <span className="sr-only">{helpText}</span>
+          </span>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowSavedMenu((s) => !s)}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-widest text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-blue-400"
+            >
+              <SlidersHorizontal size={14} />
+              Filtros salvos
+              <ChevronDown size={14} />
+            </button>
+            {showSavedMenu && (
+              <div className="absolute right-0 mt-1 w-64 max-h-56 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl z-20 py-1">
+                {savedPresets.length === 0 ? (
+                  <p className="px-3 py-2 text-xs text-slate-500">Nenhum filtro guardado.</p>
+                ) : (
+                  savedPresets.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
+                      onClick={() => {
+                        onLoadPreset(p);
+                        setShowSavedMenu(false);
+                      }}
+                    >
+                      {p.name}
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
         </div>
-      )}
 
-      {notebooks.length > 0 && (
-        <div className="mb-4">
-          <select
-            value={selectedNotebookId}
-            onChange={e => setSelectedNotebookId(e.target.value)}
-            className="block w-full pl-3 pr-10 py-2 text-base border-orange-200 dark:border-orange-800 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm rounded-md bg-orange-50/50 dark:bg-orange-900/10 text-orange-800 dark:text-orange-200"
+        <div className="p-4 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
+            <div className="md:col-span-2 relative">
+              <label className="sr-only">Pesquisar</label>
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                size={18}
+                aria-hidden
+              />
+              <input
+                type="search"
+                placeholder="Pesquisar"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+            </div>
+            <div>
+              <select
+                value={selectedSubject}
+                onChange={(e) => {
+                  setSelectedSubject(e.target.value);
+                  setSelectedTopic('');
+                }}
+                className={selectCls}
+              >
+                <option value="">Disciplina</option>
+                {subjects.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="md:col-span-2">
+              <select
+                value={selectedTopic}
+                onChange={(e) => setSelectedTopic(e.target.value)}
+                disabled={!selectedSubject}
+                className={`${selectCls} disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                <option value="">Assunto</option>
+                {filteredTopics.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <select
+              value={selectedExamBoard}
+              onChange={(e) => setSelectedExamBoard(e.target.value)}
+              className={selectCls}
+            >
+              <option value="">Banca / estilo</option>
+              {examBoards.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+            <select
+              value={selectedInstitution}
+              onChange={(e) => setSelectedInstitution(e.target.value)}
+              className={selectCls}
+            >
+              <option value="">Instituição</option>
+              {institutions.map((i) => (
+                <option key={i} value={i}>
+                  {i}
+                </option>
+              ))}
+            </select>
+            <select
+              value={selectedJobPosition}
+              onChange={(e) => setSelectedJobPosition(e.target.value)}
+              className={selectCls}
+            >
+              <option value="">Cargo</option>
+              {jobPositions.map((j) => (
+                <option key={j} value={j}>
+                  {j}
+                </option>
+              ))}
+            </select>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className={selectCls}
+            >
+              <option value="">Ano</option>
+              {years.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
           >
-            <option value="">Meus Cadernos</option>
-            {notebooks.map(n => (
-              <option key={n.id} value={n.id}>
-                {n.name} ({n.question_ids.length})
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+            {showAdvanced ? (
+              <>
+                <Minus size={14} /> Filtro simplificado
+              </>
+            ) : (
+              <>
+                <Plus size={14} /> Filtro avançado
+              </>
+            )}
+          </button>
 
-      <div className="flex flex-col gap-4 mb-12">
-        <div className="flex items-center gap-4 flex-wrap">
-          <span className="text-sm font-medium text-slate-700 dark:text-slate-300 min-w-[120px]">Minhas questões:</span>
-          <div className="flex gap-2 flex-wrap">
+          {showAdvanced && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 pt-2 border-t border-slate-200 dark:border-slate-800 animate-in slide-in-from-top-2 duration-200">
+              <select
+                value={selectedCareer}
+                onChange={(e) => setSelectedCareer(e.target.value)}
+                className={selectCls}
+              >
+                <option value="">Carreira</option>
+                {careers.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={selectedFormationArea}
+                onChange={(e) => setSelectedFormationArea(e.target.value)}
+                className={selectCls}
+              >
+                <option value="">Área de formação</option>
+                {formationAreas.map((f) => (
+                  <option key={f} value={f}>
+                    {f}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={selectedEducationLevel}
+                onChange={(e) => setSelectedEducationLevel(e.target.value)}
+                className={selectCls}
+              >
+                <option value="">Escolaridade</option>
+                {educationLevels.map((e) => (
+                  <option key={e} value={e}>
+                    {e}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={difficultyFilter}
+                onChange={(e) => setDifficultyFilter(e.target.value)}
+                className={selectCls}
+              >
+                <option value="">Dificuldade</option>
+                <option value="muito_facil">Muito fácil</option>
+                <option value="facil">Fácil</option>
+                <option value="media">Média</option>
+                <option value="dificil">Difícil</option>
+                <option value="muito_dificil">Muito difícil</option>
+              </select>
+              <select
+                value={selectedLegislation}
+                onChange={(e) => setSelectedLegislation(e.target.value)}
+                className={selectCls}
+              >
+                <option value="">Legislação</option>
+                {legislationTags.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={selectedJurisprudence}
+                onChange={(e) => setSelectedJurisprudence(e.target.value)}
+                className={selectCls}
+              >
+                <option value="">Jurisprudência</option>
+                {jurisprudenceTags.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={selectedExamName}
+                onChange={(e) => setSelectedExamName(e.target.value)}
+                className={selectCls}
+              >
+                <option value="">Prova</option>
+                {examNames.map((ex) => (
+                  <option key={ex} value={ex}>
+                    {ex}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={selectedLegalDiploma}
+                onChange={(e) => setSelectedLegalDiploma(e.target.value)}
+                className={selectCls}
+              >
+                <option value="">Diploma legal</option>
+                {legalDiplomas.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={selectedModality}
+                onChange={(e) => setSelectedModality(e.target.value)}
+                className={selectCls}
+              >
+                <option value="">Modalidade</option>
+                {MOD_KEYS.map((key) => (
+                  <option key={key} value={key}>
+                    {QUESTION_MODALITY_LABELS[key]}
+                  </option>
+                ))}
+              </select>
+              {notebooks.length > 0 && (
+                <select
+                  value={selectedNotebookId}
+                  onChange={(e) => setSelectedNotebookId(e.target.value)}
+                  className={`${selectCls} border-orange-200 dark:border-orange-900 bg-orange-50/30 dark:bg-orange-950/20 text-orange-900 dark:text-orange-200`}
+                >
+                  <option value="">Meus cadernos</option>
+                  {notebooks.map((n) => (
+                    <option key={n.id} value={n.id}>
+                      {n.name} ({n.question_ids.length})
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
+          <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-800">
+            <PillRow label="Comentários">
+              {commentaryMetaLoading && (
+                <Loader2 className="w-4 h-4 animate-spin text-slate-400 mt-2" />
+              )}
+              <Pill
+                active={commentaryFilter === 'none'}
+                onClick={() => setCommentaryFilter('none')}
+              >
+                Todos
+              </Pill>
+              <Pill
+                active={commentaryFilter === 'professors'}
+                onClick={() => setCommentaryFilter('professors')}
+              >
+                Professores
+              </Pill>
+              <Pill
+                active={commentaryFilter === 'students'}
+                onClick={() => setCommentaryFilter('students')}
+              >
+                Alunos
+              </Pill>
+              <Pill
+                active={commentaryFilter === 'mine'}
+                onClick={() => setCommentaryFilter('mine')}
+              >
+                Meus comentários
+              </Pill>
+              <Pill
+                active={commentaryFilter === 'video'}
+                onClick={() => setCommentaryFilter('video')}
+              >
+                Vídeo
+              </Pill>
+              <Pill active={commentaryFilter === 'ai'} onClick={() => setCommentaryFilter('ai')}>
+                IA
+              </Pill>
+            </PillRow>
+
+            <PillRow label="Incluir questões">
+              <Pill active={includeAnnulled} onClick={() => setIncludeAnnulled(!includeAnnulled)}>
+                Anuladas
+              </Pill>
+              <Pill active={includeOutdated} onClick={() => setIncludeOutdated(!includeOutdated)}>
+                Desatualizadas
+              </Pill>
+            </PillRow>
+
+            <PillRow label="Minhas questões">
+              <Pill active={questionStatus === 'all'} onClick={() => setQuestionStatus('all')}>
+                Todas
+              </Pill>
+              <Pill
+                active={questionStatus === 'resolved'}
+                onClick={() => setQuestionStatus('resolved')}
+              >
+                Resolvidas
+              </Pill>
+              <Pill
+                active={questionStatus === 'unresolved'}
+                onClick={() => setQuestionStatus('unresolved')}
+              >
+                Não resolvidas
+              </Pill>
+              <Pill
+                active={questionStatus === 'correct'}
+                onClick={() => setQuestionStatus('correct')}
+              >
+                Certas
+              </Pill>
+              <Pill active={questionStatus === 'wrong'} onClick={() => setQuestionStatus('wrong')}>
+                Erradas
+              </Pill>
+              <Pill
+                active={questionStatus === 'review_today'}
+                onClick={() => setQuestionStatus('review_today')}
+              >
+                Revisar hoje
+              </Pill>
+              <Pill active={hideResolved} onClick={() => setHideResolved(!hideResolved)}>
+                {hideResolved ? 'Mostrando ocultas' : 'Ocultar resolvidas'}
+              </Pill>
+            </PillRow>
+
+            <PillRow label="Questões">
+              <Pill active={unseenFilter === 'all'} onClick={() => setUnseenFilter('all')}>
+                Todas
+              </Pill>
+              <Pill
+                active={unseenFilter === 'unseen_only'}
+                onClick={() => setUnseenFilter('unseen_only')}
+              >
+                Apenas inéditas
+              </Pill>
+              <Pill
+                active={unseenFilter === 'exclude_unseen'}
+                onClick={() => setUnseenFilter('exclude_unseen')}
+              >
+                Não incluir inéditas
+              </Pill>
+            </PillRow>
+
+            <PillRow label="Tipo">
+              <Pill
+                active={selectedModality === ''}
+                onClick={() => setSelectedModality('')}
+              >
+                Qualquer
+              </Pill>
+              {MOD_KEYS.map((key) => (
+                <Pill
+                  key={key}
+                  active={selectedModality === key}
+                  onClick={() => setSelectedModality(key)}
+                >
+                  {QUESTION_MODALITY_LABELS[key]}
+                </Pill>
+              ))}
+            </PillRow>
+          </div>
+
+          <div className="min-h-[2.5rem] flex flex-wrap items-center gap-2 px-2 py-2 rounded-xl bg-white/60 dark:bg-slate-900/40 border border-dashed border-slate-200 dark:border-slate-700">
+            {activeFilterChips.length === 0 ? (
+              <span className="text-xs text-slate-400 italic">
+                Os teus filtros aparecem aqui
+              </span>
+            ) : (
+              activeFilterChips.map((c) => (
+                <span
+                  key={c.id}
+                  className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/50 text-blue-800 dark:text-blue-200 text-xs font-medium border border-blue-200 dark:border-blue-800"
+                >
+                  {c.label}
+                  <button
+                    type="button"
+                    onClick={c.onRemove}
+                    className="p-0.5 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800"
+                    aria-label={`Remover ${c.label}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))
+            )}
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-2">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <input
+                type="text"
+                value={saveName}
+                onChange={(e) => setSaveName(e.target.value)}
+                placeholder="Nome do filtro"
+                className="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm max-w-[160px]"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const n = saveName.trim();
+                  if (!n) return;
+                  onSaveCurrentFilter(n);
+                  setSaveName('');
+                }}
+                className="inline-flex items-center gap-1 font-bold text-slate-600 dark:text-slate-400 hover:text-blue-600"
+              >
+                <Save size={14} /> Salvar filtro
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 justify-end">
+              <button
+                type="button"
+                onClick={onClearFilters}
+                className="text-xs font-bold text-slate-500 hover:text-slate-800 dark:hover:text-slate-300"
+              >
+                Limpar filtro
+              </button>
+              <button
+                type="button"
+                onClick={onApplyFilters}
+                className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold shadow-sm"
+              >
+                Filtrar questões
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between px-1 py-2 border-t border-slate-200 dark:border-slate-800">
+        <div className="text-sm text-slate-600 dark:text-slate-400">
+          <span className="font-black text-slate-900 dark:text-white">
+            {filteredQuestionCount.toLocaleString('pt-BR')}
+          </span>{' '}
+          questões encontradas
+        </div>
+        <div className="flex flex-wrap items-center gap-2 lg:gap-3">
+          <button
+            type="button"
+            onClick={onOpenMockSetup}
+            className="text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-1"
+          >
+            <Plus size={14} /> Gerar simulado
+          </button>
+          <div className="flex items-center gap-1 border border-slate-200 dark:border-slate-700 rounded-lg p-0.5">
             <button
               type="button"
-              onClick={() => setQuestionStatus('all')}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                questionStatus === 'all'
-                  ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800 shadow-inner'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700 dark:hover:bg-slate-800'
-              }`}
+              onClick={onFontDecrease}
+              className="px-2 py-1 text-xs font-black text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
+              title="Diminuir texto"
             >
-              Todas
+              A−
             </button>
+            <span className="text-[10px] text-slate-400 w-8 text-center">{listFontScalePercent}%</span>
             <button
               type="button"
-              onClick={() => setQuestionStatus('correct')}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                questionStatus === 'correct'
-                  ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800 shadow-inner'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700 dark:hover:bg-slate-800'
-              }`}
+              onClick={onFontIncrease}
+              className="px-2 py-1 text-xs font-black text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
+              title="Aumentar texto"
             >
-              Certas
-            </button>
-            <button
-              type="button"
-              onClick={() => setQuestionStatus('wrong')}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                questionStatus === 'wrong'
-                  ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800 shadow-inner'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700 dark:hover:bg-slate-800'
-              }`}
-            >
-              Erradas
-            </button>
-            <button
-              type="button"
-              onClick={() => setQuestionStatus('review_today')}
-              title="Caderno de erros + último erro em dia anterior (alinhado a revisão espaçada simples)"
-              className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                questionStatus === 'review_today'
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-200 dark:border-emerald-800 shadow-inner'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700 dark:hover:bg-slate-800'
-              }`}
-            >
-              Revisar hoje
-            </button>
-            <button
-              type="button"
-              onClick={() => setHideResolved(!hideResolved)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                hideResolved
-                  ? 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800 shadow-inner'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700 dark:hover:bg-slate-800'
-              }`}
-            >
-              {hideResolved ? 'Mostrando Ocultas' : 'Ocultar Resolvidas'}
+              A+
             </button>
           </div>
-          {questionStatus === 'review_today' && (
-            <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400 max-w-2xl">
-              Fila do dia: todas as questões no caderno de erros, mais as que você errou pela última vez em um dia
-              anterior (com base na data da última tentativa guardada). Combine com matéria/tópico nos filtros ou use o
-              atalho na Revisão espaçada.
-            </p>
-          )}
+          <button
+            type="button"
+            onClick={onToggleDarkMode}
+            className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+            title={isDarkMode ? 'Modo claro' : 'Modo escuro'}
+          >
+            {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+          <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+            Por página
+            <select
+              value={listPageSize}
+              onChange={(e) => setListPageSize(Number(e.target.value))}
+              className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs py-1 pl-2 pr-6"
+            >
+              {[10, 20, 50, 100].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+          <select
+            value={sortBy}
+            onChange={(e) =>
+              setSortBy(e.target.value as 'newest' | 'oldest' | 'difficulty_asc' | 'difficulty_desc')
+            }
+            className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs py-1.5 pl-2 pr-8 font-bold text-slate-700 dark:text-slate-300"
+          >
+            <option value="newest">Mais recentes</option>
+            <option value="oldest">Mais antigas</option>
+            <option value="difficulty_asc">Dificuldade ↑</option>
+            <option value="difficulty_desc">Dificuldade ↓</option>
+          </select>
         </div>
       </div>
-    </div>
-
-    <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900">
-      <div className="text-sm text-slate-500 font-medium">
-        <span className="font-bold text-slate-900 dark:text-white">{filteredQuestionCount}</span> questões encontradas
-      </div>
-
-      <div className="flex items-center gap-4">
-        <button
-          type="button"
-          onClick={onClearFilters}
-          className="text-sm font-medium text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-        >
-          Limpar filtro
-        </button>
-        <button
-          type="button"
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors"
-        >
-          Filtrar questões
-        </button>
-      </div>
-    </div>
     </>
   );
 };

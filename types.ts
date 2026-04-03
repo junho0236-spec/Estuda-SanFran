@@ -514,6 +514,14 @@ export interface Question {
     jurisprudencia: string;
   };
   ai_correction?: QuestionAiCorrection;
+  /** Modelo Gran — metadados de concurso */
+  career?: string;
+  formation_area?: string;
+  education_level?: string;
+  job_position?: string;
+  is_annulled?: boolean;
+  is_outdated?: boolean;
+  video_url?: string;
 }
 
 /** Status devolvido pela IA na análise por alternativa (prompt em QuestionBank). */
@@ -591,6 +599,8 @@ export interface Duel {
   created_at: string;
 }
 
+export type QuestionCommentAuthorKind = 'professor' | 'student' | 'staff';
+
 export interface QuestionComment {
   id: string;
   question_id: string;
@@ -599,6 +609,7 @@ export interface QuestionComment {
   created_at: string;
   parent_id?: string;
   reply_to_user_id?: string;
+  author_kind?: QuestionCommentAuthorKind;
   user_profile?: {
     full_name: string;
     avatar_url: string;

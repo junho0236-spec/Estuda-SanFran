@@ -1,3 +1,18 @@
+/** Valores por defeito do modelo Gran para amostras offline (alinhado a supabase/sql/question_bank_gran_model_reset.sql). */
+export const SAMPLE_QUESTION_GRAN_DEFAULTS = {
+  career: '',
+  formation_area: '',
+  education_level: '',
+  job_position: '',
+  is_annulled: false,
+  is_outdated: false,
+  video_url: '',
+} as const;
+
+export function mergeGranSampleQuestion<Q extends Record<string, unknown>>(q: Q): Q & typeof SAMPLE_QUESTION_GRAN_DEFAULTS {
+  return { ...SAMPLE_QUESTION_GRAN_DEFAULTS, ...q };
+}
+
 export const sampleQuestions = [
   {
     subject: "Direito Administrativo",

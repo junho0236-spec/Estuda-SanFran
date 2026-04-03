@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
-import { QuestionComment } from '../types';
+import { QuestionComment, type QuestionCommentAuthorKind } from '../types';
 import { Send, User, MessageSquare, Loader2, Trash2, Reply, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { dataService } from '../services/dataService';
@@ -11,6 +11,8 @@ interface QuestionCommentsProps {
   isAnswered: boolean;
   questionTitle?: string;
   showNotification?: (message: string, type: 'success' | 'error') => void;
+  /** Comentários de equipa/docentes (SanFran); alunos usam "student". */
+  defaultAuthorKind?: QuestionCommentAuthorKind;
 }
 
 export const QuestionComments: React.FC<QuestionCommentsProps> = ({ 
@@ -18,14 +20,26 @@ export const QuestionComments: React.FC<QuestionCommentsProps> = ({
   userId, 
   isAnswered,
   questionTitle = "uma questão",
-  showNotification
+  showNotification,
+  defaultAuthorKind = 'student',
 }) => {
   const [comments, setComments] = useState<QuestionComment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [replyingTo, setReplyingTo] = useState<QuestionComment | null>(null);
+  /** Comentários de equipa docente usam author_kind = professor no Supabase (filtro Gran). */
+  const [postAsProfessor, setPostAsProfessor] = useState(
+    defaultAuthorKind === 'professor' || defaultAuthorKind === 'staff'
+  );
   const navigate = useNavigate();
+
+  useEffect(() => {
+    setPostAsProfessor(defaultAuthorKind === 'professor' || defaultAuthorKind === 'staff');
+  }, [defaultAuthorKind]);
+
+  const resolveAuthorKind = (): QuestionCommentAuthorKind =>
+    postAsProfessor ? 'professor' : 'student';
 
   useEffect(() => {
     if (isAnswered) {
@@ -89,7 +103,8 @@ export const QuestionComments: React.FC<QuestionCommentsProps> = ({
       
       // Optimistic update
       const tempId = 'temp-' + Date.now();
-      const newCommentObj: any = {
+      const kind = resolveAuthorKind();
+      const newCommentObj: QuestionComment = {
         id: tempId,
         question_id: questionId,
         user_id: userId,
@@ -97,6 +112,7 @@ export const QuestionComments: React.FC<QuestionCommentsProps> = ({
         created_at: new Date().toISOString(),
         parent_id: replyingTo?.id,
         reply_to_user_id: replyingTo?.user_id,
+        author_kind: kind,
         user_profile: {
           full_name: 'Você',
           avatar_url: ''
@@ -108,10 +124,11 @@ export const QuestionComments: React.FC<QuestionCommentsProps> = ({
       setNewComment('');
       setReplyingTo(null);
 
-      const commentData: any = {
+      const commentData: Record<string, unknown> = {
         question_id: questionId,
         user_id: userId,
-        content: commentToSubmit
+        content: commentToSubmit,
+        author_kind: kind,
       };
 
       if (replyingTo) {
@@ -119,9 +136,7 @@ export const QuestionComments: React.FC<QuestionCommentsProps> = ({
         commentData.reply_to_user_id = replyingTo.user_id;
       }
 
-      const { error } = await supabase
-        .from('question_comments')
-        .insert(commentData);
+      const { error } = await supabase.from('question_comments').insert(commentData);
 
       if (error) throw error;
 
@@ -234,6 +249,11 @@ export const QuestionComments: React.FC<QuestionCommentsProps> = ({
                       >
                         {comment.user_profile?.full_name || 'Usuário'}
                       </button>
+                      {(comment.author_kind === 'professor' || comment.author_kind === 'staff') && (
+                        <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                          {comment.author_kind === 'staff' ? 'Equipa' : 'Professor'}
+                        </span>
+                      )}
                       <span className="text-[10px] text-slate-400">
                         {new Date(comment.created_at).toLocaleDateString()}
                       </span>
@@ -273,6 +293,15 @@ export const QuestionComments: React.FC<QuestionCommentsProps> = ({
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3">
+        <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-600 dark:text-slate-400">
+          <input
+            type="checkbox"
+            checked={postAsProfessor}
+            onChange={(e) => setPostAsProfessor(e.target.checked)}
+            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+          />
+          Publicar como professor / equipa SanFran
+        </label>
         {replyingTo && (
           <div className="flex items-center justify-between px-4 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-900/30">
             <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">

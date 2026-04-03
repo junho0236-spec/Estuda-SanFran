@@ -163,6 +163,49 @@ export const QuestionBankAIGeneratorModal: React.FC<QuestionBankAIGeneratorModal
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
+              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Carreira</label>
+              <input
+                type="text"
+                value={aiConfig.career}
+                onChange={(e) => setAiConfig({ ...aiConfig, career: e.target.value })}
+                className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
+                placeholder="Ex: Magistratura, OAB, MPU"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Cargo</label>
+              <input
+                type="text"
+                value={aiConfig.jobPosition}
+                onChange={(e) => setAiConfig({ ...aiConfig, jobPosition: e.target.value })}
+                className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
+                placeholder="Ex: Juiz substituto, Analista judiciário"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Área de formação</label>
+              <input
+                type="text"
+                value={aiConfig.formationArea}
+                onChange={(e) => setAiConfig({ ...aiConfig, formationArea: e.target.value })}
+                className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
+                placeholder="Ex: Direito público"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Escolaridade</label>
+              <input
+                type="text"
+                value={aiConfig.educationLevel}
+                onChange={(e) => setAiConfig({ ...aiConfig, educationLevel: e.target.value })}
+                className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
+                placeholder="Ex: Superior completo"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
               <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Nome do Exame</label>
               <input
                 type="text"

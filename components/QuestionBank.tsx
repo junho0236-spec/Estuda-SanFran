@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
 import {
@@ -16,7 +16,7 @@ import {
   type AiCorrectionAlternativesAnalysis,
 } from '../types';
 import { dataService } from '../services/dataService';
-import { sampleQuestions } from './sampleQuestions';
+import { mergeGranSampleQuestion, sampleQuestions } from './sampleQuestions';
 import { NotebookModal } from './NotebookModal';
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { GEMINI_MODEL, extractPrecedent } from '../services/geminiService';
@@ -84,11 +84,17 @@ import { exportQuestionBankPdf } from './question-bank/exportQuestionBankPdf';
 import { MockResultsView } from './question-bank/MockResultsView';
 import { MockSetupModal } from './question-bank/MockSetupModal';
 import { QuestionBankAIGeneratorModal } from './question-bank/QuestionBankAIGeneratorModal';
-import { QuestionBankFiltersPanel } from './question-bank/QuestionBankFiltersPanel';
+import {
+  QuestionBankFiltersPanel,
+  type ActiveFilterChip,
+} from './question-bank/QuestionBankFiltersPanel';
 import type {
   SyncUserProgressUpdates,
   QuestionBankMockResults,
   QuestionBankAiConfig,
+  QuestionBankCommentaryFilter,
+  QuestionBankSavedFilterPreset,
+  QuestionBankUnseenFilter,
 } from './question-bank/types';
 import { validateAiQuestionsBatch } from './question-bank/validateAiGeneratedQuestions';
 import {
@@ -215,6 +221,31 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
   const [institutions, setInstitutions] = useState<string[]>([]);
   const [examNames, setExamNames] = useState<string[]>([]);
   const [legalDiplomas, setLegalDiplomas] = useState<string[]>([]);
+  const [careers, setCareers] = useState<string[]>([]);
+  const [formationAreas, setFormationAreas] = useState<string[]>([]);
+  const [educationLevels, setEducationLevels] = useState<string[]>([]);
+  const [jobPositions, setJobPositions] = useState<string[]>([]);
+  const [selectedCareer, setSelectedCareer] = useState('');
+  const [selectedFormationArea, setSelectedFormationArea] = useState('');
+  const [selectedEducationLevel, setSelectedEducationLevel] = useState('');
+  const [selectedJobPosition, setSelectedJobPosition] = useState('');
+  const [includeAnnulled, setIncludeAnnulled] = useState(false);
+  const [includeOutdated, setIncludeOutdated] = useState(false);
+  const [commentaryFilter, setCommentaryFilter] = useState<QuestionBankCommentaryFilter>('none');
+  const [unseenFilter, setUnseenFilter] = useState<QuestionBankUnseenFilter>('all');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [commentProfessorIds, setCommentProfessorIds] = useState<Set<string>>(new Set());
+  const [commentStudentIds, setCommentStudentIds] = useState<Set<string>>(new Set());
+  const [commentMyIds, setCommentMyIds] = useState<Set<string>>(new Set());
+  const [commentaryMetaLoading, setCommentaryMetaLoading] = useState(false);
+  const [listPage, setListPage] = useState(1);
+  const [listPageSize, setListPageSize] = useState(20);
+  const [listFontScalePercent, setListFontScalePercent] = useState(100);
+  const [savedFilterPresets, setSavedFilterPresets] = useState<QuestionBankSavedFilterPreset[]>([]);
+  const [qbDarkSynced, setQbDarkSynced] = useState(
+    () => typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+  );
+  const resultsSectionRef = useRef<HTMLDivElement>(null);
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'difficulty_asc' | 'difficulty_desc'>('newest');
   const [favorites, setFavorites] = useState<string[]>([]);
   const [wrongQuestions, setWrongQuestions] = useState<string[]>([]);
@@ -266,11 +297,92 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
   const [questionStatus, setQuestionStatus] = useState<
     'all' | 'resolved' | 'unresolved' | 'correct' | 'wrong' | 'review_today'
   >('all');
-  const [showFilters, setShowFilters] = useState(false);
   const [showXRay, setShowXRay] = useState(true);
   const [viewMode, setViewMode] = useState<'list' | 'single'>('list');
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const savedFiltersStorageKey = useMemo(() => `qb_filters_saved_${userId}`, [userId]);
+
+  useEffect(() => {
+    if (!userId) {
+      setSavedFilterPresets([]);
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(savedFiltersStorageKey);
+      if (!raw) setSavedFilterPresets([]);
+      else {
+        const p = JSON.parse(raw) as unknown;
+        setSavedFilterPresets(Array.isArray(p) ? (p as QuestionBankSavedFilterPreset[]) : []);
+      }
+    } catch {
+      setSavedFilterPresets([]);
+    }
+    try {
+      const ps = localStorage.getItem(`qb_page_size_${userId}`);
+      if (ps) {
+        const n = parseInt(ps, 10);
+        if (!Number.isNaN(n)) setListPageSize(Math.min(100, Math.max(10, n)));
+      }
+      const fs = localStorage.getItem(`qb_font_pct_${userId}`);
+      if (fs) {
+        const n = parseInt(fs, 10);
+        if (!Number.isNaN(n)) setListFontScalePercent(Math.min(130, Math.max(85, n)));
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [userId, savedFiltersStorageKey]);
+
+  useEffect(() => {
+    if (!userId) return;
+    localStorage.setItem(`qb_page_size_${userId}`, String(listPageSize));
+  }, [listPageSize, userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    localStorage.setItem(`qb_font_pct_${userId}`, String(listFontScalePercent));
+  }, [listFontScalePercent, userId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!userId) {
+        setCommentProfessorIds(new Set());
+        setCommentStudentIds(new Set());
+        setCommentMyIds(new Set());
+        return;
+      }
+      setCommentaryMetaLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('question_comments')
+          .select('question_id, user_id, author_kind');
+        if (cancelled || error || !data) return;
+        const prof = new Set<string>();
+        const stud = new Set<string>();
+        const mine = new Set<string>();
+        for (const row of data as { question_id: string; user_id: string; author_kind?: string }[]) {
+          if (row.author_kind === 'professor' || row.author_kind === 'staff') prof.add(row.question_id);
+          if (row.author_kind === 'student' || !row.author_kind) stud.add(row.question_id);
+          if (row.user_id === userId) mine.add(row.question_id);
+        }
+        setCommentProfessorIds(prof);
+        setCommentStudentIds(stud);
+        setCommentMyIds(mine);
+      } finally {
+        if (!cancelled) setCommentaryMetaLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    setQbDarkSynced(document.documentElement.classList.contains('dark'));
+  }, []);
 
   enum OperationType {
     CREATE = 'create',
@@ -650,6 +762,10 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
     examName: '',
     modality: 'multipla_escolha',
     legalDiploma: '',
+    career: '',
+    formationArea: '',
+    educationLevel: '',
+    jobPosition: '',
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [voiceSpeed, setVoiceSpeed] = useState(1);
@@ -665,6 +781,48 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
       return () => clearTimeout(timer);
     }
   }, [aiCooldown]);
+
+  const aiModalPrefilledRef = useRef(false);
+  useEffect(() => {
+    if (!showAIGenerator) {
+      aiModalPrefilledRef.current = false;
+      return;
+    }
+    if (aiModalPrefilledRef.current) return;
+    aiModalPrefilledRef.current = true;
+    setAiConfig((prev) => ({
+      ...prev,
+      subject: selectedSubject || prev.subject,
+      topic: selectedTopic || prev.topic,
+      examStyle: selectedExamBoard || prev.examStyle,
+      institution: selectedInstitution || prev.institution,
+      examName: selectedExamName || prev.examName,
+      legalDiploma: selectedLegalDiploma || prev.legalDiploma,
+      modality: (selectedModality as QuestionBankAiConfig['modality']) || prev.modality,
+      career: selectedCareer || prev.career,
+      formationArea: selectedFormationArea || prev.formationArea,
+      educationLevel: selectedEducationLevel || prev.educationLevel,
+      jobPosition: selectedJobPosition || prev.jobPosition,
+      ...(difficultyFilter &&
+      ['muito_facil', 'facil', 'media', 'dificil', 'muito_dificil'].includes(difficultyFilter)
+        ? { difficulty: difficultyFilter as QuestionBankAiConfig['difficulty'] }
+        : {}),
+    }));
+  }, [
+    showAIGenerator,
+    selectedSubject,
+    selectedTopic,
+    selectedExamBoard,
+    selectedInstitution,
+    selectedExamName,
+    selectedLegalDiploma,
+    selectedModality,
+    selectedCareer,
+    selectedFormationArea,
+    selectedEducationLevel,
+    selectedJobPosition,
+    difficultyFilter,
+  ]);
 
   // Glossary States
   const [activeGlossaryTerm, setActiveGlossaryTerm] = useState<string | null>(null);
@@ -1431,7 +1589,7 @@ Forneça a explicação de forma concisa e didática.`;
         if (error.code === '42P01') {
           const questionsWithIds = sampleQuestions.map((q, i) =>
             normalizeQuestionFromApi({
-              ...(q as Question),
+              ...(mergeGranSampleQuestion(q as Record<string, unknown>) as unknown as Question),
               id: (q as any).id || `sample-${i}`,
             })
           );
@@ -1445,7 +1603,7 @@ Forneça a explicação de forma concisa e didática.`;
           // Fallback to samples if DB is empty
           const questionsWithIds = sampleQuestions.map((q, i) =>
             normalizeQuestionFromApi({
-              ...(q as Question),
+              ...(mergeGranSampleQuestion(q as Record<string, unknown>) as unknown as Question),
               id: (q as any).id || `sample-${i}`,
             })
           );
@@ -1473,7 +1631,7 @@ Forneça a explicação de forma concisa e didática.`;
       // Final fallback
       const questionsWithIds = sampleQuestions.map((q, i) =>
         normalizeQuestionFromApi({
-          ...(q as Question),
+          ...(mergeGranSampleQuestion(q as Record<string, unknown>) as unknown as Question),
           id: (q as any).id || `sample-${i}`,
         })
       );
@@ -1512,6 +1670,11 @@ Forneça a explicação de forma concisa e didática.`;
 
     const uniqueLegalDiplomas = Array.from(new Set(data.map(q => q.legal_diploma))).filter(Boolean).sort() as string[];
     setLegalDiplomas(uniqueLegalDiplomas);
+
+    setCareers(Array.from(new Set(data.map((q) => q.career))).filter(Boolean).sort() as string[]);
+    setFormationAreas(Array.from(new Set(data.map((q) => q.formation_area))).filter(Boolean).sort() as string[]);
+    setEducationLevels(Array.from(new Set(data.map((q) => q.education_level))).filter(Boolean).sort() as string[]);
+    setJobPositions(Array.from(new Set(data.map((q) => q.job_position))).filter(Boolean).sort() as string[]);
   };
 
   const handleSpeak = (statement: string, hint: string, id: string) => {
@@ -1634,6 +1797,10 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
         exam_name: '',
         legal_diploma: '',
         year: yearStr,
+        career: '',
+        formation_area: '',
+        education_level: '',
+        job_position: '',
       });
       if (validated.ok === false) {
         const head = validated.errors.slice(0, 4).join(' ');
@@ -1662,6 +1829,9 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
         ...row,
         user_id: userId,
         is_reinforcement: true,
+        is_annulled: false,
+        is_outdated: false,
+        video_url: row.video_url || '',
       }));
 
       const { error: insertError } = await supabase.from('questions').insert(questionsToSave);
@@ -1773,6 +1943,10 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
         Foco Jurídico: ${aiConfig.legalFocus.join(', ') || 'Geral'}.
         Tipo de Enunciado: ${aiConfig.statementType}.
         Ano da Questão: OBRIGATORIAMENTE ${new Date().getFullYear()}.
+        Carreira / trilho: ${aiConfig.career || 'Geral'}.
+        Área de formação: ${aiConfig.formationArea || 'Geral'}.
+        Escolaridade alvo: ${aiConfig.educationLevel || 'Geral'}.
+        Cargo / função: ${aiConfig.jobPosition || 'Geral'}.
         ${jurisprudencePrompt}
         ${contextFromFlashcards}
         ${contextFromText}
@@ -1785,6 +1959,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
         A explicação deve ser EXTREMAMENTE detalhada, contendo uma análise individual para cada alternativa (ou para o item Certo/Errado), explicando por que a resposta correta está certa e por que as incorretas estão erradas, fundamentando com base no foco jurídico selecionado e no diploma legal mencionado.
         
         IMPORTANTE: Identifique e extraia tags de legislação (ex: "Art. 5, CF", "Código Penal") e jurisprudência (ex: "Súmula 123 STJ", "Informativo 999 STF") associadas a cada questão.
+        Não gere questões anuladas nem desatualizadas: use is_annulled=false e is_outdated=false. Deixe video_url vazio.
         
         Retorne as questões no formato JSON.`;
 
@@ -1824,7 +1999,14 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
                     type: Type.ARRAY, 
                     items: { type: Type.STRING },
                     description: "Tags de jurisprudência (ex: Súmulas, Informativos)"
-                  }
+                  },
+                  career: { type: Type.STRING, description: "Carreira ou trilho de concurso" },
+                  formation_area: { type: Type.STRING, description: "Área de formação" },
+                  education_level: { type: Type.STRING, description: "Escolaridade exigida ou alvo" },
+                  job_position: { type: Type.STRING, description: "Cargo do edital" },
+                  is_annulled: { type: Type.BOOLEAN, description: "Sempre false para novas questões" },
+                  is_outdated: { type: Type.BOOLEAN, description: "Sempre false para novas questões" },
+                  video_url: { type: Type.STRING, description: "Vazio para questões geradas" },
                 },
                 required: ["subject", "topic", "statement", "options", "correct_answer", "explanation", "difficulty", "exam_board", "year"]
               }
@@ -1869,6 +2051,10 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
             exam_name: aiConfig.examName || '',
             legal_diploma: aiConfig.legalDiploma || '',
             year: yearStr,
+            career: aiConfig.career || '',
+            formation_area: aiConfig.formationArea || '',
+            education_level: aiConfig.educationLevel || '',
+            job_position: aiConfig.jobPosition || '',
           }
         );
         if (validated.ok === false) {
@@ -1897,6 +2083,9 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
         const sanitizedInitialQuestions = keptAfterSimilarity.map((row) => ({
           user_id: userId,
           ...row,
+          is_annulled: false,
+          is_outdated: false,
+          video_url: row.video_url || '',
         }));
 
         let { data, error } = await supabase
@@ -2018,78 +2207,518 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
 
   const currentYear = new Date().getFullYear().toString();
 
-  const filteredQuestions = questions.filter(q => {
-    const matchSearch = searchTerm === '' || 
-      q.statement.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      (q.explanation && q.explanation.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchSubject = selectedSubject === '' || selectedSubject === 'Todos' || q.subject === selectedSubject;
-    const matchTopic = selectedTopic === '' || selectedTopic === 'Todos' || q.topic === selectedTopic;
-    const matchDifficulty = difficultyFilter === '' || difficultyFilter === 'Todos' || q.difficulty === difficultyFilter;
-    const matchExamBoard = selectedExamBoard === '' || selectedExamBoard === 'Todos' || q.exam_board === selectedExamBoard;
-    const matchYear = selectedYear === '' || selectedYear === 'Todos' || q.year?.toString() === selectedYear;
-    const matchLegislation = selectedLegislation === '' || selectedLegislation === 'Todos' || (q.legislation_tags && q.legislation_tags.includes(selectedLegislation));
-    const matchJurisprudence = selectedJurisprudence === '' || selectedJurisprudence === 'Todos' || (q.jurisprudence_tags && q.jurisprudence_tags.includes(selectedJurisprudence));
-    const matchInstitution = selectedInstitution === '' || selectedInstitution === 'Todos' || q.institution === selectedInstitution;
-    const matchExamName = selectedExamName === '' || selectedExamName === 'Todos' || q.exam_name === selectedExamName;
-    const matchModality = selectedModality === '' || selectedModality === 'Todos' || q.modality === selectedModality;
-    const matchLegalDiploma = selectedLegalDiploma === '' || selectedLegalDiploma === 'Todos' || q.legal_diploma === selectedLegalDiploma;
-    
-    let matchNotebook = true;
-    if (selectedNotebookId) {
-      const notebook = notebooks.find(n => n.id === selectedNotebookId);
-      matchNotebook = notebook ? notebook.question_ids.includes(q.id) : true;
-    }
-    
-    let matchStatus = true;
-    const isWrong = wrongQuestions.includes(q.id);
-    const isCorrect = correctQuestions.includes(q.id);
-    
-    if (isErrorNotebookMode) {
-      matchStatus = isWrong;
-    } else if (questionStatus === 'wrong') {
-      matchStatus = isWrong;
-    } else if (questionStatus === 'correct') {
-      matchStatus = isCorrect;
-    } else if (questionStatus === 'resolved') {
-      matchStatus = isWrong || isCorrect;
-    } else if (questionStatus === 'unresolved') {
-      matchStatus = !isWrong && !isCorrect;
-    } else if (questionStatus === 'review_today') {
-      matchStatus = isQuestionDueForReviewToday(q.id, wrongQuestions, questionStats);
-    }
-
-    if (questionStatus !== 'review_today' && hideResolved && (isWrong || isCorrect)) {
-      matchStatus = false;
-    }
-    
-    return matchSearch && matchSubject && matchTopic && matchDifficulty && matchExamBoard && matchYear && matchLegislation && matchJurisprudence && matchNotebook && matchStatus && matchInstitution && matchExamName && matchModality && matchLegalDiploma;
-  }).sort((a, b) => {
+  const filteredQuestions = useMemo(() => {
     const createdMs = (q: Question): number | null => {
       if (!q.created_at) return null;
       const t = Date.parse(q.created_at);
       return Number.isNaN(t) ? null : t;
     };
 
-    if (sortBy === 'newest') {
-      const na = createdMs(a) ?? 0;
-      const nb = createdMs(b) ?? 0;
-      return nb - na;
-    }
-    if (sortBy === 'oldest') {
-      const na = createdMs(a) ?? Number.POSITIVE_INFINITY;
-      const nb = createdMs(b) ?? Number.POSITIVE_INFINITY;
-      return na - nb;
-    }
+    return questions
+      .filter((q) => {
+        const matchSearch =
+          searchTerm === '' ||
+          q.statement.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (q.explanation && q.explanation.toLowerCase().includes(searchTerm.toLowerCase()));
+        const matchSubject =
+          selectedSubject === '' || selectedSubject === 'Todos' || q.subject === selectedSubject;
+        const matchTopic = selectedTopic === '' || selectedTopic === 'Todos' || q.topic === selectedTopic;
+        const matchDifficulty =
+          difficultyFilter === '' || difficultyFilter === 'Todos' || q.difficulty === difficultyFilter;
+        const matchExamBoard =
+          selectedExamBoard === '' || selectedExamBoard === 'Todos' || q.exam_board === selectedExamBoard;
+        const matchYear =
+          selectedYear === '' || selectedYear === 'Todos' || q.year?.toString() === selectedYear;
+        const matchLegislation =
+          selectedLegislation === '' ||
+          selectedLegislation === 'Todos' ||
+          (q.legislation_tags && q.legislation_tags.includes(selectedLegislation));
+        const matchJurisprudence =
+          selectedJurisprudence === '' ||
+          selectedJurisprudence === 'Todos' ||
+          (q.jurisprudence_tags && q.jurisprudence_tags.includes(selectedJurisprudence));
+        const matchInstitution =
+          selectedInstitution === '' ||
+          selectedInstitution === 'Todos' ||
+          q.institution === selectedInstitution;
+        const matchExamName =
+          selectedExamName === '' || selectedExamName === 'Todos' || q.exam_name === selectedExamName;
+        const matchModality =
+          selectedModality === '' || selectedModality === 'Todos' || q.modality === selectedModality;
+        const matchLegalDiploma =
+          selectedLegalDiploma === '' ||
+          selectedLegalDiploma === 'Todos' ||
+          q.legal_diploma === selectedLegalDiploma;
+        const matchCareer =
+          selectedCareer === '' || selectedCareer === 'Todos' || q.career === selectedCareer;
+        const matchFormation =
+          selectedFormationArea === '' ||
+          selectedFormationArea === 'Todos' ||
+          q.formation_area === selectedFormationArea;
+        const matchEdu =
+          selectedEducationLevel === '' ||
+          selectedEducationLevel === 'Todos' ||
+          q.education_level === selectedEducationLevel;
+        const matchJob =
+          selectedJobPosition === '' ||
+          selectedJobPosition === 'Todos' ||
+          q.job_position === selectedJobPosition;
 
-    const difficultyMap = { 'muito_facil': 1, 'facil': 2, 'media': 3, 'dificil': 4, 'muito_dificil': 5 };
-    const diffA = difficultyMap[a.difficulty] || 0;
-    const diffB = difficultyMap[b.difficulty] || 0;
+        const ann = !!q.is_annulled;
+        const out = !!q.is_outdated;
+        const matchAnnulled = includeAnnulled || !ann;
+        const matchOutdated = includeOutdated || !out;
 
-    if (sortBy === 'difficulty_asc') return diffA - diffB;
-    if (sortBy === 'difficulty_desc') return diffB - diffA;
+        let matchCommentary = true;
+        if (commentaryFilter === 'professors') matchCommentary = commentProfessorIds.has(q.id);
+        else if (commentaryFilter === 'students') matchCommentary = commentStudentIds.has(q.id);
+        else if (commentaryFilter === 'mine') matchCommentary = commentMyIds.has(q.id);
+        else if (commentaryFilter === 'video')
+          matchCommentary = !!(q.video_url && String(q.video_url).trim());
+        else if (commentaryFilter === 'ai')
+          matchCommentary = !!(q.ai_correction || q.texto_gabarito_ia);
 
-    return 0;
-  });
+        const isWrong = wrongQuestions.includes(q.id);
+        const isCorrect = correctQuestions.includes(q.id);
+        const seen = isWrong || isCorrect;
+        let matchUnseen = true;
+        if (unseenFilter === 'unseen_only') matchUnseen = !seen;
+        else if (unseenFilter === 'exclude_unseen') matchUnseen = seen;
+
+        let matchNotebook = true;
+        if (selectedNotebookId) {
+          const notebook = notebooks.find((n) => n.id === selectedNotebookId);
+          matchNotebook = notebook ? notebook.question_ids.includes(q.id) : true;
+        }
+
+        let matchStatus = true;
+        if (isErrorNotebookMode) {
+          matchStatus = isWrong;
+        } else if (questionStatus === 'wrong') {
+          matchStatus = isWrong;
+        } else if (questionStatus === 'correct') {
+          matchStatus = isCorrect;
+        } else if (questionStatus === 'resolved') {
+          matchStatus = isWrong || isCorrect;
+        } else if (questionStatus === 'unresolved') {
+          matchStatus = !isWrong && !isCorrect;
+        } else if (questionStatus === 'review_today') {
+          matchStatus = isQuestionDueForReviewToday(q.id, wrongQuestions, questionStats);
+        }
+
+        if (questionStatus !== 'review_today' && hideResolved && (isWrong || isCorrect)) {
+          matchStatus = false;
+        }
+
+        return (
+          matchSearch &&
+          matchSubject &&
+          matchTopic &&
+          matchDifficulty &&
+          matchExamBoard &&
+          matchYear &&
+          matchLegislation &&
+          matchJurisprudence &&
+          matchNotebook &&
+          matchStatus &&
+          matchInstitution &&
+          matchExamName &&
+          matchModality &&
+          matchLegalDiploma &&
+          matchCareer &&
+          matchFormation &&
+          matchEdu &&
+          matchJob &&
+          matchAnnulled &&
+          matchOutdated &&
+          matchCommentary &&
+          matchUnseen
+        );
+      })
+      .sort((a, b) => {
+        if (sortBy === 'newest') {
+          const na = createdMs(a) ?? 0;
+          const nb = createdMs(b) ?? 0;
+          return nb - na;
+        }
+        if (sortBy === 'oldest') {
+          const na = createdMs(a) ?? Number.POSITIVE_INFINITY;
+          const nb = createdMs(b) ?? Number.POSITIVE_INFINITY;
+          return na - nb;
+        }
+
+        const difficultyMap = {
+          muito_facil: 1,
+          facil: 2,
+          media: 3,
+          dificil: 4,
+          muito_dificil: 5,
+        };
+        const diffA = difficultyMap[a.difficulty] || 0;
+        const diffB = difficultyMap[b.difficulty] || 0;
+
+        if (sortBy === 'difficulty_asc') return diffA - diffB;
+        if (sortBy === 'difficulty_desc') return diffB - diffA;
+
+        return 0;
+      });
+  }, [
+    questions,
+    searchTerm,
+    selectedSubject,
+    selectedTopic,
+    difficultyFilter,
+    selectedExamBoard,
+    selectedYear,
+    selectedLegislation,
+    selectedJurisprudence,
+    selectedInstitution,
+    selectedExamName,
+    selectedModality,
+    selectedLegalDiploma,
+    selectedCareer,
+    selectedFormationArea,
+    selectedEducationLevel,
+    selectedJobPosition,
+    includeAnnulled,
+    includeOutdated,
+    commentaryFilter,
+    unseenFilter,
+    commentProfessorIds,
+    commentStudentIds,
+    commentMyIds,
+    wrongQuestions,
+    correctQuestions,
+    selectedNotebookId,
+    notebooks,
+    isErrorNotebookMode,
+    questionStatus,
+    questionStats,
+    hideResolved,
+    sortBy,
+  ]);
+
+  const pagedQuestions = useMemo(() => {
+    const start = (listPage - 1) * listPageSize;
+    return filteredQuestions.slice(start, start + listPageSize);
+  }, [filteredQuestions, listPage, listPageSize]);
+
+  useEffect(() => {
+    const maxP = Math.max(1, Math.ceil(filteredQuestions.length / listPageSize) || 1);
+    if (listPage > maxP) setListPage(maxP);
+  }, [filteredQuestions.length, listPageSize, listPage]);
+
+  useEffect(() => {
+    setListPage(1);
+  }, [
+    searchTerm,
+    selectedSubject,
+    selectedTopic,
+    selectedExamBoard,
+    selectedYear,
+    selectedLegislation,
+    selectedJurisprudence,
+    selectedInstitution,
+    selectedExamName,
+    selectedModality,
+    selectedLegalDiploma,
+    difficultyFilter,
+    selectedNotebookId,
+    selectedCareer,
+    selectedFormationArea,
+    selectedEducationLevel,
+    selectedJobPosition,
+    questionStatus,
+    hideResolved,
+    includeAnnulled,
+    includeOutdated,
+    commentaryFilter,
+    unseenFilter,
+    sortBy,
+    isErrorNotebookMode,
+  ]);
+
+  const persistSavedPresets = useCallback(
+    (next: QuestionBankSavedFilterPreset[]) => {
+      setSavedFilterPresets(next);
+      try {
+        localStorage.setItem(savedFiltersStorageKey, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+    },
+    [savedFiltersStorageKey]
+  );
+
+  const handleLoadSavedPreset = useCallback(
+    (p: QuestionBankSavedFilterPreset) => {
+      setSearchTerm(p.searchTerm);
+      setSelectedSubject(p.selectedSubject);
+      setSelectedTopic(p.selectedTopic);
+      setSelectedExamBoard(p.selectedExamBoard);
+      setSelectedYear(p.selectedYear);
+      setSelectedLegislation(p.selectedLegislation);
+      setSelectedJurisprudence(p.selectedJurisprudence);
+      setSelectedInstitution(p.selectedInstitution);
+      setSelectedExamName(p.selectedExamName);
+      setSelectedModality(p.selectedModality);
+      setSelectedLegalDiploma(p.selectedLegalDiploma);
+      setDifficultyFilter(p.difficultyFilter);
+      setSelectedNotebookId(p.selectedNotebookId);
+      setSelectedCareer(p.selectedCareer);
+      setSelectedFormationArea(p.selectedFormationArea);
+      setSelectedEducationLevel(p.selectedEducationLevel);
+      setSelectedJobPosition(p.selectedJobPosition);
+      setQuestionStatus(p.questionStatus);
+      setHideResolved(p.hideResolved);
+      setIncludeAnnulled(p.includeAnnulled);
+      setIncludeOutdated(p.includeOutdated);
+      setCommentaryFilter(p.commentaryFilter);
+      setUnseenFilter(p.unseenFilter);
+      showNotification('Filtro carregado.', 'success');
+    },
+    []
+  );
+
+  const handleSaveNamedFilter = useCallback(
+    (name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      const preset: QuestionBankSavedFilterPreset = {
+        id:
+          typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `qb-${Date.now()}`,
+        name: trimmed,
+        createdAt: new Date().toISOString(),
+        searchTerm,
+        selectedSubject,
+        selectedTopic,
+        selectedExamBoard,
+        selectedYear,
+        selectedLegislation,
+        selectedJurisprudence,
+        selectedInstitution,
+        selectedExamName,
+        selectedModality,
+        selectedLegalDiploma,
+        difficultyFilter,
+        selectedNotebookId,
+        selectedCareer,
+        selectedFormationArea,
+        selectedEducationLevel,
+        selectedJobPosition,
+        questionStatus,
+        hideResolved,
+        includeAnnulled,
+        includeOutdated,
+        commentaryFilter,
+        unseenFilter,
+      };
+      persistSavedPresets([...savedFilterPresets, preset]);
+      showNotification('Filtro guardado.', 'success');
+    },
+    [
+      commentaryFilter,
+      difficultyFilter,
+      hideResolved,
+      includeAnnulled,
+      includeOutdated,
+      persistSavedPresets,
+      questionStatus,
+      savedFilterPresets,
+      searchTerm,
+      selectedCareer,
+      selectedEducationLevel,
+      selectedExamBoard,
+      selectedExamName,
+      selectedFormationArea,
+      selectedInstitution,
+      selectedJobPosition,
+      selectedJurisprudence,
+      selectedLegalDiploma,
+      selectedLegislation,
+      selectedModality,
+      selectedNotebookId,
+      selectedSubject,
+      selectedTopic,
+      selectedYear,
+      unseenFilter,
+    ]
+  );
+
+  const activeFilterChips = useMemo((): ActiveFilterChip[] => {
+    const c: ActiveFilterChip[] = [];
+    if (searchTerm.trim())
+      c.push({ id: 'search', label: `Busca: ${searchTerm}`, onRemove: () => setSearchTerm('') });
+    if (selectedSubject)
+      c.push({
+        id: 'subject',
+        label: `Disciplina: ${selectedSubject}`,
+        onRemove: () => {
+          setSelectedSubject('');
+          setSelectedTopic('');
+        },
+      });
+    if (selectedTopic)
+      c.push({ id: 'topic', label: `Assunto: ${selectedTopic}`, onRemove: () => setSelectedTopic('') });
+    if (selectedExamBoard)
+      c.push({
+        id: 'board',
+        label: `Banca: ${selectedExamBoard}`,
+        onRemove: () => setSelectedExamBoard(''),
+      });
+    if (selectedInstitution)
+      c.push({
+        id: 'inst',
+        label: `Instituição: ${selectedInstitution}`,
+        onRemove: () => setSelectedInstitution(''),
+      });
+    if (selectedJobPosition)
+      c.push({
+        id: 'job',
+        label: `Cargo: ${selectedJobPosition}`,
+        onRemove: () => setSelectedJobPosition(''),
+      });
+    if (selectedYear)
+      c.push({ id: 'year', label: `Ano: ${selectedYear}`, onRemove: () => setSelectedYear('') });
+    if (selectedCareer)
+      c.push({
+        id: 'career',
+        label: `Carreira: ${selectedCareer}`,
+        onRemove: () => setSelectedCareer(''),
+      });
+    if (selectedFormationArea)
+      c.push({
+        id: 'form',
+        label: `Formação: ${selectedFormationArea}`,
+        onRemove: () => setSelectedFormationArea(''),
+      });
+    if (selectedEducationLevel)
+      c.push({
+        id: 'edu',
+        label: `Escolaridade: ${selectedEducationLevel}`,
+        onRemove: () => setSelectedEducationLevel(''),
+      });
+    if (difficultyFilter)
+      c.push({
+        id: 'diff',
+        label: `Dificuldade: ${difficultyFilter}`,
+        onRemove: () => setDifficultyFilter(''),
+      });
+    if (selectedLegislation)
+      c.push({
+        id: 'leg',
+        label: `Legislação: ${selectedLegislation}`,
+        onRemove: () => setSelectedLegislation(''),
+      });
+    if (selectedJurisprudence)
+      c.push({
+        id: 'jur',
+        label: `Jurisprudência: ${selectedJurisprudence}`,
+        onRemove: () => setSelectedJurisprudence(''),
+      });
+    if (selectedExamName)
+      c.push({
+        id: 'exam',
+        label: `Prova: ${selectedExamName}`,
+        onRemove: () => setSelectedExamName(''),
+      });
+    if (selectedLegalDiploma)
+      c.push({
+        id: 'dip',
+        label: `Diploma: ${selectedLegalDiploma}`,
+        onRemove: () => setSelectedLegalDiploma(''),
+      });
+    if (selectedModality)
+      c.push({
+        id: 'mod',
+        label: `Modalidade: ${selectedModality}`,
+        onRemove: () => setSelectedModality(''),
+      });
+    if (selectedNotebookId)
+      c.push({
+        id: 'nb',
+        label: 'Caderno',
+        onRemove: () => setSelectedNotebookId(''),
+      });
+    if (includeAnnulled)
+      c.push({
+        id: 'ann',
+        label: 'Incluir anuladas',
+        onRemove: () => setIncludeAnnulled(false),
+      });
+    if (includeOutdated)
+      c.push({
+        id: 'out',
+        label: 'Incluir desatualizadas',
+        onRemove: () => setIncludeOutdated(false),
+      });
+    if (commentaryFilter !== 'none')
+      c.push({
+        id: 'com',
+        label: `Comentários: ${commentaryFilter}`,
+        onRemove: () => setCommentaryFilter('none'),
+      });
+    if (unseenFilter !== 'all')
+      c.push({
+        id: 'unseen',
+        label: `Inéditas: ${unseenFilter}`,
+        onRemove: () => setUnseenFilter('all'),
+      });
+    return c;
+  }, [
+    commentaryFilter,
+    difficultyFilter,
+    includeAnnulled,
+    includeOutdated,
+    searchTerm,
+    selectedCareer,
+    selectedEducationLevel,
+    selectedExamBoard,
+    selectedExamName,
+    selectedFormationArea,
+    selectedInstitution,
+    selectedJobPosition,
+    selectedJurisprudence,
+    selectedLegalDiploma,
+    selectedLegislation,
+    selectedModality,
+    selectedNotebookId,
+    selectedSubject,
+    selectedTopic,
+    selectedYear,
+    unseenFilter,
+  ]);
+
+  const toggleQbDark = useCallback(() => {
+    setQbDarkSynced((d) => {
+      const next = !d;
+      document.documentElement.classList.toggle('dark', next);
+      try {
+        localStorage.setItem('omnistudy_darkmode', JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, []);
+
+  const fontSteps = [85, 100, 115, 130] as const;
+  const onListFontIncrease = useCallback(() => {
+    setListFontScalePercent((p) => {
+      const i = fontSteps.indexOf(p as (typeof fontSteps)[number]);
+      const idx = i === -1 ? 1 : i;
+      return fontSteps[Math.min(fontSteps.length - 1, idx + 1)];
+    });
+  }, []);
+  const onListFontDecrease = useCallback(() => {
+    setListFontScalePercent((p) => {
+      const i = fontSteps.indexOf(p as (typeof fontSteps)[number]);
+      const idx = i === -1 ? 1 : i;
+      return fontSteps[Math.max(0, idx - 1)];
+    });
+  }, []);
 
   const handleExportPDF = () => exportQuestionBankPdf(filteredQuestions, { setIsExporting, setExportProgress });
 
@@ -2388,7 +3017,32 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
     setSelectedOption(null);
     setShowExplanation(false);
     setViewMode('list');
-  }, [selectedSubject, selectedTopic, difficultyFilter, sortBy, searchTerm, selectedExamBoard, selectedYear, questionStatus, selectedNotebookId]);
+  }, [
+    selectedSubject,
+    selectedTopic,
+    difficultyFilter,
+    sortBy,
+    searchTerm,
+    selectedExamBoard,
+    selectedYear,
+    questionStatus,
+    selectedNotebookId,
+    selectedLegislation,
+    selectedJurisprudence,
+    selectedInstitution,
+    selectedExamName,
+    selectedModality,
+    selectedLegalDiploma,
+    selectedCareer,
+    selectedFormationArea,
+    selectedEducationLevel,
+    selectedJobPosition,
+    includeAnnulled,
+    includeOutdated,
+    commentaryFilter,
+    unseenFilter,
+    hideResolved,
+  ]);
 
   if (loading) {
     return (
@@ -2873,24 +3527,9 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
                 </div>
               </div>
             )}
-            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900">
-              <div className="flex-1 relative max-w-3xl">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
-                <input
-                  type="text"
-                  placeholder="Pesquisar"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md leading-5 bg-slate-50 dark:bg-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                />
-              </div>
-              
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-end bg-white dark:bg-slate-900">
               {selectedQuestionsForNotebook.size > 0 && (
-                <div className="ml-4 animate-in slide-in-from-right-4 duration-300">
+                <div className="animate-in slide-in-from-right-4 duration-300">
                   <button
                     onClick={() => setShowNotebookCreationMode(true)}
                     className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 shadow-lg shadow-orange-900/20"
@@ -2900,10 +3539,11 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
                 </div>
               )}
             </div>
-            
+
+            <div className="p-4">
             <QuestionBankFiltersPanel
-              showFilters={showFilters}
-              setShowFilters={setShowFilters}
+              searchTerm={searchTerm}
+              setSearchTerm={setSearchTerm}
               selectedSubject={selectedSubject}
               setSelectedSubject={setSelectedSubject}
               setSelectedTopic={setSelectedTopic}
@@ -2913,15 +3553,34 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
               selectedExamBoard={selectedExamBoard}
               setSelectedExamBoard={setSelectedExamBoard}
               examBoards={examBoards}
+              selectedInstitution={selectedInstitution}
+              setSelectedInstitution={setSelectedInstitution}
+              institutions={institutions}
+              selectedJobPosition={selectedJobPosition}
+              setSelectedJobPosition={setSelectedJobPosition}
+              jobPositions={jobPositions}
+              selectedYear={selectedYear}
+              setSelectedYear={setSelectedYear}
+              years={years}
+              showAdvanced={showAdvancedFilters}
+              setShowAdvanced={setShowAdvancedFilters}
+              selectedCareer={selectedCareer}
+              setSelectedCareer={setSelectedCareer}
+              careers={careers}
+              selectedFormationArea={selectedFormationArea}
+              setSelectedFormationArea={setSelectedFormationArea}
+              formationAreas={formationAreas}
+              selectedEducationLevel={selectedEducationLevel}
+              setSelectedEducationLevel={setSelectedEducationLevel}
+              educationLevels={educationLevels}
+              difficultyFilter={difficultyFilter}
+              setDifficultyFilter={setDifficultyFilter}
               selectedLegislation={selectedLegislation}
               setSelectedLegislation={setSelectedLegislation}
               legislationTags={legislationTags}
               selectedJurisprudence={selectedJurisprudence}
               setSelectedJurisprudence={setSelectedJurisprudence}
               jurisprudenceTags={jurisprudenceTags}
-              selectedInstitution={selectedInstitution}
-              setSelectedInstitution={setSelectedInstitution}
-              institutions={institutions}
               selectedExamName={selectedExamName}
               setSelectedExamName={setSelectedExamName}
               examNames={examNames}
@@ -2930,16 +3589,24 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
               selectedLegalDiploma={selectedLegalDiploma}
               setSelectedLegalDiploma={setSelectedLegalDiploma}
               legalDiplomas={legalDiplomas}
-              difficultyFilter={difficultyFilter}
-              setDifficultyFilter={setDifficultyFilter}
               notebooks={notebooks}
               selectedNotebookId={selectedNotebookId}
               setSelectedNotebookId={setSelectedNotebookId}
+              includeAnnulled={includeAnnulled}
+              setIncludeAnnulled={setIncludeAnnulled}
+              includeOutdated={includeOutdated}
+              setIncludeOutdated={setIncludeOutdated}
+              commentaryFilter={commentaryFilter}
+              setCommentaryFilter={setCommentaryFilter}
+              commentaryMetaLoading={commentaryMetaLoading}
+              unseenFilter={unseenFilter}
+              setUnseenFilter={setUnseenFilter}
               questionStatus={questionStatus}
               setQuestionStatus={setQuestionStatus}
               hideResolved={hideResolved}
               setHideResolved={setHideResolved}
               filteredQuestionCount={filteredQuestions.length}
+              activeFilterChips={activeFilterChips}
               onClearFilters={() => {
                 setSearchTerm('');
                 setSelectedSubject('');
@@ -2951,18 +3618,57 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
                 setSelectedExamName('');
                 setSelectedModality('');
                 setSelectedLegalDiploma('');
+                setSelectedExamBoard('');
+                setSelectedYear('');
+                setSelectedLegislation('');
+                setSelectedJurisprudence('');
+                setSelectedCareer('');
+                setSelectedFormationArea('');
+                setSelectedEducationLevel('');
+                setSelectedJobPosition('');
                 setHideResolved(false);
+                setIncludeAnnulled(false);
+                setIncludeOutdated(false);
+                setCommentaryFilter('none');
+                setUnseenFilter('all');
               }}
+              onApplyFilters={() => {
+                setCurrentIndex(0);
+                setViewMode('list');
+                setSelectedOption(null);
+                setShowExplanation(false);
+                resultsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
+              savedPresets={savedFilterPresets}
+              onLoadPreset={handleLoadSavedPreset}
+              onSaveCurrentFilter={handleSaveNamedFilter}
+              onOpenMockSetup={() => setShowMockSetup(true)}
+              sortBy={sortBy}
+              setSortBy={setSortBy}
+              listPageSize={listPageSize}
+              setListPageSize={setListPageSize}
+              listFontScalePercent={listFontScalePercent}
+              onFontIncrease={onListFontIncrease}
+              onFontDecrease={onListFontDecrease}
+              isDarkMode={qbDarkSynced}
+              onToggleDarkMode={toggleQbDark}
             />
+            </div>
           </div>
 
           {/* Question Area */}
-          <div key="question-area-container" className="w-full">
-            <div className="flex-1">
+          <div key="question-area-container" className="w-full" ref={resultsSectionRef}>
+            <div
+              className="flex-1"
+              style={{ fontSize: `${listFontScalePercent}%` }}
+            >
               {(isMockMode ? mockQuestions.length > 0 : filteredQuestions.length > 0) && currentQuestion ? (
                 viewMode === 'list' ? (
+                <>
                 <div className="grid grid-cols-1 gap-8">
-                  {filteredQuestions.map((q, idx) => (
+                  {pagedQuestions.map((q, idx) => {
+                    const globalIdx = (listPage - 1) * listPageSize + idx;
+                    return (
                     <div 
                       key={q.id}
                       className={`bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden relative pl-20 p-8 transition-all duration-300 ${activeQuestionId === q.id ? 'ring-2 ring-purple-500 shadow-lg' : ''}`}
@@ -3003,7 +3709,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
                       })()}
 
                       <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2 text-sm">
-                        <span className="font-bold text-slate-900 dark:text-white">{idx + 1}</span>
+                        <span className="font-bold text-slate-900 dark:text-white">{globalIdx + 1}</span>
                       <span className="text-blue-600 dark:text-blue-400 font-medium">{q.id.substring(0, 8)}</span>
                       <span className="text-slate-400 mx-1">•</span>
                       <span className="text-blue-600 dark:text-blue-400 font-medium">{q.subject}</span>
@@ -3014,7 +3720,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
                     <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col gap-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <div className="flex gap-4 text-xs font-medium text-slate-500">
-                          <span>Ano: <span className="text-slate-900 dark:text-white">{new Date().getFullYear()}</span></span>
+                          <span>Ano: <span className="text-slate-900 dark:text-white">{q.year || 'N/A'}</span></span>
                           <span>Estilo: <span className="text-slate-900 dark:text-white">{q.exam_board || 'N/A'}</span></span>
                           <span>Dificuldade: <span className="text-slate-900 dark:text-white capitalize">{q.difficulty}</span></span>
                         </div>
@@ -3088,7 +3794,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
                               setExpandedQuestionId(null);
                             } else {
                               setExpandedQuestionId(q.id);
-                              setCurrentIndex(idx);
+                              setCurrentIndex(globalIdx);
                               setSelectedOption(null);
                               setShowExplanation(false);
                             }
@@ -3116,7 +3822,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => {
-                                setCurrentIndex(idx);
+                                setCurrentIndex(globalIdx);
                                 setViewMode('single');
                                 setSelectedOption(null);
                                 setShowExplanation(false);
@@ -3398,8 +4104,40 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
                         </div>
                       )}
                     </div>
-                ))}
-              </div>
+                    );
+                  })}
+                </div>
+                {filteredQuestions.length > listPageSize && (
+                  <div className="flex flex-wrap items-center justify-center gap-3 py-4">
+                    <button
+                      type="button"
+                      disabled={listPage <= 1}
+                      onClick={() => setListPage((p) => Math.max(1, p - 1))}
+                      className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-bold disabled:opacity-40"
+                    >
+                      Anterior
+                    </button>
+                    <span className="text-sm text-slate-600 dark:text-slate-400">
+                      Página {listPage} de {Math.max(1, Math.ceil(filteredQuestions.length / listPageSize))}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={listPage >= Math.ceil(filteredQuestions.length / listPageSize)}
+                      onClick={() =>
+                        setListPage((p) =>
+                          Math.min(
+                            Math.max(1, Math.ceil(filteredQuestions.length / listPageSize)),
+                            p + 1
+                          )
+                        )
+                      }
+                      className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-bold disabled:opacity-40"
+                    >
+                      Seguinte
+                    </button>
+                  </div>
+                )}
+            </>
             ) : (
               <div className="flex flex-col gap-4">
                 <button 
