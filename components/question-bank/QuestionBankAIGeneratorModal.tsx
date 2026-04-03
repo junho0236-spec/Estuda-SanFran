@@ -60,14 +60,20 @@ export const QuestionBankAIGeneratorModal: React.FC<QuestionBankAIGeneratorModal
               />
             </div>
             <div>
-              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Tópico Específico</label>
+              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">
+                Sugestão de tópico (opcional)
+              </label>
               <input
                 type="text"
                 value={aiConfig.topic}
                 onChange={e => setAiConfig({ ...aiConfig, topic: e.target.value })}
                 className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
                 placeholder="Ex: Crimes contra a vida"
+                aria-describedby="qb-ai-topic-hint"
               />
+              <p id="qb-ai-topic-hint" className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                A IA reutiliza os tópicos que já existem no seu acervo quando faz sentido; esta sugestão só orienta o foco.
+              </p>
             </div>
           </div>
 

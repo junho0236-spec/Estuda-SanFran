@@ -91,6 +91,11 @@ import type {
   QuestionBankAiConfig,
 } from './question-bank/types';
 import { validateAiQuestionsBatch } from './question-bank/validateAiGeneratedQuestions';
+import {
+  applyCanonicalTopicsToRows,
+  buildTopicReuseCatalog,
+  TOPIC_REUSE_PROMPT_MAX_LABELS,
+} from './question-bank/aiQuestionTopics';
 import { dedupeSimilarAiStatements } from './question-bank/similarStatementDetection';
 import {
   bumpAnswerGoals,
@@ -1585,8 +1590,13 @@ Forneça a explicação de forma concisa e didática.`;
 
       // 2. Generate questions with Gemini
       const topics = weakTopics.map(t => t.topic).join(', ');
+      const smartCatalog = buildTopicReuseCatalog(questions, null, TOPIC_REUSE_PROMPT_MAX_LABELS);
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
-      const prompt = `Com base nestes temas que o aluno errou muito: ${topics}, gere 5 novas questões inéditas de nível Médio/Difícil para reforçar o aprendizado. Retorne em formato JSON array de objetos com: subject, topic, statement, options (array de exatamente 5 strings, alternativas A a E), correct_answer (inteiro 0 a 4), explanation, difficulty (ex: media, dificil), exam_board, year.`;
+      const prompt = `Com base nestes temas que o aluno errou muito: ${topics}, gere 5 novas questões inéditas de nível Médio/Difícil para reforçar o aprendizado.
+
+${smartCatalog.promptBlock}
+
+Retorne em formato JSON array de objetos com: subject, topic, statement, options (array de exatamente 5 strings, alternativas A a E), correct_answer (inteiro 0 a 4), explanation, difficulty (ex: media, dificil), exam_board, year. O campo topic deve seguir as regras de reutilização de rótulos acima.`;
       
       const response = await ai.models.generateContent({
         model: GEMINI_MODEL,
@@ -1629,8 +1639,12 @@ Forneça a explicação de forma concisa e didática.`;
         return;
       }
 
-      const { kept: keptAfterSimilarity, dropped: droppedSimilar } = dedupeSimilarAiStatements(
+      const smartRowsCanonical = applyCanonicalTopicsToRows(
         validated.rows,
+        smartCatalog.canonicalByTopicKey
+      );
+      const { kept: keptAfterSimilarity, dropped: droppedSimilar } = dedupeSimilarAiStatements(
+        smartRowsCanonical,
         questions
       );
       if (keptAfterSimilarity.length === 0) {
@@ -1721,11 +1735,34 @@ Forneça a explicação de forma concisa e didática.`;
         ? 'Explicação detalhada referindo cada alternativa A–E.'
         : 'Explicação detalhada para Certo e para Errado.';
 
+      const subjectTrim = aiConfig.subject.trim();
+      const topicCatalog = buildTopicReuseCatalog(
+        questions,
+        subjectTrim || null,
+        TOPIC_REUSE_PROMPT_MAX_LABELS
+      );
+      const topicSuggestionLine = aiConfig.topic.trim()
+        ? `Preferência opcional do aluno para o tópico (não obrigatório seguir literalmente; respeite as regras de reutilização de rótulos): "${aiConfig.topic.trim()}".`
+        : '';
+      const subjectLineForPrompt = subjectTrim
+        ? `Matéria de referência: "${subjectTrim}". As questões devem ser coerentes com esta matéria.`
+        : `Defina o campo "subject" de cada questão de forma coerente com o material base (flashcards ou texto) e com a disciplina jurídica abordada.`;
+
+      const topicSchemaDesc =
+        topicCatalog.topicLabelsInPrompt.length > 0
+          ? 'Tópico: copiar EXATAMENTE um dos rótulos listados nas instruções TÓPICOS JÁ USADOS quando o conteúdo encaixar; só use texto novo curto se nenhum encaixar.'
+          : 'Tópico: no máximo 2 ou 3 rótulos distintos em todo o lote; nomes curtos; reutilize o mesmo texto quando várias questões forem do mesmo tema.';
+
       for (let i = 0; i < totalQuestions; i += chunkSize) {
         const currentBatchSize = Math.min(chunkSize, totalQuestions - i);
         setGeneratingStatus(`Gerando lote ${Math.floor(i / chunkSize) + 1} de ${Math.ceil(totalQuestions / chunkSize)}... (${i + currentBatchSize}/${totalQuestions} concluídas)`);
 
-        const prompt = `Crie ${currentBatchSize} questões de nível ${aiConfig.difficulty} sobre a matéria "${aiConfig.subject}" e tópico "${aiConfig.topic}".
+        const prompt = `Crie ${currentBatchSize} questões de nível ${aiConfig.difficulty}.
+        ${subjectLineForPrompt}
+        ${topicSuggestionLine}
+
+        ${topicCatalog.promptBlock}
+
         Modalidade: ${questionModalityLabel(aiConfig.modality)} (código no JSON: ${aiConfig.modality}).
         Estilo de Prova: ${aiConfig.examStyle}.
         Instituição: ${aiConfig.institution || 'Geral'}.
@@ -1756,7 +1793,7 @@ Forneça a explicação de forma concisa e didática.`;
                 type: Type.OBJECT,
                 properties: {
                   subject: { type: Type.STRING, description: "A matéria (ex: Direito Civil)" },
-                  topic: { type: Type.STRING, description: "O tópico (ex: Contratos)" },
+                  topic: { type: Type.STRING, description: topicSchemaDesc },
                   statement: { type: Type.STRING, description: "O enunciado da questão" },
                   options: {
                     type: Type.ARRAY,
@@ -1836,8 +1873,12 @@ Forneça a explicação de forma concisa e didática.`;
           return;
         }
 
-        const { kept: keptAfterSimilarity, dropped: droppedSimilar } = dedupeSimilarAiStatements(
+        const rowsCanonicalTopics = applyCanonicalTopicsToRows(
           validated.rows,
+          topicCatalog.canonicalByTopicKey
+        );
+        const { kept: keptAfterSimilarity, dropped: droppedSimilar } = dedupeSimilarAiStatements(
+          rowsCanonicalTopics,
           questions
         );
         if (keptAfterSimilarity.length === 0) {
