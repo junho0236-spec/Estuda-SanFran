@@ -2,6 +2,8 @@ import React from 'react';
 import { Sparkles, X, Loader2, Timer, Gavel } from 'lucide-react';
 import { QUESTION_MODALITY_LABELS, type Folder, type QuestionModality } from '../../types';
 import type { QuestionBankAiConfig, QuestionBankAiConfigSetter } from './types';
+import { SearchableFilterDropdown, toOptions } from './SearchableFilterDropdown';
+import { DisciplineFilterDropdown } from './DisciplineFilterDropdown';
 
 export interface QuestionBankAIGeneratorModalProps {
   open: boolean;
@@ -49,15 +51,22 @@ export const QuestionBankAIGeneratorModal: React.FC<QuestionBankAIGeneratorModal
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Matéria / Assunto *</label>
-              <input
-                type="text"
-                required={!aiConfig.baseOnFlashcards && !aiConfig.context}
+              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">
+                Disciplina (catálogo fixo) *
+              </label>
+              <DisciplineFilterDropdown
+                emptyLabel="Selecione a disciplina"
+                clearLabel="Selecione a disciplina"
                 value={aiConfig.subject}
-                onChange={e => setAiConfig({ ...aiConfig, subject: e.target.value })}
-                className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
-                placeholder="Ex: Direito Penal"
+                onChange={(subject) => setAiConfig({ ...aiConfig, subject })}
+                className="w-full"
+                useFixedPortal
               />
+              {!aiConfig.baseOnFlashcards && !aiConfig.context && !aiConfig.subject.trim() ? (
+                <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                  Escolha uma disciplina para gerar questões.
+                </p>
+              ) : null}
             </div>
             <div>
               <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">

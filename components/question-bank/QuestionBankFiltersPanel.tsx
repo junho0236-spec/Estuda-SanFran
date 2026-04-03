@@ -16,11 +16,22 @@ import {
   type QuestionModality,
 } from '../../types';
 import type { QuestionBankSavedFilterPreset } from './types';
+import {
+  SearchableFilterDropdown,
+  toOptions,
+  type SearchableDropdownOption,
+} from './SearchableFilterDropdown';
+import { DisciplineFilterDropdown } from './DisciplineFilterDropdown';
 
 const MOD_KEYS: QuestionModality[] = ['multipla_escolha', 'certo_errado'];
 
-const selectCls =
-  'block w-full pl-3 pr-10 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500';
+const DIFFICULTY_OPTS: SearchableDropdownOption[] = [
+  { value: 'muito_facil', label: 'Muito fácil' },
+  { value: 'facil', label: 'Fácil' },
+  { value: 'media', label: 'Média' },
+  { value: 'dificil', label: 'Difícil' },
+  { value: 'muito_dificil', label: 'Muito difícil' },
+];
 
 function PillRow({
   label,
@@ -78,7 +89,6 @@ export interface QuestionBankFiltersPanelProps {
   selectedSubject: string;
   setSelectedSubject: (v: string) => void;
   setSelectedTopic: (v: string) => void;
-  subjects: string[];
   filteredTopics: string[];
   selectedTopic: string;
   selectedExamBoard: string;
@@ -152,7 +162,6 @@ export const QuestionBankFiltersPanel: React.FC<QuestionBankFiltersPanelProps> =
   selectedSubject,
   setSelectedSubject,
   setSelectedTopic,
-  subjects,
   filteredTopics,
   selectedTopic,
   selectedExamBoard,
@@ -220,15 +229,29 @@ export const QuestionBankFiltersPanel: React.FC<QuestionBankFiltersPanelProps> =
   const [saveName, setSaveName] = useState('');
   const [showSavedMenu, setShowSavedMenu] = useState(false);
 
+  const modalityOptions = useMemo(
+    () => MOD_KEYS.map((key) => ({ value: key, label: QUESTION_MODALITY_LABELS[key] })),
+    []
+  );
+
+  const notebookOptions = useMemo(
+    () =>
+      notebooks.map((n) => ({
+        value: n.id,
+        label: `${n.name} (${n.question_ids.length})`,
+      })),
+    [notebooks]
+  );
+
   const helpText = useMemo(
     () =>
-      'Os filtros aplicam-se em tempo real. Use chips para remover critérios. Comentários: escolha um modo (professor, alunos, seus, vídeo ou IA). Por defeito, questões anuladas ou desatualizadas ficam de fora até marcar Incluir.',
+      'Os filtros aplicam-se em tempo real. Use chips para remover critérios. A disciplina é escolhida numa lista fixa (como no Gran Cursos).',
     []
   );
 
   return (
     <>
-      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/40 overflow-hidden shadow-sm">
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/40 shadow-sm overflow-visible">
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60">
           <span
             className="inline-flex items-center justify-center rounded-full p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-help"
@@ -272,8 +295,8 @@ export const QuestionBankFiltersPanel: React.FC<QuestionBankFiltersPanelProps> =
         </div>
 
         <div className="p-4 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
-            <div className="md:col-span-2 relative">
+          <div className="space-y-3">
+            <div className="relative w-full">
               <label className="sr-only">Pesquisar</label>
               <Search
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -288,89 +311,65 @@ export const QuestionBankFiltersPanel: React.FC<QuestionBankFiltersPanelProps> =
                 className="w-full pl-10 pr-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 focus:ring-2 focus:ring-blue-500 outline-none"
               />
             </div>
-            <div>
-              <select
-                value={selectedSubject}
-                onChange={(e) => {
-                  setSelectedSubject(e.target.value);
-                  setSelectedTopic('');
-                }}
-                className={selectCls}
-              >
-                <option value="">Disciplina</option>
-                {subjects.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="md:col-span-2">
-              <select
-                value={selectedTopic}
-                onChange={(e) => setSelectedTopic(e.target.value)}
-                disabled={!selectedSubject}
-                className={`${selectCls} disabled:opacity-50 disabled:cursor-not-allowed`}
-              >
-                <option value="">Assunto</option>
-                {filteredTopics.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
+              <div className="min-w-0">
+                <DisciplineFilterDropdown
+                  emptyLabel="Disciplina"
+                  clearLabel="Todas as disciplinas"
+                  value={selectedSubject}
+                  onChange={(v) => {
+                    setSelectedSubject(v);
+                    setSelectedTopic('');
+                  }}
+                />
+              </div>
+              <div className="min-w-0">
+                <SearchableFilterDropdown
+                  label="Assunto"
+                  emptyLabel="Assunto"
+                  clearLabel="Todos os assuntos"
+                  value={selectedTopic}
+                  onChange={setSelectedTopic}
+                  options={toOptions(filteredTopics)}
+                  disabled={!selectedSubject}
+                />
+              </div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <select
+            <SearchableFilterDropdown
+              label="Banca / estilo"
+              emptyLabel="Banca / estilo"
+              clearLabel="Todas as bancas"
               value={selectedExamBoard}
-              onChange={(e) => setSelectedExamBoard(e.target.value)}
-              className={selectCls}
-            >
-              <option value="">Banca / estilo</option>
-              {examBoards.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
-            <select
+              onChange={setSelectedExamBoard}
+              options={toOptions(examBoards)}
+            />
+            <SearchableFilterDropdown
+              label="Instituição"
+              emptyLabel="Instituição"
+              clearLabel="Todas"
               value={selectedInstitution}
-              onChange={(e) => setSelectedInstitution(e.target.value)}
-              className={selectCls}
-            >
-              <option value="">Instituição</option>
-              {institutions.map((i) => (
-                <option key={i} value={i}>
-                  {i}
-                </option>
-              ))}
-            </select>
-            <select
+              onChange={setSelectedInstitution}
+              options={toOptions(institutions)}
+            />
+            <SearchableFilterDropdown
+              label="Cargo"
+              emptyLabel="Cargo"
+              clearLabel="Todos"
               value={selectedJobPosition}
-              onChange={(e) => setSelectedJobPosition(e.target.value)}
-              className={selectCls}
-            >
-              <option value="">Cargo</option>
-              {jobPositions.map((j) => (
-                <option key={j} value={j}>
-                  {j}
-                </option>
-              ))}
-            </select>
-            <select
+              onChange={setSelectedJobPosition}
+              options={toOptions(jobPositions)}
+            />
+            <SearchableFilterDropdown
+              label="Ano"
+              emptyLabel="Ano"
+              clearLabel="Todos os anos"
               value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
-              className={selectCls}
-            >
-              <option value="">Ano</option>
-              {years.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedYear}
+              options={toOptions(years)}
+            />
           </div>
 
           <button
@@ -391,127 +390,89 @@ export const QuestionBankFiltersPanel: React.FC<QuestionBankFiltersPanelProps> =
 
           {showAdvanced && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 pt-2 border-t border-slate-200 dark:border-slate-800 animate-in slide-in-from-top-2 duration-200">
-              <select
+              <SearchableFilterDropdown
+                label="Carreira"
+                emptyLabel="Carreira"
+                clearLabel="Todas"
                 value={selectedCareer}
-                onChange={(e) => setSelectedCareer(e.target.value)}
-                className={selectCls}
-              >
-                <option value="">Carreira</option>
-                {careers.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-              <select
+                onChange={setSelectedCareer}
+                options={toOptions(careers)}
+              />
+              <SearchableFilterDropdown
+                label="Área de formação"
+                emptyLabel="Área de formação"
+                clearLabel="Todas"
                 value={selectedFormationArea}
-                onChange={(e) => setSelectedFormationArea(e.target.value)}
-                className={selectCls}
-              >
-                <option value="">Área de formação</option>
-                {formationAreas.map((f) => (
-                  <option key={f} value={f}>
-                    {f}
-                  </option>
-                ))}
-              </select>
-              <select
+                onChange={setSelectedFormationArea}
+                options={toOptions(formationAreas)}
+              />
+              <SearchableFilterDropdown
+                label="Escolaridade"
+                emptyLabel="Escolaridade"
+                clearLabel="Todas"
                 value={selectedEducationLevel}
-                onChange={(e) => setSelectedEducationLevel(e.target.value)}
-                className={selectCls}
-              >
-                <option value="">Escolaridade</option>
-                {educationLevels.map((e) => (
-                  <option key={e} value={e}>
-                    {e}
-                  </option>
-                ))}
-              </select>
-              <select
+                onChange={setSelectedEducationLevel}
+                options={toOptions(educationLevels)}
+              />
+              <SearchableFilterDropdown
+                label="Dificuldade"
+                emptyLabel="Dificuldade"
+                clearLabel="Qualquer dificuldade"
                 value={difficultyFilter}
-                onChange={(e) => setDifficultyFilter(e.target.value)}
-                className={selectCls}
-              >
-                <option value="">Dificuldade</option>
-                <option value="muito_facil">Muito fácil</option>
-                <option value="facil">Fácil</option>
-                <option value="media">Média</option>
-                <option value="dificil">Difícil</option>
-                <option value="muito_dificil">Muito difícil</option>
-              </select>
-              <select
+                onChange={setDifficultyFilter}
+                options={DIFFICULTY_OPTS}
+              />
+              <SearchableFilterDropdown
+                label="Legislação"
+                emptyLabel="Legislação"
+                clearLabel="Todas"
                 value={selectedLegislation}
-                onChange={(e) => setSelectedLegislation(e.target.value)}
-                className={selectCls}
-              >
-                <option value="">Legislação</option>
-                {legislationTags.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-              <select
+                onChange={setSelectedLegislation}
+                options={toOptions(legislationTags)}
+              />
+              <SearchableFilterDropdown
+                label="Jurisprudência"
+                emptyLabel="Jurisprudência"
+                clearLabel="Todas"
                 value={selectedJurisprudence}
-                onChange={(e) => setSelectedJurisprudence(e.target.value)}
-                className={selectCls}
-              >
-                <option value="">Jurisprudência</option>
-                {jurisprudenceTags.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-              <select
+                onChange={setSelectedJurisprudence}
+                options={toOptions(jurisprudenceTags)}
+              />
+              <SearchableFilterDropdown
+                label="Prova"
+                emptyLabel="Prova"
+                clearLabel="Todas"
                 value={selectedExamName}
-                onChange={(e) => setSelectedExamName(e.target.value)}
-                className={selectCls}
-              >
-                <option value="">Prova</option>
-                {examNames.map((ex) => (
-                  <option key={ex} value={ex}>
-                    {ex}
-                  </option>
-                ))}
-              </select>
-              <select
+                onChange={setSelectedExamName}
+                options={toOptions(examNames)}
+              />
+              <SearchableFilterDropdown
+                label="Diploma legal"
+                emptyLabel="Diploma legal"
+                clearLabel="Todos"
                 value={selectedLegalDiploma}
-                onChange={(e) => setSelectedLegalDiploma(e.target.value)}
-                className={selectCls}
-              >
-                <option value="">Diploma legal</option>
-                {legalDiplomas.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </select>
-              <select
+                onChange={setSelectedLegalDiploma}
+                options={toOptions(legalDiplomas)}
+              />
+              <SearchableFilterDropdown
+                label="Modalidade"
+                emptyLabel="Modalidade"
+                clearLabel="Qualquer modalidade"
                 value={selectedModality}
-                onChange={(e) => setSelectedModality(e.target.value)}
-                className={selectCls}
-              >
-                <option value="">Modalidade</option>
-                {MOD_KEYS.map((key) => (
-                  <option key={key} value={key}>
-                    {QUESTION_MODALITY_LABELS[key]}
-                  </option>
-                ))}
-              </select>
+                onChange={setSelectedModality}
+                options={modalityOptions}
+              />
               {notebooks.length > 0 && (
-                <select
-                  value={selectedNotebookId}
-                  onChange={(e) => setSelectedNotebookId(e.target.value)}
-                  className={`${selectCls} border-orange-200 dark:border-orange-900 bg-orange-50/30 dark:bg-orange-950/20 text-orange-900 dark:text-orange-200`}
-                >
-                  <option value="">Meus cadernos</option>
-                  {notebooks.map((n) => (
-                    <option key={n.id} value={n.id}>
-                      {n.name} ({n.question_ids.length})
-                    </option>
-                  ))}
-                </select>
+                <div className="rounded-lg border border-orange-200 bg-orange-50/30 p-0.5 dark:border-orange-900 dark:bg-orange-950/20">
+                  <SearchableFilterDropdown
+                    label="Meus cadernos"
+                    emptyLabel="Meus cadernos"
+                    clearLabel="Nenhum caderno"
+                    value={selectedNotebookId}
+                    onChange={setSelectedNotebookId}
+                    options={notebookOptions}
+                  />
+                </div>
               )}
             </div>
           )}

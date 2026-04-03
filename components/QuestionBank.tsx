@@ -196,7 +196,6 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
   const [showExplanation, setShowExplanation] = useState(false);
   
   // Filters
-  const [subjects, setSubjects] = useState<string[]>([]);
   const [topics, setTopics] = useState<string[]>([]);
   const [examBoards, setExamBoards] = useState<string[]>([]);
   const [years, setYears] = useState<string[]>([]);
@@ -1577,10 +1576,6 @@ Forneça a explicação de forma concisa e didática.`;
   };
 
   const updateFilters = (data: Question[]) => {
-    // Extract unique subjects and topics
-    const uniqueSubjects = Array.from(new Set(data.map(q => q.subject))).filter(Boolean).sort();
-    setSubjects(uniqueSubjects);
-    
     const uniqueTopics = Array.from(new Set(data.map(q => q.topic))).filter(Boolean).sort();
     setTopics(uniqueTopics);
 
@@ -2061,9 +2056,6 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
               : `${data.length} questões geradas com sucesso!`,
             'success'
           );
-          
-          const newSubjects = Array.from(new Set([...subjects, ...data.map(q => q.subject)])).filter(Boolean);
-          setSubjects(newSubjects);
           
           const newTopics = Array.from(new Set([...topics, ...data.map(q => q.topic)])).filter(Boolean);
           setTopics(newTopics);
@@ -3401,7 +3393,6 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
               selectedSubject={selectedSubject}
               setSelectedSubject={setSelectedSubject}
               setSelectedTopic={setSelectedTopic}
-              subjects={subjects}
               filteredTopics={filteredTopics}
               selectedTopic={selectedTopic}
               selectedExamBoard={selectedExamBoard}
