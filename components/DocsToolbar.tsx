@@ -309,9 +309,9 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
     if (quillRef.current) {
       ensureQuillSelection();
       let value: string | boolean = false;
-      if (align === 'justifyCenter') value = 'center';
-      if (align === 'justifyRight') value = 'right';
-      if (align === 'justifyFull') value = 'justify';
+      if (align === 'center') value = 'center';
+      if (align === 'right') value = 'right';
+      if (align === 'justify') value = 'justify';
       quillRef.current.format('align', value);
     }
   };
@@ -319,7 +319,10 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
   const handleList = (type: string) => {
     if (quillRef.current) {
       ensureQuillSelection();
-      const value = type === 'insertOrderedList' ? 'ordered' : 'bullet';
+      let value = 'bullet';
+      if (type === 'ordered') value = 'ordered';
+      else if (type === 'unchecked' || type === 'checked') value = 'check';
+      
       const current = quillRef.current.getFormat().list;
       quillRef.current.format('list', current === value ? false : value);
     }
@@ -354,7 +357,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
   const handleLineSpacing = (value: string) => {
     if (quillRef.current) {
       ensureQuillSelection();
-      quillRef.current.format('lineheight', value === '1.15' ? false : value);
+      quillRef.current.format('lineheight', value);
     }
   };
 

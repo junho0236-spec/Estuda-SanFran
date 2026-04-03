@@ -17,6 +17,7 @@ interface NoteEditorPaneProps {
   showComments: boolean;
   setShowComments: (show: boolean) => void;
   quillRef: React.MutableRefObject<Quill | null>;
+  noteContent: string;
 }
 
 const EQUATION_SYMBOLS = ['∑', '∏', '∫', '√', '∞', '≠', '≈', '≤', '≥'];
@@ -40,7 +41,18 @@ const NoteEditorPane: React.FC<NoteEditorPaneProps> = ({
   showComments,
   setShowComments,
   quillRef,
+  noteContent,
 }) => {
+  const comments = React.useMemo(() => {
+    const doc = new DOMParser().parseFromString(noteContent, 'text/html');
+    const commentNodes = doc.querySelectorAll('span[data-comment]');
+    return Array.from(commentNodes).map((node, index) => ({
+      id: index,
+      text: node.getAttribute('data-comment') || '',
+      context: node.textContent || ''
+    }));
+  }, [noteContent]);
+
   return (
     <div className="flex flex-1 flex-col min-h-0 min-w-0 overflow-hidden">
       {showRuler && !isVadeMecumMode && (
@@ -128,15 +140,24 @@ const NoteEditorPane: React.FC<NoteEditorPaneProps> = ({
         </div>
 
         {showComments && (
-          <aside className="w-80 bg-slate-50 dark:bg-white/5 border-l border-slate-200 dark:border-white/10 p-6 animate-in slide-in-from-right duration-300">
+          <aside className="w-80 bg-slate-50 dark:bg-white/5 border-l border-slate-200 dark:border-white/10 p-6 animate-in slide-in-from-right duration-300 overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Comentários</h4>
               <button onClick={() => setShowComments(false)} className="text-slate-400 hover:text-slate-600"><Minimize2 size={16} /></button>
             </div>
             <div className="space-y-4">
-              <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-white/5">
-                <p className="text-xs text-slate-500 italic">Nenhum comentário neste documento.</p>
-              </div>
+              {comments.length === 0 ? (
+                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-white/5">
+                  <p className="text-xs text-slate-500 italic">Nenhum comentário neste documento.</p>
+                </div>
+              ) : (
+                comments.map(comment => (
+                  <div key={comment.id} className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-white/5">
+                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">"{comment.context}"</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">{comment.text}</p>
+                  </div>
+                ))
+              )}
             </div>
           </aside>
         )}

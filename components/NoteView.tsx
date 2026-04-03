@@ -1292,6 +1292,7 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                     showComments={showComments}
                     setShowComments={setShowComments}
                     quillRef={quillRef}
+                    noteContent={noteContent}
                   />
                   </div>
                 </div>
