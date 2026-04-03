@@ -882,8 +882,8 @@ export interface IracEntry {
   created_at: string;
 }
 
-/** `fixed` = escada Ebbinghaus; `sm2` = intervalo adaptativo (SuperMemo 2 simplificado). */
-export type SrsAlgorithm = 'fixed' | 'sm2';
+/** `fixed` = escada Ebbinghaus; `sm2` = SM-2; `fsrs` = FSRS (ts-fsrs, intervalos em dias). */
+export type SrsAlgorithm = 'fixed' | 'sm2' | 'fsrs';
 
 /** Destaque de atalhos no tópico de revisão espaçada (flashcards, resumidor, banco de questões). */
 export type SpacedMaterialKind = 'none' | 'flashcards' | 'summarizer' | 'both' | 'question_bank';
@@ -908,8 +908,10 @@ export interface SpacedTopic {
   srs_repetitions?: number | null;
   /** Último intervalo em dias calculado pelo SM-2. */
   srs_interval_days?: number | null;
-  /** Próxima revisão (YYYY-MM-DD) para tópicos SM-2. */
+  /** Próxima revisão (YYYY-MM-DD) para tópicos SM-2 / FSRS. */
   srs_next_review_at?: string | null;
+  /** Estado serializado do cartão FSRS (`services/spacedFsrs.ts`). Só para `srs_algorithm === 'fsrs'`. */
+  srs_fsrs_card?: unknown;
   /** Modo fixo: adia a revisão de um degrau (ex.: Again) — chave = intervalo em string, valor = data. */
   review_snoozes?: Record<string, string>;
   /** Modo fixo: deslocamento em dias aplicado à escada (Hard/Easy). */

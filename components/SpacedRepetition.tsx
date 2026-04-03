@@ -7,7 +7,7 @@ import {
   Star, Ghost, Sword, X, TrendingUp, Award, Target,
   ChevronRight, ChevronLeft, Brain, Sparkles, ZapIcon, ShieldCheck, Clock,
   FileText, Save, RotateCcw, Search, ThumbsDown, Minus, ThumbsUp,
-  Bell, BrainCircuit
+  Bell, BrainCircuit, Settings2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../services/supabaseClient';
@@ -15,6 +15,13 @@ import { SpacedTopic, UserProfile, SrsAlgorithm, SpacedMaterialKind } from '../t
 import confetti from 'canvas-confetti';
 import { toast } from 'sonner';
 import { dataService } from '../services/dataService';
+import {
+  applyFsrsReview,
+  createInitialFsrsCard,
+  fsrsCardToSnapshot,
+  getFsrsRepsFromSnapshot,
+} from '../services/spacedFsrs';
+import { applySpacedTopicPlanEdit } from '../services/spacedTopicRecalc';
 
 interface SpacedRepetitionProps {
   userId: string;
@@ -26,10 +33,10 @@ interface ReviewTask {
   topicId: string;
   subject: string;
   topic: string;
-  interval: number; // degrau fixo em dias ou último intervalo SM-2
+  interval: number; // degrau fixo em dias ou último intervalo SM-2 / FSRS
   dueDate: Date;
   status: 'pending' | 'done' | 'overdue';
-  reviewKind: 'fixed' | 'sm2';
+  reviewKind: 'fixed' | 'sm2' | 'fsrs';
 }
 
 type ReviewQuality = 'again' | 'hard' | 'good' | 'easy';
@@ -73,17 +80,31 @@ function sm2Step(
   };
 }
 
+function isAdaptiveSrsAlgorithm(a: unknown): a is 'sm2' | 'fsrs' {
+  return a === 'sm2' || a === 'fsrs';
+}
+
 function spacedTopicPersistPayload(t: SpacedTopic) {
+  const algo = (t.srs_algorithm || 'fixed') as SrsAlgorithm;
   return {
     reviews_completed: t.reviews_completed,
     review_completion_dates: t.review_completion_dates || {},
-    srs_algorithm: (t.srs_algorithm || 'fixed') as SrsAlgorithm,
+    srs_algorithm: algo,
     srs_ease_factor: t.srs_ease_factor ?? 2.5,
     srs_repetitions: t.srs_repetitions ?? 0,
     srs_interval_days: t.srs_interval_days ?? null,
     srs_next_review_at: t.srs_next_review_at ?? null,
     review_snoozes: t.review_snoozes || {},
     srs_cumulative_offset_days: t.srs_cumulative_offset_days ?? 0,
+    srs_fsrs_card: algo === 'fsrs' ? (t.srs_fsrs_card ?? null) : null,
+  };
+}
+
+function spacedTopicDbUpdateFields(t: SpacedTopic) {
+  return {
+    ...spacedTopicPersistPayload(t),
+    study_date: t.study_date,
+    cycles: t.cycles,
   };
 }
 
@@ -107,9 +128,10 @@ const normalizeSpacedTopic = (t: SpacedTopic): SpacedTopic => {
     snRaw && typeof snRaw === 'object' && !Array.isArray(snRaw)
       ? (snRaw as Record<string, string>)
       : {};
-  const algo: SrsAlgorithm = t.srs_algorithm === 'sm2' ? 'sm2' : 'fixed';
+  const rawAlgo = t.srs_algorithm;
+  const algo: SrsAlgorithm = isAdaptiveSrsAlgorithm(rawAlgo) ? rawAlgo : 'fixed';
   let srs_next = t.srs_next_review_at ?? null;
-  if (algo === 'sm2' && !srs_next && t.study_date) {
+  if (isAdaptiveSrsAlgorithm(algo) && !srs_next && t.study_date) {
     srs_next = addCalendarDays(t.study_date, 1);
   }
   return {
@@ -142,6 +164,26 @@ function cloneTopicSnapshot(t: SpacedTopic): SpacedTopic {
 function applyReviewQuality(topic: SpacedTopic, task: ReviewTask, quality: ReviewQuality): SpacedTopic {
   const completionDay = localCalendarDateString();
   const algo = topic.srs_algorithm || 'fixed';
+
+  if (algo === 'fsrs') {
+    const { snapshot, nextReviewLocalISO, intervalDays } = applyFsrsReview(
+      topic.study_date,
+      topic.srs_fsrs_card,
+      quality,
+      completionDay
+    );
+    const dates = { ...(topic.review_completion_dates || {}) };
+    if (quality !== 'again') {
+      dates[`fsrs-${snapshot.reps}`] = completionDay;
+    }
+    return normalizeSpacedTopic({
+      ...topic,
+      srs_fsrs_card: snapshot,
+      srs_interval_days: intervalDays,
+      srs_next_review_at: nextReviewLocalISO,
+      review_completion_dates: dates,
+    });
+  }
 
   if (algo === 'sm2') {
     const ef = topic.srs_ease_factor ?? 2.5;
@@ -192,7 +234,7 @@ const localCalendarDateString = () => new Date().toLocaleDateString('en-CA');
 
 /** Data (início do dia local) da próxima revisão pendente, na ordem dos intervalos do plano. */
 const getNextReviewDueDate = (t: SpacedTopic): Date | null => {
-  if ((t.srs_algorithm || 'fixed') === 'sm2' && t.srs_next_review_at) {
+  if (isAdaptiveSrsAlgorithm(t.srs_algorithm) && t.srs_next_review_at) {
     const d = new Date(t.srs_next_review_at + 'T00:00:00');
     d.setHours(0, 0, 0, 0);
     return d;
@@ -228,17 +270,20 @@ function weekStartMonday(d: Date): Date {
 
 function topicIsMastered(t: SpacedTopic): boolean {
   const topicIntervals = getIntervalsForCycles(t.cycles || 4);
-  const isSm2 = (t.srs_algorithm || 'fixed') === 'sm2';
-  if (isSm2) return (t.srs_repetitions ?? 0) >= (t.cycles || 4) * 3;
+  const algo = t.srs_algorithm || 'fixed';
+  if (algo === 'fsrs') {
+    return getFsrsRepsFromSnapshot(t.srs_fsrs_card) >= (t.cycles || 4) * 3;
+  }
+  if (algo === 'sm2') return (t.srs_repetitions ?? 0) >= (t.cycles || 4) * 3;
   const progress = (t.reviews_completed.length / topicIntervals.length) * 100;
   return progress === 100;
 }
 
-/** Datas previstas de cada degrau ainda pendente (fixo: escada + offset + snooze; SM-2: próxima única). */
+/** Datas previstas de cada degrau ainda pendente (fixo: escada + offset + snooze; SM-2/FSRS: próxima única). */
 function collectUpcomingDueDates(t: SpacedTopic): Date[] {
   if (topicIsMastered(t)) return [];
   const algo = t.srs_algorithm || 'fixed';
-  if (algo === 'sm2') {
+  if (algo === 'sm2' || algo === 'fsrs') {
     const next = t.srs_next_review_at || addCalendarDays(t.study_date, 1);
     const d = new Date(next + 'T00:00:00');
     d.setHours(0, 0, 0, 0);
@@ -458,6 +503,10 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
   const [contentMaterialKind, setContentMaterialKind] = useState<SpacedMaterialKind>('both');
   const [contentMaterialQuery, setContentMaterialQuery] = useState('');
   const [savingMaterialLink, setSavingMaterialLink] = useState(false);
+  const [editPlanStudyDate, setEditPlanStudyDate] = useState('');
+  const [editPlanCycles, setEditPlanCycles] = useState(4);
+  const [editPlanAlgorithm, setEditPlanAlgorithm] = useState<SrsAlgorithm>('fixed');
+  const [isSavingTopicPlan, setIsSavingTopicPlan] = useState(false);
 
   const reminderPrefsRef = useRef({ enabled: false, time: '09:00' });
   const todaysReviewsRef = useRef<ReviewTask[]>([]);
@@ -506,7 +555,7 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
     data.forEach(t => {
       const algo = t.srs_algorithm || 'fixed';
 
-      if (algo === 'sm2') {
+      if (algo === 'sm2' || algo === 'fsrs') {
         let nextAt = t.srs_next_review_at;
         if (!nextAt) nextAt = addCalendarDays(t.study_date, 1);
         const due = new Date(nextAt + 'T00:00:00');
@@ -519,7 +568,7 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
             interval: t.srs_interval_days || 1,
             dueDate: due,
             status: due.getTime() === today.getTime() ? 'pending' : 'overdue',
-            reviewKind: 'sm2',
+            reviewKind: algo === 'fsrs' ? 'fsrs' : 'sm2',
           });
         }
         return;
@@ -557,10 +606,15 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
       });
     });
 
+    const adaptiveRank = (k: ReviewTask['reviewKind']) =>
+      k === 'fsrs' ? 0 : k === 'sm2' ? 1 : 2;
+
     tasks.sort((a, b) => {
       if (a.status === 'overdue' && b.status !== 'overdue') return -1;
       if (a.status !== 'overdue' && b.status === 'overdue') return 1;
-      if (a.reviewKind !== b.reviewKind) return a.reviewKind === 'sm2' ? -1 : 1;
+      const ar = adaptiveRank(a.reviewKind);
+      const br = adaptiveRank(b.reviewKind);
+      if (ar !== br) return ar - br;
       if (a.interval !== b.interval) return a.interval - b.interval;
       return a.topic.localeCompare(b.topic);
     });
@@ -724,6 +778,10 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
     if (!selectedTopicForContent) return;
     setContentMaterialKind(normalizeMaterialKind(selectedTopicForContent.linked_material_kind));
     setContentMaterialQuery(selectedTopicForContent.linked_material_query || '');
+    setEditPlanStudyDate(selectedTopicForContent.study_date);
+    setEditPlanCycles(selectedTopicForContent.cycles || 4);
+    const a = selectedTopicForContent.srs_algorithm;
+    setEditPlanAlgorithm(a === 'sm2' || a === 'fsrs' ? a : 'fixed');
   }, [selectedTopicForContent]);
 
   const requestReminderPermission = async () => {
@@ -816,6 +874,7 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
 
     try {
       const sm2 = newTopicAlgorithm === 'sm2';
+      const useFsrs = newTopicAlgorithm === 'fsrs';
       const insertRow: Record<string, unknown> = {
         user_id: userId,
         subject: subject,
@@ -828,12 +887,15 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
         srs_ease_factor: 2.5,
         srs_repetitions: 0,
         srs_interval_days: null,
-        srs_next_review_at: sm2 ? addCalendarDays(studyDate, 1) : null,
+        srs_next_review_at: sm2 || useFsrs ? addCalendarDays(studyDate, 1) : null,
         review_snoozes: {},
         srs_cumulative_offset_days: 0,
         linked_material_kind: newTopicMaterialKind,
         linked_material_query: newTopicMaterialQuery.trim() || null,
       };
+      if (useFsrs) {
+        insertRow.srs_fsrs_card = fsrsCardToSnapshot(createInitialFsrsCard(studyDate));
+      }
 
       const { data, error } = await supabase.from('spaced_topics').insert(insertRow).select().single();
 
@@ -892,11 +954,15 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
       quality !== 'again' && (task.status === 'pending' || task.status === 'overdue');
 
     if (quality === 'again') {
+      const alg = topic.srs_algorithm || 'fixed';
+      const againDesc =
+        alg === 'sm2'
+          ? 'Intervalo SM-2 reiniciado; próxima revisão em 1 dia.'
+          : alg === 'fsrs'
+            ? 'FSRS ajustou estabilidade; a próxima data segue o scheduler (geralmente breve após Again).'
+            : 'Este degrau volta à fila amanhã (modo fixo).';
       toast.info('Vamos repetir em breve.', {
-        description:
-          (topic.srs_algorithm || 'fixed') === 'sm2'
-            ? 'Intervalo SM-2 reiniciado; próxima revisão em 1 dia.'
-            : 'Este degrau volta à fila amanhã (modo fixo).',
+        description: againDesc,
       });
       setLastReviewUndo({
         topicSnapshot,
@@ -1077,6 +1143,58 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
     setTopicContent(topic.content || '');
   };
 
+  const topicPlanDirty = useMemo(() => {
+    const cur = selectedTopicForContent;
+    if (!cur) return false;
+    const curAlgo = cur.srs_algorithm === 'sm2' || cur.srs_algorithm === 'fsrs' ? cur.srs_algorithm : 'fixed';
+    return (
+      editPlanStudyDate !== cur.study_date ||
+      editPlanCycles !== (cur.cycles || 4) ||
+      editPlanAlgorithm !== curAlgo
+    );
+  }, [selectedTopicForContent, editPlanStudyDate, editPlanCycles, editPlanAlgorithm]);
+
+  const handleSaveTopicPlan = async () => {
+    const cur = selectedTopicForContent;
+    if (!cur || !topicPlanDirty) return;
+    if (!editPlanStudyDate.trim()) {
+      toast.warning('Informe a data do estudo.');
+      return;
+    }
+    setIsSavingTopicPlan(true);
+    const merged = applySpacedTopicPlanEdit(cur, {
+      study_date: editPlanStudyDate,
+      cycles: editPlanCycles,
+      srs_algorithm: editPlanAlgorithm,
+    });
+    const nextTopic = normalizeSpacedTopic(merged);
+    const snapshot = topics.map(t => cloneTopicSnapshot(t));
+    const newList = topics.map(t => (t.id === cur.id ? nextTopic : t));
+    setTopics(newList);
+    calculateReviews(newList);
+    calculateWeeklyActivity(newList);
+    try {
+      const { error } = await supabase
+        .from('spaced_topics')
+        .update(spacedTopicDbUpdateFields(nextTopic))
+        .eq('id', cur.id);
+      if (error) throw error;
+      setSelectedTopicForContent(nextTopic);
+      setLastReviewUndo(u => (u?.topicSnapshot.id === cur.id ? null : u));
+      toast.success('Plano de revisão atualizado.', {
+        description: 'Regras de recálculo aplicadas; fila e calendário foram ajustados.',
+      });
+    } catch (e) {
+      console.error(e);
+      setTopics(snapshot);
+      calculateReviews(snapshot);
+      calculateWeeklyActivity(snapshot);
+      toast.error('Não foi possível salvar o plano.', { description: describeSupabaseError(e) });
+    } finally {
+      setIsSavingTopicPlan(false);
+    }
+  };
+
   const getIntervalLabel = (days: number) => {
     switch (days) {
         case 1: return '24h';
@@ -1120,12 +1238,7 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
       if (urgent) return 0;
       const soon = todaysReviews.some(r => r.topicId === t.id && r.status === 'pending');
       if (soon) return 1;
-      const topicIntervals = getIntervalsForCycles(t.cycles || 4);
-      const isSm2 = (t.srs_algorithm || 'fixed') === 'sm2';
-      const mastered = isSm2
-        ? (t.srs_repetitions ?? 0) >= (t.cycles || 4) * 3
-        : t.reviews_completed.length >= topicIntervals.length;
-      if (mastered) return 3;
+      if (topicIsMastered(t)) return 3;
       return 2;
     };
 
@@ -1247,7 +1360,7 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
     let late = 0;
     let onTime = 0;
     topics.forEach(topic => {
-      if ((topic.srs_algorithm || 'fixed') === 'sm2') return;
+      if (isAdaptiveSrsAlgorithm(topic.srs_algorithm)) return;
       const planIntervals = getIntervalsForCycles(topic.cycles || 4);
       const dates = topic.review_completion_dates || {};
       for (const [k, completed] of Object.entries(dates)) {
@@ -1708,16 +1821,21 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                           >
                             <option value="fixed">Intervalos fixos (Ebbinghaus + qualidade)</option>
                             <option value="sm2">Adaptativo SM-2 (Again / Hard / Good / Easy)</option>
+                            <option value="fsrs">Adaptativo FSRS (Again / Hard / Good / Easy)</option>
                           </select>
                           <p className="mt-2 text-[9px] leading-snug text-slate-500 dark:text-slate-400">
-                            {newTopicAlgorithm === 'sm2'
-                              ? 'SuperMemo 2 simplificado: o próximo prazo depende da qualidade e do fator de facilidade. FSRS (usado no Anki moderno) é ainda mais fino — pode ser integrado depois.'
-                              : 'Escada clássica 1d → 3d → 7d… Hard/Easy deslocam levemente os prazos; Again repete o degrau no dia seguinte.'}
+                            {newTopicAlgorithm === 'fsrs'
+                              ? 'FSRS (biblioteca ts-fsrs): scheduler moderno, melhor previsão de esquecimento que SM-2 clássico. Intervalos em dias (sem steps de minutos), alinhado ao calendário do app.'
+                              : newTopicAlgorithm === 'sm2'
+                                ? 'SuperMemo 2 simplificado: o próximo prazo depende da qualidade e do fator de facilidade. FSRS costuma ser mais preciso para retenção a longo prazo.'
+                                : 'Escada clássica 1d → 3d → 7d… Hard/Easy deslocam levemente os prazos; Again repete o degrau no dia seguinte.'}
                           </p>
                        </div>
                        <div className="flex justify-between items-center mb-4">
                           <p className="text-[10px] font-black uppercase text-sky-600 dark:text-sky-400 tracking-widest">
-                            {newTopicAlgorithm === 'sm2' ? 'Meta visual (ciclos)' : 'Plano de Revisão'}
+                            {newTopicAlgorithm === 'sm2' || newTopicAlgorithm === 'fsrs'
+                              ? 'Meta visual (ciclos)'
+                              : 'Plano de Revisão'}
                           </p>
                           <div className="flex items-center gap-2">
                              <label htmlFor="spaced-cycles-select" className="text-[10px] font-bold text-slate-400">Ciclos:</label>
@@ -1749,7 +1867,9 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                          </>
                        ) : (
                          <p className="text-[9px] text-slate-500 dark:text-slate-400">
-                           Primeira revisão 1 dia após a data do estudo; depois os intervalos crescem conforme Good/Easy ou reiniciam com Again.
+                           {newTopicAlgorithm === 'fsrs'
+                             ? 'Primeira revisão 1 dia após a data do estudo; depois o FSRS calcula estabilidade e dificuldade a cada resposta (Again / Hard / Good / Easy).'
+                             : 'Primeira revisão 1 dia após a data do estudo; depois os intervalos crescem conforme Good/Easy ou reiniciam com Again.'}
                          </p>
                        )}
                     </div>
@@ -1847,7 +1967,7 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                 Qualidade da revisão
               </h2>
               <p id="spaced-quality-desc" className="mt-2 text-sm font-medium text-slate-600 dark:text-slate-400">
-                “{qualityPickTask.topic}” — isso ajusta o próximo intervalo (SM-2) ou a escala fixa (Hard/Easy/Again).
+                “{qualityPickTask.topic}” — isso ajusta o próximo intervalo (FSRS / SM-2) ou a escada fixa (Hard/Easy/Again).
               </p>
               <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <button
@@ -1916,7 +2036,7 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                )}
             </div>
             <p className="mb-2 text-[9px] font-medium text-slate-400 dark:text-slate-500">
-              Ao concluir uma revisão, indique a qualidade (Again / Hard / Good / Easy) para ajustar o próximo intervalo — especialmente no modo SM-2.
+              Ao concluir uma revisão, indique a qualidade (Again / Hard / Good / Easy) para ajustar o próximo intervalo — essencial nos modos adaptativos (FSRS e SM-2).
             </p>
 
             <div className="flex-1 bg-white dark:bg-[#1a1a1a] rounded-3xl xl:rounded-[2.5rem] border border-slate-200 dark:border-white/5 shadow-xl overflow-hidden flex flex-col relative min-h-[300px]">
@@ -1990,9 +2110,11 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                               <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex flex-col items-center justify-center shrink-0 ${task.status === 'overdue' ? 'bg-red-100 text-red-600' : 'bg-sky-100 text-sky-600 dark:bg-sky-900/20 dark:text-sky-400'}`}>
                                  <span className="text-[8px] sm:text-[10px] font-black uppercase">Rev</span>
                                  <span className="text-xs sm:text-sm font-black leading-none">
-                                   {task.reviewKind === 'sm2'
-                                     ? `SM-2${task.interval > 1 ? ` · ${task.interval}d` : ''}`
-                                     : getIntervalLabel(task.interval)}
+                                   {task.reviewKind === 'fsrs'
+                                     ? `FSRS${task.interval > 1 ? ` · ${task.interval}d` : ''}`
+                                     : task.reviewKind === 'sm2'
+                                       ? `SM-2${task.interval > 1 ? ` · ${task.interval}d` : ''}`
+                                       : getIntervalLabel(task.interval)}
                                  </span>
                               </div>
                               <div className="min-w-0 flex-1">
@@ -2142,13 +2264,14 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                   ) : (
                     filteredSortedTopics.map(t => {
                      const topicIntervals = getIntervalsForCycles(t.cycles || 4);
-                     const isSm2 = (t.srs_algorithm || 'fixed') === 'sm2';
-                     const progress = isSm2
-                       ? Math.min(100, ((t.srs_repetitions ?? 0) / Math.max(1, topicIntervals.length)) * 100)
-                       : (t.reviews_completed.length / topicIntervals.length) * 100;
-                     const isMastered = isSm2
-                       ? (t.srs_repetitions ?? 0) >= (t.cycles || 4) * 3
-                       : progress === 100;
+                     const algo = t.srs_algorithm || 'fixed';
+                     const isSm2 = algo === 'sm2';
+                     const isFsrs = algo === 'fsrs';
+                     const isAdaptive = isSm2 || isFsrs;
+                     const adaptiveReps = isFsrs
+                       ? getFsrsRepsFromSnapshot(t.srs_fsrs_card)
+                       : (t.srs_repetitions ?? 0);
+                     const isMastered = topicIsMastered(t);
                      const isUrgent = todaysReviews.some(r => r.topicId === t.id && r.status === 'overdue');
                      const isDueSoon = todaysReviews.some(r => r.topicId === t.id && r.status === 'pending');
                      const nextDueDate = getNextReviewDueDate(t);
@@ -2181,6 +2304,11 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                                   {isSm2 && (
                                     <span className="text-[8px] font-black uppercase text-violet-600 bg-violet-50 dark:bg-violet-900/25 dark:text-violet-300 px-2 py-0.5 rounded-lg border border-violet-100 dark:border-violet-800/40">
                                       SM-2
+                                    </span>
+                                  )}
+                                  {isFsrs && (
+                                    <span className="text-[8px] font-black uppercase text-teal-700 bg-teal-50 dark:bg-teal-900/25 dark:text-teal-200 px-2 py-0.5 rounded-lg border border-teal-100 dark:border-teal-800/40">
+                                      FSRS
                                     </span>
                                   )}
                                 </div>
@@ -2264,14 +2392,20 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
 
                            <div className="flex items-center gap-1.5 mb-4">
                               {topicIntervals.map((int, idx) => {
-                                const filled = isSm2
-                                  ? idx < Math.min(topicIntervals.length, t.srs_repetitions ?? 0)
+                                const filled = isAdaptive
+                                  ? idx < Math.min(topicIntervals.length, adaptiveReps)
                                   : t.reviews_completed.includes(int);
                                 return (
                                  <div 
                                    key={int} 
                                    className={`h-2 flex-1 rounded-full transition-all duration-500 ${filled ? 'bg-gradient-to-r from-sky-500 to-blue-600 shadow-sm' : 'bg-slate-100 dark:bg-white/5'}`}
-                                   title={isSm2 ? `Revisões SM-2: ${t.srs_repetitions ?? 0}` : getIntervalLabel(int)}
+                                   title={
+                                     isFsrs
+                                       ? `Revisões FSRS: ${adaptiveReps}`
+                                       : isSm2
+                                         ? `Revisões SM-2: ${t.srs_repetitions ?? 0}`
+                                         : getIntervalLabel(int)
+                                   }
                                  />
                                 );
                               })}
@@ -2318,8 +2452,8 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                                 </div>
                                 <span>
                                   Domínio:{' '}
-                                  {isSm2
-                                    ? Math.min(100, Math.round(((t.srs_repetitions ?? 0) / Math.max(1, t.cycles || 4)) * 25))
+                                  {isAdaptive
+                                    ? Math.min(100, Math.round((adaptiveReps / Math.max(1, t.cycles || 4)) * 25))
                                     : Math.round((t.reviews_completed.length / (t.cycles || 4)) * 100)}
                                   %
                                 </span>
@@ -2344,7 +2478,7 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                 Calendário e estatísticas
               </h3>
             </div>
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
               <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#1a1a1a] sm:p-5">
                 <div className="mb-4 flex items-center justify-between gap-2">
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
@@ -2427,84 +2561,86 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                 </div>
               </div>
 
-              <div className="flex flex-col gap-4">
-                <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#1a1a1a] sm:p-5">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    Revisões concluídas por semana
-                  </p>
-                  <p className="mt-1 text-[9px] leading-snug text-slate-400">
-                    Contagem de registros de conclusão (últimas 8 semanas, semana começa na segunda).
-                  </p>
-                  <div className="mt-4 flex h-36 items-end justify-between gap-1 border-b border-slate-100 pb-1 dark:border-white/10">
-                    {(() => {
-                      const maxC = Math.max(1, ...spacedPlanningStats.weekBuckets.map(w => w.count));
-                      const barMaxPx = 112;
-                      return spacedPlanningStats.weekBuckets.map(w => (
-                        <div
-                          key={w.weekStartISO}
-                          className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-end gap-1"
-                          title={`Semana de ${w.label}: ${w.count} conclusão(ões)`}
-                        >
+              <div className="flex min-h-0 flex-col lg:h-full lg:min-h-0">
+                <div className="flex w-full flex-col gap-4 lg:mt-auto">
+                  <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#1a1a1a] sm:p-5">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      Revisões concluídas por semana
+                    </p>
+                    <p className="mt-1 text-[9px] leading-snug text-slate-400">
+                      Contagem de registros de conclusão (últimas 8 semanas, semana começa na segunda).
+                    </p>
+                    <div className="mt-4 flex h-36 items-end justify-between gap-1 border-b border-slate-100 pb-1 dark:border-white/10">
+                      {(() => {
+                        const maxC = Math.max(1, ...spacedPlanningStats.weekBuckets.map(w => w.count));
+                        const barMaxPx = 112;
+                        return spacedPlanningStats.weekBuckets.map(w => (
                           <div
-                            className="w-full max-w-[2rem] rounded-t-md bg-gradient-to-t from-sky-600 to-sky-400 transition-all"
-                            style={{
-                              height: `${Math.max(4, Math.round((w.count / maxC) * barMaxPx))}px`,
-                            }}
-                          />
-                          <span className="truncate text-[8px] font-bold text-slate-400">{w.label}</span>
-                        </div>
-                      ));
-                    })()}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#1a1a1a] sm:p-5">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      Taxa de atraso
-                    </p>
-                    <p className="mt-1 text-[9px] leading-snug text-slate-400">
-                      Modo escada fixa: conclusão depois de{' '}
-                      <span className="font-bold text-slate-500">estudo + intervalo</span> (sem offset).
-                      SM-2 não entra (sem prazo fixo por degrau).
-                    </p>
-                    {spacedPlanningStats.lateRatePct == null ? (
-                      <p className="mt-4 text-sm font-bold text-slate-400">Sem dados ainda</p>
-                    ) : (
-                      <>
-                        <p className="mt-4 text-3xl font-black text-amber-600 dark:text-amber-400">
-                          {spacedPlanningStats.lateRatePct}%
-                        </p>
-                        <p className="mt-1 text-[10px] font-medium text-slate-500">
-                          {spacedPlanningStats.late} atrasada(s) · {spacedPlanningStats.onTime} no prazo
-                        </p>
-                      </>
-                    )}
+                            key={w.weekStartISO}
+                            className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-end gap-1"
+                            title={`Semana de ${w.label}: ${w.count} conclusão(ões)`}
+                          >
+                            <div
+                              className="w-full max-w-[2rem] rounded-t-md bg-gradient-to-t from-sky-600 to-sky-400 transition-all"
+                              style={{
+                                height: `${Math.max(4, Math.round((w.count / maxC) * barMaxPx))}px`,
+                              }}
+                            />
+                            <span className="truncate text-[8px] font-bold text-slate-400">{w.label}</span>
+                          </div>
+                        ));
+                      })()}
+                    </div>
                   </div>
 
-                  <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#1a1a1a] sm:p-5">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      Tempo até consolidado
-                    </p>
-                    <p className="mt-1 text-[9px] leading-snug text-slate-400">
-                      Média de dias da <span className="font-bold text-slate-500">data do estudo</span> até a{' '}
-                      <span className="font-bold text-slate-500">última data registrada</span> de revisão, só em
-                      tópicos já consolidados.
-                    </p>
-                    {spacedPlanningStats.avgDaysToMastered == null ? (
-                      <p className="mt-4 text-sm font-bold text-slate-400">Nenhum consolidado ainda</p>
-                    ) : (
-                      <>
-                        <p className="mt-4 text-3xl font-black text-emerald-600 dark:text-emerald-400">
-                          {spacedPlanningStats.avgDaysToMastered}{' '}
-                          <span className="text-lg font-black text-slate-400">dias</span>
-                        </p>
-                        <p className="mt-1 text-[10px] font-medium text-slate-500">
-                          Base: {spacedPlanningStats.masteredCount} tópico
-                          {spacedPlanningStats.masteredCount === 1 ? '' : 's'}
-                        </p>
-                      </>
-                    )}
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#1a1a1a] sm:p-5">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        Taxa de atraso
+                      </p>
+                      <p className="mt-1 text-[9px] leading-snug text-slate-400">
+                        Modo escada fixa: conclusão depois de{' '}
+                        <span className="font-bold text-slate-500">estudo + intervalo</span> (sem offset).
+                        SM-2 e FSRS não entram (sem prazo fixo por degrau).
+                      </p>
+                      {spacedPlanningStats.lateRatePct == null ? (
+                        <p className="mt-4 text-sm font-bold text-slate-400">Sem dados ainda</p>
+                      ) : (
+                        <>
+                          <p className="mt-4 text-3xl font-black text-amber-600 dark:text-amber-400">
+                            {spacedPlanningStats.lateRatePct}%
+                          </p>
+                          <p className="mt-1 text-[10px] font-medium text-slate-500">
+                            {spacedPlanningStats.late} atrasada(s) · {spacedPlanningStats.onTime} no prazo
+                          </p>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#1a1a1a] sm:p-5">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        Tempo até consolidado
+                      </p>
+                      <p className="mt-1 text-[9px] leading-snug text-slate-400">
+                        Média de dias da <span className="font-bold text-slate-500">data do estudo</span> até a{' '}
+                        <span className="font-bold text-slate-500">última data registrada</span> de revisão, só em
+                        tópicos já consolidados.
+                      </p>
+                      {spacedPlanningStats.avgDaysToMastered == null ? (
+                        <p className="mt-4 text-sm font-bold text-slate-400">Nenhum consolidado ainda</p>
+                      ) : (
+                        <>
+                          <p className="mt-4 text-3xl font-black text-emerald-600 dark:text-emerald-400">
+                            {spacedPlanningStats.avgDaysToMastered}{' '}
+                            <span className="text-lg font-black text-slate-400">dias</span>
+                          </p>
+                          <p className="mt-1 text-[10px] font-medium text-slate-500">
+                            Base: {spacedPlanningStats.masteredCount} tópico
+                            {spacedPlanningStats.masteredCount === 1 ? '' : 's'}
+                          </p>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2529,13 +2665,13 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 20 }}
-              className="bg-white dark:bg-[#1a1a1a] w-full max-w-4xl rounded-3xl p-6 sm:p-8 border-4 border-sky-100 dark:border-sky-900 shadow-2xl relative flex flex-col h-[85vh]"
+              className="relative flex h-[min(85vh,880px)] max-h-[min(85vh,880px)] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border-4 border-sky-100 bg-white p-6 shadow-2xl dark:border-sky-900 dark:bg-[#1a1a1a] sm:p-8"
               role="dialog"
               aria-modal="true"
               aria-labelledby="spaced-content-title"
               onClick={e => e.stopPropagation()}
             >
-              <div className="flex justify-between items-center mb-6 shrink-0">
+              <div className="mb-4 flex shrink-0 items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-sky-100 dark:bg-sky-900/30 rounded-xl flex items-center justify-center text-sky-600 dark:text-sky-400">
                     <FileText size={20} />
@@ -2555,106 +2691,189 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                 </button>
               </div>
 
-              <div className="mb-6 flex min-h-0 flex-1 flex-col gap-2">
-                <label htmlFor="spaced-topic-content" className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  Conteúdo para revisão
-                </label>
-                <textarea
-                  id="spaced-topic-content"
-                  value={topicContent}
-                  onChange={(e) => setTopicContent(e.target.value)}
-                  placeholder="Adicione aqui o conteúdo deste assunto para revisão..."
-                  className="h-full min-h-[200px] w-full flex-1 resize-none rounded-2xl border-2 border-slate-200 bg-slate-50 p-6 font-medium text-slate-800 outline-none transition-all focus:border-sky-500 dark:border-slate-700 dark:bg-black/40 dark:text-slate-200"
-                />
-              </div>
-
-              <div className="shrink-0 space-y-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-black/30">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  Integração com o restante do app
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const t = selectedTopicForContent;
-                      if (!t) return;
-                      const q = encodeURIComponent(getSpacedMaterialQuery(t));
-                      navigate(`/flashcards?q=${q}`);
-                      setSelectedTopicForContent(null);
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-sky-200 bg-white px-3 py-2 text-[9px] font-black uppercase tracking-tight text-sky-800 transition-colors hover:bg-sky-50 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200"
-                  >
-                    <BrainCircuit size={14} aria-hidden /> Abrir flashcards
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const t = selectedTopicForContent;
-                      if (!t) return;
-                      const q = encodeURIComponent(getSpacedMaterialQuery(t));
-                      navigate(`/intelligent_summarizer?prefill=${q}`);
-                      setSelectedTopicForContent(null);
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-white px-3 py-2 text-[9px] font-black uppercase tracking-tight text-violet-900 transition-colors hover:bg-violet-50 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-100"
-                  >
-                    <Sparkles size={14} aria-hidden /> Abrir resumidor
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const t = selectedTopicForContent;
-                      if (!t) return;
-                      navigateToQuestionBankForTopic(navigate, t);
-                      setSelectedTopicForContent(null);
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-[9px] font-black uppercase tracking-tight text-emerald-900 transition-colors hover:bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100"
-                  >
-                    <BookOpen size={14} aria-hidden /> Banco de questões (revisar hoje)
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <div>
-                    <label htmlFor="spaced-content-material-kind" className="text-[9px] font-black uppercase text-slate-400">
-                      Destaque nos cards
+              <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain pr-1 [-webkit-overflow-scrolling:touch]">
+                <div className="flex flex-col gap-5 pb-2">
+                  <div className="flex flex-col gap-2">
+                    <label htmlFor="spaced-topic-content" className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      Conteúdo para revisão
                     </label>
-                    <select
-                      id="spaced-content-material-kind"
-                      value={contentMaterialKind}
-                      onChange={e => setContentMaterialKind(e.target.value as SpacedMaterialKind)}
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-2 py-2 text-[11px] font-bold text-slate-700 outline-none dark:border-white/10 dark:bg-black/40 dark:text-slate-200"
-                    >
-                      <option value="both">Flashcards e resumidor</option>
-                      <option value="flashcards">Só flashcards</option>
-                      <option value="summarizer">Só resumidor</option>
-                      <option value="question_bank">Só banco de questões</option>
-                      <option value="none">Sem preferência</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label htmlFor="spaced-content-material-query" className="text-[9px] font-black uppercase text-slate-400">
-                      Texto (busca / pré-preenchimento)
-                    </label>
-                    <input
-                      id="spaced-content-material-query"
-                      type="text"
-                      value={contentMaterialQuery}
-                      onChange={e => setContentMaterialQuery(e.target.value)}
-                      placeholder="Vazio = matéria — tópico"
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-2 py-2 text-sm font-medium text-slate-800 outline-none dark:border-white/10 dark:bg-black/40 dark:text-slate-100"
+                    <textarea
+                      id="spaced-topic-content"
+                      value={topicContent}
+                      onChange={(e) => setTopicContent(e.target.value)}
+                      placeholder="Adicione aqui o conteúdo deste assunto para revisão..."
+                      className="min-h-[11rem] w-full max-h-[min(40vh,320px)] resize-y rounded-2xl border-2 border-slate-200 bg-slate-50 p-4 font-medium text-slate-800 outline-none transition-all focus:border-sky-500 dark:border-slate-700 dark:bg-black/40 dark:text-slate-200 sm:min-h-[12rem] sm:p-6"
                     />
                   </div>
+
+                  <div className="space-y-3 rounded-2xl border border-amber-100 bg-amber-50/40 p-4 dark:border-amber-900/30 dark:bg-amber-950/20">
+                    <div className="flex items-center gap-2">
+                      <Settings2 className="h-4 w-4 text-amber-600 dark:text-amber-400" aria-hidden />
+                      <p className="text-[10px] font-black uppercase tracking-widest text-amber-800 dark:text-amber-200">
+                        Plano de revisão (data, ciclos, algoritmo)
+                      </p>
+                    </div>
+                    <ul className="list-inside list-disc space-y-1 text-[9px] font-medium leading-snug text-slate-600 dark:text-slate-400">
+                      <li>
+                        <span className="font-bold text-slate-700 dark:text-slate-300">Trocar algoritmo:</span> reinicia o estado
+                        do modo escolhido. Fixo mantém só degraus da escada que ainda existem no plano; SM-2/FSRS zeram a fila fixa e
+                        voltam à primeira revisão (estudo + 1 dia).
+                      </li>
+                      <li>
+                        <span className="font-bold text-slate-700 dark:text-slate-300">Só mudar data do estudo:</span> no fixo,
+                        mantemos degraus já concluídos e zeramos offset + snoozes. No SM-2/FSRS, o scheduler reinicia a partir da
+                        nova data.
+                      </li>
+                      <li>
+                        <span className="font-bold text-slate-700 dark:text-slate-300">Só mudar ciclos:</span> no fixo, removemos
+                        conclusões/snoozes de degraus que sumiram do plano. Nos adaptativos, só muda a meta visual de “ciclos”.
+                      </li>
+                    </ul>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <div>
+                        <label htmlFor="spaced-edit-study-date" className="text-[9px] font-black uppercase text-slate-500">
+                          Data do estudo
+                        </label>
+                        <input
+                          id="spaced-edit-study-date"
+                          type="date"
+                          value={editPlanStudyDate}
+                          onChange={e => setEditPlanStudyDate(e.target.value)}
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800 outline-none focus:border-amber-400 dark:border-white/10 dark:bg-black/40 dark:text-slate-100"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="spaced-edit-cycles" className="text-[9px] font-black uppercase text-slate-500">
+                          Ciclos
+                        </label>
+                        <select
+                          id="spaced-edit-cycles"
+                          value={editPlanCycles}
+                          onChange={e => setEditPlanCycles(parseInt(e.target.value, 10))}
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-700 outline-none dark:border-white/10 dark:bg-black/40 dark:text-slate-200"
+                        >
+                          {[4, 5, 6, 7, 8, 9, 10, 11, 12].map(n => (
+                            <option key={n} value={n}>
+                              {n}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label htmlFor="spaced-edit-algo" className="text-[9px] font-black uppercase text-slate-500">
+                          Algoritmo
+                        </label>
+                        <select
+                          id="spaced-edit-algo"
+                          value={editPlanAlgorithm}
+                          onChange={e => setEditPlanAlgorithm(e.target.value as SrsAlgorithm)}
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-700 outline-none dark:border-white/10 dark:bg-black/40 dark:text-slate-200"
+                        >
+                          <option value="fixed">Intervalos fixos</option>
+                          <option value="sm2">SM-2</option>
+                          <option value="fsrs">FSRS</option>
+                        </select>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!topicPlanDirty || isSavingTopicPlan}
+                      onClick={() => void handleSaveTopicPlan()}
+                      className="w-full rounded-xl border border-amber-200 bg-white py-2.5 text-[9px] font-black uppercase tracking-widest text-amber-900 transition-colors hover:bg-amber-100 disabled:opacity-50 dark:border-amber-800 dark:bg-black/40 dark:text-amber-100 dark:hover:bg-amber-950/50"
+                    >
+                      {isSavingTopicPlan ? 'Aplicando…' : 'Aplicar alterações do plano'}
+                    </button>
+                  </div>
+
+                  <div className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-black/30">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      Integração com o restante do app
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const t = selectedTopicForContent;
+                          if (!t) return;
+                          const q = encodeURIComponent(getSpacedMaterialQuery(t));
+                          navigate(`/flashcards?q=${q}`);
+                          setSelectedTopicForContent(null);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-sky-200 bg-white px-3 py-2 text-[9px] font-black uppercase tracking-tight text-sky-800 transition-colors hover:bg-sky-50 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200"
+                      >
+                        <BrainCircuit size={14} aria-hidden /> Abrir flashcards
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const t = selectedTopicForContent;
+                          if (!t) return;
+                          const q = encodeURIComponent(getSpacedMaterialQuery(t));
+                          navigate(`/intelligent_summarizer?prefill=${q}`);
+                          setSelectedTopicForContent(null);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-white px-3 py-2 text-[9px] font-black uppercase tracking-tight text-violet-900 transition-colors hover:bg-violet-50 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-100"
+                      >
+                        <Sparkles size={14} aria-hidden /> Abrir resumidor
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const t = selectedTopicForContent;
+                          if (!t) return;
+                          navigateToQuestionBankForTopic(navigate, t);
+                          setSelectedTopicForContent(null);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-[9px] font-black uppercase tracking-tight text-emerald-900 transition-colors hover:bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100"
+                      >
+                        <BookOpen size={14} aria-hidden /> Banco de questões (revisar hoje)
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <div>
+                        <label htmlFor="spaced-content-material-kind" className="text-[9px] font-black uppercase text-slate-400">
+                          Destaque nos cards
+                        </label>
+                        <select
+                          id="spaced-content-material-kind"
+                          value={contentMaterialKind}
+                          onChange={e => setContentMaterialKind(e.target.value as SpacedMaterialKind)}
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-2 py-2 text-[11px] font-bold text-slate-700 outline-none dark:border-white/10 dark:bg-black/40 dark:text-slate-200"
+                        >
+                          <option value="both">Flashcards e resumidor</option>
+                          <option value="flashcards">Só flashcards</option>
+                          <option value="summarizer">Só resumidor</option>
+                          <option value="question_bank">Só banco de questões</option>
+                          <option value="none">Sem preferência</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label htmlFor="spaced-content-material-query" className="text-[9px] font-black uppercase text-slate-400">
+                          Texto (busca / pré-preenchimento)
+                        </label>
+                        <input
+                          id="spaced-content-material-query"
+                          type="text"
+                          value={contentMaterialQuery}
+                          onChange={e => setContentMaterialQuery(e.target.value)}
+                          placeholder="Vazio = matéria — tópico"
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-2 py-2 text-sm font-medium text-slate-800 outline-none dark:border-white/10 dark:bg-black/40 dark:text-slate-100"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={savingMaterialLink || !selectedTopicForContent}
+                      onClick={() => selectedTopicForContent && void saveMaterialLinkForTopic(selectedTopicForContent.id)}
+                      className="w-full rounded-xl border border-slate-200 bg-white py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-600 transition-colors hover:border-sky-200 hover:bg-sky-50 hover:text-sky-800 disabled:opacity-50 dark:border-white/10 dark:bg-black/40 dark:text-slate-300 dark:hover:border-sky-800"
+                    >
+                      {savingMaterialLink ? 'Salvando vínculo…' : 'Salvar preferências de material'}
+                    </button>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  disabled={savingMaterialLink || !selectedTopicForContent}
-                  onClick={() => selectedTopicForContent && void saveMaterialLinkForTopic(selectedTopicForContent.id)}
-                  className="w-full rounded-xl border border-slate-200 bg-white py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-600 transition-colors hover:border-sky-200 hover:bg-sky-50 hover:text-sky-800 disabled:opacity-50 dark:border-white/10 dark:bg-black/40 dark:text-slate-300 dark:hover:border-sky-800"
-                >
-                  {savingMaterialLink ? 'Salvando vínculo…' : 'Salvar preferências de material'}
-                </button>
               </div>
 
-              <div className="flex justify-end gap-3 shrink-0">
+              <div className="mt-4 flex shrink-0 justify-end gap-3 border-t border-slate-100 pt-4 dark:border-white/10">
                 <button
                   type="button"
                   onClick={() => setSelectedTopicForContent(null)}
