@@ -18,6 +18,8 @@ interface NoteEditorPaneProps {
   setShowComments: (show: boolean) => void;
   quillRef: React.MutableRefObject<Quill | null>;
   noteContent: string;
+  onAcceptAllSuggestions: () => void;
+  onRejectAllSuggestions: () => void;
 }
 
 const EQUATION_SYMBOLS = ['∑', '∏', '∫', '√', '∞', '≠', '≈', '≤', '≥'];
@@ -42,6 +44,8 @@ const NoteEditorPane: React.FC<NoteEditorPaneProps> = ({
   setShowComments,
   quillRef,
   noteContent,
+  onAcceptAllSuggestions,
+  onRejectAllSuggestions,
 }) => {
   const comments = React.useMemo(() => {
     const doc = new DOMParser().parseFromString(noteContent, 'text/html');
@@ -106,12 +110,38 @@ const NoteEditorPane: React.FC<NoteEditorPaneProps> = ({
       )}
 
       {editMode === 'suggesting' && (
-        <div className="bg-amber-50 dark:bg-amber-900/20 p-2 border-b border-amber-100 dark:border-amber-900/30 flex items-center justify-between px-4 animate-in slide-in-from-top duration-200">
-          <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 text-sm">
-            <Sparkles size={16} />
-            <span>Você está no modo de <strong>Sugestão</strong>. Suas edições serão marcadas para revisão.</span>
+        <div className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-100 dark:border-amber-900/30 px-3 py-2 animate-in slide-in-from-top duration-200">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 text-xs sm:text-sm min-w-0 flex-1">
+              <Sparkles size={16} className="shrink-0" />
+              <span>
+                <strong>Sugestões</strong>: o que escrever a partir de agora fica marcado (estilo revisão). Use Aceitar para incorporar ou Rejeitar para voltar ao texto de quando entrou neste modo.
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={onAcceptAllSuggestions}
+                className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-white hover:bg-emerald-700"
+              >
+                Aceitar todas
+              </button>
+              <button
+                type="button"
+                onClick={onRejectAllSuggestions}
+                className="rounded-lg bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-amber-900 ring-1 ring-amber-300 hover:bg-amber-100 dark:bg-slate-800 dark:text-amber-200 dark:ring-amber-700"
+              >
+                Rejeitar todas
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditMode('editing')}
+                className="text-[10px] font-bold text-amber-800 dark:text-amber-300 hover:underline px-1"
+              >
+                Sair (mantém marcações)
+              </button>
+            </div>
           </div>
-          <button onClick={() => setEditMode('editing')} className="text-xs font-bold text-amber-800 dark:text-amber-300 hover:underline">Voltar para Edição</button>
         </div>
       )}
 

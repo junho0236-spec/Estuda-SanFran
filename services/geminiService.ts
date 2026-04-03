@@ -275,6 +275,18 @@ export const geminiService = {
     return response.text;
   },
 
+  /** Tradução do documento; `targetLangCode` = código ISO 639-1 (ex.: en, es, de). */
+  translateText: async (text: string, targetLangCode: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return '';
+    const prompt = `You are a professional translator. Translate the following text into the language identified by ISO 639-1 code "${targetLangCode}". Preserve paragraph breaks (use blank lines between paragraphs). Output ONLY the translated text — no quotes, no "Here is the translation", no markdown fences.\n\n---\n${trimmed}\n---`;
+    const response = await ai.models.generateContent({
+      model: FLASH_MODEL,
+      contents: [{ parts: [{ text: prompt }] }],
+    });
+    return (response.text ?? '').trim();
+  },
+
   extractKeyPoints: async (text: string) => {
     const prompt = `Extraia os pontos-chave do seguinte texto jurídico: "${text}"`;
     const response = await ai.models.generateContent({
@@ -768,6 +780,7 @@ export const generateFlashcardsStream = geminiService.generateFlashcardsStream;
 export const evaluateDissertativeAnswer = geminiService.evaluateDissertativeAnswer;
 export const fetchTermDefinition = geminiService.fetchTermDefinition;
 export const summarizeText = geminiService.summarizeText;
+export const translateText = geminiService.translateText;
 export const extractKeyPoints = geminiService.extractKeyPoints;
 export const generateMindMap = geminiService.generateMindMap;
 export const simplifyLegalText = geminiService.simplifyLegalText;

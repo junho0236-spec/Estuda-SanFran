@@ -337,6 +337,20 @@
   min-height: 12rem;
 }
 
+/* Modo Sugestões (track changes simplificado) */
+.note-view-editor-root .ql-editor span[data-suggestion='insert'],
+.note-suggestion-insert {
+  background-color: rgba(52, 168, 83, 0.2);
+  border-bottom: 2px solid #34a853;
+  border-radius: 2px;
+}
+
+.dark .note-view-editor-root .ql-editor span[data-suggestion='insert'],
+.dark .note-suggestion-insert {
+  background-color: rgba(129, 201, 149, 0.22);
+  border-bottom-color: #81c995;
+}
+
 /* Maximized: toolbar lives in DocsToolbar (#docs-toolbar), not inside .quill-editor-custom */
 .is-maximized .note-view-editor-root {
   flex: 1 1 0%;

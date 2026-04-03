@@ -4,9 +4,11 @@ import 'quill/dist/quill.snow.css'; // Import Quill styles
 import { ArrowLeft, Save, Loader2, FileText, BrainCircuit, Sparkles, Tag, Split, Download, Gavel, Edit3, Pencil, Maximize2, Minimize2, Star, X } from 'lucide-react';
 import { Note, Subject, SubjectFile } from '../types';
 import { dataService } from '../services/dataService';
-import { summarizeText, generateFlashcardFromHighlight } from '../services/geminiService';
+import { summarizeText, generateFlashcardFromHighlight, translateText } from '../services/geminiService';
 import html2pdf from 'html2pdf.js';
-import { Document, Packer, Paragraph, TextRun } from 'docx';
+import { buildDocxBlobFromEditorHtml } from '../services/noteDocxExport';
+import { pushNoteVersion, getNoteVersions, type NoteVersionEntry } from '../services/noteVersionHistory';
+import { diffLines, type DiffLine } from '../services/textDiff';
 import { SmartText } from './SmartVadeMecum';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -57,6 +59,22 @@ CommentBlot.blotName = 'comment';
 CommentBlot.tagName = 'span';
 Quill.register(CommentBlot);
 
+class SuggestionBlot extends Inline {
+  static create(value: string) {
+    const node = super.create();
+    node.setAttribute('data-suggestion', value);
+    node.classList.add('note-suggestion-insert');
+    return node;
+  }
+
+  static formats(node: HTMLElement) {
+    return node.getAttribute('data-suggestion') || undefined;
+  }
+}
+SuggestionBlot.blotName = 'suggestion';
+SuggestionBlot.tagName = 'span';
+Quill.register(SuggestionBlot);
+
 // Set up pdfjs worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -80,7 +98,8 @@ const formats = [
   'align',
   'code-block',
   'lineheight',
-  'comment'
+  'comment',
+  'suggestion'
 ];
 
 const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId, isOnline, initialTab = 'notes', onBack, onNavigateToAnki, subjects, onToggleSidebar }) => {
@@ -115,6 +134,14 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   const [isGeneratingFlashcard, setIsGeneratingFlashcard] = useState(false);
   const [showFlashcardModal, setShowFlashcardModal] = useState(false);
   const [newFlashcardData, setNewFlashcardData] = useState<{ front: string, back: string } | null>(null);
+  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
+  const [versionList, setVersionList] = useState<NoteVersionEntry[]>([]);
+  const [compareModalOpen, setCompareModalOpen] = useState(false);
+  const [compareDiff, setCompareDiff] = useState<DiffLine[]>([]);
+  const [compareLabel, setCompareLabel] = useState('');
+  const [isTranslatingDoc, setIsTranslatingDoc] = useState(false);
+
+  const suggestionSnapshotOpsRef = useRef<unknown[] | null>(null);
   
   // View Menu States
   const [editMode, setEditMode] = useState<'editing' | 'suggesting' | 'viewing'>('editing');
@@ -195,6 +222,20 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
     }
   }, [editMode]);
 
+  useEffect(() => {
+    if (editMode !== 'suggesting') return;
+    const id = requestAnimationFrame(() => {
+      const quill = quillRef.current;
+      if (!quill) return;
+      try {
+        suggestionSnapshotOpsRef.current = JSON.parse(JSON.stringify(quill.getContents().ops));
+      } catch {
+        suggestionSnapshotOpsRef.current = null;
+      }
+    });
+    return () => cancelAnimationFrame(id);
+  }, [editMode, selectedNote?.id]);
+
   const contentInitializedRef = useRef(false);
 
   const onEditorRef = useCallback((node: HTMLDivElement | null) => {
@@ -206,9 +247,31 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
           formats: formats,
         });
 
-        quillRef.current.on('text-change', () => {
+        quillRef.current.on('text-change', (delta: { ops?: unknown[] }, _old: unknown, source: string) => {
           const html = node.querySelector('.ql-editor')?.innerHTML || '';
           setNoteContent(html);
+          if (source !== 'user' || editModeRef.current !== 'suggesting') return;
+          const quill = quillRef.current;
+          if (!quill || !delta?.ops) return;
+          queueMicrotask(() => {
+            const q = quillRef.current;
+            if (!q || editModeRef.current !== 'suggesting') return;
+            let i = 0;
+            for (const op of delta.ops as { retain?: number; insert?: unknown; delete?: number }[]) {
+              if (typeof op.retain === 'number') i += op.retain;
+              if (typeof op.insert === 'string') {
+                const len = op.insert.length;
+                try {
+                  q.formatText(i, len, 'suggestion', 'insert', 'silent');
+                } catch {
+                  /* ignore range errors */
+                }
+                i += len;
+              } else if (op.insert != null && typeof op.insert !== 'string') {
+                i += 1;
+              }
+            }
+          });
         });
 
         quillRef.current.on('selection-change', (range: any) => {
@@ -530,6 +593,131 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
   const getEditorHtml = () =>
     quillRef.current?.root.innerHTML ?? noteContentRef.current ?? noteContent;
 
+  const acceptAllSuggestions = useCallback(() => {
+    const quill = quillRef.current;
+    if (!quill) return;
+    const len = quill.getLength();
+    let i = 0;
+    while (i < len) {
+      const fmt = quill.getFormat(i);
+      if (fmt.suggestion) {
+        let j = i + 1;
+        while (j < len && quill.getFormat(j).suggestion) j++;
+        quill.formatText(i, j - i, 'suggestion', false, 'silent');
+        i = j;
+      } else {
+        i++;
+      }
+    }
+    setNoteContent(quill.root.innerHTML);
+    setEditMode('editing');
+    suggestionSnapshotOpsRef.current = null;
+    toast.success('Sugestões aceitas: alterações incorporadas ao documento.');
+  }, []);
+
+  const rejectAllSuggestions = useCallback(() => {
+    const quill = quillRef.current;
+    const snap = suggestionSnapshotOpsRef.current;
+    if (!quill || !snap) {
+      toast.error('Entre no modo Sugestões novamente para registrar o ponto de revisão.');
+      return;
+    }
+    const Delta = Quill.import('delta') as new (ops: unknown[]) => object;
+    quill.setContents(new Delta(snap) as any, 'silent');
+    setNoteContent(quill.root.innerHTML);
+    setEditMode('editing');
+    suggestionSnapshotOpsRef.current = null;
+    toast.info('Sugestões rejeitadas. Documento restaurado ao estado anterior.');
+  }, []);
+
+  const openVersionHistory = useCallback(() => {
+    if (!selectedNote) return;
+    setVersionList(getNoteVersions(userId, selectedNote.id));
+    setVersionHistoryOpen(true);
+  }, [userId, selectedNote]);
+
+  const restoreVersionEntry = useCallback((entry: NoteVersionEntry) => {
+    const quill = quillRef.current;
+    if (!quill) return;
+    try {
+      const delta = quill.clipboard.convert({ html: entry.html });
+      quill.setContents(delta, 'silent');
+      setNoteContent(quill.root.innerHTML);
+      setVersionHistoryOpen(false);
+      toast.success('Versão carregada no editor. Use Salvar para gravar no servidor.');
+    } catch (e) {
+      console.error(e);
+      toast.error('Não foi possível restaurar esta versão.');
+    }
+  }, []);
+
+  const handleTranslateDocument = useCallback(async () => {
+    const lang = window.prompt('Idioma de destino (código ISO, ex.: en, es, de, fr):', 'en');
+    if (!lang?.trim()) return;
+    const html = quillRef.current?.root.innerHTML ?? noteContentRef.current ?? noteContent;
+    const plain = new DOMParser().parseFromString(html, 'text/html').body.textContent || '';
+    if (plain.trim().length < 2) {
+      toast.error('Documento vazio.');
+      return;
+    }
+    const env = typeof process !== 'undefined' ? (process as { env?: { GEMINI_API_KEY?: string } }).env : undefined;
+    if (!env?.GEMINI_API_KEY?.trim()) {
+      toast.error('Configure GEMINI_API_KEY ou VITE_GEMINI_API_KEY em .env.local para traduzir.');
+      return;
+    }
+    setIsTranslatingDoc(true);
+    try {
+      const translated = await translateText(plain, lang.trim());
+      if (!translated?.trim()) {
+        toast.error('Tradução vazia. Verifique a chave da API.');
+        return;
+      }
+      const esc = (line: string) => {
+        const d = document.createElement('div');
+        d.textContent = line;
+        return d.innerHTML;
+      };
+      const safeHtml = translated
+        .split(/\n\n+/)
+        .map((block) => `<p>${block.split('\n').map(esc).join('<br/>')}</p>`)
+        .join('');
+      const quill = quillRef.current;
+      if (quill) {
+        const delta = quill.clipboard.convert({ html: safeHtml });
+        quill.setContents(delta, 'silent');
+        setNoteContent(quill.root.innerHTML);
+      } else {
+        setNoteContent(safeHtml);
+      }
+      toast.success('Tradução concluída.');
+    } catch (e) {
+      console.error(e);
+      toast.error('Falha na tradução. Verifique a API ou o limite de uso.');
+    } finally {
+      setIsTranslatingDoc(false);
+    }
+  }, []);
+
+  const handleCompareDocuments = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.txt,.md,text/plain';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const other = String(reader.result || '');
+        const current = quillRef.current?.getText() || '';
+        setCompareDiff(diffLines(current, other));
+        setCompareLabel(file.name);
+        setCompareModalOpen(true);
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  }, []);
+
   const saveNoteContent = useCallback(async (isAuto: boolean = false) => {
     const currentNote = selectedNoteRef.current;
     const currentContent = noteContentRef.current;
@@ -554,6 +742,8 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
       };
 
       await dataService.saveNote(updatedNote, userId, isOnline);
+
+      pushNoteVersion(userId, currentNote.id, currentContent, currentNote.title || '');
       
       // Update local state
       setNotes(prev => prev.map(n => n.id === currentNote.id ? updatedNote : n));
@@ -735,26 +925,19 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
 
   const handleExportDocx = async () => {
     setIsExportMenuOpen(false);
-    const plainText = new DOMParser().parseFromString(getEditorHtml(), 'text/html').body.textContent || '';
-    const doc = new Document({
-      sections: [{
-        properties: {},
-        children: [
-          new Paragraph({
-            children: [new TextRun(plainText)],
-          }),
-        ],
-      }],
-    });
-
-    const buffer = await Packer.toBuffer(doc);
-    const blob = new Blob([new Uint8Array(buffer)], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    const base = selectedNote?.title?.replace(/[^\w\s-]/g, '')?.trim() || 'anotacao';
-    link.download = `${base}.docx`;
-    link.click();
-    URL.revokeObjectURL(link.href);
+    try {
+      const blob = await buildDocxBlobFromEditorHtml(getEditorHtml());
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      const base = selectedNote?.title?.replace(/[^\w\s-]/g, '')?.trim() || 'anotacao';
+      link.download = `${base}.docx`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+      toast.success('Documento Word exportado.');
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao gerar o arquivo Word.');
+    }
   };
 
   const handleSummarize = async () => {
@@ -877,6 +1060,111 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
         onClose={() => setShowFlashcardModal(false)}
         onSave={handleSaveGeneratedFlashcard}
       />
+
+      {versionHistoryOpen && selectedNote && (
+        <div
+          className="fixed inset-0 z-[210] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="version-history-heading"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setVersionHistoryOpen(false);
+          }}
+        >
+          <div className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-[#1a1a1a]">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-white/10">
+              <h3 id="version-history-heading" className="text-lg font-black text-slate-900 dark:text-white">
+                Histórico local
+              </h3>
+              <button
+                type="button"
+                onClick={() => setVersionHistoryOpen(false)}
+                className="rounded-full p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10"
+                aria-label="Fechar"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <p className="px-5 py-2 text-xs text-slate-500">
+              Versões guardadas neste dispositivo após cada gravação bem-sucedida (máx. 12). Não substitui backup na nuvem.
+            </p>
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 space-y-2">
+              {versionList.length === 0 ? (
+                <p className="py-8 text-center text-sm text-slate-400">Ainda não há versões. Salve o documento para criar entradas.</p>
+              ) : (
+                versionList.map((v) => (
+                  <div
+                    key={v.savedAt}
+                    className="flex flex-col gap-2 rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-700 dark:text-slate-200">{v.title}</p>
+                      <p className="text-[10px] text-slate-400">{new Date(v.savedAt).toLocaleString()}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => restoreVersionEntry(v)}
+                      className="shrink-0 rounded-xl bg-sanfran-rubi px-4 py-2 text-[10px] font-black uppercase text-white hover:bg-red-700"
+                    >
+                      Restaurar
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {compareModalOpen && (
+        <div
+          className="fixed inset-0 z-[210] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="compare-heading"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setCompareModalOpen(false);
+          }}
+        >
+          <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-[#1a1a1a]">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-white/10">
+              <h3 id="compare-heading" className="text-lg font-black text-slate-900 dark:text-white">
+                Comparar com ficheiro
+              </h3>
+              <button
+                type="button"
+                onClick={() => setCompareModalOpen(false)}
+                className="rounded-full p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10"
+                aria-label="Fechar"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <p className="px-5 py-2 text-xs text-slate-500">
+              Texto atual do editor vs. <span className="font-mono">{compareLabel || 'ficheiro'}</span>. Linhas verdes foram adicionadas; vermelhas existem só no editor.
+            </p>
+            <div className="min-h-0 flex-1 overflow-auto px-5 pb-5">
+              <pre className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left text-[11px] leading-relaxed dark:border-white/10 dark:bg-black/30 font-mono whitespace-pre-wrap break-words">
+                {compareDiff.map((line, i) => (
+                  <div
+                    key={i}
+                    className={
+                      line.type === 'add'
+                        ? 'bg-emerald-100/80 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100'
+                        : line.type === 'remove'
+                          ? 'bg-rose-100/80 text-rose-900 dark:bg-rose-900/30 dark:text-rose-100'
+                          : 'text-slate-700 dark:text-slate-300'
+                    }
+                  >
+                    {line.type === 'add' ? '+ ' : line.type === 'remove' ? '− ' : '  '}
+                    {line.text || ' '}
+                  </div>
+                ))}
+              </pre>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isNewNoteTitleModalOpen && (
         <div
@@ -1281,7 +1569,10 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                     }}
                     onExportTxt={handleExportTxt}
                     onDelete={() => selectedNote && deleteNote(selectedNote.id)}
-                    onVersionHistory={() => toast.success('Histórico de versões aberto (simulação).')}
+                    onVersionHistory={openVersionHistory}
+                    onTranslateDocument={handleTranslateDocument}
+                    onCompareDocuments={handleCompareDocuments}
+                    isTranslatingDocument={isTranslatingDoc}
                     onOfflineToggle={() => setIsOfflineAvailable(!isOfflineAvailable)}
                     isOfflineAvailable={isOfflineAvailable}
                     onDetails={showDetails}
@@ -1334,6 +1625,8 @@ const NoteView: React.FC<NoteViewProps> = ({ subjectId: initialSubjectId, userId
                     setShowComments={setShowComments}
                     quillRef={quillRef}
                     noteContent={noteContent}
+                    onAcceptAllSuggestions={acceptAllSuggestions}
+                    onRejectAllSuggestions={rejectAllSuggestions}
                   />
                   </div>
                 </div>

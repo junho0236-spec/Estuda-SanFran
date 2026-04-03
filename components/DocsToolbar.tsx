@@ -35,6 +35,11 @@ interface DocsToolbarProps {
   onEmail: () => void;
   onDelete: () => void;
   onVersionHistory: () => void;
+  /** Tradução real via Gemini (NoteView). */
+  onTranslateDocument: () => void | Promise<void>;
+  /** Compara texto do editor com ficheiro .txt (NoteView). */
+  onCompareDocuments: () => void;
+  isTranslatingDocument?: boolean;
   onOfflineToggle: () => void;
   isOfflineAvailable: boolean;
   onDetails: () => void;
@@ -64,6 +69,7 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
   quillRef, savedQuillRangeRef, onImageUpload, onExportPdf, onExportDocx, onExportTxt, onPrint, 
   isMaximized, setIsMaximized, title, onRename, isStarred, onToggleStar,
   onNew, onOpen, onCopy, onShare, onEmail, onDelete, onVersionHistory,
+  onTranslateDocument, onCompareDocuments, isTranslatingDocument,
   onOfflineToggle, isOfflineAvailable, onDetails, onLanguageChange, onPageSetup,
   zoom, onZoomChange,
   editMode, setEditMode, showComments, setShowComments, showPrintLayout, setShowPrintLayout,
@@ -810,25 +816,6 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
     }
   };
 
-  const handleCompareDocuments = () => {
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = '.txt,.doc,.docx';
-    fileInput.onchange = () => {
-      toast.success('Documento selecionado. Comparação em andamento...');
-      setTimeout(() => toast.info('Nenhuma diferença significativa encontrada.'), 2000);
-    };
-    fileInput.click();
-  };
-
-  const handleTranslate = () => {
-    const lang = prompt('Para qual idioma deseja traduzir? (ex: en, es, fr)', 'en');
-    if (lang && quillRef.current) {
-      toast.info(`Iniciando tradução para ${lang}...`);
-      setTimeout(() => toast.success('Tradução concluída! (Simulação)'), 2000);
-    }
-  };
-
   const handleDictionary = () => {
     const selection = window.getSelection()?.toString().trim();
     if (selection) {
@@ -891,6 +878,9 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
     { name: 'Localizar e substituir', icon: <Replace size={16} />, action: () => setShowFindReplace(true) },
     { name: 'Configuração da página', icon: <FileText size={16} />, action: onPageSetup },
     { name: 'Detalhes do documento', icon: <AlertCircle size={16} />, action: onDetails },
+    { name: 'Histórico de versões', icon: <Clock size={16} />, action: onVersionHistory },
+    { name: 'Traduzir documento', icon: <Languages size={16} />, action: () => void onTranslateDocument() },
+    { name: 'Comparar documentos', icon: <FileSearch size={16} />, action: onCompareDocuments },
   ];
 
   useEffect(() => {
@@ -1345,10 +1335,10 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                     <Hash size={16} className="text-slate-400" /> Contagem de palavras <span className="ml-auto text-[10px] text-slate-400">Ctrl+Shift+C</span>
                   </button>
                   <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => toast.info('Nenhuma sugestão pendente.')}>
-                    <CheckSquare size={16} className="text-slate-400" /> Revisar edições sugeridas
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={() => { setEditMode('suggesting'); toast.info('Modo Sugestões: novas inserções serão marcadas. Use Aceitar/Rejeitar na barra do editor.'); }}>
+                    <CheckSquare size={16} className="text-slate-400" /> Modo sugestões (revisão)
                   </button>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleCompareDocuments}>
+                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={onCompareDocuments}>
                     <FileSearch size={16} className="text-slate-400" /> Comparar documentos
                   </button>
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleCitation}>
@@ -1361,8 +1351,8 @@ const DocsToolbar: React.FC<DocsToolbarProps> = ({
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleDictionary}>
                     <Book size={16} className="text-slate-400" /> Dicionário <span className="ml-auto text-[10px] text-slate-400">Ctrl+Shift+Y</span>
                   </button>
-                  <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleTranslate}>
-                    <Languages size={16} className="text-slate-400" /> Traduzir documento
+                  <button type="button" disabled={!!isTranslatingDocument} className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3 disabled:opacity-50" onClick={() => void onTranslateDocument()}>
+                    <Languages size={16} className="text-slate-400" /> Traduzir documento {isTranslatingDocument ? '…' : ''}
                   </button>
                   <div className="h-px bg-slate-200 dark:bg-white/10 my-1"></div>
                   <button className="w-full text-left px-4 py-1.5 hover:bg-slate-100 dark:hover:bg-white/5 text-sm flex items-center gap-3" onClick={handleVoiceTyping}>
