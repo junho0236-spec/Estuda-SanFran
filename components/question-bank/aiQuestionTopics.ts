@@ -2,6 +2,21 @@ import type { Question } from '../../types';
 
 export const TOPIC_REUSE_PROMPT_MAX_LABELS = 80;
 
+/** Teto de valores distintos de `topic` num único array JSON devolvido pela IA. */
+export const MAX_DISTINCT_TOPICS_PER_AI_BATCH = 3;
+
+/**
+ * Instruções gerais para poucos tópicos amplos por lote.
+ * Deve aparecer no prompt **depois** do material de base (texto/flashcards).
+ */
+export function buildTopicMinimalityInstructions(): string {
+  return `ESTRATÉGIA DE TÓPICOS (campo "topic" em cada objeto do JSON desta resposta):
+- Regra por defeito: use EXATAMENTE 1 (um) único texto de "topic" para TODAS as questões deste array quando o conteúdo for um bloco tematicamente coerente (mesma aula, mesmo texto, mesmo foco).
+- Só aumente o número de rótulos distintos se o material tiver eixos temáticos CLARAMENTE independentes (pilares que não se reduzem a um só capítulo). Nunca mais de ${MAX_DISTINCT_TOPICS_PER_AI_BATCH} valores distintos de "topic" neste array.
+- Cada "topic" deve ser amplo (estilo capítulo ou disciplina), poucas palavras. PROIBIDO criar um micro-tópico diferente por questão só para variar redação ou para espelhar cada parágrafo.
+- Se seguirem instruções "TÓPICOS JÁ USADOS NO SEU ACERVO" abaixo, minimize os rótulos distintos: quando todo o lote couber num único rótulo da lista, use apenas esse rótulo (copiado caractere a caractere) em todas as questões.`;
+}
+
 type PerKeyAgg = {
   labelCounts: Map<string, number>;
 };
@@ -93,7 +108,7 @@ export function buildTopicReuseCatalog(
   let promptBlock: string;
   if (topicLabelsInPrompt.length === 0) {
     const scope = filterKey ? ' para esta matéria' : '';
-    promptBlock = `TÓPICOS: Ainda não há tópicos salvos no seu acervo${scope}. Use no máximo 2 ou 3 rótulos de tópico DISTINTOS para TODO este lote, com nomes curtos e estáveis (ex.: "Contratos", "Obrigações"), e reutilize exatamente o mesmo texto em várias questões quando o conteúdo for do mesmo tema. Evite variações cosméticas do mesmo conceito.`;
+    promptBlock = `TÓPICOS NO ACERVO: Ainda não há tópicos salvos${scope}. Crie o MENOR número possível de rótulos novos (o ideal é 1 só), amplos e estáveis; reutilize o mesmo texto em todas as questões do lote quando o tema for o mesmo. Só crie um segundo ou terceiro rótulo se o material tiver pilares claramente separados (máximo ${MAX_DISTINCT_TOPICS_PER_AI_BATCH} distintos).`;
   } else {
     const scopeLabel = filterKey
       ? ` para a matéria alinhada a "${String(subjectFilter).trim()}"`
@@ -103,7 +118,13 @@ export function buildTopicReuseCatalog(
         ? '\n(A lista pode estar truncada por tamanho — priorize reutilizar os rótulos que aparecem acima.)'
         : '';
     const bulletList = topicLabelsInPrompt.map((t) => `- ${t}`).join('\n');
-    promptBlock = `TÓPICOS JÁ USADOS NO SEU ACERVO${scopeLabel}. O campo "topic" de CADA questão deve ser EXATAMENTE IGUAL (copiar caractere a caractere) a UM dos rótulos abaixo quando o conteúdo da questão se encaixar nele. Não invente sinónimos nem variações só de capitalização para o mesmo tema.\n\n${bulletList}\n\nSe e somente se nenhum rótulo acima servir para uma questão, use UM nome novo curto (máximo 6 palavras). Evite criar vários rótulos novos diferentes para o mesmo tema neste lote.${truncatedNote}`;
+    promptBlock = `TÓPICOS JÁ USADOS NO SEU ACERVO${scopeLabel}. MINIMIZE a quantidade de valores distintos de "topic" neste array: se um único rótulo da lista abaixo cobrir todo o lote, use só esse em todas as questões (copiado caractere a caractere). Quando várias questões partilharem o mesmo tema, reutilize o MESMO texto de "topic".
+
+O campo "topic" de cada questão deve ser EXATAMENTE IGUAL a UM dos rótulos abaixo quando encaixar. Não invente sinónimos nem variações só de capitalização para o mesmo tema.
+
+${bulletList}
+
+Se e somente se nenhum rótulo acima servir para uma questão, use UM nome novo curto (máximo 6 palavras). No máximo ${MAX_DISTINCT_TOPICS_PER_AI_BATCH} valores distintos de "topic" no lote inteiro, incluindo novos.${truncatedNote}`;
   }
 
   return { promptBlock, canonicalByTopicKey, topicLabelsInPrompt };

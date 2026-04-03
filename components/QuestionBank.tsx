@@ -93,7 +93,9 @@ import type {
 import { validateAiQuestionsBatch } from './question-bank/validateAiGeneratedQuestions';
 import {
   applyCanonicalTopicsToRows,
+  buildTopicMinimalityInstructions,
   buildTopicReuseCatalog,
+  MAX_DISTINCT_TOPICS_PER_AI_BATCH,
   TOPIC_REUSE_PROMPT_MAX_LABELS,
 } from './question-bank/aiQuestionTopics';
 import { dedupeSimilarAiStatements } from './question-bank/similarStatementDetection';
@@ -1594,9 +1596,11 @@ Forneça a explicação de forma concisa e didática.`;
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
       const prompt = `Com base nestes temas que o aluno errou muito: ${topics}, gere 5 novas questões inéditas de nível Médio/Difícil para reforçar o aprendizado.
 
+${buildTopicMinimalityInstructions()}
+
 ${smartCatalog.promptBlock}
 
-Retorne em formato JSON array de objetos com: subject, topic, statement, options (array de exatamente 5 strings, alternativas A a E), correct_answer (inteiro 0 a 4), explanation, difficulty (ex: media, dificil), exam_board, year. O campo topic deve seguir as regras de reutilização de rótulos acima.`;
+Retorne em formato JSON array de objetos com: subject, topic, statement, options (array de exatamente 5 strings, alternativas A a E), correct_answer (inteiro 0 a 4), explanation, difficulty (ex: media, dificil), exam_board, year. O campo topic deve seguir a estratégia de tópicos e as regras de reutilização acima (poucos rótulos amplos, preferir um único "topic" repetido quando os temas fracos forem o mesmo eixo).`;
       
       const response = await ai.models.generateContent({
         model: GEMINI_MODEL,
@@ -1750,8 +1754,8 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
 
       const topicSchemaDesc =
         topicCatalog.topicLabelsInPrompt.length > 0
-          ? 'Tópico: copiar EXATAMENTE um dos rótulos listados nas instruções TÓPICOS JÁ USADOS quando o conteúdo encaixar; só use texto novo curto se nenhum encaixar.'
-          : 'Tópico: no máximo 2 ou 3 rótulos distintos em todo o lote; nomes curtos; reutilize o mesmo texto quando várias questões forem do mesmo tema.';
+          ? `Tópico: preferir 1 único valor repetido em todas as questões quando possível; no máximo ${MAX_DISTINCT_TOPICS_PER_AI_BATCH} distintos no array; rótulos amplos; copiar EXATAMENTE um rótulo das instruções TÓPICOS JÁ USADOS quando encaixar.`
+          : `Tópico: preferir 1 único valor repetido em todas as questões; no máximo ${MAX_DISTINCT_TOPICS_PER_AI_BATCH} distintos; nomes amplos (capítulo/disciplina), não micro-assuntos por questão.`;
 
       for (let i = 0; i < totalQuestions; i += chunkSize) {
         const currentBatchSize = Math.min(chunkSize, totalQuestions - i);
@@ -1760,8 +1764,6 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
         const prompt = `Crie ${currentBatchSize} questões de nível ${aiConfig.difficulty}.
         ${subjectLineForPrompt}
         ${topicSuggestionLine}
-
-        ${topicCatalog.promptBlock}
 
         Modalidade: ${questionModalityLabel(aiConfig.modality)} (código no JSON: ${aiConfig.modality}).
         Estilo de Prova: ${aiConfig.examStyle}.
@@ -1774,6 +1776,10 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
         ${jurisprudencePrompt}
         ${contextFromFlashcards}
         ${contextFromText}
+
+        ${buildTopicMinimalityInstructions()}
+
+        ${topicCatalog.promptBlock}
         
         ${aiConfig.modality === 'multipla_escolha' ? 'Cada questão deve ter 5 alternativas (A, B, C, D, E).' : 'Cada questão deve ser de Certo ou Errado (duas alternativas: Certo e Errado).'}
         A explicação deve ser EXTREMAMENTE detalhada, contendo uma análise individual para cada alternativa (ou para o item Certo/Errado), explicando por que a resposta correta está certa e por que as incorretas estão erradas, fundamentando com base no foco jurídico selecionado e no diploma legal mencionado.
