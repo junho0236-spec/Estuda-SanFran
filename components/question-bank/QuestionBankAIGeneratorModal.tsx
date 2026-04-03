@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Sparkles, X, Loader2, Timer, Gavel } from 'lucide-react';
 import { QUESTION_MODALITY_LABELS, type Folder, type QuestionModality } from '../../types';
 import type { QuestionBankAiConfig, QuestionBankAiConfigSetter } from './types';
@@ -30,8 +31,12 @@ export const QuestionBankAIGeneratorModal: React.FC<QuestionBankAIGeneratorModal
 }) => {
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" role="presentation">
+  // Portal + z alto: overlay dentro do QuestionBank ficava por baixo do HeaderActions (main).
+  const overlay = (
+    <div
+      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+      role="presentation"
+    >
       <div
         role="dialog"
         aria-modal="true"
@@ -387,4 +392,6 @@ export const QuestionBankAIGeneratorModal: React.FC<QuestionBankAIGeneratorModal
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(overlay, document.body) : null;
 };
