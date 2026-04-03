@@ -15,7 +15,7 @@ import {
   type Notebook,
   type QuestionModality,
 } from '../../types';
-import type { QuestionBankSavedFilterPreset, QuestionBankUnseenFilter } from './types';
+import type { QuestionBankSavedFilterPreset } from './types';
 
 const MOD_KEYS: QuestionModality[] = ['multipla_escolha', 'certo_errado'];
 
@@ -123,14 +123,10 @@ export interface QuestionBankFiltersPanelProps {
   notebooks: Notebook[];
   selectedNotebookId: string;
   setSelectedNotebookId: (v: string) => void;
-  unseenFilter: QuestionBankUnseenFilter;
-  setUnseenFilter: (v: QuestionBankUnseenFilter) => void;
   questionStatus: 'all' | 'resolved' | 'unresolved' | 'correct' | 'wrong' | 'review_today';
   setQuestionStatus: (
     v: 'all' | 'resolved' | 'unresolved' | 'correct' | 'wrong' | 'review_today'
   ) => void;
-  hideResolved: boolean;
-  setHideResolved: (v: boolean) => void;
   filteredQuestionCount: number;
   activeFilterChips: ActiveFilterChip[];
   onClearFilters: () => void;
@@ -201,12 +197,8 @@ export const QuestionBankFiltersPanel: React.FC<QuestionBankFiltersPanelProps> =
   notebooks,
   selectedNotebookId,
   setSelectedNotebookId,
-  unseenFilter,
-  setUnseenFilter,
   questionStatus,
   setQuestionStatus,
-  hideResolved,
-  setHideResolved,
   filteredQuestionCount,
   activeFilterChips,
   onClearFilters,
@@ -555,27 +547,6 @@ export const QuestionBankFiltersPanel: React.FC<QuestionBankFiltersPanelProps> =
                 onClick={() => setQuestionStatus('review_today')}
               >
                 Revisar hoje
-              </Pill>
-              <Pill active={hideResolved} onClick={() => setHideResolved(!hideResolved)}>
-                {hideResolved ? 'Mostrando ocultas' : 'Ocultar resolvidas'}
-              </Pill>
-            </PillRow>
-
-            <PillRow label="Questões">
-              <Pill active={unseenFilter === 'all'} onClick={() => setUnseenFilter('all')}>
-                Todas
-              </Pill>
-              <Pill
-                active={unseenFilter === 'unseen_only'}
-                onClick={() => setUnseenFilter('unseen_only')}
-              >
-                Apenas inéditas
-              </Pill>
-              <Pill
-                active={unseenFilter === 'exclude_unseen'}
-                onClick={() => setUnseenFilter('exclude_unseen')}
-              >
-                Não incluir inéditas
               </Pill>
             </PillRow>
 

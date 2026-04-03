@@ -92,7 +92,6 @@ import type {
   QuestionBankMockResults,
   QuestionBankAiConfig,
   QuestionBankSavedFilterPreset,
-  QuestionBankUnseenFilter,
 } from './question-bank/types';
 import { validateAiQuestionsBatch } from './question-bank/validateAiGeneratedQuestions';
 import {
@@ -215,7 +214,6 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
   const [selectedModality, setSelectedModality] = useState<string>('');
   const [selectedLegalDiploma, setSelectedLegalDiploma] = useState<string>('');
   const [difficultyFilter, setDifficultyFilter] = useState<string>('');
-  const [hideResolved, setHideResolved] = useState(false);
   const [institutions, setInstitutions] = useState<string[]>([]);
   const [examNames, setExamNames] = useState<string[]>([]);
   const [legalDiplomas, setLegalDiplomas] = useState<string[]>([]);
@@ -227,7 +225,6 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
   const [selectedFormationArea, setSelectedFormationArea] = useState('');
   const [selectedEducationLevel, setSelectedEducationLevel] = useState('');
   const [selectedJobPosition, setSelectedJobPosition] = useState('');
-  const [unseenFilter, setUnseenFilter] = useState<QuestionBankUnseenFilter>('all');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [listPage, setListPage] = useState(1);
   const [listPageSize, setListPageSize] = useState(20);
@@ -2208,10 +2205,6 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
 
         const isWrong = wrongQuestions.includes(q.id);
         const isCorrect = correctQuestions.includes(q.id);
-        const seen = isWrong || isCorrect;
-        let matchUnseen = true;
-        if (unseenFilter === 'unseen_only') matchUnseen = !seen;
-        else if (unseenFilter === 'exclude_unseen') matchUnseen = seen;
 
         let matchNotebook = true;
         if (selectedNotebookId) {
@@ -2234,10 +2227,6 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
           matchStatus = isQuestionDueForReviewToday(q.id, wrongQuestions, questionStats);
         }
 
-        if (questionStatus !== 'review_today' && hideResolved && (isWrong || isCorrect)) {
-          matchStatus = false;
-        }
-
         return (
           matchSearch &&
           matchSubject &&
@@ -2258,8 +2247,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
           matchEdu &&
           matchJob &&
           matchAnnulled &&
-          matchOutdated &&
-          matchUnseen
+          matchOutdated
         );
       })
       .sort((a, b) => {
@@ -2307,7 +2295,6 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
     selectedFormationArea,
     selectedEducationLevel,
     selectedJobPosition,
-    unseenFilter,
     wrongQuestions,
     correctQuestions,
     selectedNotebookId,
@@ -2315,7 +2302,6 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
     isErrorNotebookMode,
     questionStatus,
     questionStats,
-    hideResolved,
     sortBy,
   ]);
 
@@ -2350,8 +2336,6 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
     selectedEducationLevel,
     selectedJobPosition,
     questionStatus,
-    hideResolved,
-    unseenFilter,
     sortBy,
     isErrorNotebookMode,
   ]);
@@ -2388,8 +2372,6 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
       setSelectedEducationLevel(p.selectedEducationLevel);
       setSelectedJobPosition(p.selectedJobPosition);
       setQuestionStatus(p.questionStatus);
-      setHideResolved(p.hideResolved);
-      setUnseenFilter(p.unseenFilter);
       showNotification('Filtro carregado.', 'success');
     },
     []
@@ -2424,15 +2406,12 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
         selectedEducationLevel,
         selectedJobPosition,
         questionStatus,
-        hideResolved,
-        unseenFilter,
       };
       persistSavedPresets([...savedFilterPresets, preset]);
       showNotification('Filtro guardado.', 'success');
     },
     [
       difficultyFilter,
-      hideResolved,
       persistSavedPresets,
       questionStatus,
       savedFilterPresets,
@@ -2452,7 +2431,6 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
       selectedSubject,
       selectedTopic,
       selectedYear,
-      unseenFilter,
     ]
   );
 
@@ -2551,12 +2529,6 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
         label: 'Caderno',
         onRemove: () => setSelectedNotebookId(''),
       });
-    if (unseenFilter !== 'all')
-      c.push({
-        id: 'unseen',
-        label: `Inéditas: ${unseenFilter}`,
-        onRemove: () => setUnseenFilter('all'),
-      });
     return c;
   }, [
     difficultyFilter,
@@ -2576,7 +2548,6 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
     selectedSubject,
     selectedTopic,
     selectedYear,
-    unseenFilter,
   ]);
 
   const toggleQbDark = useCallback(() => {
@@ -2925,8 +2896,6 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
     selectedFormationArea,
     selectedEducationLevel,
     selectedJobPosition,
-    unseenFilter,
-    hideResolved,
   ]);
 
   if (loading) {
@@ -3477,12 +3446,8 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
               notebooks={notebooks}
               selectedNotebookId={selectedNotebookId}
               setSelectedNotebookId={setSelectedNotebookId}
-              unseenFilter={unseenFilter}
-              setUnseenFilter={setUnseenFilter}
               questionStatus={questionStatus}
               setQuestionStatus={setQuestionStatus}
-              hideResolved={hideResolved}
-              setHideResolved={setHideResolved}
               filteredQuestionCount={filteredQuestions.length}
               activeFilterChips={activeFilterChips}
               onClearFilters={() => {
@@ -3504,8 +3469,6 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
                 setSelectedFormationArea('');
                 setSelectedEducationLevel('');
                 setSelectedJobPosition('');
-                setHideResolved(false);
-                setUnseenFilter('all');
               }}
               onApplyFilters={() => {
                 setCurrentIndex(0);

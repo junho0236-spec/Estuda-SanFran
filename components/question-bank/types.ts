@@ -61,8 +61,6 @@ export type QuestionBankAiConfig = {
   jobPosition: string;
 };
 
-export type QuestionBankUnseenFilter = 'all' | 'unseen_only' | 'exclude_unseen';
-
 /** Snapshot serializável para filtros guardados (localStorage). */
 export type QuestionBankSavedFilterPreset = {
   id: string;
@@ -86,8 +84,6 @@ export type QuestionBankSavedFilterPreset = {
   selectedEducationLevel: string;
   selectedJobPosition: string;
   questionStatus: 'all' | 'resolved' | 'unresolved' | 'correct' | 'wrong' | 'review_today';
-  hideResolved: boolean;
-  unseenFilter: QuestionBankUnseenFilter;
 };
 
 export type QuestionBankAiConfigSetter = Dispatch<SetStateAction<QuestionBankAiConfig>>;
