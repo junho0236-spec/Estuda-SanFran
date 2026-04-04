@@ -67,7 +67,10 @@ export type QuestionBankSavedFilterPreset = {
   name: string;
   createdAt: string;
   searchTerm: string;
-  selectedSubject: string;
+  /** Disciplinas do catálogo (filtro múltiplo). */
+  selectedSubjects: string[];
+  /** Presets antigos: uma única disciplina. */
+  selectedSubject?: string;
   selectedTopic: string;
   selectedExamBoard: string;
   selectedYear: string;

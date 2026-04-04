@@ -86,8 +86,8 @@ export interface ActiveFilterChip {
 export interface QuestionBankFiltersPanelProps {
   searchTerm: string;
   setSearchTerm: (v: string) => void;
-  selectedSubject: string;
-  setSelectedSubject: (v: string) => void;
+  selectedSubjects: string[];
+  setSelectedSubjects: (v: string[]) => void;
   setSelectedTopic: (v: string) => void;
   filteredTopics: string[];
   selectedTopic: string;
@@ -159,8 +159,8 @@ export interface QuestionBankFiltersPanelProps {
 export const QuestionBankFiltersPanel: React.FC<QuestionBankFiltersPanelProps> = ({
   searchTerm,
   setSearchTerm,
-  selectedSubject,
-  setSelectedSubject,
+  selectedSubjects,
+  setSelectedSubjects,
   setSelectedTopic,
   filteredTopics,
   selectedTopic,
@@ -245,7 +245,7 @@ export const QuestionBankFiltersPanel: React.FC<QuestionBankFiltersPanelProps> =
 
   const helpText = useMemo(
     () =>
-      'Os filtros aplicam-se em tempo real. Use chips para remover critérios. A disciplina é escolhida numa lista fixa (como no Gran Cursos).',
+      'Os filtros aplicam-se em tempo real. Use chips para remover critérios. Podes selecionar várias disciplinas; os assuntos mostram a união das disciplinas escolhidas.',
     []
   );
 
@@ -314,11 +314,12 @@ export const QuestionBankFiltersPanel: React.FC<QuestionBankFiltersPanelProps> =
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
               <div className="min-w-0">
                 <DisciplineFilterDropdown
+                  multiple
                   emptyLabel="Disciplina"
                   clearLabel="Todas as disciplinas"
-                  value={selectedSubject}
-                  onChange={(v) => {
-                    setSelectedSubject(v);
+                  values={selectedSubjects}
+                  onChange={(next) => {
+                    setSelectedSubjects(next);
                     setSelectedTopic('');
                   }}
                 />
@@ -331,7 +332,7 @@ export const QuestionBankFiltersPanel: React.FC<QuestionBankFiltersPanelProps> =
                   value={selectedTopic}
                   onChange={setSelectedTopic}
                   options={toOptions(filteredTopics)}
-                  disabled={!selectedSubject}
+                  disabled={filteredTopics.length === 0}
                 />
               </div>
             </div>

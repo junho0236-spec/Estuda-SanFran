@@ -12,9 +12,7 @@ import { getTopDisciplinesByLocalStats, recordDisciplineCatalogPick } from './di
 const CATALOG_SET = new Set(ALL_CATALOG_DISCIPLINE_VALUES);
 const PAGE_STEP = 55;
 
-export type DisciplineFilterDropdownProps = {
-  value: string;
-  onChange: (v: string) => void;
+type DisciplineFilterDropdownBase = {
   disabled?: boolean;
   className?: string;
   emptyLabel?: string;
@@ -22,15 +20,37 @@ export type DisciplineFilterDropdownProps = {
   useFixedPortal?: boolean;
 };
 
-export function DisciplineFilterDropdown({
-  value,
-  onChange,
-  disabled,
-  className = '',
-  emptyLabel = 'Disciplina',
-  clearLabel = 'Todas as disciplinas',
-  useFixedPortal = false,
-}: DisciplineFilterDropdownProps) {
+export type DisciplineFilterDropdownProps =
+  | (DisciplineFilterDropdownBase & {
+      multiple?: false;
+      value: string;
+      onChange: (v: string) => void;
+    })
+  | (DisciplineFilterDropdownBase & {
+      multiple: true;
+      values: string[];
+      onChange: (v: string[]) => void;
+    });
+
+function toggleDisciplineInList(current: string[], label: string): string[] {
+  const i = current.indexOf(label);
+  if (i >= 0) return current.filter((_, j) => j !== i);
+  return [...current, label];
+}
+
+export function DisciplineFilterDropdown(props: DisciplineFilterDropdownProps) {
+  const {
+    disabled,
+    className = '',
+    emptyLabel = 'Disciplina',
+    clearLabel = 'Todas as disciplinas',
+    useFixedPortal = false,
+  } = props;
+  const multiple = props.multiple === true;
+  const value = multiple ? '' : props.value;
+  const values = multiple ? props.values : [];
+  const onChangeSingle = multiple ? () => {} : props.onChange;
+  const onChangeMulti = multiple ? props.onChange : (_: string[]) => {};
   const id = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -47,7 +67,13 @@ export function DisciplineFilterDropdown({
   const [sanfranLimit, setSanfranLimit] = useState(PAGE_STEP);
   const [outrasLimit, setOutrasLimit] = useState(PAGE_STEP);
 
-  const selectedLabel = value || emptyLabel;
+  const selectedLabel = multiple
+    ? values.length === 0
+      ? emptyLabel
+      : values.length === 1
+        ? values[0]
+        : `${values.length} disciplinas selecionadas`
+    : value || emptyLabel;
 
   const filteredSanfran = useMemo(() => {
     const f = SANFRAN_DISCIPLINES.filter((d) => disciplineMatchesSearch(d, query));
@@ -110,13 +136,28 @@ export function DisciplineFilterDropdown({
 
   const pick = useCallback(
     (v: string) => {
+      if (multiple) return;
       if (v) recordDisciplineCatalogPick(v);
-      onChange(v);
+      onChangeSingle(v);
       setOpen(false);
       setQuery('');
     },
-    [onChange]
+    [multiple, onChangeSingle]
   );
+
+  const togglePick = useCallback(
+    (label: string) => {
+      if (!multiple) return;
+      if (label && !values.includes(label)) recordDisciplineCatalogPick(label);
+      onChangeMulti(toggleDisciplineInList(values, label));
+    },
+    [multiple, onChangeMulti, values]
+  );
+
+  const clearMulti = useCallback(() => {
+    if (!multiple) return;
+    onChangeMulti([]);
+  }, [multiple, onChangeMulti]);
 
   const onListScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
@@ -134,23 +175,26 @@ export function DisciplineFilterDropdown({
   const sanfranSlice = filteredSanfran.slice(0, sanfranLimit);
   const outrasSlice = filteredOutras.slice(0, outrasLimit);
 
+  const isRowSelected = (label: string) =>
+    multiple ? values.includes(label) : value === label;
+
   const renderRow = (label: string, i: number) => (
     <button
       key={label}
       type="button"
       role="option"
-      aria-selected={value === label}
-      onClick={() => pick(label)}
+      aria-selected={isRowSelected(label)}
+      onClick={() => (multiple ? togglePick(label) : pick(label))}
       className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#1e3a8a] hover:bg-blue-50 dark:text-blue-100 dark:hover:bg-slate-800/80 ${
         i % 2 === 1 ? 'bg-slate-50/80 dark:bg-slate-800/40' : ''
       }`}
     >
       <span
         className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border border-slate-300 dark:border-slate-600 ${
-          value === label ? 'border-blue-600 bg-blue-600 text-white' : ''
+          isRowSelected(label) ? 'border-blue-600 bg-blue-600 text-white' : ''
         }`}
       >
-        {value === label ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
+        {isRowSelected(label) ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
       </span>
       <span className="min-w-0 flex-1 break-words">{label}</span>
     </button>
@@ -181,7 +225,9 @@ export function DisciplineFilterDropdown({
   const panelBody = (
     <>
       <div className="flex items-center justify-between bg-[#1e3a8a] px-3 py-2 text-white dark:bg-blue-950">
-        <span className="text-sm font-bold tracking-tight">Disciplina</span>
+        <span className="text-sm font-bold tracking-tight">
+          {multiple ? 'Disciplinas (várias)' : 'Disciplina'}
+        </span>
         <ChevronUp className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
       </div>
 
@@ -205,19 +251,28 @@ export function DisciplineFilterDropdown({
         <button
           type="button"
           role="option"
-          aria-selected={value === ''}
-          onClick={() => pick('')}
+          aria-selected={multiple ? values.length === 0 : value === ''}
+          onClick={() => (multiple ? clearMulti() : pick(''))}
           className="flex w-full items-center gap-2 border-b border-slate-100 px-3 py-2 text-left text-sm hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/80"
         >
           <span
             className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border border-slate-300 dark:border-slate-600 ${
-              value === '' ? 'border-blue-600 bg-blue-600 text-white' : ''
+              multiple ? (values.length === 0 ? 'border-blue-600 bg-blue-600 text-white' : '') : value === '' ? 'border-blue-600 bg-blue-600 text-white' : ''
             }`}
           >
-            {value === '' ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
+            {multiple ? (
+              values.length === 0 ? <Check className="h-3 w-3" strokeWidth={3} /> : null
+            ) : value === '' ? (
+              <Check className="h-3 w-3" strokeWidth={3} />
+            ) : null}
           </span>
           <span className="text-slate-600 dark:text-slate-300">{clearLabel}</span>
         </button>
+        {multiple && values.length > 0 && (
+          <p className="border-b border-slate-100 px-3 py-2 text-[10px] font-semibold text-slate-500 dark:border-slate-800 dark:text-slate-400">
+            Clica nas disciplinas para marcar ou desmarcar. Fecha o painel ao clicar fora.
+          </p>
+        )}
 
         {sectionHeader('Mais buscadas', showMost, setShowMost)}
         {showMost && (
@@ -282,7 +337,14 @@ export function DisciplineFilterDropdown({
       : undefined;
 
   const panel = (
-    <div ref={panelShellRef} id={`${id}-panel`} role="listbox" className={panelClass} style={panelStyle}>
+    <div
+      ref={panelShellRef}
+      id={`${id}-panel`}
+      role="listbox"
+      aria-multiselectable={multiple ? true : undefined}
+      className={panelClass}
+      style={panelStyle}
+    >
       {panelBody}
     </div>
   );
@@ -295,12 +357,22 @@ export function DisciplineFilterDropdown({
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
-        title={value ? selectedLabel : undefined}
+        title={
+          multiple
+            ? values.length > 0
+              ? values.join(' · ')
+              : undefined
+            : value
+              ? selectedLabel
+              : undefined
+        }
         onClick={() => !disabled && setOpen((o) => !o)}
         className="flex h-10 w-full min-h-10 max-h-10 items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 text-left text-sm text-slate-900 shadow-sm transition-colors hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
       >
         <span
-          className={`min-w-0 flex-1 truncate text-left ${!value ? 'text-slate-500 dark:text-slate-400' : ''}`}
+          className={`min-w-0 flex-1 truncate text-left ${
+            multiple ? (values.length === 0 ? 'text-slate-500 dark:text-slate-400' : '') : !value ? 'text-slate-500 dark:text-slate-400' : ''
+          }`}
         >
           {selectedLabel}
         </span>

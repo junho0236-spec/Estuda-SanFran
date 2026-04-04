@@ -168,6 +168,27 @@ function QuestionAlternativeAnalysisBlocks({
   );
 }
 
+function migrateSavedFilterPresetRow(row: unknown): QuestionBankSavedFilterPreset | null {
+  if (!row || typeof row !== 'object') return null;
+  const x = row as Partial<QuestionBankSavedFilterPreset> & { selectedSubject?: string };
+  if (typeof x.id !== 'string' || typeof x.name !== 'string') return null;
+  const subs =
+    Array.isArray(x.selectedSubjects) &&
+    x.selectedSubjects.length > 0 &&
+    x.selectedSubjects.every((s) => typeof s === 'string')
+      ? x.selectedSubjects
+      : typeof x.selectedSubject === 'string' &&
+          x.selectedSubject !== '' &&
+          x.selectedSubject !== 'Todos'
+        ? [x.selectedSubject]
+        : [];
+  return {
+    ...(x as QuestionBankSavedFilterPreset),
+    selectedSubjects: subs,
+    selectedSubject: subs[0] ?? '',
+  };
+}
+
 interface QuestionBankProps {
   userId: string;
   folders?: Folder[];
@@ -202,7 +223,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
   const [legislationTags, setLegislationTags] = useState<string[]>([]);
   const [jurisprudenceTags, setJurisprudenceTags] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedSubject, setSelectedSubject] = useState<string>('');
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [selectedTopic, setSelectedTopic] = useState<string>('');
   const [selectedExamBoard, setSelectedExamBoard] = useState<string>('');
   const [selectedYear, setSelectedYear] = useState<string>('');
@@ -301,7 +322,13 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
       if (!raw) setSavedFilterPresets([]);
       else {
         const p = JSON.parse(raw) as unknown;
-        setSavedFilterPresets(Array.isArray(p) ? (p as QuestionBankSavedFilterPreset[]) : []);
+        setSavedFilterPresets(
+          Array.isArray(p)
+            ? p
+                .map(migrateSavedFilterPresetRow)
+                .filter((x): x is QuestionBankSavedFilterPreset => x != null)
+            : []
+        );
       }
     } catch {
       setSavedFilterPresets([]);
@@ -744,7 +771,12 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
     aiModalPrefilledRef.current = true;
     setAiConfig((prev) => ({
       ...prev,
-      subject: selectedSubject || prev.subject,
+      subject:
+        selectedSubjects.length === 0
+          ? prev.subject
+          : selectedSubjects.length === 1
+            ? selectedSubjects[0]
+            : selectedSubjects.join('; '),
       topic: selectedTopic || prev.topic,
       examStyle: selectedExamBoard || prev.examStyle,
       institution: selectedInstitution || prev.institution,
@@ -762,7 +794,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
     }));
   }, [
     showAIGenerator,
-    selectedSubject,
+    selectedSubjects,
     selectedTopic,
     selectedExamBoard,
     selectedInstitution,
@@ -967,7 +999,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
     const qsearch = searchParams.get('qbSearch');
     if (!rs && !sub && !top && !qsearch) return;
     qbDeepLinkApplied.current = true;
-    if (sub) setSelectedSubject(sub);
+    if (sub) setSelectedSubjects([sub]);
     if (top) setSelectedTopic(top);
     if (qsearch) setSearchTerm(qsearch);
     if (rs === '1' || rs === 'true') setQuestionStatus('review_today');
@@ -2108,9 +2140,13 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
       setShowAiLesson(true);
       
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
+      const scope =
+        subject.includes(';') || subject.includes(',')
+          ? `nas seguintes disciplinas: ${subject.replace(/;/g, ', ')}`
+          : `na disciplina de ${subject}`;
       const prompt = `Você é um professor de Direito especialista em concursos e OAB. 
-      O aluno está tendo erros recorrentes na disciplina de ${subject}.
-      Crie uma aula resumida e focada, explicando os conceitos fundamentais, as principais pegadinhas de banca e dicas de memorização (mnemônicos) para este tema.
+      O aluno está tendo erros recorrentes ${scope}.
+      Crie uma aula resumida e focada, explicando os conceitos fundamentais, as principais pegadinhas de banca e dicas de memorização (mnemônicos) para ${subject.includes(';') ? 'essas áreas' : 'este tema'}.
       Use uma linguagem clara, direta e motivadora. Formate em Markdown.`;
 
       const response = await ai.models.generateContent({
@@ -2127,9 +2163,26 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
     }
   };
 
-  const filteredTopics = selectedSubject && selectedSubject !== 'Todos'
-    ? Array.from(new Set(questions.filter(q => q.subject === selectedSubject).map(q => q.topic))).filter(Boolean).sort()
-    : topics;
+  const filteredTopics = useMemo(() => {
+    const set = new Set<string>();
+    if (selectedSubjects.length === 0) {
+      for (const t of topics) {
+        if (t && t !== 'Todos') set.add(t);
+      }
+      return [...set].sort((a, b) => a.localeCompare(b, 'pt'));
+    }
+    for (const q of questions) {
+      if (selectedSubjects.includes(q.subject) && q.topic && q.topic !== 'Todos') set.add(q.topic);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, 'pt'));
+  }, [questions, topics, selectedSubjects]);
+
+  useEffect(() => {
+    if (!selectedTopic || selectedTopic === 'Todos') return;
+    if (!filteredTopics.includes(selectedTopic)) {
+      setSelectedTopic('');
+    }
+  }, [selectedTopic, filteredTopics]);
 
   const currentYear = new Date().getFullYear().toString();
 
@@ -2147,7 +2200,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
           q.statement.toLowerCase().includes(searchTerm.toLowerCase()) ||
           (q.explanation && q.explanation.toLowerCase().includes(searchTerm.toLowerCase()));
         const matchSubject =
-          selectedSubject === '' || selectedSubject === 'Todos' || q.subject === selectedSubject;
+          selectedSubjects.length === 0 || selectedSubjects.includes(q.subject);
         const matchTopic = selectedTopic === '' || selectedTopic === 'Todos' || q.topic === selectedTopic;
         const matchDifficulty =
           difficultyFilter === '' || difficultyFilter === 'Todos' || q.difficulty === difficultyFilter;
@@ -2272,7 +2325,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
   }, [
     questions,
     searchTerm,
-    selectedSubject,
+    selectedSubjects,
     selectedTopic,
     difficultyFilter,
     selectedExamBoard,
@@ -2311,7 +2364,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
     setListPage(1);
   }, [
     searchTerm,
-    selectedSubject,
+    selectedSubjects,
     selectedTopic,
     selectedExamBoard,
     selectedYear,
@@ -2347,7 +2400,13 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
   const handleLoadSavedPreset = useCallback(
     (p: QuestionBankSavedFilterPreset) => {
       setSearchTerm(p.searchTerm);
-      setSelectedSubject(p.selectedSubject);
+      const subs =
+        Array.isArray(p.selectedSubjects) && p.selectedSubjects.length > 0
+          ? p.selectedSubjects
+          : p.selectedSubject && p.selectedSubject !== 'Todos'
+            ? [p.selectedSubject]
+            : [];
+      setSelectedSubjects(subs);
       setSelectedTopic(p.selectedTopic);
       setSelectedExamBoard(p.selectedExamBoard);
       setSelectedYear(p.selectedYear);
@@ -2381,7 +2440,8 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
         name: trimmed,
         createdAt: new Date().toISOString(),
         searchTerm,
-        selectedSubject,
+        selectedSubjects,
+        selectedSubject: selectedSubjects[0] ?? '',
         selectedTopic,
         selectedExamBoard,
         selectedYear,
@@ -2420,7 +2480,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
       selectedLegislation,
       selectedModality,
       selectedNotebookId,
-      selectedSubject,
+      selectedSubjects,
       selectedTopic,
       selectedYear,
     ]
@@ -2430,15 +2490,16 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
     const c: ActiveFilterChip[] = [];
     if (searchTerm.trim())
       c.push({ id: 'search', label: `Busca: ${searchTerm}`, onRemove: () => setSearchTerm('') });
-    if (selectedSubject)
+    selectedSubjects.forEach((sub, idx) => {
+      const safeId = sub.slice(0, 40).replace(/\s+/g, '-');
       c.push({
-        id: 'subject',
-        label: `Disciplina: ${selectedSubject}`,
+        id: `subject-${idx}-${safeId}`,
+        label: `Disciplina: ${sub}`,
         onRemove: () => {
-          setSelectedSubject('');
-          setSelectedTopic('');
+          setSelectedSubjects((prev) => prev.filter((s) => s !== sub));
         },
       });
+    });
     if (selectedTopic)
       c.push({ id: 'topic', label: `Assunto: ${selectedTopic}`, onRemove: () => setSelectedTopic('') });
     if (selectedExamBoard)
@@ -2537,7 +2598,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
     selectedLegislation,
     selectedModality,
     selectedNotebookId,
-    selectedSubject,
+    selectedSubjects,
     selectedTopic,
     selectedYear,
   ]);
@@ -2869,7 +2930,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
     setShowExplanation(false);
     setViewMode('list');
   }, [
-    selectedSubject,
+    selectedSubjects,
     selectedTopic,
     difficultyFilter,
     sortBy,
@@ -3143,8 +3204,18 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
             <div className="space-y-4">
               <p className="text-sm font-bold leading-relaxed max-w-2xl">
                 Você tem <span className="text-2xl px-2">{wrongQuestions.length}</span> erros recorrentes. 
-                {selectedSubject && selectedSubject !== 'Todos' ? (
-                  <> A disciplina de <span className="underline decoration-2 underline-offset-4">{selectedSubject}</span> é onde você mais precisa de reforço.</>
+                {selectedSubjects.length === 1 ? (
+                  <> A disciplina de <span className="underline decoration-2 underline-offset-4">{selectedSubjects[0]}</span> é onde você mais precisa de reforço.</>
+                ) : selectedSubjects.length > 1 ? (
+                  <>
+                    {' '}
+                    Foco nas disciplinas:{' '}
+                    <span className="underline decoration-2 underline-offset-4">
+                      {selectedSubjects.slice(0, 3).join(', ')}
+                      {selectedSubjects.length > 3 ? ` e mais ${selectedSubjects.length - 3}` : ''}
+                    </span>
+                    .
+                  </>
                 ) : (
                   <> Analisamos seu histórico e identificamos lacunas importantes em temas fundamentais.</>
                 )}
@@ -3157,9 +3228,15 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
                 >
                   <Sword size={16} /> Vencer Meus Erros
                 </button>
-                {selectedSubject && selectedSubject !== 'Todos' && (
+                {selectedSubjects.length > 0 && (
                   <button
-                    onClick={() => generateAiLesson(selectedSubject)}
+                    onClick={() =>
+                      generateAiLesson(
+                        selectedSubjects.length === 1
+                          ? selectedSubjects[0]
+                          : selectedSubjects.join('; ')
+                      )
+                    }
                     className="px-6 py-3 bg-red-900/20 hover:bg-red-900/30 text-white border border-white/30 rounded-xl font-black text-xs uppercase tracking-widest transition-all flex items-center gap-2 backdrop-blur-sm"
                   >
                     <Sparkles size={16} /> Aula Resumida IA
@@ -3390,8 +3467,8 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
             <QuestionBankFiltersPanel
               searchTerm={searchTerm}
               setSearchTerm={setSearchTerm}
-              selectedSubject={selectedSubject}
-              setSelectedSubject={setSelectedSubject}
+              selectedSubjects={selectedSubjects}
+              setSelectedSubjects={setSelectedSubjects}
               setSelectedTopic={setSelectedTopic}
               filteredTopics={filteredTopics}
               selectedTopic={selectedTopic}
@@ -3443,7 +3520,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
               activeFilterChips={activeFilterChips}
               onClearFilters={() => {
                 setSearchTerm('');
-                setSelectedSubject('');
+                setSelectedSubjects([]);
                 setSelectedTopic('');
                 setDifficultyFilter('');
                 setQuestionStatus('all');
@@ -4502,7 +4579,13 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
                 </div>
                 <div>
                   <h2 id="qb-ai-lesson-title" className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Aula Resumida IA</h2>
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{selectedSubject}</p>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                    {selectedSubjects.length === 0
+                      ? '—'
+                      : selectedSubjects.length === 1
+                        ? selectedSubjects[0]
+                        : selectedSubjects.join(' · ')}
+                  </p>
                 </div>
               </div>
               <button type="button" onClick={() => setShowAiLesson(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all" aria-label="Fechar aula resumida">
