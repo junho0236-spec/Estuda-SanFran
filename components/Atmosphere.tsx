@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Volume2, VolumeX, CloudRain, Coffee, Music, Library, Play, Pause, Waves, Bell, Users } from 'lucide-react';
 
@@ -40,7 +39,7 @@ const Atmosphere: React.FC<AtmosphereProps> = ({ isExtremeFocus, isSidebarOpen, 
     if (audioRef.current) {
       audioRef.current.volume = volume;
     }
-  }, [volume]);
+  }, [volume]); // Dependencies are correctly set
 
   // Efeito para gerenciar a troca de faixas e Play/Pause
   useEffect(() => {

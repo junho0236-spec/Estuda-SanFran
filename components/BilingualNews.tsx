@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Newspaper, Globe, ArrowRight, Eye, X, BookOpen, Clock, Tag, ChevronLeft, Volume2
@@ -86,7 +85,7 @@ const BilingualNews: React.FC<BilingualNewsProps> = ({ userId }) => {
 
   useEffect(() => {
     fetchArticles();
-  }, [currentLang]);
+  }, [currentLang]); // Ensure this runs only when currentLang changes
 
   const fetchArticles = async () => {
     setLoading(true);

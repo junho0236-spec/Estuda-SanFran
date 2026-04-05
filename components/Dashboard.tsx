@@ -1,4 +1,3 @@
-
 // Dashboard Component - Refactored to use CompetenceRadar
 import { Brain, CheckCircle2, Clock, Zap, TrendingUp, Medal, Gavel, Award, Scale, Briefcase, GraduationCap, Quote, Sun, Book, Shield, Zap as ZapIcon, Trophy, BookOpen, Layout, MousePointerClick, Calculator, Target, Calendar } from 'lucide-react';
 import React, { useMemo, useState, useEffect } from 'react';
@@ -30,7 +29,7 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
       }
     };
     fetchConfig();
-  }, []);
+  }, []); // Ensure this runs only once on mount
 
   const daysToOab = useMemo(() => {
     const target = new Date(oabDate + 'T00:00:00');
