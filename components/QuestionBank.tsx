@@ -220,8 +220,6 @@ interface QuestionBankProps {
   folders?: Folder[];
   flashcards?: Flashcard[];
   isOnline?: boolean;
-  /** Chamado após persistir `user_progress` com sucesso (debounced). Atualiza contadores no App sem depender só do realtime. */
-  onUserProgressSynced?: () => void | Promise<void>;
 }
 
 const QuestionBank: React.FC<QuestionBankProps> = ({ 
@@ -229,7 +227,6 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
   folders = [], 
   flashcards = [],
   isOnline = true,
-  onUserProgressSynced
 }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const qbDeepLinkApplied = useRef(false);
@@ -1146,25 +1143,6 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
     }
   };
 
-  const appProgressNotifyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    return () => {
-      if (appProgressNotifyTimerRef.current) {
-        clearTimeout(appProgressNotifyTimerRef.current);
-        appProgressNotifyTimerRef.current = null;
-      }
-    };
-  }, []);
-
-  const scheduleAppProgressRefresh = useCallback(() => {
-    if (!onUserProgressSynced) return;
-    if (appProgressNotifyTimerRef.current) clearTimeout(appProgressNotifyTimerRef.current);
-    appProgressNotifyTimerRef.current = setTimeout(() => {
-      appProgressNotifyTimerRef.current = null;
-      void onUserProgressSynced();
-    }, 400);
-  }, [onUserProgressSynced]);
-
   const syncUserProgress = async (updates: SyncUserProgressUpdates = {}) => {
     if (!userId || !isProgressLoaded) {
       return;
@@ -1214,11 +1192,9 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
           handleFirestoreError(retry.error, OperationType.WRITE, 'user_progress');
         } else {
           setUserProgress(retry.data);
-          scheduleAppProgressRefresh();
         }
       } else if (data) {
         setUserProgress(data);
-        scheduleAppProgressRefresh();
       }
     } catch (err) {
       console.error('Unexpected error in syncUserProgress:', err);

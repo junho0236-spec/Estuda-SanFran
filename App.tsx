@@ -18,10 +18,13 @@ import {
   type RealtimeUserDataScope,
 } from './utils/realtimeThrottle';
 
-/** Temporário: `*` até validar schema no Supabase; listas explícitas evitam colunas inexistentes ou omissões. */
-const FLASHCARD_CLOUD_COLUMNS = '*';
-const TASK_CLOUD_COLUMNS = '*';
-const USER_PROGRESS_CLOUD_COLUMNS = '*';
+/** Colunas usadas em `loadUserData` (menos payload que `*`). Ajustar se o schema Supabase diferir. */
+const FLASHCARD_CLOUD_COLUMNS =
+  'id, front, back, notes, tags, source, subject_id, folder_id, next_review, interval, status, learning_step, ease_factor, total_errors, archived_at';
+const TASK_CLOUD_COLUMNS =
+  'id, title, status, subject_id, due_date, completed_at, category, priority, notes, subtasks, description, archived_at, delegated_to, delegated_by, created_at, google_event_id';
+const USER_PROGRESS_CLOUD_COLUMNS =
+  'correct_count, wrong_count, wrong_questions, wrong_question_ids, confidence_levels';
 
 // Lazy Load dos Componentes para Performance (Code Splitting)
 const Dashboard = React.lazy(() => import('./components/Dashboard'));
@@ -803,6 +806,8 @@ const App: React.FC = () => {
       }
 
       if (isOnline) {
+        const syncQueueCount = await db.syncQueue.count();
+
         // Fetch subjects first as they are often dependencies
         const { data: subs } = await supabase.from('subjects').select('id, name').eq('user_id', userId);
         if (subs) setSubjects(subs);
@@ -850,8 +855,7 @@ const App: React.FC = () => {
             version: f.version || 1
           }));
 
-          const syncCount = await db.syncQueue.count();
-          if (syncCount === 0) {
+          if (syncQueueCount === 0) {
             const localFolders = await db.folders.toArray();
             const remoteIds = new Set(formattedFolders.map(f => f.id));
             const idsToDelete = localFolders.filter(f => !remoteIds.has(f.id)).map(f => f.id);
@@ -862,8 +866,7 @@ const App: React.FC = () => {
         }
         
         if (subs) {
-          const syncCount = await db.syncQueue.count();
-          if (syncCount === 0) {
+          if (syncQueueCount === 0) {
             const localSubs = await db.subjects.toArray();
             const remoteIds = new Set(subs.map(s => s.id));
             const idsToDelete = localSubs.filter(s => !remoteIds.has(s.id)).map(s => s.id);
@@ -933,8 +936,7 @@ const App: React.FC = () => {
             };
           });
 
-          const syncCount = await db.syncQueue.count();
-          if (syncCount === 0) {
+          if (syncQueueCount === 0) {
             const localTasks = await db.tasks.toArray();
             const remoteIds = new Set(formattedTasks.map(t => t.id));
             const idsToDelete = localTasks.filter(t => !remoteIds.has(t.id)).map(t => t.id);
@@ -948,16 +950,14 @@ const App: React.FC = () => {
           const formattedBoards = resBoards.data.map(b => ({
             id: b.id, name: b.name, columns: b.columns, userId: b.user_id, createdAt: b.created_at
           }));
-          const syncCount = await db.syncQueue.count();
-          if (syncCount === 0) {
+          if (syncQueueCount === 0) {
             await db.boards.bulkPut(formattedBoards);
           }
           setBoards(formattedBoards);
         }
         
         if (resSessions.data) {
-          const syncCount = await db.syncQueue.count();
-          if (syncCount === 0) {
+          if (syncQueueCount === 0) {
             const localSessions = await db.study_sessions.toArray();
             const remoteIds = new Set(resSessions.data.map(s => s.id));
             const idsToDelete = localSessions.filter(s => !remoteIds.has(s.id)).map(s => s.id);
@@ -997,8 +997,8 @@ const App: React.FC = () => {
   const loadUserDataRef = useRef(loadUserData);
   loadUserDataRef.current = loadUserData;
 
-  const onQuestionBankProgressSynced = useCallback(() => {
-    void loadUserDataRef.current({ scope: 'user_progress' });
+  const refreshCalendarTasks = useCallback(() => {
+    void loadUserDataRef.current({ scope: 'tasks' });
   }, []);
 
   // --- Realtime Data Sync Listener (debounced + scoped refetch; after loadUserDataRef) ---
@@ -1015,9 +1015,8 @@ const App: React.FC = () => {
         return;
       }
       const order: RealtimeUserDataScope[] = ['folders', 'tasks', 'flashcards', 'user_progress'];
-      for (const s of order) {
-        if (scopes.has(s)) await loadUserDataRef.current({ scope: s });
-      }
+      const toRun = order.filter((s) => scopes.has(s));
+      await Promise.all(toRun.map((s) => loadUserDataRef.current({ scope: s })));
     });
 
     const dataChannel = supabase.channel('realtime_data_sync')
@@ -1743,7 +1742,7 @@ const App: React.FC = () => {
                 <Route path={getPathFromView(View.PronunciationLab)} element={<PronunciationLab userId={session.user.id} />} />
                 <Route path={getPathFromView(View.LyricalVibes)} element={<LyricalVibes userId={session.user.id} />} />
                 <Route path={getPathFromView(View.TheExchangeStudent)} element={<TheExchangeStudent userId={session.user.id} />} />
-                <Route path={getPathFromView(View.QuestionBank)} element={<QuestionBank userId={session.user.id} folders={folders} flashcards={flashcards} isOnline={isOnline} onUserProgressSynced={onQuestionBankProgressSynced} />} />
+                <Route path={getPathFromView(View.QuestionBank)} element={<QuestionBank userId={session.user.id} folders={folders} flashcards={flashcards} isOnline={isOnline} />} />
                 <Route path={getPathFromView(View.IntelligentSummarizer)} element={<IntelligentSummarizer userId={session.user.id} />} />
                 <Route path={getPathFromView(View.StudyBuddy)} element={<StudyBuddy userId={session.user.id} />} />
                 <Route path={getPathFromView(View.Certificates)} element={<Certificates userId={session.user.id} userName={session.user.user_metadata?.full_name} />} />
@@ -1836,7 +1835,7 @@ const App: React.FC = () => {
                 } />
 
                 <Route path={getPathFromView(View.OralArgument)} element={<OralArgument />} />
-                <Route path={getPathFromView(View.Calendar)} element={<CalendarView subjects={subjects} tasks={tasks} userId={session.user.id} studySessions={studySessions} isOnline={isOnline} onTasksChanged={loadUserData} onAfterGoogleCalendarSync={loadUserData} />} />
+                <Route path={getPathFromView(View.Calendar)} element={<CalendarView subjects={subjects} tasks={tasks} userId={session.user.id} studySessions={studySessions} isOnline={isOnline} onTasksChanged={refreshCalendarTasks} onAfterGoogleCalendarSync={refreshCalendarTasks} />} />
                 <Route path={getPathFromView(View.Ranking)} element={<Ranking userId={session.user.id} session={session} flashcards={flashcards} />} />
                 <Route path={getPathFromView(View.Subjects)} element={
                   <Subjects 
@@ -1874,7 +1873,7 @@ const App: React.FC = () => {
                   />
                 } />
 
-                <Route path="/simulados" element={<QuestionBank userId={session.user.id} folders={folders} flashcards={flashcards} isOnline={isOnline} onUserProgressSynced={onQuestionBankProgressSynced} />} />
+                <Route path="/simulados" element={<QuestionBank userId={session.user.id} folders={folders} flashcards={flashcards} isOnline={isOnline} />} />
 
               </Routes>
 </ErrorBoundary>
