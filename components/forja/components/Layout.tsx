@@ -22,6 +22,7 @@ import {
   Trash2,
   CheckCheck,
   Lock,
+  Scale,
 } from "lucide-react";
 
 interface LayoutProps {
@@ -33,23 +34,23 @@ function NotificationPanel({ onClose }: { onClose: () => void }) {
   const { notifications, markAsRead, markAllAsRead, clearAll } = useNotifications();
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-end justify-center" onClick={onClose}>
-      <div className="bg-[#1a1a1a] w-full max-w-lg rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 bg-slate-900/50 dark:bg-black/70 flex items-end justify-center" onClick={onClose}>
+      <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto border-t border-slate-200 dark:border-slate-700" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
-              <Bell className="w-5 h-5 text-blue-400" />
+            <div className="w-10 h-10 bg-sanfran-rubi/15 rounded-xl flex items-center justify-center">
+              <Bell className="w-5 h-5 text-sanfran-rubi" />
             </div>
             <h2 className="text-lg font-bold">Notificações</h2>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={markAllAsRead} className="p-2 hover:bg-[#2a2a2a] rounded-lg transition" title="Marcar todas como lidas">
+            <button onClick={markAllAsRead} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition" title="Marcar todas como lidas">
               <CheckCheck className="w-4 h-4 text-gray-400" />
             </button>
-            <button onClick={clearAll} className="p-2 hover:bg-[#2a2a2a] rounded-lg transition" title="Limpar todas">
+            <button onClick={clearAll} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition" title="Limpar todas">
               <Trash2 className="w-4 h-4 text-gray-400" />
             </button>
-            <button onClick={onClose} className="p-2 hover:bg-[#2a2a2a] rounded-lg"><X className="w-5 h-5" /></button>
+            <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"><X className="w-5 h-5" /></button>
           </div>
         </div>
 
@@ -65,8 +66,8 @@ function NotificationPanel({ onClose }: { onClose: () => void }) {
               <button
                 key={n.id}
                 onClick={() => markAsRead(n.id)}
-                className={`w-full text-left bg-[#111] rounded-xl p-4 border transition hover:bg-[#1a1a1a] ${
-                  n.read ? 'border-[#2a2a2a] opacity-60' : 'border-[#333]'
+                className={`w-full text-left bg-slate-50 dark:bg-slate-950 rounded-xl p-4 border transition hover:bg-white dark:bg-slate-900 ${
+                  n.read ? 'border-slate-200 dark:border-slate-700 opacity-60' : 'border-slate-300 dark:border-slate-600'
                 }`}
               >
                 <div className="flex items-start gap-3">
@@ -74,7 +75,7 @@ function NotificationPanel({ onClose }: { onClose: () => void }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
                       <span className={`font-bold text-sm ${n.color}`}>{n.title}</span>
-                      {!n.read && <span className="w-2 h-2 bg-red-500 rounded-full shrink-0"></span>}
+                      {!n.read && <span className="w-2 h-2 bg-sanfran-rubi rounded-full shrink-0"></span>}
                     </div>
                     <p className="text-xs text-gray-400 leading-relaxed">{n.message}</p>
                     <p className="text-[10px] text-gray-600 mt-1">
@@ -95,42 +96,42 @@ function NotificationPanel({ onClose }: { onClose: () => void }) {
 function XPPopup({ onClose }: { onClose: () => void }) {
   const days = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-end justify-center" onClick={onClose}>
-      <div className="bg-[#1a1a1a] w-full max-w-lg rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 bg-slate-900/50 dark:bg-black/70 flex items-end justify-center" onClick={onClose}>
+      <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-red-500/20 rounded-xl flex items-center justify-center">
-              <Zap className="w-6 h-6 text-red-500" />
+            <div className="w-10 h-10 bg-sanfran-rubi/15 rounded-xl flex items-center justify-center">
+              <Zap className="w-6 h-6 text-sanfran-rubi" />
             </div>
             <h2 className="text-lg font-bold">Estatísticas de XP</h2>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-[#2a2a2a] rounded-lg"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"><X className="w-5 h-5" /></button>
         </div>
-        <div className="bg-[#2a2a2a] rounded-xl p-4 mb-4">
+        <div className="bg-sanfran-paper dark:bg-slate-800 rounded-xl p-4 mb-4">
           <p className="text-sm text-gray-400">Saldo de hoje</p>
           <p className="text-3xl font-bold text-green-400">+5</p>
           <p className="text-sm text-green-400">+5 ganho</p>
         </div>
         <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="bg-[#2a2a2a] rounded-xl p-3 text-center">
+          <div className="bg-sanfran-paper dark:bg-slate-800 rounded-xl p-3 text-center">
             <p className="text-xs text-gray-400">Semana</p>
             <p className="text-xl font-bold">5</p>
           </div>
-          <div className="bg-[#2a2a2a] rounded-xl p-3 text-center">
+          <div className="bg-sanfran-paper dark:bg-slate-800 rounded-xl p-3 text-center">
             <p className="text-xs text-gray-400">Mês</p>
             <p className="text-xl font-bold">5</p>
           </div>
-          <div className="bg-[#2a2a2a] rounded-xl p-3 text-center">
+          <div className="bg-sanfran-paper dark:bg-slate-800 rounded-xl p-3 text-center">
             <p className="text-xs text-gray-400">Nv. 2</p>
             <p className="text-xl font-bold">5</p>
           </div>
         </div>
         <h3 className="font-bold mb-3">Últimos 7 dias</h3>
-        <div className="bg-[#2a2a2a] rounded-xl p-4 mb-6">
+        <div className="bg-sanfran-paper dark:bg-slate-800 rounded-xl p-4 mb-6">
           <div className="flex items-end justify-between h-24 mb-2">
             {days.map((d, i) => (
               <div key={d} className="flex flex-col items-center gap-1 flex-1">
-                <div className="w-6 bg-red-500/30 rounded-t" style={{ height: i === 6 ? '60px' : '4px' }}></div>
+                <div className="w-6 bg-sanfran-rubi/35 rounded-t" style={{ height: i === 6 ? '60px' : '4px' }}></div>
               </div>
             ))}
           </div>
@@ -139,19 +140,19 @@ function XPPopup({ onClose }: { onClose: () => void }) {
           </div>
         </div>
         <h3 className="font-bold mb-3">Resumo Semanal</h3>
-        <div className="bg-[#2a2a2a] rounded-xl p-4 mb-4">
+        <div className="bg-sanfran-paper dark:bg-slate-800 rounded-xl p-4 mb-4">
           <div className="flex justify-between mb-2">
             <span className="text-gray-400">Total:</span>
             <span className="font-bold text-green-400">+5 XP</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm">Outros</span>
-            <div className="flex-1 bg-[#333] rounded-full h-2"><div className="bg-blue-500 h-full rounded-full" style={{ width: '100%' }}></div></div>
+            <div className="flex-1 bg-slate-200 dark:bg-slate-700 rounded-full h-2"><div className="bg-sanfran-rubi h-full rounded-full" style={{ width: '100%' }}></div></div>
             <span className="text-sm">100% +5</span>
           </div>
         </div>
         <h3 className="font-bold mb-3">Atividades de hoje</h3>
-        <div className="bg-[#2a2a2a] rounded-xl p-4">
+        <div className="bg-sanfran-paper dark:bg-slate-800 rounded-xl p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span className="text-lg">📅</span>
@@ -171,8 +172,8 @@ function XPPopup({ onClose }: { onClose: () => void }) {
 /* ── Coins Popup ── */
 function CoinsPopup({ onClose }: { onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-end justify-center" onClick={onClose}>
-      <div className="bg-[#1a1a1a] w-full max-w-lg rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 bg-slate-900/50 dark:bg-black/70 flex items-end justify-center" onClick={onClose}>
+      <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-yellow-500/20 rounded-xl flex items-center justify-center">
@@ -180,30 +181,30 @@ function CoinsPopup({ onClose }: { onClose: () => void }) {
             </div>
             <h2 className="text-lg font-bold">Life Coins</h2>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-[#2a2a2a] rounded-lg"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"><X className="w-5 h-5" /></button>
         </div>
-        <div className="bg-[#2a2a2a] rounded-xl p-4 mb-4 text-center">
+        <div className="bg-sanfran-paper dark:bg-slate-800 rounded-xl p-4 mb-4 text-center">
           <p className="text-sm text-gray-400">Saldo Total</p>
           <p className="text-4xl font-bold text-yellow-400">1</p>
         </div>
         <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="bg-[#2a2a2a] rounded-xl p-3 text-center">
+          <div className="bg-sanfran-paper dark:bg-slate-800 rounded-xl p-3 text-center">
             <p className="text-xs text-gray-400">Ganho (semana)</p>
             <p className="text-lg font-bold text-green-400">+0</p>
           </div>
-          <div className="bg-[#2a2a2a] rounded-xl p-3 text-center">
+          <div className="bg-sanfran-paper dark:bg-slate-800 rounded-xl p-3 text-center">
             <p className="text-xs text-gray-400">Gasto (semana)</p>
-            <p className="text-lg font-bold text-red-400">-0</p>
+            <p className="text-lg font-bold text-sanfran-rubi">-0</p>
           </div>
-          <div className="bg-[#2a2a2a] rounded-xl p-3 text-center">
+          <div className="bg-sanfran-paper dark:bg-slate-800 rounded-xl p-3 text-center">
             <p className="text-xs text-gray-400">Líquido</p>
             <p className="text-lg font-bold">0</p>
           </div>
         </div>
-        <div className="bg-[#2a2a2a] rounded-xl p-4 mb-4">
+        <div className="bg-sanfran-paper dark:bg-slate-800 rounded-xl p-4 mb-4">
           <p className="text-sm text-gray-400">Você ganha 20% do XP em Life Coins para gastar na loja!</p>
         </div>
-        <div className="bg-[#2a2a2a] rounded-xl p-6 text-center">
+        <div className="bg-sanfran-paper dark:bg-slate-800 rounded-xl p-6 text-center">
           <span className="text-3xl mb-2 block">💰</span>
           <p className="text-gray-400 text-sm">Nenhuma transação ainda. Complete hábitos e tarefas para ganhar moedas!</p>
         </div>
@@ -221,18 +222,18 @@ function TitlesPopup({ onClose }: { onClose: () => void }) {
     { name: "Mestre", level: 20 },
   ];
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-end justify-center" onClick={onClose}>
-      <div className="bg-[#1a1a1a] w-full max-w-lg rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 bg-slate-900/50 dark:bg-black/70 flex items-end justify-center" onClick={onClose}>
+      <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-bold">Meus Títulos</h2>
-          <button onClick={onClose} className="p-2 hover:bg-[#2a2a2a] rounded-lg"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"><X className="w-5 h-5" /></button>
         </div>
         <div className="bg-gradient-to-r from-purple-600 to-purple-800 rounded-xl p-4 mb-6 text-center">
           <p className="text-sm text-purple-200">Título Atual</p>
           <p className="text-2xl font-bold">Iniciante</p>
         </div>
         <h3 className="font-bold mb-3 text-sm text-gray-400">Títulos Desbloqueados</h3>
-        <div className="bg-[#2a2a2a] rounded-xl p-4 mb-6 flex items-center justify-between">
+        <div className="bg-sanfran-paper dark:bg-slate-800 rounded-xl p-4 mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Shield className="w-5 h-5 text-purple-400" />
             <span className="font-medium">Iniciante</span>
@@ -242,7 +243,7 @@ function TitlesPopup({ onClose }: { onClose: () => void }) {
         <h3 className="font-bold mb-3 text-sm text-gray-400">Títulos Bloqueados</h3>
         <div className="space-y-3">
           {blocked.map(t => (
-            <div key={t.name} className="bg-[#2a2a2a] rounded-xl p-4 flex items-center justify-between opacity-50">
+            <div key={t.name} className="bg-sanfran-paper dark:bg-slate-800 rounded-xl p-4 flex items-center justify-between opacity-50">
               <div className="flex items-center gap-3">
                 <Shield className="w-5 h-5 text-gray-500" />
                 <span className="font-medium">{t.name}</span>
@@ -287,13 +288,13 @@ const ALL_ACHIEVEMENTS_LIST = [
 
 function getRarityBadgeColor(rarity: string) {
   switch (rarity) {
-    case "Comum": return "bg-[#333] text-gray-300";
-    case "Incomum": return "bg-[#333] text-gray-300";
-    case "Raro": return "bg-[#333] text-gray-300";
-    case "Épico": return "bg-[#333] text-gray-300";
-    case "Lendário": return "bg-[#333] text-gray-300";
-    case "Mítico": return "bg-[#333] text-gray-300";
-    default: return "bg-[#333] text-gray-300";
+    case "Comum": return "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300";
+    case "Incomum": return "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300";
+    case "Raro": return "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300";
+    case "Épico": return "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300";
+    case "Lendário": return "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300";
+    case "Mítico": return "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300";
+    default: return "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300";
   }
 }
 
@@ -308,18 +309,18 @@ function AchievementsPopup({ onClose }: { onClose: () => void }) {
   const blockedCount = filtered.length;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-end justify-center" onClick={onClose}>
-      <div className="bg-[#1a1a1a] w-full max-w-lg rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 bg-slate-900/50 dark:bg-black/70 flex items-end justify-center" onClick={onClose}>
+      <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <svg className="w-7 h-7 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+            <svg className="w-7 h-7 text-sanfran-rubi" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 2l2.4 7.2H22l-6 4.8 2.4 7.2L12 16.4l-6.4 4.8L8 14 2 9.2h7.6z" />
             </svg>
             <h2 className="text-lg font-bold">Conquistas</h2>
-            <span className="text-sm bg-[#333] text-gray-300 px-2 py-0.5 rounded-full">0/21</span>
+            <span className="text-sm bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-full">0/21</span>
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full border border-[#444] hover:bg-[#2a2a2a] transition">
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -329,7 +330,7 @@ function AchievementsPopup({ onClose }: { onClose: () => void }) {
           {tabs.map(t => (
             <button key={t} onClick={() => setActiveTab(t)}
               className={`px-3.5 py-1.5 rounded-full text-sm whitespace-nowrap transition font-medium ${
-                activeTab === t ? 'bg-red-500 text-white' : 'bg-[#2a2a2a] text-gray-400 hover:text-gray-300'
+                activeTab === t ? 'bg-sanfran-rubi text-white' : 'bg-sanfran-paper dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}>
               {t}
             </button>
@@ -347,9 +348,9 @@ function AchievementsPopup({ onClose }: { onClose: () => void }) {
           {filtered.map(a => {
             const progressPercent = a.target > 0 ? Math.min((a.current / a.target) * 100, 100) : 0;
             return (
-              <div key={a.name} className="bg-[#2a2a2a] rounded-xl p-4 flex gap-4">
+              <div key={a.name} className="bg-sanfran-paper dark:bg-slate-800 rounded-xl p-4 flex gap-4">
                 {/* Lock icon */}
-                <div className="w-14 h-14 bg-[#333] rounded-xl flex items-center justify-center shrink-0">
+                <div className="w-14 h-14 bg-slate-200 dark:bg-slate-700 rounded-xl flex items-center justify-center shrink-0">
                   <Lock className="w-6 h-6 text-gray-500" />
                 </div>
                 {/* Content */}
@@ -361,10 +362,10 @@ function AchievementsPopup({ onClose }: { onClose: () => void }) {
                   <p className="text-sm text-gray-400 mb-2">{a.desc}</p>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs text-gray-500">Progresso</span>
-                    <span className="text-xs text-red-500 font-bold">{a.current}/{a.target}</span>
+                    <span className="text-xs text-sanfran-rubi font-bold">{a.current}/{a.target}</span>
                   </div>
-                  <div className="w-full bg-[#444] rounded-full h-1.5">
-                    <div className="bg-red-500 h-full rounded-full transition-all" style={{ width: `${progressPercent}%` }}></div>
+                  <div className="w-full bg-slate-300 dark:bg-slate-600 rounded-full h-1.5">
+                    <div className="bg-sanfran-rubi h-full rounded-full transition-all" style={{ width: `${progressPercent}%` }}></div>
                   </div>
                 </div>
               </div>
@@ -394,13 +395,13 @@ function PushBanner() {
   if (!showBanner || dismissed || isSubscribed || permission === 'denied') return null;
 
   return (
-    <div className="bg-gradient-to-r from-red-600 to-red-800 mx-4 mt-2 rounded-xl p-4 flex items-center gap-3 animate-in slide-in-from-top">
+    <div className="bg-gradient-to-r from-sanfran-rubi to-sanfran-rubi-dark mx-4 mt-2 rounded-xl p-4 flex items-center gap-3 animate-in slide-in-from-top shadow-md border border-sanfran-rubi-dark/30">
       <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
         <Bell className="w-5 h-5 text-white" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="font-bold text-sm">Ativar Notificações</p>
-        <p className="text-xs text-red-100">Receba lembretes de hábitos, tarefas e água!</p>
+        <p className="text-xs text-white/90">Receba lembretes de hábitos, tarefas e água!</p>
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <button
@@ -409,7 +410,7 @@ function PushBanner() {
             setShowBanner(false);
           }}
           disabled={isLoading}
-          className="bg-white text-red-600 font-bold text-xs px-3 py-1.5 rounded-lg hover:bg-red-50 transition disabled:opacity-50"
+          className="bg-white text-sanfran-rubi font-bold text-xs px-3 py-1.5 rounded-lg hover:bg-sanfran-offwhite transition disabled:opacity-50"
         >
           {isLoading ? 'Ativando...' : 'Ativar'}
         </button>
@@ -445,54 +446,54 @@ export default function Layout({ children }: LayoutProps) {
   ];
 
   return (
-    <div className="flex flex-col h-screen bg-[#0D0D0D] text-white overflow-hidden">
-      {/* Header */}
-      <header className="bg-[#1a1a1a] border-b border-[#2a2a2a] px-4 py-3 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-[#2a2a2a] rounded-lg flex items-center justify-center">
-            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+    <div className="flex flex-col h-screen bg-sanfran-offwhite text-slate-900 dark:bg-slate-950 dark:text-slate-100 overflow-hidden">
+      {/* Header — marca SanFran */}
+      <header className="relative bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center justify-between shrink-0">
+        <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-sanfran-rubi via-amber-700/80 to-sanfran-rubi-dark" aria-hidden />
+        <div className="flex items-center gap-3 pt-0.5">
+          <div className="w-9 h-9 rounded-lg bg-sanfran-rubi/10 dark:bg-sanfran-rubi/20 border border-sanfran-rubi/25 flex items-center justify-center shrink-0">
+            <Scale className="w-5 h-5 text-sanfran-rubi" aria-hidden />
           </div>
-          <span className="text-sm font-medium text-gray-300">sistemalife.com</span>
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.28em] text-sanfran-rubi">SanFran Academy</p>
+            <h1 className="forja-forja-title text-base font-bold text-slate-900 dark:text-white leading-tight truncate">Forja</h1>
+          </div>
         </div>
-        <button className="p-2 hover:bg-[#2a2a2a] rounded-lg transition">
-          <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-          </svg>
-        </button>
+        <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium hidden sm:block">Produtividade</span>
       </header>
 
       {/* Top Bar - Status/Badges */}
-      <div className="bg-[#0D0D0D] px-4 py-2.5 flex items-center gap-3 shrink-0">
-        <button onClick={() => setPopup('xp')} className="flex items-center gap-1.5 bg-[#1a1a1a] border border-[#2a2a2a] px-3 py-1.5 rounded-full hover:bg-[#2a2a2a] transition">
-          <Zap className="w-4 h-4 text-red-500" />
-          <span className="text-sm font-bold text-red-500">+5</span>
+      <div className="bg-sanfran-offwhite dark:bg-slate-950 border-b border-slate-200/80 dark:border-slate-800 px-4 py-2.5 flex items-center gap-3 shrink-0">
+        <button onClick={() => setPopup('xp')} className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+          <Zap className="w-4 h-4 text-sanfran-rubi" />
+          <span className="text-sm font-bold text-sanfran-rubi">+5</span>
         </button>
-        <button onClick={() => setPopup('coins')} className="flex items-center gap-1.5 bg-[#1a1a1a] border border-[#2a2a2a] px-3 py-1.5 rounded-full hover:bg-[#2a2a2a] transition">
+        <button onClick={() => setPopup('coins')} className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition">
           <span className="text-sm">💰</span>
           <span className="text-sm font-bold text-yellow-400">1</span>
         </button>
         <div className="flex items-center gap-2 ml-auto">
           {/* Notification Bell */}
-          <button onClick={() => setPopup('notifications')} className="relative w-9 h-9 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg flex items-center justify-center hover:bg-[#2a2a2a] transition">
-            <Bell className="w-4 h-4 text-gray-400" />
+          <button onClick={() => setPopup('notifications')} className="relative w-9 h-9 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+            <Bell className="w-4 h-4 text-slate-500 dark:text-slate-400" />
             {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] font-bold flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-sanfran-rubi text-white rounded-full text-[10px] font-bold flex items-center justify-center">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
           </button>
-          <button onClick={() => setPopup('titles')} className="w-9 h-9 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg flex items-center justify-center hover:bg-[#2a2a2a] transition">
+          <button onClick={() => setPopup('titles')} className="w-9 h-9 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 transition">
             <Shield className="w-4 h-4 text-purple-400" />
           </button>
-          <button onClick={() => setPopup('achievements')} className="w-9 h-9 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg flex items-center justify-center hover:bg-[#2a2a2a] transition">
-            <Trophy className="w-4 h-4 text-red-500" />
+          <button onClick={() => setPopup('achievements')} className="w-9 h-9 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+            <Trophy className="w-4 h-4 text-sanfran-rubi" />
           </button>
-          <button onClick={() => setPopup('featured')} className="w-9 h-9 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg flex items-center justify-center hover:bg-[#2a2a2a] transition">
+          <button onClick={() => setPopup('featured')} className="w-9 h-9 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 transition">
             <Medal className="w-4 h-4 text-yellow-400" />
           </button>
           <div className="relative">
-            <button onClick={() => setPopup(popup === 'profile' ? null : 'profile')} className="w-9 h-9 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg flex items-center justify-center hover:bg-[#2a2a2a] transition">
-              <User className="w-4 h-4 text-gray-400" />
+            <button onClick={() => setPopup(popup === 'profile' ? null : 'profile')} className="w-9 h-9 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+              <User className="w-4 h-4 text-slate-500 dark:text-slate-400" />
             </button>
             {popup === 'profile' && <ProfileDropdown onClose={() => setPopup(null)} />}
           </div>
@@ -508,7 +509,7 @@ export default function Layout({ children }: LayoutProps) {
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-[#1a1a1a] border-t border-[#2a2a2a] px-2 py-2 flex justify-around items-center z-40">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-700 px-2 py-2 flex justify-around items-center z-40 supports-[backdrop-filter]:bg-white/80">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isDashHome =
@@ -520,7 +521,7 @@ export default function Layout({ children }: LayoutProps) {
               key={item.path}
               onClick={() => navigate(item.path)}
               className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition ${
-                isActive ? "text-red-500" : "text-gray-500 hover:text-gray-400"
+                isActive ? "text-sanfran-rubi" : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
               }`}
             >
               <Icon className="w-5 h-5" />

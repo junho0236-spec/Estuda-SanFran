@@ -95,12 +95,12 @@ export default function Profile() {
     .slice(0, 2);
 
   return (
-    <div className="min-h-screen bg-[#0D0D0D] text-white">
+    <div className="min-h-screen bg-sanfran-offwhite text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       {/* Header */}
-      <div className="bg-[#1a1a1a] border-b border-[#2a2a2a] px-4 py-3 flex items-center gap-3">
+      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3">
         <button
           onClick={() => navigate(FORJA_BASE_PATH)}
-          className="w-9 h-9 bg-[#2a2a2a] rounded-lg flex items-center justify-center hover:bg-[#333] transition"
+          className="w-9 h-9 bg-sanfran-paper dark:bg-slate-800 rounded-lg flex items-center justify-center hover:bg-[#333] transition"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
@@ -109,7 +109,7 @@ export default function Profile() {
 
       <div className="p-4 pb-32 space-y-6 max-w-lg mx-auto">
         {/* Avatar & Name Section */}
-        <div className="bg-[#1a1a1a] rounded-2xl p-6 border border-[#2a2a2a]">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-700">
           <div className="flex flex-col items-center mb-6">
             <div className="relative mb-4">
               {avatarUrl ? (
@@ -123,7 +123,7 @@ export default function Profile() {
                   {initials}
                 </div>
               )}
-              <button className="absolute bottom-0 right-0 w-8 h-8 bg-red-500 rounded-full flex items-center justify-center border-2 border-[#1a1a1a] hover:bg-red-600 transition">
+              <button type="button" className="absolute bottom-0 right-0 w-8 h-8 bg-sanfran-rubi rounded-full flex items-center justify-center border-2 border-white dark:border-slate-900 hover:bg-sanfran-rubi-dark transition">
                 <Camera className="w-4 h-4" />
               </button>
             </div>
@@ -179,7 +179,7 @@ export default function Profile() {
         </div>
 
         {/* Security Section */}
-        <div className="bg-[#1a1a1a] rounded-2xl p-6 border border-[#2a2a2a]">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-700">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
               <Lock className="w-5 h-5 text-blue-400" />
@@ -245,7 +245,7 @@ export default function Profile() {
         </div>
 
         {/* Notifications Section */}
-        <div className="bg-[#1a1a1a] rounded-2xl p-6 border border-[#2a2a2a]">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-700">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 bg-yellow-500/20 rounded-xl flex items-center justify-center">
               <Bell className="w-5 h-5 text-yellow-400" />
@@ -323,7 +323,7 @@ export default function Profile() {
         </div>
 
         {/* About Section */}
-        <div className="bg-[#1a1a1a] rounded-2xl p-6 border border-[#2a2a2a]">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-700">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 bg-green-500/20 rounded-xl flex items-center justify-center">
               <Info className="w-5 h-5 text-green-400" />
@@ -339,18 +339,18 @@ export default function Profile() {
               <span className="text-sm text-gray-400">Versão</span>
               <span className="text-sm font-medium">v2.1.6</span>
             </div>
-            <div className="border-t border-[#2a2a2a]"></div>
-            <button className="w-full flex items-center justify-between py-2 hover:bg-[#2a2a2a] rounded-lg px-2 -mx-2 transition">
+            <div className="border-t border-slate-200 dark:border-slate-700"></div>
+            <button className="w-full flex items-center justify-between py-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg px-2 -mx-2 transition">
               <span className="text-sm text-gray-400">Últimas Atualizações</span>
               <ChevronRight className="w-4 h-4 text-gray-500" />
             </button>
-            <div className="border-t border-[#2a2a2a]"></div>
-            <button className="w-full flex items-center justify-between py-2 hover:bg-[#2a2a2a] rounded-lg px-2 -mx-2 transition">
+            <div className="border-t border-slate-200 dark:border-slate-700"></div>
+            <button className="w-full flex items-center justify-between py-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg px-2 -mx-2 transition">
               <span className="text-sm text-gray-400">Termos de Uso</span>
               <ChevronRight className="w-4 h-4 text-gray-500" />
             </button>
-            <div className="border-t border-[#2a2a2a]"></div>
-            <button className="w-full flex items-center justify-between py-2 hover:bg-[#2a2a2a] rounded-lg px-2 -mx-2 transition">
+            <div className="border-t border-slate-200 dark:border-slate-700"></div>
+            <button className="w-full flex items-center justify-between py-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg px-2 -mx-2 transition">
               <span className="text-sm text-gray-400">Política de Privacidade</span>
               <ChevronRight className="w-4 h-4 text-gray-500" />
             </button>
@@ -358,7 +358,7 @@ export default function Profile() {
         </div>
 
         {/* Logout Section */}
-        <div className="bg-[#1a1a1a] rounded-2xl border border-[#2a2a2a] overflow-hidden">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
           <button
             onClick={handleLogout}
             className="w-full p-4 flex items-center justify-center gap-3 text-red-400 hover:bg-red-500/10 transition"

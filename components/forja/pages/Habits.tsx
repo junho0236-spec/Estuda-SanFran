@@ -122,9 +122,9 @@ export default function Habits() {
         </div>
 
         {/* Tabs */}
-        <div className="bg-[#1a1a1a] border border-[#2a2a2a] p-1.5 rounded-xl flex gap-1">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-1.5 rounded-xl flex gap-1">
           <button onClick={() => setActiveTab("hoje")}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition ${activeTab === 'hoje' ? 'bg-[#2a2a2a] text-white' : 'text-gray-400 hover:text-gray-300'}`}>
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition ${activeTab === 'hoje' ? 'bg-sanfran-paper dark:bg-slate-800 text-white' : 'text-gray-400 hover:text-gray-300'}`}>
             <Calendar className="w-4 h-4" />
             Hoje
             <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">{habits.length}</span>
@@ -149,7 +149,7 @@ export default function Habits() {
               const progress = todayCompletions[habit.id] || 0;
               const target = habit.dailyGoal || 1;
               return (
-                <div key={habit.id} className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+                <div key={habit.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-10 h-10 bg-cyan-500/20 rounded-xl flex items-center justify-center">
                       <span className="text-lg">{habit.icon}</span>
@@ -174,14 +174,14 @@ export default function Habits() {
                         className={`w-10 h-10 rounded-lg flex items-center justify-center text-xs font-bold transition ${
                           i < progress
                             ? 'bg-green-500 text-white border border-green-400'
-                            : 'bg-[#2a2a2a] border border-[#333] text-gray-500 hover:bg-[#333]'
+                            : 'bg-sanfran-paper dark:bg-slate-800 border border-[#333] text-gray-500 hover:bg-[#333]'
                         }`}>
                         {i < progress ? '✓' : i + 1}
                       </button>
                     ))}
                   </div>
                   <div className="mt-3">
-                    <div className="bg-[#2a2a2a] rounded-full h-1.5">
+                    <div className="bg-sanfran-paper dark:bg-slate-800 rounded-full h-1.5">
                       <div className="bg-green-500 h-full rounded-full transition-all duration-300" style={{ width: `${Math.min(100, (progress / target) * 100)}%` }}></div>
                     </div>
                   </div>
@@ -189,7 +189,7 @@ export default function Habits() {
               );
             })}
             {habits.length === 0 && (
-              <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-8 text-center">
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-8 text-center">
                 <p className="text-gray-400 mb-3">Nenhum hábito criado</p>
                 <button onClick={() => setShowModal(true)} className="bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-xl text-sm transition">
                   Criar primeiro hábito
@@ -203,7 +203,7 @@ export default function Habits() {
         {activeTab === "mes" && (
           <div className="space-y-4">
             <p className="text-center text-gray-400">{new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase())}</p>
-            <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-red-500/20 rounded-xl flex items-center justify-center">
@@ -215,13 +215,13 @@ export default function Habits() {
                   </div>
                 </div>
                 <div className="flex gap-1">
-                  <button className="p-1.5 hover:bg-[#2a2a2a] rounded-lg transition"><ChevronLeft className="w-4 h-4" /></button>
-                  <button className="p-1.5 hover:bg-[#2a2a2a] rounded-lg transition"><ChevronRight className="w-4 h-4" /></button>
+                  <button className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"><ChevronLeft className="w-4 h-4" /></button>
+                  <button className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"><ChevronRight className="w-4 h-4" /></button>
                 </div>
               </div>
               <ResponsiveContainer width="100%" height={180}>
                 <LineChart data={monthData} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" />
                   <XAxis dataKey="day" stroke="#555" tick={{ fontSize: 10 }} />
                   <YAxis stroke="#555" tick={{ fontSize: 10 }} tickFormatter={(v) => `${v}%`} domain={[0, 100]} />
                   <Line type="monotone" dataKey="value" stroke="#EF4444" strokeWidth={2} dot={false} />
@@ -243,10 +243,10 @@ export default function Habits() {
               </div>
             </div>
             <div className="flex gap-3">
-              <div className="flex-1 bg-[#1a1a1a] border border-red-500/20 rounded-xl p-4">
+              <div className="flex-1 bg-white dark:bg-slate-900 border border-red-500/20 rounded-xl p-4">
                 <div className="flex items-center gap-2"><div className="w-8 h-8 bg-red-500/20 rounded-lg flex items-center justify-center"><span className="text-sm">🎯</span></div><div><p className="text-sm font-bold">Esta Semana</p><p className="text-xs text-gray-400">1 dias</p></div></div>
               </div>
-              <div className="flex-1 bg-[#1a1a1a] border border-green-500/20 rounded-xl p-4">
+              <div className="flex-1 bg-white dark:bg-slate-900 border border-green-500/20 rounded-xl p-4">
                 <div className="flex items-center gap-2"><div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center"><span className="text-sm">✅</span></div><div><p className="text-sm font-bold">{new Date().toLocaleString('pt-BR', { month: 'long' })}</p><p className="text-xs text-gray-400">{new Date().getDate()} dias</p></div></div>
               </div>
             </div>
@@ -256,10 +256,10 @@ export default function Habits() {
         {/* Tab Dashboards */}
         {activeTab === "dashboards" && (
           <div className="space-y-4">
-            <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3">
               <div className="flex gap-2 overflow-x-auto">
                 {Array.from({ length: 9 }, (_, i) => i + 4).map(d => (
-                  <button key={d} className={`w-9 h-9 rounded-full flex items-center justify-center text-sm shrink-0 transition ${d === new Date().getDate() ? 'border-2 border-green-500 text-green-400' : 'text-gray-400 hover:bg-[#2a2a2a]'}`}>
+                  <button key={d} className={`w-9 h-9 rounded-full flex items-center justify-center text-sm shrink-0 transition ${d === new Date().getDate() ? 'border-2 border-green-500 text-green-400' : 'text-gray-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
                     {d}
                   </button>
                 ))}
@@ -267,7 +267,7 @@ export default function Habits() {
             </div>
 
             {/* Produtividade */}
-            <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-8 h-8 bg-yellow-500/20 rounded-lg flex items-center justify-center"><span>⚡</span></div>
                 <div>
@@ -279,14 +279,14 @@ export default function Habits() {
                 {Array.from({ length: 11 }).map((_, i) => (
                   <button key={i} onClick={() => { setProductivity(i); toast.success(`Produtividade: ${i}/10`); }}
                     className={`flex-1 h-9 rounded text-xs font-bold transition ${
-                      productivity !== null && i <= productivity ? 'bg-yellow-500 text-black' : 'bg-[#2a2a2a] text-gray-500 hover:bg-[#333]'
+                      productivity !== null && i <= productivity ? 'bg-yellow-500 text-black' : 'bg-sanfran-paper dark:bg-slate-800 text-gray-500 hover:bg-[#333]'
                     }`}>{i}</button>
                 ))}
               </div>
             </div>
 
             {/* Humor */}
-            <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center"><span>😊</span></div>
                 <div>
@@ -298,22 +298,22 @@ export default function Habits() {
                 {Array.from({ length: 11 }).map((_, i) => (
                   <button key={i} onClick={() => { setHumor(i); toast.success(`Humor: ${i}/10`); }}
                     className={`flex-1 h-9 rounded text-xs font-bold transition ${
-                      humor !== null && i <= humor ? 'bg-green-500 text-black' : 'bg-[#2a2a2a] text-gray-500 hover:bg-[#333]'
+                      humor !== null && i <= humor ? 'bg-green-500 text-black' : 'bg-sanfran-paper dark:bg-slate-800 text-gray-500 hover:bg-[#333]'
                     }`}>{i}</button>
                 ))}
               </div>
             </div>
 
             {/* Tendências */}
-            <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-red-500/20 rounded-xl flex items-center justify-center"><TrendingUp className="w-5 h-5 text-red-500" /></div>
                   <div><h3 className="font-bold">Tendências de Bem-estar</h3><p className="text-sm text-gray-400">{new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase())}</p></div>
                 </div>
                 <div className="flex gap-1">
-                  <button className="p-1.5 hover:bg-[#2a2a2a] rounded-lg transition"><ChevronLeft className="w-4 h-4" /></button>
-                  <button className="p-1.5 hover:bg-[#2a2a2a] rounded-lg transition"><ChevronRight className="w-4 h-4" /></button>
+                  <button className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"><ChevronLeft className="w-4 h-4" /></button>
+                  <button className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"><ChevronRight className="w-4 h-4" /></button>
                 </div>
               </div>
               <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 mb-4">
@@ -328,10 +328,10 @@ export default function Habits() {
             </div>
 
             {/* Histórico */}
-            <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2"><span className="text-gray-400">📊</span><h3 className="font-bold">Histórico de Hábitos</h3></div>
-                <div className="flex gap-1 bg-[#2a2a2a] rounded-lg p-1">
+                <div className="flex gap-1 bg-sanfran-paper dark:bg-slate-800 rounded-lg p-1">
                   <button className="px-3 py-1 rounded text-xs bg-[#333] text-white">Mensal</button>
                   <button className="px-3 py-1 rounded text-xs text-gray-400">Anual</button>
                 </div>
@@ -343,13 +343,13 @@ export default function Habits() {
               </div>
               <div className="grid grid-cols-3 gap-3">
                 {["Jan", "Fev", "Mar"].map(m => (
-                  <div key={m} className="bg-[#2a2a2a] rounded-xl p-3 text-center"><p className="text-xs text-gray-400">{m}</p><p className="text-lg font-bold text-red-500">0%</p></div>
+                  <div key={m} className="bg-sanfran-paper dark:bg-slate-800 rounded-xl p-3 text-center"><p className="text-xs text-gray-400">{m}</p><p className="text-lg font-bold text-red-500">0%</p></div>
                 ))}
               </div>
             </div>
 
             {/* Comparativo */}
-            <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-4"><Calendar className="w-4 h-4 text-gray-400" /><h3 className="font-bold">Comparativo Anual</h3></div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm">{new Date().getFullYear() - 1} <span className="font-bold">0%</span></span>
@@ -377,10 +377,10 @@ export default function Habits() {
       {/* Modal Novo Hábito */}
       {showModal && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-end justify-center" onClick={() => setShowModal(false)}>
-          <div className="bg-[#1a1a1a] w-full max-w-lg rounded-t-3xl p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-t-3xl p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold">Novo Hábito</h2>
-              <button onClick={() => setShowModal(false)} className="p-2 hover:bg-[#2a2a2a] rounded-lg"><X className="w-5 h-5" /></button>
+              <button onClick={() => setShowModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"><X className="w-5 h-5" /></button>
             </div>
 
             <div className="space-y-5">
@@ -389,7 +389,7 @@ export default function Habits() {
                 <div className="flex gap-2 flex-wrap">
                   {icons.map(ic => (
                     <button key={ic} onClick={() => setNewHabitIcon(ic)}
-                      className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg transition ${newHabitIcon === ic ? 'bg-red-500 ring-2 ring-red-400' : 'bg-[#2a2a2a] hover:bg-[#333]'}`}>
+                      className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg transition ${newHabitIcon === ic ? 'bg-red-500 ring-2 ring-red-400' : 'bg-sanfran-paper dark:bg-slate-800 hover:bg-[#333]'}`}>
                       {ic}
                     </button>
                   ))}
@@ -399,7 +399,7 @@ export default function Habits() {
               <div>
                 <label className="text-sm text-gray-400 mb-2 block">Nome do hábito *</label>
                 <input type="text" value={newHabitName} onChange={e => setNewHabitName(e.target.value)} placeholder="Ex: Meditar, Ler, Exercício..."
-                  className="w-full bg-[#2a2a2a] border border-[#333] rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-red-500 focus:outline-none transition" />
+                  className="w-full bg-sanfran-paper dark:bg-slate-800 border border-[#333] rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-red-500 focus:outline-none transition" />
               </div>
 
               <div>
@@ -407,7 +407,7 @@ export default function Habits() {
                 <div className="flex gap-2">
                   {["Diário", "Semanal", "Personalizado"].map(f => (
                     <button key={f} onClick={() => setNewHabitFrequency(f)}
-                      className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition ${newHabitFrequency === f ? 'bg-red-500 text-white' : 'bg-[#2a2a2a] text-gray-400 hover:bg-[#333]'}`}>
+                      className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition ${newHabitFrequency === f ? 'bg-red-500 text-white' : 'bg-sanfran-paper dark:bg-slate-800 text-gray-400 hover:bg-[#333]'}`}>
                       {f}
                     </button>
                   ))}
@@ -417,14 +417,14 @@ export default function Habits() {
               <div>
                 <label className="text-sm text-gray-400 mb-2 block">Meta diária (vezes)</label>
                 <div className="flex items-center gap-4">
-                  <button onClick={() => setNewHabitTarget(Math.max(1, newHabitTarget - 1))} className="w-10 h-10 bg-[#2a2a2a] rounded-xl flex items-center justify-center hover:bg-[#333] transition">-</button>
+                  <button onClick={() => setNewHabitTarget(Math.max(1, newHabitTarget - 1))} className="w-10 h-10 bg-sanfran-paper dark:bg-slate-800 rounded-xl flex items-center justify-center hover:bg-[#333] transition">-</button>
                   <span className="text-2xl font-bold w-8 text-center">{newHabitTarget}</span>
-                  <button onClick={() => setNewHabitTarget(newHabitTarget + 1)} className="w-10 h-10 bg-[#2a2a2a] rounded-xl flex items-center justify-center hover:bg-[#333] transition">+</button>
+                  <button onClick={() => setNewHabitTarget(newHabitTarget + 1)} className="w-10 h-10 bg-sanfran-paper dark:bg-slate-800 rounded-xl flex items-center justify-center hover:bg-[#333] transition">+</button>
                 </div>
               </div>
 
               <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowModal(false)} className="flex-1 bg-[#2a2a2a] text-gray-300 py-3 rounded-xl font-medium hover:bg-[#333] transition">Cancelar</button>
+                <button onClick={() => setShowModal(false)} className="flex-1 bg-sanfran-paper dark:bg-slate-800 text-gray-300 py-3 rounded-xl font-medium hover:bg-[#333] transition">Cancelar</button>
                 <button onClick={createHabit} disabled={createHabitMut.isPending} className="flex-1 bg-red-500 text-white py-3 rounded-xl font-medium hover:bg-red-600 transition disabled:opacity-50">
                   {createHabitMut.isPending ? 'Criando...' : 'Criar Hábito'}
                 </button>

@@ -1499,25 +1499,30 @@ const App: React.FC = () => {
         </header>
 
         <main className={`flex-1 min-h-0 overflow-y-auto ${isExtremeFocus ? 'p-0' : 'p-4 md:p-10'} relative transition-all duration-700`}>
+          {/* Flutuante no canto: não ocupa uma “faixa” em fluxo nem empurra o conteúdo (ex.: header da Forja) */}
           {!isExtremeFocus && (
-            <div className="flex justify-end mb-6">
-              <HeaderActions 
-                notifications={notifications} 
-                userId={session?.user?.id || ''}
-                userProfile={userProfile}
-                isDarkMode={isDarkMode}
-                onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
-                onNotificationClick={handleNotificationClick}
-                onAcceptFriendRequest={handleAcceptFriendRequest}
-                onDeclineFriendRequest={handleDeclineFriendRequest}
-                onMarkAllRead={() => setNotifications(prev => prev.map(n => n.type === 'friend_request' ? n : { ...n, is_read: true }))}
-                onViewChange={setCurrentView}
-                onLogout={handleLogout}
-                timerIsActive={(timerIsActive || timerSecondsLeft < timerTotalInitial) && currentView !== View.Timer}
-                timerSecondsLeft={timerSecondsLeft}
-                timerTotalInitial={timerTotalInitial}
-                timerMode={timerMode}
-              />
+            <div className="pointer-events-none absolute top-4 right-4 z-20 md:top-10 md:right-10">
+              <Suspense fallback={null}>
+                <div className="pointer-events-auto">
+                  <HeaderActions 
+                    notifications={notifications} 
+                    userId={session?.user?.id || ''}
+                    userProfile={userProfile}
+                    isDarkMode={isDarkMode}
+                    onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+                    onNotificationClick={handleNotificationClick}
+                    onAcceptFriendRequest={handleAcceptFriendRequest}
+                    onDeclineFriendRequest={handleDeclineFriendRequest}
+                    onMarkAllRead={() => setNotifications(prev => prev.map(n => n.type === 'friend_request' ? n : { ...n, is_read: true }))}
+                    onViewChange={setCurrentView}
+                    onLogout={handleLogout}
+                    timerIsActive={(timerIsActive || timerSecondsLeft < timerTotalInitial) && currentView !== View.Timer}
+                    timerSecondsLeft={timerSecondsLeft}
+                    timerTotalInitial={timerTotalInitial}
+                    timerMode={timerMode}
+                  />
+                </div>
+              </Suspense>
             </div>
           )}
           {/* Offline Indicator */}

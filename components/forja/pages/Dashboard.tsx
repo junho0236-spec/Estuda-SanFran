@@ -135,23 +135,23 @@ export default function Dashboard() {
       <div className="px-4 py-4 max-w-2xl mx-auto space-y-4">
 
         {/* Install App Bar */}
-        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-3 flex items-center justify-between">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 flex items-center justify-between">
           <button onClick={() => toast.info("Para instalar, use o menu do navegador > 'Adicionar à tela inicial'")} className="flex items-center gap-3 hover:opacity-80 transition flex-1">
             <Download className="w-5 h-5 text-gray-400" />
             <span className="text-sm font-medium text-gray-300">Instalar App</span>
           </button>
-          <button onClick={() => toast.info("Abra as notificações na barra superior")} className="p-2 hover:bg-[#2a2a2a] rounded-lg transition">
+          <button onClick={() => toast.info("Abra as notificações na barra superior")} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition">
             <Bell className="w-5 h-5 text-gray-400" />
           </button>
         </div>
 
         {/* Main Card - Março */}
-        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
           <div className="flex items-start gap-4 mb-5">
             <div className="relative w-16 h-16 shrink-0">
               <svg className="w-16 h-16 -rotate-90" viewBox="0 0 36 36">
-                <path d="M18 2.0845a 15.9155 15.9155 0 0 1 0 31.831a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#2a2a2a" strokeWidth="3" />
-                <path d="M18 2.0845a 15.9155 15.9155 0 0 1 0 31.831a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#EF4444" strokeWidth="3" strokeDasharray={`${habitsAvg}, 100`} />
+                <path className="text-slate-200 dark:text-slate-700" d="M18 2.0845a 15.9155 15.9155 0 0 1 0 31.831a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
+                <path className="text-sanfran-rubi" d="M18 2.0845a 15.9155 15.9155 0 0 1 0 31.831a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" strokeDasharray={`${habitsAvg}, 100`} />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
                 <span className="text-sm font-bold">{habitsAvg}%</span>
@@ -159,7 +159,7 @@ export default function Dashboard() {
             </div>
             <div>
               <h2 className="text-xl font-bold">{new Date().toLocaleString('pt-BR', { month: 'long' }).replace(/^\w/, c => c.toUpperCase())}</h2>
-              <p className="text-red-500 text-sm">{habitsAvg >= 80 ? 'Excelente!' : habitsAvg >= 50 ? 'Bom progresso' : 'Precisa melhorar'}</p>
+              <p className="text-sanfran-rubi text-sm">{habitsAvg >= 80 ? 'Excelente!' : habitsAvg >= 50 ? 'Bom progresso' : 'Precisa melhorar'}</p>
             </div>
           </div>
 
@@ -204,7 +204,7 @@ export default function Dashboard() {
           </div>
 
           {/* Hábitos da Semana */}
-          <div className="bg-[#111] rounded-xl p-4 mb-3">
+          <div className="rounded-xl border border-slate-200 bg-sanfran-paper p-4 mb-3 dark:border-slate-700 dark:bg-slate-800/80">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 bg-orange-500/20 rounded-lg flex items-center justify-center">
@@ -216,25 +216,25 @@ export default function Dashboard() {
             </div>
             <div className="flex justify-between mb-2">
               {habitsWeekData.map((val, i) => (
-                <span key={`hp-${i}`} className={`text-[10px] flex-1 text-center ${i === todayIndex ? 'text-red-500 font-bold' : 'text-gray-500'}`}>{val}%</span>
+                <span key={`hp-${i}`} className={`text-[10px] flex-1 text-center ${i === todayIndex ? 'text-sanfran-rubi font-bold' : 'text-gray-500'}`}>{val}%</span>
               ))}
             </div>
             <div className="flex justify-between items-end h-20 mb-2">
               {habitsWeekData.map((val, i) => (
                 <div key={`hb-${i}`} className="flex flex-col items-center flex-1">
-                  <div className="w-5 rounded-t transition-all duration-300" style={{ height: `${Math.max(3, val * 0.8)}px`, backgroundColor: val > 0 ? '#EF4444' : '#2a2a2a' }}></div>
+                  <div className="w-5 rounded-t transition-all duration-300" style={{ height: `${Math.max(3, val * 0.8)}px`, backgroundColor: val > 0 ? '#8B1A1A' : '#cbd5e1' }}></div>
                 </div>
               ))}
             </div>
             <div className="flex justify-between">
               {weekDays.map((d, i) => (
-                <span key={`wd-${i}`} className={`text-[10px] flex-1 text-center ${i === todayIndex ? 'text-red-500 font-bold' : 'text-gray-500'}`}>{d}</span>
+                <span key={`wd-${i}`} className={`text-[10px] flex-1 text-center ${i === todayIndex ? 'text-sanfran-rubi font-bold' : 'text-gray-500'}`}>{d}</span>
               ))}
             </div>
           </div>
 
           {/* Tarefas da Semana */}
-          <div className="bg-[#111] rounded-xl p-4">
+          <div className="rounded-xl border border-slate-200 bg-sanfran-paper p-4 dark:border-slate-700 dark:bg-slate-800/80">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 bg-cyan-500/20 rounded-lg flex items-center justify-center">
@@ -249,7 +249,7 @@ export default function Dashboard() {
             </div>
             <div className="flex justify-between mb-2">
               {tasksWeekData.map(([done, total], i) => (
-                <span key={`tp-${i}`} className={`text-[10px] flex-1 text-center ${i === todayIndex ? 'text-red-500 font-bold' : 'text-gray-500'}`}>{done}/{total}</span>
+                <span key={`tp-${i}`} className={`text-[10px] flex-1 text-center ${i === todayIndex ? 'text-sanfran-rubi font-bold' : 'text-gray-500'}`}>{done}/{total}</span>
               ))}
             </div>
             <div className="flex justify-between items-end h-20 mb-2">
@@ -257,21 +257,21 @@ export default function Dashboard() {
                 const pct = total > 0 ? (done / total) * 100 : 0;
                 return (
                   <div key={`tb-${i}`} className="flex flex-col items-center flex-1">
-                    <div className="w-5 rounded-t transition-all duration-300" style={{ height: `${Math.max(3, pct * 0.8)}px`, backgroundColor: pct > 0 ? '#06B6D4' : '#2a2a2a' }}></div>
+                    <div className="w-5 rounded-t transition-all duration-300" style={{ height: `${Math.max(3, pct * 0.8)}px`, backgroundColor: pct > 0 ? '#475569' : '#cbd5e1' }}></div>
                   </div>
                 );
               })}
             </div>
             <div className="flex justify-between">
               {weekDays.map((d, i) => (
-                <span key={`td-${i}`} className={`text-[10px] flex-1 text-center ${i === todayIndex ? 'text-red-500 font-bold' : 'text-gray-500'}`}>{d}</span>
+                <span key={`td-${i}`} className={`text-[10px] flex-1 text-center ${i === todayIndex ? 'text-sanfran-rubi font-bold' : 'text-gray-500'}`}>{d}</span>
               ))}
             </div>
           </div>
         </div>
 
         {/* Card Água */}
-        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-cyan-500/20 rounded-xl flex items-center justify-center">
@@ -282,22 +282,22 @@ export default function Dashboard() {
                 <p className="text-xs text-gray-400">{waterAmount}ml / {waterGoal >= 1000 ? `${waterGoal / 1000}L` : `${waterGoal}ml`}</p>
               </div>
             </div>
-            <button onClick={() => setShowWaterSettings(!showWaterSettings)} className="p-2 hover:bg-[#2a2a2a] rounded-lg transition">
+            <button onClick={() => setShowWaterSettings(!showWaterSettings)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition">
               <Settings className="w-5 h-5 text-gray-400" />
             </button>
           </div>
 
           {showWaterSettings && (
-            <div className="bg-[#111] border border-[#2a2a2a] rounded-xl p-4 mb-4">
+            <div className="mb-4 rounded-xl border border-slate-200 bg-sanfran-paper p-4 dark:border-slate-700 dark:bg-slate-800/80">
               <h4 className="text-sm font-bold mb-3">Configurações de Água</h4>
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm text-gray-400">Meta diária</span>
                 <div className="flex items-center gap-3">
-                  <button onClick={() => profileUpdate.mutate({ waterGoalMl: Math.max(500, waterGoal - 250) })} className="w-8 h-8 bg-[#2a2a2a] rounded-lg flex items-center justify-center hover:bg-[#333] transition">
+                  <button type="button" onClick={() => profileUpdate.mutate({ waterGoalMl: Math.max(500, waterGoal - 250) })} className="w-8 h-8 bg-sanfran-paper dark:bg-slate-800 rounded-lg flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-700 transition">
                     <Minus className="w-4 h-4" />
                   </button>
                   <span className="font-bold w-16 text-center">{waterGoal}ml</span>
-                  <button onClick={() => profileUpdate.mutate({ waterGoalMl: waterGoal + 250 })} className="w-8 h-8 bg-[#2a2a2a] rounded-lg flex items-center justify-center hover:bg-[#333] transition">
+                  <button type="button" onClick={() => profileUpdate.mutate({ waterGoalMl: waterGoal + 250 })} className="w-8 h-8 bg-sanfran-paper dark:bg-slate-800 rounded-lg flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-700 transition">
                     <Plus className="w-4 h-4" />
                   </button>
                 </div>
@@ -313,7 +313,7 @@ export default function Dashboard() {
               {dayNames.map((day, i) => (
                 <div key={day} className="flex items-center gap-2">
                   <span className={`text-xs w-8 ${i === todayIndex ? 'text-cyan-400 font-bold' : 'text-gray-500'}`}>{day}</span>
-                  <div className="flex-1 bg-[#2a2a2a] rounded-full h-2">
+                  <div className="flex-1 bg-slate-200 dark:bg-slate-700 rounded-full h-2">
                     <div className="bg-cyan-400 h-full rounded-full transition-all duration-300" style={{ width: `${Math.min(100, ((waterByDay[i] || 0) / waterGoal) * 100)}%` }}></div>
                   </div>
                   <span className="text-xs text-gray-500 w-8 text-right">{(waterByDay[i] || 0) > 0 ? waterByDay[i] : '-'}</span>
@@ -332,7 +332,7 @@ export default function Dashboard() {
               </button>
               <div className="relative w-28 h-14 overflow-hidden">
                 <svg className="w-28 h-28" viewBox="0 0 120 60">
-                  <path d="M10 55 A50 50 0 0 1 110 55" fill="none" stroke="#2a2a2a" strokeWidth="8" strokeLinecap="round" />
+                  <path d="M10 55 A50 50 0 0 1 110 55" fill="none" stroke="currentColor" strokeWidth="8" strokeLinecap="round" />
                   <path d="M10 55 A50 50 0 0 1 110 55" fill="none" stroke="#06B6D4" strokeWidth="8" strokeLinecap="round" strokeDasharray="157" strokeDashoffset={157 - (157 * waterPercent / 100)} className="transition-all duration-500" />
                 </svg>
               </div>
@@ -342,7 +342,7 @@ export default function Dashboard() {
         </div>
 
         {/* Card Horas de Foco */}
-        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
@@ -356,7 +356,7 @@ export default function Dashboard() {
             <span className="text-2xl font-bold">{focusMinutes >= 60 ? `${Math.floor(focusMinutes / 60)}h${focusMinutes % 60 > 0 ? `${focusMinutes % 60}m` : ''}` : `${focusMinutes}m`}</span>
           </div>
           <div className="mt-3">
-            <div className="bg-[#2a2a2a] rounded-full h-2">
+            <div className="bg-slate-200 dark:bg-slate-700 rounded-full h-2">
               <div className="bg-blue-500 h-full rounded-full transition-all" style={{ width: `${Math.min(100, focusPercent)}%` }}></div>
             </div>
             <p className="text-sm text-gray-500 mt-2">{focusPercent}% da meta semanal</p>
@@ -364,28 +364,28 @@ export default function Dashboard() {
         </div>
 
         {/* Como funciona o sistema de XP */}
-        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
           <div className="flex items-center gap-3 mb-5">
-            <div className="w-10 h-10 bg-red-500/20 rounded-xl flex items-center justify-center">
-              <Info className="w-6 h-6 text-red-500" />
+            <div className="w-10 h-10 bg-sanfran-rubi/15 rounded-xl flex items-center justify-center">
+              <Info className="w-6 h-6 text-sanfran-rubi" />
             </div>
             <h2 className="text-lg font-bold">Como funciona o sistema de XP</h2>
           </div>
 
           <div className="space-y-3">
             {[
-              { id: 'xp', icon: '⚡', iconColor: 'text-red-500', label: 'Ganho de XP', content: (
+              { id: 'xp', icon: '⚡', iconColor: 'text-sanfran-rubi', label: 'Ganho de XP', content: (
                 <div>
                   <div className="flex justify-between mb-3 text-sm text-gray-400"><span>Ação</span><span>XP</span></div>
                   <div className="space-y-3 text-sm">
-                    <div className="flex justify-between"><div className="flex items-center gap-2"><span>🔄</span> Completar hábito</div><span className="text-red-400 font-bold">+10</span></div>
-                    <div className="flex justify-between pl-6 text-gray-500"><span>└ Bônus streak 3 dias</span><span className="text-red-400 font-bold">+20</span></div>
-                    <div className="flex justify-between pl-6 text-gray-500"><span>└ Bônus streak 7 dias</span><span className="text-red-400 font-bold">+50</span></div>
-                    <div className="flex justify-between pl-6 text-gray-500"><span>└ Bônus streak 30 dias</span><span className="text-red-400 font-bold">+200</span></div>
-                    <div className="flex justify-between"><div className="flex items-center gap-2"><span>✅</span> Completar tarefa</div><span className="text-red-400 font-bold">+10</span></div>
-                    <div className="flex justify-between"><div className="flex items-center gap-2"><span>📈</span> Progresso em meta (1x/dia)</div><span className="text-red-400 font-bold">+5</span></div>
-                    <div className="flex justify-between"><div className="flex items-center gap-2"><span>🎯</span> Concluir meta</div><span className="text-red-400 font-bold">+100</span></div>
-                    <div className="flex justify-between"><div className="flex items-center gap-2"><span>📅</span> Login diário</div><span className="text-red-400 font-bold">+5 a +25</span></div>
+                    <div className="flex justify-between"><div className="flex items-center gap-2"><span>🔄</span> Completar hábito</div><span className="text-sanfran-rubi font-bold">+10</span></div>
+                    <div className="flex justify-between pl-6 text-gray-500"><span>└ Bônus streak 3 dias</span><span className="text-sanfran-rubi font-bold">+20</span></div>
+                    <div className="flex justify-between pl-6 text-gray-500"><span>└ Bônus streak 7 dias</span><span className="text-sanfran-rubi font-bold">+50</span></div>
+                    <div className="flex justify-between pl-6 text-gray-500"><span>└ Bônus streak 30 dias</span><span className="text-sanfran-rubi font-bold">+200</span></div>
+                    <div className="flex justify-between"><div className="flex items-center gap-2"><span>✅</span> Completar tarefa</div><span className="text-sanfran-rubi font-bold">+10</span></div>
+                    <div className="flex justify-between"><div className="flex items-center gap-2"><span>📈</span> Progresso em meta (1x/dia)</div><span className="text-sanfran-rubi font-bold">+5</span></div>
+                    <div className="flex justify-between"><div className="flex items-center gap-2"><span>🎯</span> Concluir meta</div><span className="text-sanfran-rubi font-bold">+100</span></div>
+                    <div className="flex justify-between"><div className="flex items-center gap-2"><span>📅</span> Login diário</div><span className="text-sanfran-rubi font-bold">+5 a +25</span></div>
                   </div>
                 </div>
               )},
@@ -398,12 +398,12 @@ export default function Dashboard() {
                   <p className="text-gray-500 mt-2">Use na loja para comprar itens especiais, proteções e boosts.</p>
                 </div>
               )},
-              { id: 'penalties', icon: '⚠️', iconColor: 'text-red-500', label: 'Penalidades', content: (
+              { id: 'penalties', icon: '⚠️', iconColor: 'text-sanfran-rubi', label: 'Penalidades', content: (
                 <div className="space-y-3 text-sm">
-                  <div className="flex justify-between"><span className="text-gray-400">Não completar hábito</span><span className="text-red-400 font-bold">-5 XP</span></div>
-                  <div className="flex justify-between"><span className="text-gray-400">Perder streak de 3+ dias</span><span className="text-red-400 font-bold">-15 XP</span></div>
-                  <div className="flex justify-between"><span className="text-gray-400">Perder streak de 7+ dias</span><span className="text-red-400 font-bold">-30 XP</span></div>
-                  <div className="flex justify-between"><span className="text-gray-400">Tarefa atrasada</span><span className="text-red-400 font-bold">-3 XP/dia</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">Não completar hábito</span><span className="text-sanfran-rubi font-bold">-5 XP</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">Perder streak de 3+ dias</span><span className="text-sanfran-rubi font-bold">-15 XP</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">Perder streak de 7+ dias</span><span className="text-sanfran-rubi font-bold">-30 XP</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">Tarefa atrasada</span><span className="text-sanfran-rubi font-bold">-3 XP/dia</span></div>
                   <p className="text-gray-500 mt-2">Penalidades são aplicadas automaticamente ao final do dia.</p>
                 </div>
               )},
@@ -417,8 +417,8 @@ export default function Dashboard() {
                 </div>
               )},
             ].map(acc => (
-              <div key={acc.id} className="bg-[#111] rounded-xl border border-[#2a2a2a] overflow-hidden">
-                <button onClick={() => toggleAccordion(acc.id)} className="w-full px-4 py-4 flex items-center justify-between hover:bg-[#1a1a1a] transition text-left">
+              <div key={acc.id} className="overflow-hidden rounded-xl border border-slate-200 bg-sanfran-paper dark:border-slate-700 dark:bg-slate-800/80">
+                <button onClick={() => toggleAccordion(acc.id)} className="w-full px-4 py-4 flex items-center justify-between hover:bg-white dark:bg-slate-900 transition text-left">
                   <div className="flex items-center gap-3">
                     <span className={acc.iconColor}>{acc.icon}</span>
                     <span className="font-medium">{acc.label}</span>
@@ -426,7 +426,7 @@ export default function Dashboard() {
                   {expandedAccordion === acc.id ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
                 </button>
                 {expandedAccordion === acc.id && (
-                  <div className="px-4 pb-4 border-t border-[#2a2a2a] pt-4">
+                  <div className="px-4 pb-4 border-t border-slate-200 dark:border-slate-700 pt-4">
                     {acc.content}
                   </div>
                 )}

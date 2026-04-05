@@ -22,15 +22,30 @@ import {
 import { FORJA_BASE_PATH } from "@forja/constants";
 import { getLoginUrl } from "@forja/const";
 import { useIsMobile } from "@forja/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users } from "lucide-react";
+import {
+  LayoutDashboard,
+  LogOut,
+  PanelLeft,
+  CheckSquare,
+  Calendar,
+  Target,
+  Wallet,
+  Clock,
+  User,
+} from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Page 1", path: FORJA_BASE_PATH },
-  { icon: Users, label: "Page 2", path: `${FORJA_BASE_PATH}/some-path` },
+  { icon: LayoutDashboard, label: "Painel", path: FORJA_BASE_PATH },
+  { icon: CheckSquare, label: "Hábitos", path: `${FORJA_BASE_PATH}/habits` },
+  { icon: Calendar, label: "Tarefas", path: `${FORJA_BASE_PATH}/tasks` },
+  { icon: Target, label: "Metas", path: `${FORJA_BASE_PATH}/goals` },
+  { icon: Wallet, label: "Finanças", path: `${FORJA_BASE_PATH}/finance` },
+  { icon: Clock, label: "Foco", path: `${FORJA_BASE_PATH}/focus` },
+  { icon: User, label: "Perfil", path: `${FORJA_BASE_PATH}/profile` },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -183,7 +198,15 @@ function DashboardLayoutContent({
           <SidebarContent className="gap-0">
             <SidebarMenu className="px-2 py-1">
               {menuItems.map(item => {
-                const isActive = location === item.path;
+                const isDash =
+                  item.path === FORJA_BASE_PATH &&
+                  (location === FORJA_BASE_PATH ||
+                    location === `${FORJA_BASE_PATH}/` ||
+                    location === `${FORJA_BASE_PATH}/dashboard`);
+                const isActive =
+                  isDash ||
+                  (item.path !== FORJA_BASE_PATH &&
+                    (location === item.path || location.startsWith(`${item.path}/`)));
                 return (
                   <SidebarMenuItem key={item.path}>
                     <SidebarMenuButton

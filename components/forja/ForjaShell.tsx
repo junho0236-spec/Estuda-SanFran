@@ -37,9 +37,9 @@ export default function ForjaShell({ userId, email, displayName, onLeaveForja }:
   return (
     <QueryClientProvider client={queryClient}>
       <ForjaSessionProvider value={sessionValue}>
-        <ThemeProvider defaultTheme="dark" switchable={false} applyToDocument={false}>
+        <ThemeProvider defaultTheme="light" switchable={false} applyToDocument={false}>
           <TooltipProvider>
-            <div className="forja-root dark min-h-[min(85dvh,900px)] h-full w-full bg-[#0D0D0D] text-white">
+            <div className="forja-root min-h-[min(85dvh,900px)] h-full w-full bg-sanfran-offwhite text-slate-900 dark:bg-slate-950 dark:text-slate-100">
               <NotificationProvider>
                 <Toaster />
                 <Routes>

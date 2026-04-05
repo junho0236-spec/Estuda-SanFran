@@ -127,15 +127,15 @@ export default function Goals() {
         {/* Tabs */}
         <div className="flex gap-2">
           <button onClick={() => setActiveTab("ativas")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition ${activeTab === 'ativas' ? 'bg-red-500 text-white' : 'bg-[#1a1a1a] border border-[#2a2a2a] text-gray-400'}`}>
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition ${activeTab === 'ativas' ? 'bg-red-500 text-white' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-gray-400'}`}>
             <Target className="w-4 h-4" /> Ativas
           </button>
           <button onClick={() => setActiveTab("concluidas")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition ${activeTab === 'concluidas' ? 'bg-red-500 text-white' : 'bg-[#1a1a1a] border border-[#2a2a2a] text-gray-400'}`}>
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition ${activeTab === 'concluidas' ? 'bg-red-500 text-white' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-gray-400'}`}>
             <Trophy className="w-4 h-4" /> Concluídas
           </button>
           <button onClick={() => setActiveTab("pausadas")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition ${activeTab === 'pausadas' ? 'bg-red-500 text-white' : 'bg-[#1a1a1a] border border-[#2a2a2a] text-gray-400'}`}>
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition ${activeTab === 'pausadas' ? 'bg-red-500 text-white' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-gray-400'}`}>
             <Pause className="w-4 h-4" /> Pausadas
           </button>
         </div>
@@ -146,7 +146,7 @@ export default function Goals() {
             {filtered.map((goal: any) => {
               const cat = categories.find(c => c.name === goal.category) || categories[0];
               return (
-                <div key={goal.id} className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+                <div key={goal.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <div className={`w-10 h-10 ${cat.color} rounded-xl flex items-center justify-center border`}>
@@ -159,18 +159,18 @@ export default function Goals() {
                     </div>
                     <div className="flex gap-1">
                       {goal.status !== "completed" && (
-                        <button onClick={() => togglePause(goal.id, goal.status)} className="p-1.5 hover:bg-[#2a2a2a] rounded-lg transition text-xs text-gray-400">
+                        <button onClick={() => togglePause(goal.id, goal.status)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition text-xs text-gray-400">
                           {goal.status === "paused" ? "▶" : "⏸"}
                         </button>
                       )}
-                      <button onClick={() => deleteGoalMut.mutate({ id: goal.id })} className="p-1.5 hover:bg-[#2a2a2a] rounded-lg transition">
+                      <button onClick={() => deleteGoalMut.mutate({ id: goal.id })} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition">
                         <Trash2 className="w-4 h-4 text-gray-500" />
                       </button>
                     </div>
                   </div>
                   {goal.description && <p className="text-sm text-gray-400 mb-3">{goal.description}</p>}
                   <div className="flex items-center gap-3 mb-2">
-                    <div className="flex-1 bg-[#2a2a2a] rounded-full h-2.5">
+                    <div className="flex-1 bg-sanfran-paper dark:bg-slate-800 rounded-full h-2.5">
                       <div className={`h-full rounded-full transition-all duration-300 ${(goal.progress || 0) >= 100 ? 'bg-green-500' : 'bg-red-500'}`} style={{ width: `${goal.progress || 0}%` }}></div>
                     </div>
                     <span className="text-sm font-bold">{goal.progress || 0}%</span>
@@ -179,7 +179,7 @@ export default function Goals() {
                     <div className="flex gap-2 mt-3">
                       <button onClick={() => updateProgress(goal.id, 10, goal)} className="flex-1 bg-red-500/10 border border-red-500/30 text-red-400 py-2 rounded-xl text-sm font-medium hover:bg-red-500/20 transition">+10%</button>
                       <button onClick={() => updateProgress(goal.id, 25, goal)} className="flex-1 bg-red-500/10 border border-red-500/30 text-red-400 py-2 rounded-xl text-sm font-medium hover:bg-red-500/20 transition">+25%</button>
-                      <button onClick={() => updateProgress(goal.id, -10, goal)} className="flex-1 bg-[#2a2a2a] border border-[#333] text-gray-400 py-2 rounded-xl text-sm font-medium hover:bg-[#333] transition">-10%</button>
+                      <button onClick={() => updateProgress(goal.id, -10, goal)} className="flex-1 bg-sanfran-paper dark:bg-slate-800 border border-[#333] text-gray-400 py-2 rounded-xl text-sm font-medium hover:bg-[#333] transition">-10%</button>
                     </div>
                   )}
                 </div>
@@ -188,7 +188,7 @@ export default function Goals() {
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-20">
-            <div className="w-16 h-16 bg-[#2a2a2a] rounded-2xl flex items-center justify-center mb-4">
+            <div className="w-16 h-16 bg-sanfran-paper dark:bg-slate-800 rounded-2xl flex items-center justify-center mb-4">
               <Target className="w-8 h-8 text-gray-500" />
             </div>
             <p className="text-gray-400 mb-4">
@@ -197,7 +197,7 @@ export default function Goals() {
               {activeTab === "pausadas" && "Nenhuma meta pausada"}
             </p>
             {activeTab === "ativas" && (
-              <button onClick={openModal} className="bg-[#2a2a2a] border border-[#333] text-white py-2.5 px-5 rounded-xl flex items-center gap-2 hover:bg-[#333] transition">
+              <button onClick={openModal} className="bg-sanfran-paper dark:bg-slate-800 border border-[#333] text-white py-2.5 px-5 rounded-xl flex items-center gap-2 hover:bg-[#333] transition">
                 <Plus className="w-4 h-4" /> Criar meta
               </button>
             )}
@@ -208,7 +208,7 @@ export default function Goals() {
       {/* Modal Nova Meta - Wizard */}
       {showModal && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-end justify-center" onClick={() => setShowModal(false)}>
-          <div className="bg-[#1a1a1a] w-full max-w-lg rounded-t-3xl p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-t-3xl p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-red-500/20 rounded-xl flex items-center justify-center">
@@ -219,12 +219,12 @@ export default function Goals() {
                   <p className="text-sm text-gray-400">Etapa {step} de 4 — {step === 1 ? 'Objetivo' : step === 2 ? 'Categoria' : step === 3 ? 'Prazo' : 'Revisão'}</p>
                 </div>
               </div>
-              <button onClick={() => setShowModal(false)} className="p-2 hover:bg-[#2a2a2a] rounded-lg"><X className="w-5 h-5" /></button>
+              <button onClick={() => setShowModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"><X className="w-5 h-5" /></button>
             </div>
 
             <div className="flex gap-2 mb-6">
               {[1, 2, 3, 4].map(s => (
-                <div key={s} className={`flex-1 h-1 rounded-full transition ${s <= step ? 'bg-red-500' : 'bg-[#2a2a2a]'}`}></div>
+                <div key={s} className={`flex-1 h-1 rounded-full transition ${s <= step ? 'bg-red-500' : 'bg-sanfran-paper dark:bg-slate-800'}`}></div>
               ))}
             </div>
 
@@ -233,12 +233,12 @@ export default function Goals() {
                 <div>
                   <label className="text-sm text-gray-400 mb-2 block">Qual é a sua meta? *</label>
                   <input type="text" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Ex: Ler 12 livros este ano"
-                    className="w-full bg-[#2a2a2a] border border-[#333] rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-red-500 focus:outline-none transition" />
+                    className="w-full bg-sanfran-paper dark:bg-slate-800 border border-[#333] rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-red-500 focus:outline-none transition" />
                 </div>
                 <div>
                   <label className="text-sm text-gray-400 mb-2 block">Descrição (opcional)</label>
                   <textarea value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="Descreva sua meta..."
-                    className="w-full bg-[#2a2a2a] border border-[#333] rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-red-500 focus:outline-none transition h-20 resize-none" />
+                    className="w-full bg-sanfran-paper dark:bg-slate-800 border border-[#333] rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-red-500 focus:outline-none transition h-20 resize-none" />
                 </div>
               </div>
             )}
@@ -249,7 +249,7 @@ export default function Goals() {
                 <div className="grid grid-cols-2 gap-3">
                   {categories.map(cat => (
                     <button key={cat.name} onClick={() => setNewCategory(cat.name)}
-                      className={`flex items-center gap-3 p-4 rounded-xl border transition ${newCategory === cat.name ? 'bg-red-500/10 border-red-500/50 text-white' : 'bg-[#2a2a2a] border-[#333] text-gray-400 hover:bg-[#333]'}`}>
+                      className={`flex items-center gap-3 p-4 rounded-xl border transition ${newCategory === cat.name ? 'bg-red-500/10 border-red-500/50 text-white' : 'bg-sanfran-paper dark:bg-slate-800 border-[#333] text-gray-400 hover:bg-[#333]'}`}>
                       <span className="text-xl">{cat.icon}</span>
                       <span className="text-sm font-medium">{cat.name}</span>
                     </button>
@@ -264,7 +264,7 @@ export default function Goals() {
                 <div className="grid grid-cols-3 gap-3">
                   {["7", "14", "30", "60", "90", "180"].map(d => (
                     <button key={d} onClick={() => setNewDeadline(d)}
-                      className={`py-3 rounded-xl text-sm font-medium transition ${newDeadline === d ? 'bg-red-500 text-white' : 'bg-[#2a2a2a] text-gray-400 hover:bg-[#333]'}`}>
+                      className={`py-3 rounded-xl text-sm font-medium transition ${newDeadline === d ? 'bg-red-500 text-white' : 'bg-sanfran-paper dark:bg-slate-800 text-gray-400 hover:bg-[#333]'}`}>
                       {d} dias
                     </button>
                   ))}
@@ -272,7 +272,7 @@ export default function Goals() {
                 <div>
                   <label className="text-sm text-gray-400 mb-2 block">Ou digite um valor personalizado</label>
                   <input type="number" value={newDeadline} onChange={e => setNewDeadline(e.target.value)} min="1"
-                    className="w-full bg-[#2a2a2a] border border-[#333] rounded-xl px-4 py-3 text-white focus:border-red-500 focus:outline-none transition" />
+                    className="w-full bg-sanfran-paper dark:bg-slate-800 border border-[#333] rounded-xl px-4 py-3 text-white focus:border-red-500 focus:outline-none transition" />
                 </div>
               </div>
             )}
@@ -280,7 +280,7 @@ export default function Goals() {
             {step === 4 && (
               <div className="space-y-4">
                 <h3 className="text-lg font-bold">Revisão</h3>
-                <div className="bg-[#2a2a2a] rounded-xl p-4 space-y-3">
+                <div className="bg-sanfran-paper dark:bg-slate-800 rounded-xl p-4 space-y-3">
                   <div className="flex justify-between"><span className="text-gray-400">Meta:</span><span className="font-bold">{newTitle}</span></div>
                   {newDesc && <div className="flex justify-between"><span className="text-gray-400">Descrição:</span><span className="text-sm">{newDesc}</span></div>}
                   <div className="flex justify-between"><span className="text-gray-400">Categoria:</span><span>{newCategory}</span></div>
@@ -291,7 +291,7 @@ export default function Goals() {
 
             <div className="flex gap-3 pt-6">
               {step > 1 && (
-                <button onClick={() => setStep(step - 1)} className="flex-1 bg-[#2a2a2a] text-gray-300 py-3 rounded-xl font-medium hover:bg-[#333] transition">Voltar</button>
+                <button onClick={() => setStep(step - 1)} className="flex-1 bg-sanfran-paper dark:bg-slate-800 text-gray-300 py-3 rounded-xl font-medium hover:bg-[#333] transition">Voltar</button>
               )}
               <button onClick={nextStep} disabled={createGoalMut.isPending}
                 className="flex-1 bg-red-500 text-white py-3 rounded-xl font-medium hover:bg-red-600 transition flex items-center justify-center gap-2 disabled:opacity-50">

@@ -42,17 +42,17 @@ export default function ProfileDropdown({ onClose }: ProfileDropdownProps) {
   return (
     <div
       ref={dropdownRef}
-      className="absolute right-0 top-12 w-64 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+      className="absolute right-0 top-12 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
     >
       {/* User Info Header */}
-      <div className="p-4 border-b border-[#2a2a2a]">
+      <div className="p-4 border-b border-slate-200 dark:border-slate-700">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center text-sm font-bold shrink-0">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-sanfran-rubi to-sanfran-rubi-dark flex items-center justify-center text-sm font-bold text-white shrink-0">
             {initials}
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-bold text-sm truncate">{displayName}</p>
-            <p className="text-xs text-gray-400 truncate">{email}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{email}</p>
           </div>
         </div>
       </div>
@@ -64,11 +64,11 @@ export default function ProfileDropdown({ onClose }: ProfileDropdownProps) {
             onClose();
             navigate(`${FORJA_BASE_PATH}/profile`);
           }}
-          className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[#2a2a2a] transition text-left"
+          className="w-full px-4 py-3 flex items-center gap-3 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left"
         >
-          <User className="w-4 h-4 text-gray-400" />
+          <User className="w-4 h-4 text-slate-500 dark:text-slate-400" />
           <span className="text-sm flex-1">Perfil</span>
-          <ChevronRight className="w-4 h-4 text-gray-600" />
+          <ChevronRight className="w-4 h-4 text-slate-400 dark:text-slate-500" />
         </button>
 
         <button
@@ -76,14 +76,14 @@ export default function ProfileDropdown({ onClose }: ProfileDropdownProps) {
             onClose();
             navigate(`${FORJA_BASE_PATH}/profile`);
           }}
-          className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[#2a2a2a] transition text-left"
+          className="w-full px-4 py-3 flex items-center gap-3 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left"
         >
-          <Settings className="w-4 h-4 text-gray-400" />
+          <Settings className="w-4 h-4 text-slate-400 dark:text-slate-500" />
           <span className="text-sm flex-1">Configurações</span>
-          <ChevronRight className="w-4 h-4 text-gray-600" />
+          <ChevronRight className="w-4 h-4 text-slate-400 dark:text-slate-500" />
         </button>
 
-        <div className="border-t border-[#2a2a2a] my-1"></div>
+        <div className="border-t border-slate-200 dark:border-slate-700 my-1"></div>
 
         <button
           onClick={handleLogout}

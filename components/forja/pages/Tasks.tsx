@@ -155,11 +155,11 @@ export default function Tasks() {
         </div>
 
         {/* Week Header */}
-        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3">
           <div className="flex items-center justify-between mb-3">
-            <button className="p-1 hover:bg-[#2a2a2a] rounded-lg"><ChevronLeft className="w-4 h-4" /></button>
+            <button className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"><ChevronLeft className="w-4 h-4" /></button>
             <span className="text-sm font-bold">{days[0].month} {new Date().getFullYear()}</span>
-            <button className="p-1 hover:bg-[#2a2a2a] rounded-lg"><ChevronRight className="w-4 h-4" /></button>
+            <button className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"><ChevronRight className="w-4 h-4" /></button>
           </div>
           <div className="flex justify-between">
             {days.map((d, i) => {
@@ -168,7 +168,7 @@ export default function Tasks() {
               return (
                 <button key={i} onClick={() => setTargetDay(i)}
                   className={`flex flex-col items-center gap-1 px-2 py-2 rounded-xl transition ${
-                    isToday ? 'bg-cyan-500/20 border border-cyan-500/30' : targetDay === i ? 'bg-[#2a2a2a]' : 'hover:bg-[#2a2a2a]'
+                    isToday ? 'bg-cyan-500/20 border border-cyan-500/30' : targetDay === i ? 'bg-sanfran-paper dark:bg-slate-800' : 'hover:bg-slate-100 dark:hover:bg-slate-800'
                   }`}>
                   <span className={`text-[10px] ${isToday ? 'text-cyan-400 font-bold' : 'text-gray-500'}`}>{weekDayLabels[i]}</span>
                   <span className={`text-sm font-bold ${isToday ? 'text-cyan-400' : 'text-white'}`}>{d.date}</span>
@@ -183,7 +183,7 @@ export default function Tasks() {
         <div>
           <h2 className="text-lg font-bold mb-3">{days[targetDay].day} - {days[targetDay].date} de {days[targetDay].month}</h2>
           {tasks.filter((t: any) => t.date === days[targetDay].dateStr).length === 0 ? (
-            <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-8 text-center">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-8 text-center">
               <p className="text-gray-400 mb-3">Nenhuma tarefa para este dia</p>
               <button onClick={() => setShowModal(true)} className="bg-cyan-500 hover:bg-cyan-600 text-white py-2 px-4 rounded-xl text-sm transition">
                 Adicionar tarefa
@@ -194,7 +194,7 @@ export default function Tasks() {
               {tasks.filter((t: any) => t.date === days[targetDay].dateStr).map((task: any) => {
                 const colors = priorityColors[task.priority] || priorityColors.medium;
                 return (
-                  <div key={task.id} className={`bg-[#1a1a1a] border ${task.isCompleted ? 'border-green-500/30 opacity-70' : 'border-[#2a2a2a]'} rounded-2xl p-4`}>
+                  <div key={task.id} className={`bg-white dark:bg-slate-900 border ${task.isCompleted ? 'border-green-500/30 opacity-70' : 'border-slate-200 dark:border-slate-700'} rounded-2xl p-4`}>
                     <div className="flex items-start gap-3">
                       <button onClick={() => toggleComplete(task.id, task.isCompleted)}
                         className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition ${
@@ -228,29 +228,29 @@ export default function Tasks() {
       {/* Modal Nova Tarefa */}
       {showModal && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-end justify-center" onClick={() => setShowModal(false)}>
-          <div className="bg-[#1a1a1a] w-full max-w-lg rounded-t-3xl p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-t-3xl p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold">Nova Tarefa</h2>
-              <button onClick={() => setShowModal(false)} className="p-2 hover:bg-[#2a2a2a] rounded-lg"><X className="w-5 h-5" /></button>
+              <button onClick={() => setShowModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"><X className="w-5 h-5" /></button>
             </div>
 
             <div className="space-y-5">
               <div>
                 <label className="text-sm text-gray-400 mb-2 block">Título *</label>
                 <input type="text" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Ex: Reunião, Estudar, Compras..."
-                  className="w-full bg-[#2a2a2a] border border-[#333] rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none transition" />
+                  className="w-full bg-sanfran-paper dark:bg-slate-800 border border-[#333] rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none transition" />
               </div>
 
               <div>
                 <label className="text-sm text-gray-400 mb-2 block">Descrição</label>
                 <textarea value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="Detalhes da tarefa..."
-                  className="w-full bg-[#2a2a2a] border border-[#333] rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none transition h-20 resize-none" />
+                  className="w-full bg-sanfran-paper dark:bg-slate-800 border border-[#333] rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none transition h-20 resize-none" />
               </div>
 
               <div>
                 <label className="text-sm text-gray-400 mb-2 block">Horário (opcional)</label>
                 <input type="time" value={newTime} onChange={e => setNewTime(e.target.value)}
-                  className="w-full bg-[#2a2a2a] border border-[#333] rounded-xl px-4 py-3 text-white focus:border-cyan-500 focus:outline-none transition" />
+                  className="w-full bg-sanfran-paper dark:bg-slate-800 border border-[#333] rounded-xl px-4 py-3 text-white focus:border-cyan-500 focus:outline-none transition" />
               </div>
 
               <div>
@@ -258,7 +258,7 @@ export default function Tasks() {
                 <div className="flex gap-2">
                   {(["low", "medium", "high", "urgent"] as const).map(p => (
                     <button key={p} onClick={() => setNewPriority(p)}
-                      className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition ${newPriority === p ? 'bg-cyan-500 text-white' : 'bg-[#2a2a2a] text-gray-400 hover:bg-[#333]'}`}>
+                      className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition ${newPriority === p ? 'bg-cyan-500 text-white' : 'bg-sanfran-paper dark:bg-slate-800 text-gray-400 hover:bg-[#333]'}`}>
                       {priorityLabels[p]}
                     </button>
                   ))}
@@ -281,7 +281,7 @@ export default function Tasks() {
                   <div className="flex gap-2">
                     {weekDayLabels.map((d, i) => (
                       <button key={i} onClick={() => toggleDay(i)}
-                        className={`w-10 h-10 rounded-lg text-sm font-bold transition ${selectedDays.includes(i) ? 'bg-cyan-500 text-white' : 'bg-[#2a2a2a] text-gray-500 hover:bg-[#333]'}`}>
+                        className={`w-10 h-10 rounded-lg text-sm font-bold transition ${selectedDays.includes(i) ? 'bg-cyan-500 text-white' : 'bg-sanfran-paper dark:bg-slate-800 text-gray-500 hover:bg-[#333]'}`}>
                         {d}
                       </button>
                     ))}
@@ -295,7 +295,7 @@ export default function Tasks() {
                   <div className="flex gap-2 overflow-x-auto">
                     {days.map((d, i) => (
                       <button key={i} onClick={() => setTargetDay(i)}
-                        className={`px-3 py-2 rounded-xl text-sm shrink-0 transition ${targetDay === i ? 'bg-cyan-500 text-white' : 'bg-[#2a2a2a] text-gray-400 hover:bg-[#333]'}`}>
+                        className={`px-3 py-2 rounded-xl text-sm shrink-0 transition ${targetDay === i ? 'bg-cyan-500 text-white' : 'bg-sanfran-paper dark:bg-slate-800 text-gray-400 hover:bg-[#333]'}`}>
                         {d.day.split('-')[0]} {d.date}
                       </button>
                     ))}
@@ -304,7 +304,7 @@ export default function Tasks() {
               )}
 
               <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowModal(false)} className="flex-1 bg-[#2a2a2a] text-gray-300 py-3 rounded-xl font-medium hover:bg-[#333] transition">Cancelar</button>
+                <button onClick={() => setShowModal(false)} className="flex-1 bg-sanfran-paper dark:bg-slate-800 text-gray-300 py-3 rounded-xl font-medium hover:bg-[#333] transition">Cancelar</button>
                 <button onClick={createTask} disabled={createTaskMut.isPending} className="flex-1 bg-cyan-500 text-white py-3 rounded-xl font-medium hover:bg-cyan-600 transition disabled:opacity-50">
                   {createTaskMut.isPending ? 'Criando...' : 'Criar Tarefa'}
                 </button>

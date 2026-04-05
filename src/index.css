@@ -13,6 +13,17 @@
   --color-sanfran-paper: #E4E3E0;
 }
 
+/* Sistema Forja embutido: herda claro/escuro do documento; tipografia alinhada ao hub */
+.forja-root {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.forja-root .forja-forja-title {
+  font-family: var(--font-serif);
+  letter-spacing: -0.02em;
+}
+
 :root {
   --bg-color: #F5F2ED; /* Aged paper */
   --text-color: #1A202C; /* Dark blue-gray */

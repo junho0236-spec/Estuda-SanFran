@@ -97,10 +97,10 @@ export default function FeaturedAchievementsPopup({ onClose }: FeaturedAchieveme
   // Selection view - shows ALL achievements (unlocked + locked)
   if (selectingSlot !== null) {
     return (
-      <div className="fixed inset-0 z-50 bg-black/70 flex items-end justify-center" onClick={onClose}>
-        <div className="bg-[#1a1a1a] w-full max-w-lg rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+      <div className="fixed inset-0 z-50 bg-slate-900/50 dark:bg-black/70 flex items-end justify-center" onClick={onClose}>
+        <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto border-t border-slate-200 dark:border-slate-700" onClick={e => e.stopPropagation()}>
           <div className="flex items-center gap-3 mb-6">
-            <button onClick={() => setSelectingSlot(null)} className="p-2 hover:bg-[#2a2a2a] rounded-lg">
+            <button onClick={() => setSelectingSlot(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
               <ArrowLeft className="w-5 h-5" />
             </button>
             <h2 className="text-lg font-bold">Selecionar Conquista</h2>
@@ -116,8 +116,8 @@ export default function FeaturedAchievementsPopup({ onClose }: FeaturedAchieveme
                   disabled={!isUnlocked}
                   className={`w-full rounded-xl p-4 flex items-center gap-3 border transition ${
                     isUnlocked
-                      ? `${getRarityColor(a.rarity)} hover:bg-[#2a2a2a] cursor-pointer`
-                      : "border-[#2a2a2a] bg-[#111] opacity-50 cursor-not-allowed"
+                      ? `${getRarityColor(a.rarity)} hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer`
+                      : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 opacity-50 cursor-not-allowed"
                   }`}
                 >
                   <span className="text-2xl">{a.icon}</span>
@@ -141,8 +141,8 @@ export default function FeaturedAchievementsPopup({ onClose }: FeaturedAchieveme
 
   // Main view with 3 slots
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-end justify-center" onClick={onClose}>
-      <div className="bg-[#1a1a1a] w-full max-w-lg rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 bg-slate-900/50 dark:bg-black/70 flex items-end justify-center" onClick={onClose}>
+      <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto border-t border-slate-200 dark:border-slate-700" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-yellow-500/20 rounded-xl flex items-center justify-center">
@@ -152,7 +152,7 @@ export default function FeaturedAchievementsPopup({ onClose }: FeaturedAchieveme
               <h2 className="text-lg font-bold">Conquistas em Destaque</h2>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-[#2a2a2a] rounded-lg">
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -169,7 +169,7 @@ export default function FeaturedAchievementsPopup({ onClose }: FeaturedAchieveme
               <button
                 key={slot}
                 onClick={() => setSelectingSlot(slot)}
-                className={`w-full rounded-xl p-4 flex items-center gap-4 border transition hover:bg-[#2a2a2a] ${
+                className={`w-full rounded-xl p-4 flex items-center gap-4 border transition hover:bg-slate-100 dark:hover:bg-slate-800 ${
                   achievement ? getRarityColor(achievement.rarity) : "border-dashed border-[#333] bg-[#111]"
                 }`}
               >
