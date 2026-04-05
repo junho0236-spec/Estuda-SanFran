@@ -7,13 +7,10 @@ import {
   Notebook,
   Folder,
   Flashcard,
-  normalizeQuestionModality,
   questionModalityLabel,
   formatAlternativesAnalysisPlain,
-  isAlternativesAnalysisArray,
   type QuestionAiCommentary,
   type QuestionAiCorrection,
-  type AiCorrectionAlternativesAnalysis,
 } from '../types';
 import { dataService } from '../services/dataService';
 import { NotebookModal } from './NotebookModal';
@@ -52,8 +49,6 @@ import {
   Scale,
   Gavel,
   ShieldCheck,
-  FileText,
-  Timer,
   Clock,
   History,
   Target,
@@ -63,8 +58,6 @@ import {
   Play,
   CheckCircle,
   AlertTriangle,
-  BookX,
-  Sword,
   Book,
   Search,
   Settings,
@@ -115,105 +108,19 @@ import {
   isQuestionDueForReviewToday,
   type QuestionStatForReview,
 } from './question-bank/questionReviewQueue';
-
-function normalizeQuestionFromApi(q: Question): Question {
-  const m = normalizeQuestionModality((q as { modality?: string | null }).modality);
-  return { ...q, modality: m };
-}
-
-const QB_OPTION_FOCUS =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950';
-
-function QuestionAlternativeAnalysisBlocks({
-  analysis,
-  headingId,
-}: {
-  analysis: AiCorrectionAlternativesAnalysis | undefined;
-  headingId: string;
-}) {
-  if (analysis == null || analysis === '') return null;
-  if (isAlternativesAnalysisArray(analysis)) {
-    return (
-      <ul className="m-0 list-none space-y-2 p-0" aria-labelledby={headingId}>
-        {analysis.map((alt, idx) => (
-          <li key={`${alt.alternative}-${idx}`}>
-            <div
-              className={`rounded-xl border p-4 ${
-                alt.status === 'Correta'
-                  ? 'border-green-100 bg-green-50 dark:border-green-900/30 dark:bg-green-900/10'
-                  : 'border-red-100 bg-red-50 dark:border-red-900/30 dark:bg-red-900/10'
-              }`}
-              role="group"
-              aria-label={`Alternativa ${alt.alternative}, ${alt.status === 'Correta' ? 'correta' : 'incorreta'}. ${alt.explanation}`}
-            >
-              <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                <span className="font-black uppercase">
-                  [{alt.alternative}] {alt.status}:
-                </span>{' '}
-                {alt.explanation}
-              </p>
-            </div>
-          </li>
-        ))}
-      </ul>
-    );
-  }
-  return (
-    <p
-      className="text-sm leading-relaxed text-slate-600 dark:text-slate-400"
-      role="region"
-      aria-label="Análise das alternativas"
-    >
-      {analysis}
-    </p>
-  );
-}
-
-/** Limita tokens/latência ao gerar questões a partir de uma pasta grande de flashcards. */
-const AI_FLASHCARD_CONTEXT_MAX_CARDS = 80;
-const AI_FLASHCARD_CONTEXT_MAX_CHARS = 48_000;
-
-function buildCappedFlashcardContextForAi(folderCards: Flashcard[]): string {
-  if (folderCards.length === 0) return '';
-  const capCards = folderCards.slice(0, AI_FLASHCARD_CONTEXT_MAX_CARDS);
-  const lines: string[] = [];
-  let used = 0;
-  for (const c of capCards) {
-    const line = `- ${c.front}: ${c.back}`;
-    const next = used + (lines.length > 0 ? 1 : 0) + line.length;
-    if (next > AI_FLASHCARD_CONTEXT_MAX_CHARS) break;
-    lines.push(line);
-    used = next;
-  }
-  const included = lines.length;
-  const base = `Baseie as questões no seguinte conteúdo jurídico (flashcards):\n${lines.join('\n')}`;
-  const omitted = folderCards.length - included;
-  if (omitted > 0) {
-    return `${base}\n(Nota: ${omitted} flashcard(s) omitidos por limite de tamanho do contexto; use o material acima como base principal.)`;
-  }
-  return base;
-}
-
-function migrateSavedFilterPresetRow(row: unknown): QuestionBankSavedFilterPreset | null {
-  if (!row || typeof row !== 'object') return null;
-  const x = row as Partial<QuestionBankSavedFilterPreset> & { selectedSubject?: string };
-  if (typeof x.id !== 'string' || typeof x.name !== 'string') return null;
-  const subs =
-    Array.isArray(x.selectedSubjects) &&
-    x.selectedSubjects.length > 0 &&
-    x.selectedSubjects.every((s) => typeof s === 'string')
-      ? x.selectedSubjects
-      : typeof x.selectedSubject === 'string' &&
-          x.selectedSubject !== '' &&
-          x.selectedSubject !== 'Todos'
-        ? [x.selectedSubject]
-        : [];
-  return {
-    ...(x as QuestionBankSavedFilterPreset),
-    selectedSubjects: subs,
-    selectedSubject: subs[0] ?? '',
-  };
-}
+import {
+  normalizeQuestionFromApi,
+  QB_OPTION_FOCUS,
+  buildCappedFlashcardContextForAi,
+  migrateSavedFilterPresetRow,
+} from './question-bank/questionBankHelpers';
+import { QuestionAlternativeAnalysisBlocks } from './question-bank/QuestionAlternativeAnalysisBlocks';
+import { filterAndSortBankQuestions } from './question-bank/filterBankQuestions';
+import { QuestionBankConfidenceModal } from './question-bank/QuestionBankConfidenceModal';
+import { QuestionBankMockHud } from './question-bank/QuestionBankMockHud';
+import { QuestionBankMainHeader } from './question-bank/QuestionBankMainHeader';
+import { QuestionBankErrorInsightBanner } from './question-bank/QuestionBankErrorInsightBanner';
+import { QuestionBankPdfHiddenShell } from './question-bank/QuestionBankPdfHiddenShell';
 
 interface QuestionBankProps {
   userId: string;
@@ -706,13 +613,6 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [isMockMode, isMockFinished]);
-
-  const formatTime = (seconds: number) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    return `${h > 0 ? h + ':' : ''}${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
 
   const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
     if (notificationTimeoutRef.current) clearTimeout(notificationTimeoutRef.current);
@@ -2255,143 +2155,36 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
 
   const currentYear = new Date().getFullYear().toString();
 
-  const filteredQuestions = useMemo(() => {
-    const createdMs = (q: Question): number | null => {
-      if (!q.created_at) return null;
-      const t = Date.parse(q.created_at);
-      return Number.isNaN(t) ? null : t;
-    };
-
-    return questions
-      .filter((q) => {
-        const matchSearch =
-          searchTerm === '' ||
-          q.statement.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (q.explanation && q.explanation.toLowerCase().includes(searchTerm.toLowerCase()));
-        const matchSubject =
-          selectedSubjects.length === 0 || selectedSubjects.includes(q.subject);
-        const matchTopic = selectedTopic === '' || selectedTopic === 'Todos' || q.topic === selectedTopic;
-        const matchDifficulty =
-          difficultyFilter === '' || difficultyFilter === 'Todos' || q.difficulty === difficultyFilter;
-        const matchExamBoard =
-          selectedExamBoard === '' || selectedExamBoard === 'Todos' || q.exam_board === selectedExamBoard;
-        const matchYear =
-          selectedYear === '' || selectedYear === 'Todos' || q.year?.toString() === selectedYear;
-        const matchLegislation =
-          selectedLegislation === '' ||
-          selectedLegislation === 'Todos' ||
-          (q.legislation_tags && q.legislation_tags.includes(selectedLegislation));
-        const matchJurisprudence =
-          selectedJurisprudence === '' ||
-          selectedJurisprudence === 'Todos' ||
-          (q.jurisprudence_tags && q.jurisprudence_tags.includes(selectedJurisprudence));
-        const matchInstitution =
-          selectedInstitution === '' ||
-          selectedInstitution === 'Todos' ||
-          q.institution === selectedInstitution;
-        const matchExamName =
-          selectedExamName === '' || selectedExamName === 'Todos' || q.exam_name === selectedExamName;
-        const matchModality =
-          selectedModality === '' || selectedModality === 'Todos' || q.modality === selectedModality;
-        const matchLegalDiploma =
-          selectedLegalDiploma === '' ||
-          selectedLegalDiploma === 'Todos' ||
-          q.legal_diploma === selectedLegalDiploma;
-        const matchCareer =
-          selectedCareer === '' || selectedCareer === 'Todos' || q.career === selectedCareer;
-        const matchFormation =
-          selectedFormationArea === '' ||
-          selectedFormationArea === 'Todos' ||
-          q.formation_area === selectedFormationArea;
-        const matchEdu =
-          selectedEducationLevel === '' ||
-          selectedEducationLevel === 'Todos' ||
-          q.education_level === selectedEducationLevel;
-        const matchJob =
-          selectedJobPosition === '' ||
-          selectedJobPosition === 'Todos' ||
-          q.job_position === selectedJobPosition;
-
-        const ann = !!q.is_annulled;
-        const out = !!q.is_outdated;
-        const matchAnnulled = !ann;
-        const matchOutdated = !out;
-
-        const isWrong = wrongQuestions.includes(q.id);
-        const isCorrect = correctQuestions.includes(q.id);
-
-        let matchNotebook = true;
-        if (selectedNotebookId) {
-          const notebook = notebooks.find((n) => n.id === selectedNotebookId);
-          matchNotebook = notebook ? notebook.question_ids.includes(q.id) : true;
-        }
-
-        let matchStatus = true;
-        if (isErrorNotebookMode) {
-          matchStatus = isWrong;
-        } else if (questionStatus === 'wrong') {
-          matchStatus = isWrong;
-        } else if (questionStatus === 'correct') {
-          matchStatus = isCorrect;
-        } else if (questionStatus === 'resolved') {
-          matchStatus = isWrong || isCorrect;
-        } else if (questionStatus === 'unresolved') {
-          matchStatus = !isWrong && !isCorrect;
-        } else if (questionStatus === 'review_today') {
-          matchStatus = isQuestionDueForReviewToday(q.id, wrongQuestions, questionStats);
-        }
-
-        return (
-          matchSearch &&
-          matchSubject &&
-          matchTopic &&
-          matchDifficulty &&
-          matchExamBoard &&
-          matchYear &&
-          matchLegislation &&
-          matchJurisprudence &&
-          matchNotebook &&
-          matchStatus &&
-          matchInstitution &&
-          matchExamName &&
-          matchModality &&
-          matchLegalDiploma &&
-          matchCareer &&
-          matchFormation &&
-          matchEdu &&
-          matchJob &&
-          matchAnnulled &&
-          matchOutdated
-        );
-      })
-      .sort((a, b) => {
-        if (sortBy === 'newest') {
-          const na = createdMs(a) ?? 0;
-          const nb = createdMs(b) ?? 0;
-          return nb - na;
-        }
-        if (sortBy === 'oldest') {
-          const na = createdMs(a) ?? Number.POSITIVE_INFINITY;
-          const nb = createdMs(b) ?? Number.POSITIVE_INFINITY;
-          return na - nb;
-        }
-
-        const difficultyMap = {
-          muito_facil: 1,
-          facil: 2,
-          media: 3,
-          dificil: 4,
-          muito_dificil: 5,
-        };
-        const diffA = difficultyMap[a.difficulty] || 0;
-        const diffB = difficultyMap[b.difficulty] || 0;
-
-        if (sortBy === 'difficulty_asc') return diffA - diffB;
-        if (sortBy === 'difficulty_desc') return diffB - diffA;
-
-        return 0;
-      });
-  }, [
+  const filteredQuestions = useMemo(
+    () =>
+      filterAndSortBankQuestions({
+        questions,
+        searchTerm,
+        selectedSubjects,
+        selectedTopic,
+        difficultyFilter,
+        selectedExamBoard,
+        selectedYear,
+        selectedLegislation,
+        selectedJurisprudence,
+        selectedInstitution,
+        selectedExamName,
+        selectedModality,
+        selectedLegalDiploma,
+        selectedCareer,
+        selectedFormationArea,
+        selectedEducationLevel,
+        selectedJobPosition,
+        wrongQuestions,
+        correctQuestions,
+        selectedNotebookId,
+        notebooks,
+        isErrorNotebookMode,
+        questionStatus,
+        questionStats,
+        sortBy,
+      }),
+    [
     questions,
     searchTerm,
     selectedSubjects,
@@ -3055,266 +2848,61 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
 
   return (
     <div className={`${isMockMode ? 'fixed inset-0 z-[100] bg-slate-50 dark:bg-slate-950 overflow-y-auto' : 'max-w-4xl mx-auto p-4 md:p-8 animate-in fade-in duration-500 pb-24'}`}>
-      {/* Confidence Selection Modal */}
-      <AnimatePresence>
-        {showConfidenceSelection && (
-          <div
-            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm"
-            role="presentation"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="qb-confidence-title"
-              className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-2xl max-w-md w-full text-center relative"
-            >
-              <button 
-                type="button"
-                onClick={() => setShowConfidenceSelection(false)}
-                className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
-                aria-label="Fechar diálogo de nível de confiança"
-              >
-                <X size={24} aria-hidden />
-              </button>
-              <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-6" aria-hidden>
-                <BrainCircuit className="text-blue-600 dark:text-blue-400" size={32} />
-              </div>
-              <h3 id="qb-confidence-title" className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Nível de Confiança</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-8">Como você avalia sua resposta para esta questão?</p>
-              
-              <div className="grid grid-cols-1 gap-3">
-                <button
-                  type="button"
-                  onClick={() => confirmAnswer('certeza')}
-                  className="flex items-center justify-between p-4 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-900/50 rounded-2xl transition-all group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/50" />
-                    <div className="text-left">
-                      <span className="block font-black text-emerald-900 dark:text-emerald-400 text-sm uppercase tracking-widest">Certeza</span>
-                      <span className="text-[10px] text-emerald-700 dark:text-emerald-500 font-bold">Tenho o fundamento jurídico</span>
-                    </div>
-                  </div>
-                  <ChevronRight size={16} className="text-emerald-400 group-hover:translate-x-1 transition-transform" />
-                </button>
+      <QuestionBankConfidenceModal
+        open={showConfidenceSelection}
+        onClose={() => setShowConfidenceSelection(false)}
+        onSelect={(level) => confirmAnswer(level)}
+      />
 
-                <button
-                  type="button"
-                  onClick={() => confirmAnswer('duvida')}
-                  className="flex items-center justify-between p-4 bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/20 dark:hover:bg-amber-900/30 border border-amber-200 dark:border-amber-900/50 rounded-2xl transition-all group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full bg-amber-500 shadow-lg shadow-amber-500/50" />
-                    <div className="text-left">
-                      <span className="block font-black text-amber-900 dark:text-amber-400 text-sm uppercase tracking-widest">Dúvida</span>
-                      <span className="text-[10px] text-amber-700 dark:text-amber-500 font-bold">Fiquei entre duas alternativas</span>
-                    </div>
-                  </div>
-                  <ChevronRight size={16} className="text-amber-400 group-hover:translate-x-1 transition-transform" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => confirmAnswer('chute')}
-                  className="flex items-center justify-between p-4 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 border border-red-200 dark:border-red-900/50 rounded-2xl transition-all group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full bg-red-500 shadow-lg shadow-red-500/50" />
-                    <div className="text-left">
-                      <span className="block font-black text-red-900 dark:text-red-400 text-sm uppercase tracking-widest">Chute</span>
-                      <span className="text-[10px] text-red-700 dark:text-red-500 font-bold">Não conheço o tema</span>
-                    </div>
-                  </div>
-                  <ChevronRight size={16} className="text-red-400 group-hover:translate-x-1 transition-transform" />
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Mock Mode Floating Timer */}
       {isMockMode && !isMockFinished && (
-        <div className={`fixed top-6 right-6 z-[110] flex items-center gap-4 p-4 rounded-3xl border-2 shadow-2xl backdrop-blur-md transition-all duration-500 ${mockTimeRemaining < 600 ? 'bg-red-50/90 border-red-500 animate-pulse' : 'bg-white/90 dark:bg-slate-900/90 border-slate-200 dark:border-slate-800'}`}>
-          <div className="flex flex-col items-end">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tempo Restante</span>
-            <span className={`text-2xl font-black tabular-nums ${mockTimeRemaining < 600 ? 'text-red-600' : 'text-slate-900 dark:text-white'}`}>
-              {formatTime(mockTimeRemaining)}
-            </span>
-          </div>
-          <div className={`p-3 rounded-2xl ${mockTimeRemaining < 600 ? 'bg-red-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
-            <Clock size={24} />
-          </div>
-          <button
-            onClick={() => {
-              if (window.confirm('Tem certeza que deseja finalizar o simulado agora?')) {
-                finishMock();
-              }
-            }}
-            className="ml-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"
-          >
-            Finalizar
-          </button>
-        </div>
-      )}
-
-      {/* Mock Mode Progress Header */}
-      {isMockMode && !isMockFinished && (
-        <div className="fixed top-0 left-0 right-0 h-1.5 bg-slate-200 dark:bg-slate-800 z-[110]">
-          <div 
-            className="h-full bg-emerald-500 transition-all duration-500"
-            style={{ width: `${(Object.keys(mockAnswers).length / mockQuestions.length) * 100}%` }}
-          ></div>
-        </div>
+        <QuestionBankMockHud
+          mockTimeRemaining={mockTimeRemaining}
+          answeredCount={Object.keys(mockAnswers).length}
+          totalQuestions={mockQuestions.length}
+          onFinishClick={() => {
+            if (window.confirm('Tem certeza que deseja finalizar o simulado agora?')) {
+              finishMock();
+            }
+          }}
+        />
       )}
 
       {!isMockMode && (
-        <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div>
-            <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
-              <BookOpen className="text-blue-500" size={32} />
-              Banco de Questões
-            </h1>
-            <p className="text-slate-500 dark:text-slate-400 mt-2">
-              Treine com questões de múltipla escolha e acompanhe seu desempenho.
-            </p>
-          </div>
-          
-          <div className="flex flex-wrap items-center gap-3 mb-8">
-            <button
-              onClick={() => setShowXRay(!showXRay)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors ${showXRay ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
-              title="Ocultar/Mostrar Raio-X"
-            >
-              {showXRay ? <EyeOff size={14} /> : <Eye size={14} />} Raio-X
-            </button>
-            <button
-              onClick={() => setShowManualGlossarySearch(!showManualGlossarySearch)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors ${showManualGlossarySearch ? 'bg-indigo-600 text-white' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-200'}`}
-              title="Dicionário Jurídico"
-            >
-              <Book size={14} /> Dicionário
-            </button>
-            <button
-              onClick={() => setShowMockSetup(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors shadow-lg shadow-emerald-900/20"
-            >
-              <Timer size={14} /> Simulado
-            </button>
-            <button
-              onClick={handleExportPDF}
-              disabled={isExporting}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 disabled:opacity-50 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors shadow-lg shadow-slate-900/20"
-            >
-              {isExporting ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />} 
-              {isExporting ? `Gerando (${exportProgress}%)...` : 'Exportar PDF'}
-            </button>
-            <button
-              onClick={() => setShowAIGenerator(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors shadow-lg shadow-purple-900/20"
-            >
-              <Sparkles size={14} /> IA
-            </button>
-            <button
-              onClick={handleGenerateSmartReview}
-              className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors shadow-lg shadow-amber-900/20"
-            >
-              <Zap size={14} /> Reforço
-            </button>
-            <button
-              onClick={() => setShowNotebookCreationMode(prev => !prev)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors ${showNotebookCreationMode ? 'bg-orange-600 text-white' : 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 hover:bg-orange-200'}`}
-            >
-              <NotebookText size={14} /> Caderno
-            </button>
-            {selectedQuestionsForNotebook.size > 0 && (
-              <button
-                onClick={() => setIsNotebookModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors"
-              >
-                <Plus size={14} /> Adicionar ({selectedQuestionsForNotebook.size})
-              </button>
-            )}
-            <button
-              onClick={() => {
-                if (isErrorNotebookMode) {
-                  setIsErrorNotebookMode(false);
-                  setViewMode('list');
-                } else {
-                  setIsErrorNotebookMode(true);
-                  setViewMode('list');
-                }
-              }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors ${isErrorNotebookMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50 text-red-700 dark:text-red-400'}`}
-            >
-              <BookX size={14} /> {isErrorNotebookMode ? 'Sair dos Erros' : 'Caderno de Erros'}
-            </button>
-          </div>
-        </header>
+        <QuestionBankMainHeader
+          showXRay={showXRay}
+          onToggleXRay={() => setShowXRay(!showXRay)}
+          showManualGlossarySearch={showManualGlossarySearch}
+          onToggleGlossary={() => setShowManualGlossarySearch(!showManualGlossarySearch)}
+          onOpenMockSetup={() => setShowMockSetup(true)}
+          onExportPdf={handleExportPDF}
+          isExporting={isExporting}
+          exportProgress={exportProgress}
+          onOpenAiGenerator={() => setShowAIGenerator(true)}
+          onSmartReview={handleGenerateSmartReview}
+          showNotebookCreationMode={showNotebookCreationMode}
+          onToggleNotebookMode={() => setShowNotebookCreationMode((prev) => !prev)}
+          selectedForNotebookCount={selectedQuestionsForNotebook.size}
+          onOpenNotebookModal={() => setIsNotebookModalOpen(true)}
+          isErrorNotebookMode={isErrorNotebookMode}
+          onToggleErrorNotebook={() => {
+            if (isErrorNotebookMode) {
+              setIsErrorNotebookMode(false);
+              setViewMode('list');
+            } else {
+              setIsErrorNotebookMode(true);
+              setViewMode('list');
+            }
+          }}
+        />
       )}
 
-      {/* AI Insight Banner for Error Notebook */}
       {isErrorNotebookMode && !isMockMode && !isMockFinished && (
-        <div className="mb-8 p-6 bg-gradient-to-r from-red-500 to-orange-500 rounded-[2rem] text-white shadow-xl shadow-red-900/20 relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-8 opacity-10">
-            <BrainCircuit size={120} />
-          </div>
-          <div className="relative z-10">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
-                <AlertTriangle size={20} />
-              </div>
-              <h3 className="text-lg font-black uppercase tracking-tight">Insight de Desempenho Inteligente</h3>
-            </div>
-            
-            <div className="space-y-4">
-              <p className="text-sm font-bold leading-relaxed max-w-2xl">
-                Você tem <span className="text-2xl px-2">{wrongQuestions.length}</span> erros recorrentes. 
-                {selectedSubjects.length === 1 ? (
-                  <> A disciplina de <span className="underline decoration-2 underline-offset-4">{selectedSubjects[0]}</span> é onde você mais precisa de reforço.</>
-                ) : selectedSubjects.length > 1 ? (
-                  <>
-                    {' '}
-                    Foco nas disciplinas:{' '}
-                    <span className="underline decoration-2 underline-offset-4">
-                      {selectedSubjects.slice(0, 3).join(', ')}
-                      {selectedSubjects.length > 3 ? ` e mais ${selectedSubjects.length - 3}` : ''}
-                    </span>
-                    .
-                  </>
-                ) : (
-                  <> Analisamos seu histórico e identificamos lacunas importantes em temas fundamentais.</>
-                )}
-              </p>
-              
-              <div className="flex flex-wrap gap-3 pt-2">
-                <button
-                  onClick={startErrorRetrain}
-                  className="px-6 py-3 bg-white text-red-600 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-50 transition-all flex items-center gap-2 shadow-lg"
-                >
-                  <Sword size={16} /> Vencer Meus Erros
-                </button>
-                {selectedSubjects.length > 0 && (
-                  <button
-                    onClick={() =>
-                      generateAiLesson(
-                        selectedSubjects.length === 1
-                          ? selectedSubjects[0]
-                          : selectedSubjects.join('; ')
-                      )
-                    }
-                    className="px-6 py-3 bg-red-900/20 hover:bg-red-900/30 text-white border border-white/30 rounded-xl font-black text-xs uppercase tracking-widest transition-all flex items-center gap-2 backdrop-blur-sm"
-                  >
-                    <Sparkles size={16} /> Aula Resumida IA
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
+        <QuestionBankErrorInsightBanner
+          wrongCount={wrongQuestions.length}
+          selectedSubjects={selectedSubjects}
+          onStartErrorRetrain={startErrorRetrain}
+          onGenerateAiLesson={generateAiLesson}
+        />
       )}
 
       <MockSetupModal
@@ -4921,64 +4509,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
       )}
 
 
-      {/* Hidden container for PDF export */}
-      {isExporting && (
-        <div style={{ position: 'absolute', left: '-9999px', top: 0, width: '800px', backgroundColor: '#ffffff', zIndex: -1 }}>
-          <div id="pdf-cover" className="p-16 bg-white flex flex-col items-center justify-center text-center h-[1100px]">
-            <div className="w-32 h-32 bg-[#800020] rounded-3xl flex items-center justify-center mb-12 border border-gray-200">
-              <Scale className="w-16 h-16 text-white" />
-            </div>
-            
-            <h1 className="text-5xl font-black text-gray-900 tracking-tight mb-4 font-serif">
-              CADERNO DE QUESTÕES
-            </h1>
-            <h2 className="text-2xl font-bold text-[#800020] tracking-widest uppercase mb-24">
-              Exame de Proficiência Jurídica
-            </h2>
-
-            <div className="w-full max-w-2xl space-y-8 text-left mb-24">
-              <div className="border-b-2 border-gray-300 pb-2">
-                <span className="text-sm font-bold text-gray-500 uppercase tracking-wider">Nome do Aluno</span>
-              </div>
-              <div className="grid grid-cols-2 gap-8">
-                <div className="border-b-2 border-gray-300 pb-2">
-                  <span className="text-sm font-bold text-gray-500 uppercase tracking-wider">Número USP</span>
-                </div>
-                <div className="border-b-2 border-gray-300 pb-2">
-                  <span className="text-sm font-bold text-gray-500 uppercase tracking-wider">Data</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="w-full max-w-2xl bg-gray-50 p-8 rounded-2xl border border-gray-200 text-left">
-              <h3 className="text-lg font-bold text-gray-900 mb-4 uppercase tracking-wider">Instruções ao Candidato</h3>
-              <ul className="space-y-3 text-gray-600 text-sm font-medium list-disc list-inside">
-                <li>Verifique se este caderno contém todas as questões solicitadas.</li>
-                <li>Leia atentamente cada questão antes de assinalar a resposta.</li>
-                <li>Preencha o gabarito ao final do caderno com caneta esferográfica de tinta azul ou preta.</li>
-                <li>Não é permitido o uso de material de consulta durante a resolução.</li>
-                <li>O tempo sugerido para resolução é de 3 minutos por questão.</li>
-              </ul>
-            </div>
-          </div>
-
-          <div id="pdf-header" className="p-8 bg-gray-50/80 border-b border-gray-200 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-[#800020] rounded-xl flex items-center justify-center border border-gray-200">
-                <Scale className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 tracking-tight">SANFRAN ACADEMY</h1>
-                <p className="text-sm text-gray-500 font-medium">Excelência no Ensino Jurídico - XI de Agosto</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-lg font-bold text-[#800020]">Simulado Oficial</p>
-              <p className="text-sm text-gray-500 font-medium">{new Date().toLocaleDateString()}</p>
-            </div>
-          </div>
-        </div>
-      )}
+      <QuestionBankPdfHiddenShell active={isExporting} />
       </div>
   );
 };
