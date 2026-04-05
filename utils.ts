@@ -23,6 +23,7 @@ export const getViewLabel = (view: string) => {
     case View.Tasks: return 'Consultando a Pauta';
     case View.Calendar: return 'Revisando a Agenda';
     case View.Ranking: return 'No Hall da Fama';
+    case View.MeuDinheiroOrganizado: return 'Organizando as Finanças';
     case View.Library: return 'Consultando a Doutrina';
     case View.Largo: return 'No Largo São Francisco';
     case View.Duel: return 'Em Combate Intelectual';

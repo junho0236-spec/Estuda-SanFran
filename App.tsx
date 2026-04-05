@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map as MapIcon, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck, BookX, ScrollText, FileText, Repeat, UserX, ListTodo, Handshake, Eye, Key, CalendarCheck, Loader2, BarChart3, Search, Command, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map as MapIcon, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck, BookX, ScrollText, FileText, Repeat, UserX, ListTodo, Handshake, Eye, Key, CalendarCheck, Loader2, BarChart3, Search, Command, ChevronLeft, ChevronRight, Wallet } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel, StudyMode, Board, Notification, Friendship, UserProfile } from './types';
 import Login from './components/Login';
 import Atmosphere from './components/Atmosphere';
@@ -96,6 +96,7 @@ const SanFranCommunity = React.lazy(() => import('./components/SanFranCommunity'
 const SanFranImprovement = React.lazy(() => import('./components/SanFranImprovement'));
 const SanFranLanguages = React.lazy(() => import('./components/SanFranLanguages'));
 const SanFranLife = React.lazy(() => import('./components/SanFranLife'));
+const MeuDinheiroOrganizado = React.lazy(() => import('./components/MeuDinheiroOrganizado'));
 const SanFranGames = React.lazy(() => import('./components/SanFranGames'));
 const SanFranHelp = React.lazy(() => import('./components/SanFranHelp'));
 const FAQ = React.lazy(() => import('./components/FAQ'));
@@ -933,6 +934,13 @@ const App: React.FC = () => {
     { id: View.Friends, icon: Users, label: 'FRIENDS', color: 'text-emerald-600', bg: 'bg-emerald-100' },
     { id: View.Statistics, icon: BarChart3, label: 'Estatísticas', color: 'text-usp-gold', bg: 'bg-usp-gold/10' },
     { id: View.Timer, icon: TimerIcon, label: 'Controle de Tempo', color: 'text-red-600', bg: 'bg-red-100' },
+    {
+      id: View.MeuDinheiroOrganizado,
+      icon: Wallet,
+      label: 'MDO',
+      color: 'text-teal-700',
+      bg: 'bg-teal-100',
+    },
 
     // HUBS
     { id: View.SanFranCommunity, icon: Users, label: 'COMMUNITY', color: 'text-cyan-600', bg: 'bg-cyan-100' },
@@ -1595,6 +1603,11 @@ const App: React.FC = () => {
                     setIsExtremeFocusRequested={setIsExtremeFocusActive}
                   />
                 } />
+
+                <Route
+                  path={getPathFromView(View.MeuDinheiroOrganizado)}
+                  element={<MeuDinheiroOrganizado userId={session.user.id} />}
+                />
 
                 <Route path={getPathFromView(View.OralArgument)} element={<OralArgument />} />
                 <Route path={getPathFromView(View.Calendar)} element={<CalendarView subjects={subjects} tasks={tasks} userId={session.user.id} studySessions={studySessions} isOnline={isOnline} onTasksChanged={loadUserData} onAfterGoogleCalendarSync={loadUserData} />} />

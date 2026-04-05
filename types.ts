@@ -112,6 +112,8 @@ export enum View {
   ApprovalTrail = 'approval_trail',
   Connect = 'connect',
   Friends = 'friends',
+  /** Mini gestão financeira (localStorage), inspirada no MDO */
+  MeuDinheiroOrganizado = 'meu_dinheiro_organizado',
 }
 
 export interface Folder {
