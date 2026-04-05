@@ -823,16 +823,34 @@ const App: React.FC = () => {
       if (isOnline) {
         const syncQueueCount = await db.syncQueue.count();
 
-        // Fetch subjects first as they are often dependencies (`color` por defeito — tipo Subject exige-o).
+        // Subjects: incluir `color` e metadados — `select('id, name')` fazia todos os círculos caírem no cinza (#94a3b8).
         const { data: subsRows, error: subjectsFetchError } = await supabase
           .from('subjects')
-          .select('id, name')
+          .select('*')
           .eq('user_id', userId);
-        const subs: Subject[] = (subsRows ?? []).map((s) => ({
-          id: s.id,
-          name: s.name,
-          color: '#94a3b8',
-        }));
+        const subs: Subject[] = (subsRows ?? []).map((s) => {
+          const row = s as Record<string, unknown>;
+          const colorRaw = row.color;
+          const color =
+            typeof colorRaw === 'string' && colorRaw.trim() !== ''
+              ? colorRaw.trim()
+              : '#94a3b8';
+          return {
+            id: String(row.id),
+            name: String(row.name ?? ''),
+            color,
+            semester_start_date: (row.semester_start_date as string) ?? undefined,
+            semester_end_date: (row.semester_end_date as string) ?? undefined,
+            absences: typeof row.absences === 'number' ? row.absences : undefined,
+            max_absences: typeof row.max_absences === 'number' ? row.max_absences : undefined,
+            semester_year: (row.semester_year as string) ?? undefined,
+            workload: typeof row.workload === 'number' ? row.workload : undefined,
+            p1_date: (row.p1_date as string) ?? undefined,
+            p2_date: (row.p2_date as string) ?? undefined,
+            content: (row.content as string) ?? undefined,
+            topics: Array.isArray(row.topics) ? (row.topics as Subject['topics']) : undefined,
+          };
+        });
         
         const profile = await dataService.getUserProfile(userId, isOnline);
         if (profile) {
