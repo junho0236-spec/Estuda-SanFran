@@ -17,16 +17,7 @@ import { NotebookModal } from './NotebookModal';
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { GEMINI_MODEL, extractPrecedent } from '../services/geminiService';
 import { createTrailingDebounce } from '../utils/realtimeThrottle';
-import {
-  ChevronRight,
-  ChevronLeft,
-  Plus,
-  Loader2,
-  X,
-  NotebookText,
-  Target,
-  ListFilter,
-} from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { GlossaryPopover } from './GlossaryPopover.tsx';
 import { fetchTermDefinition } from '../services/geminiService';
 import { GlossaryTerm } from '../types';
@@ -61,7 +52,6 @@ import {
   reconcileAnswerGoals,
   type QuestionAnswerGoalsPersisted,
 } from './question-bank/answerGoals';
-import { QuestionBankGoalsBar } from './question-bank/QuestionBankGoalsBar';
 import {
   isQuestionDueForReviewToday,
   type QuestionStatForReview,
@@ -85,6 +75,8 @@ import { QuestionBankJuridiquesModal } from './question-bank/QuestionBankJuridiq
 import { QuestionBankManualGlossaryModal } from './question-bank/QuestionBankManualGlossaryModal';
 import { QuestionBankDeckPickerModal } from './question-bank/QuestionBankDeckPickerModal';
 import { QuestionBankNotificationToast } from './question-bank/QuestionBankNotificationToast';
+import { QuestionBankMockSessionPanel } from './question-bank/QuestionBankMockSessionPanel';
+import { QuestionBankStatsGoalsNotebookShell } from './question-bank/QuestionBankStatsGoalsNotebookShell';
 
 interface QuestionBankProps {
   userId: string;
@@ -2885,92 +2877,20 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
       />
 
       {isMockMode && !isMockFinished && (
-        <div className="max-w-4xl mx-auto pt-24 pb-32 px-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-8">
-            <div className="flex items-center gap-4 min-w-0">
-              <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-2xl shrink-0">
-                <Target className="text-blue-600 dark:text-blue-400" size={32} />
-              </div>
-              <div className="min-w-0">
-                <h2 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Simulado em Curso</h2>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Questão {currentIndex + 1} de {mockQuestions.length}</p>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-              <label className="flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black uppercase tracking-widest text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                  checked={mockNavUnansweredOnly}
-                  onChange={(e) => {
-                    const v = e.target.checked;
-                    setMockNavUnansweredOnly(v);
-                    if (v && currentQuestion && mockAnswers[currentQuestion.id] !== undefined) {
-                      const next = getNextUnansweredMockIndex(currentIndex);
-                      if (next >= 0) setCurrentIndex(next);
-                      else {
-                        const first = mockQuestions.findIndex((q) => mockAnswers[q.id] === undefined);
-                        if (first >= 0) setCurrentIndex(first);
-                      }
-                    }
-                  }}
-                />
-                <ListFilter size={16} className="shrink-0 text-slate-400" aria-hidden />
-                Só não respondidas
-              </label>
-              <button
-                type="button"
-                onClick={handlePrev}
-                disabled={
-                  mockNavUnansweredOnly
-                    ? getPrevUnansweredMockIndex(currentIndex) < 0
-                    : currentIndex === 0
-                }
-                className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 disabled:opacity-30 transition-all"
-                aria-label="Questão anterior"
-              >
-                <ChevronLeft size={24} />
-              </button>
-              <button
-                type="button"
-                onClick={handleNext}
-                disabled={
-                  mockNavUnansweredOnly
-                    ? getNextUnansweredMockIndex(currentIndex) < 0
-                    : currentIndex === mockQuestions.length - 1
-                }
-                className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 disabled:opacity-30 transition-all"
-                aria-label="Próxima questão"
-              >
-                <ChevronRight size={24} />
-              </button>
-            </div>
-          </div>
-
-          {/* Question Navigation Bar */}
-          <div className="flex flex-wrap gap-2 mb-8 p-4 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-lg">
-            {mockQuestions.map((q, idx) => (
-              <button
-                key={q.id}
-                type="button"
-                onClick={() => setCurrentIndex(idx)}
-                title={mockMarkReviewLater[q.id] ? 'Marcada para revisar depois' : undefined}
-                className={`w-10 h-10 rounded-xl font-black text-xs flex items-center justify-center transition-all ring-2 ring-offset-2 ring-offset-white dark:ring-offset-slate-900 ${
-                  currentIndex === idx
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20 ring-blue-400/50'
-                    : mockMarkReviewLater[q.id]
-                      ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 ring-amber-400/60'
-                      : mockAnswers[q.id] !== undefined
-                        ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 ring-transparent'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-slate-200 ring-transparent'
-                }`}
-              >
-                {idx + 1}
-              </button>
-            ))}
-          </div>
-        </div>
+        <QuestionBankMockSessionPanel
+          mockQuestions={mockQuestions}
+          currentIndex={currentIndex}
+          setCurrentIndex={setCurrentIndex}
+          currentQuestion={currentQuestion}
+          mockAnswers={mockAnswers}
+          mockNavUnansweredOnly={mockNavUnansweredOnly}
+          setMockNavUnansweredOnly={setMockNavUnansweredOnly}
+          mockMarkReviewLater={mockMarkReviewLater}
+          getNextUnansweredMockIndex={getNextUnansweredMockIndex}
+          getPrevUnansweredMockIndex={getPrevUnansweredMockIndex}
+          onPrev={handlePrev}
+          onNext={handleNext}
+        />
       )}
 
       <div id="ai-generator-portal">
@@ -2992,99 +2912,42 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
 
           <>
             {/* Filters & Stats */}
-          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 mb-6 overflow-hidden">
-            {/* Quick Stats */}
-            <div className="p-4 grid grid-cols-3 gap-6 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-              <div className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white dark:bg-slate-900 shadow-[5px_5px_10px_#d1d9e6,-5px_-5px_10px_#ffffff] dark:shadow-[5px_5px_10px_#000000,-5px_-5px_10px_#2a2a2a]">
-                <span className="text-3xl font-black text-slate-900 dark:text-white">{correctCount + wrongCount}</span>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-1">Questões</span>
-              </div>
-              <div className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white dark:bg-slate-900 shadow-[5px_5px_10px_#d1d9e6,-5px_-5px_10px_#ffffff] dark:shadow-[5px_5px_10px_#000000,-5px_-5px_10px_#2a2a2a]">
-                <span className="text-3xl font-black text-green-600 dark:text-green-400">{correctCount}</span>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-1">Acertos</span>
-              </div>
-              <div className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white dark:bg-slate-900 shadow-[5px_5px_10px_#d1d9e6,-5px_-5px_10px_#ffffff] dark:shadow-[5px_5px_10px_#000000,-5px_-5px_10px_#2a2a2a]">
-                <span className="text-3xl font-black text-blue-600 dark:text-blue-400">
-                  {correctCount + wrongCount > 0 ? ((correctCount / (correctCount + wrongCount)) * 100).toFixed(0) : 0}%
-                </span>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-1">Aproveit.</span>
-              </div>
-            </div>
-            {!isMockMode && (
-              <QuestionBankGoalsBar
-                goals={answerGoals}
-                onSaveTargets={(daily, weekly) => {
-                  if (!isProgressLoaded) {
-                    showNotification('Carregando o progresso. Tente de novo em instantes.', 'error');
-                    return;
-                  }
-                  const base = reconcileAnswerGoals(answerGoals);
-                  const next: QuestionAnswerGoalsPersisted = {
-                    ...base,
-                    daily_target: daily,
-                    weekly_target: weekly,
-                  };
-                  setAnswerGoals(next);
-                  void syncUserProgress({ question_answer_goals: next });
-                  showNotification('Metas guardadas.', 'success');
-                }}
-                disabled={!isOnline || !isProgressLoaded}
-              />
-            )}
-            {showNotebookCreationMode && (
-              <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-row items-center gap-4 bg-orange-50 dark:bg-orange-900/20 animate-in fade-in duration-300">
-                <h3 className="text-lg font-bold text-orange-800 dark:text-orange-200 flex items-center gap-2">
-                  <NotebookText size={20} /> Criar Novo Caderno
-                </h3>
-                <input
-                  type="text"
-                  placeholder="Nome do Caderno (Ex: Reta Final OAB - Ética)"
-                  value={newNotebookName}
-                  onChange={(e) => setNewNotebookName(e.target.value)}
-                  className="flex-1 p-3 rounded-xl bg-white dark:bg-slate-800 border border-orange-200 dark:border-orange-700 focus:ring-2 focus:ring-orange-500 outline-none text-slate-900 dark:text-white"
-                />
-                <input
-                  type="text"
-                  placeholder="Descrição (Opcional)"
-                  value={newNotebookDescription}
-                  onChange={(e) => setNewNotebookDescription(e.target.value)}
-                  className="flex-1 p-3 rounded-xl bg-white dark:bg-slate-800 border border-orange-200 dark:border-orange-700 focus:ring-2 focus:ring-orange-500 outline-none text-slate-900 dark:text-white"
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleCreateNotebook}
-                    disabled={selectedQuestionsForNotebook.size === 0 || newNotebookName.trim() === '' || isSubmitting}
-                    className="px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm transition-colors flex items-center gap-2"
-                  >
-                    {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus size={16} />} Criar
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowNotebookCreationMode(false);
-                      setSelectedQuestionsForNotebook(new Set());
-                      setNewNotebookName('');
-                    }}
-                    className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-sm transition-colors"
-                  >
-                    <X size={16} /> Cancelar
-                  </button>
-                </div>
-              </div>
-            )}
-            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-end bg-white dark:bg-slate-900">
-              {selectedQuestionsForNotebook.size > 0 && (
-                <div className="animate-in slide-in-from-right-4 duration-300">
-                  <button
-                    onClick={() => setShowNotebookCreationMode(true)}
-                    className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 shadow-lg shadow-orange-900/20"
-                  >
-                    <NotebookText size={14} /> Adicionar ao Caderno ({selectedQuestionsForNotebook.size})
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="p-4">
+          <QuestionBankStatsGoalsNotebookShell
+            isMockMode={isMockMode}
+            correctCount={correctCount}
+            wrongCount={wrongCount}
+            answerGoals={answerGoals}
+            onSaveAnswerGoals={(daily, weekly) => {
+              if (!isProgressLoaded) {
+                showNotification('Carregando o progresso. Tente de novo em instantes.', 'error');
+                return;
+              }
+              const base = reconcileAnswerGoals(answerGoals);
+              const next: QuestionAnswerGoalsPersisted = {
+                ...base,
+                daily_target: daily,
+                weekly_target: weekly,
+              };
+              setAnswerGoals(next);
+              void syncUserProgress({ question_answer_goals: next });
+              showNotification('Metas guardadas.', 'success');
+            }}
+            goalsBarDisabled={!isOnline || !isProgressLoaded}
+            showNotebookCreationMode={showNotebookCreationMode}
+            newNotebookName={newNotebookName}
+            setNewNotebookName={setNewNotebookName}
+            newNotebookDescription={newNotebookDescription}
+            setNewNotebookDescription={setNewNotebookDescription}
+            onCreateNotebook={handleCreateNotebook}
+            onCancelNotebookCreation={() => {
+              setShowNotebookCreationMode(false);
+              setSelectedQuestionsForNotebook(new Set());
+              setNewNotebookName('');
+            }}
+            isSubmitting={isSubmitting}
+            selectedForNotebookCount={selectedQuestionsForNotebook.size}
+            onOpenNotebookCreation={() => setShowNotebookCreationMode(true)}
+          >
             <QuestionBankFiltersPanel
               searchTerm={searchTerm}
               setSearchTerm={setSearchTerm}
@@ -3180,8 +3043,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
               isDarkMode={qbDarkSynced}
               onToggleDarkMode={toggleQbDark}
             />
-            </div>
-          </div>
+          </QuestionBankStatsGoalsNotebookShell>
 
           {/* Question Area */}
           <div key="question-area-container" className="w-full" ref={resultsSectionRef}>
