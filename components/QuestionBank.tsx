@@ -17,9 +17,6 @@ import { NotebookModal } from './NotebookModal';
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { GEMINI_MODEL, extractPrecedent } from '../services/geminiService';
 import { createTrailingDebounce } from '../utils/realtimeThrottle';
-import Markdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { QuestionComments } from './QuestionComments';
 import { 
   BookOpen, 
   CheckCircle2, 
@@ -33,7 +30,6 @@ import {
   AlertCircle,
   Download,
   Star,
-  ArrowLeft,
   LayoutList,
   Sparkles,
   X,
@@ -52,23 +48,19 @@ import {
   Clock,
   History,
   Target,
-  BrainCircuit,
   Maximize2,
   Minimize2,
   Play,
   CheckCircle,
   AlertTriangle,
   Book,
-  Search,
   Settings,
   Volume2,
   Send,
   MessageSquare,
-  Folder as FolderIcon,
   Bookmark,
   ListFilter
 } from 'lucide-react';
-import { GlossaryText } from './GlossaryText.tsx';
 import { GlossaryPopover } from './GlossaryPopover.tsx';
 import { fetchTermDefinition } from '../services/geminiService';
 import { GlossaryTerm } from '../types';
@@ -110,17 +102,23 @@ import {
 } from './question-bank/questionReviewQueue';
 import {
   normalizeQuestionFromApi,
-  QB_OPTION_FOCUS,
   buildCappedFlashcardContextForAi,
   migrateSavedFilterPresetRow,
 } from './question-bank/questionBankHelpers';
-import { QuestionAlternativeAnalysisBlocks } from './question-bank/QuestionAlternativeAnalysisBlocks';
 import { filterAndSortBankQuestions } from './question-bank/filterBankQuestions';
 import { QuestionBankConfidenceModal } from './question-bank/QuestionBankConfidenceModal';
 import { QuestionBankMockHud } from './question-bank/QuestionBankMockHud';
 import { QuestionBankMainHeader } from './question-bank/QuestionBankMainHeader';
 import { QuestionBankErrorInsightBanner } from './question-bank/QuestionBankErrorInsightBanner';
 import { QuestionBankPdfHiddenShell } from './question-bank/QuestionBankPdfHiddenShell';
+import { QuestionBankListView } from './question-bank/QuestionBankListView';
+import { QuestionBankSingleQuestionView } from './question-bank/QuestionBankSingleQuestionView';
+import { QuestionBankEmptyQuestions } from './question-bank/QuestionBankEmptyQuestions';
+import { QuestionBankAiLessonModal } from './question-bank/QuestionBankAiLessonModal';
+import { QuestionBankJuridiquesModal } from './question-bank/QuestionBankJuridiquesModal';
+import { QuestionBankManualGlossaryModal } from './question-bank/QuestionBankManualGlossaryModal';
+import { QuestionBankDeckPickerModal } from './question-bank/QuestionBankDeckPickerModal';
+import { QuestionBankNotificationToast } from './question-bank/QuestionBankNotificationToast';
 
 interface QuestionBankProps {
   userId: string;
@@ -3227,1166 +3225,154 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
             >
               {(isMockMode ? mockQuestions.length > 0 : filteredQuestions.length > 0) && currentQuestion ? (
                 viewMode === 'list' ? (
-                <>
-                <div className="grid grid-cols-1 gap-8">
-                  {pagedQuestions.map((q, idx) => {
-                    const globalIdx = (listPage - 1) * listPageSize + idx;
-                    return (
-                    <div 
-                      key={q.id}
-                      className={`bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden relative pl-20 p-8 transition-all duration-300 ${activeQuestionId === q.id ? 'ring-2 ring-purple-500 shadow-lg' : ''}`}
-                    >
-                      {/* Checkbox for Notebook Selection */}
-                      <div className="absolute top-8 left-6 z-10">
-                        <input 
-                          type="checkbox"
-                          checked={selectedQuestionsForNotebook.has(q.id)}
-                          onChange={() => toggleQuestionSelection(q.id)}
-                          className="w-6 h-6 rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
-                        />
-                      </div>
-                      
-                      {(() => {
-                        const stats = getXRayStats(q.id);
-                        return (
-                          <div className="absolute top-8 right-8 z-10 flex items-center gap-3">
-                            {q.user_id === userId && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteQuestion(q.id);
-                                }}
-                                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-all"
-                                title="Excluir questão permanentemente"
-                              >
-                                <X size={20} />
-                              </button>
-                            )}
-                            {stats.totalAttempts > 0 && (
-                              <div className={stats.lastAttemptCorrect ? 'text-green-500' : 'text-red-500'}>
-                                <Target size={32} />
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()}
-
-                      <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2 text-sm">
-                        <span className="font-bold text-slate-900 dark:text-white">{globalIdx + 1}</span>
-                      <span className="text-blue-600 dark:text-blue-400 font-medium">{q.id.substring(0, 8)}</span>
-                      <span className="text-slate-400 mx-1">•</span>
-                      <span className="text-blue-600 dark:text-blue-400 font-medium">{q.subject}</span>
-                      <span className="text-slate-400 mx-1">▸</span>
-                      <span className="text-blue-600 dark:text-blue-400 font-medium truncate">{q.topic}</span>
-                    </div>
-                    
-                    <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col gap-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="flex gap-4 text-xs font-medium text-slate-500">
-                          <span>Ano: <span className="text-slate-900 dark:text-white">{q.year || 'N/A'}</span></span>
-                          <span>Estilo: <span className="text-slate-900 dark:text-white">{q.exam_board || 'N/A'}</span></span>
-                          <span>Dificuldade: <span className="text-slate-900 dark:text-white capitalize">{q.difficulty}</span></span>
-                        </div>
-                        {q.legislation_tags && q.legislation_tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {q.legislation_tags.map(tag => (
-                              <span key={tag} className="px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold border border-amber-100 dark:border-amber-900/30">
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        {q.jurisprudence_tags && q.jurisprudence_tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {q.jurisprudence_tags.map(tag => (
-                              <span key={tag} className="px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 text-[10px] font-bold border border-purple-100 dark:border-purple-900/30">
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        {(correctQuestions.includes(q.id) || wrongQuestions.includes(q.id)) && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-[10px] font-black uppercase tracking-widest border border-blue-100 dark:border-blue-900/30">
-                            <MessageSquare size={10} /> Discussão Liberada
-                          </span>
-                        )}
-                      </div>
-                      
-                      {showXRay && (
-                        <div className="flex flex-wrap items-center gap-2">
-                          {(() => {
-                            const stats = getXRayStats(q.id);
-                            return (
-                              <>
-                                { /* Removed: Você acertou stats */ }
-                                {!stats.lastAttemptCorrect && stats.totalAttempts > 0 && (
-                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-xs font-semibold shadow-sm border border-red-100 dark:border-red-900/30">
-                                    <AlertCircle size={12} />
-                                    Última tentativa: Erro
-                                  </span>
-                                )}
-                                { /* Removed: Tempo médio stats */ }
-                              </>
-                            );
-                          })()}
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="p-6">
-                      <div
-                        id={`qb-statement-${q.id}`}
-                        className="text-slate-800 dark:text-slate-200 leading-relaxed mb-4"
-                      >
-                        <GlossaryText text={q.statement} onTermClick={handleTermClick} />
-                      </div>
-                      {selectedText && (
-                        <button
-                          onClick={handleJuridiquesTranslate}
-                          disabled={loadingJuridiquesExplanation}
-                          className="mb-4 flex items-center gap-2 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-bold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {loadingJuridiquesExplanation ? <Loader2 className="w-3 h-3 animate-spin" /> : <MessageSquareText size={14} />} Traduzir Juridiquês
-                        </button>
-                      )}
-                      
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => {
-                            if (expandedQuestionId === q.id) {
-                              setExpandedQuestionId(null);
-                            } else {
-                              setExpandedQuestionId(q.id);
-                              setCurrentIndex(globalIdx);
-                              setSelectedOption(null);
-                              setShowExplanation(false);
-                            }
-                          }}
-                          className={`px-4 py-2 rounded-md text-sm font-bold transition-all flex items-center gap-2 ${
-                            expandedQuestionId === q.id 
-                              ? 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200' 
-                              : 'bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50'
-                          }`}
-                        >
-                          {expandedQuestionId === q.id ? 'Fechar Questão' : 'Resolver Questão'}
-                        </button>
-                        
-                        <button
-                          onClick={() => handleAudioHint(q)}
-                          disabled={isGeneratingHint}
-                          className={`p-2 rounded-full ${activeQuestionId === q.id ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-600'}`}
-                        >
-                          {isGeneratingHint ? <Loader2 size={16} className="animate-spin" /> : <Volume2 size={16} />}
-                        </button>
-                        
-                      </div>
-                        
-                        {!isMockMode && (
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => {
-                                setCurrentIndex(globalIdx);
-                                setViewMode('single');
-                                setSelectedOption(null);
-                                setShowExplanation(false);
-                                window.scrollTo({ top: 0, behavior: 'smooth' });
-                              }}
-                              className="px-4 py-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold transition-colors"
-                            >
-                              Modo Foco
-                            </button>
-                            <button
-                              onClick={() => handleSaveAsPrecedent(q)}
-                              disabled={isSavingPrecedent[q.id]}
-                              className="px-4 py-2 text-purple-600 hover:text-purple-700 dark:text-purple-400 text-sm font-bold transition-colors flex items-center gap-2"
-                              title="Salvar como Precedente Relevante"
-                            >
-                              {isSavingPrecedent[q.id] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Gavel size={16} />}
-                              <span>Salvar Precedente</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Expanded Accordion Content */}
-                      {expandedQuestionId === q.id && (
-                        <div className="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-4 duration-300">
-                          <div
-                            className="space-y-3"
-                            role="group"
-                            aria-label="Alternativas da questão"
-                            aria-labelledby={`qb-statement-${q.id}`}
-                          >
-                            {q.options.map((option, optIdx) => {
-                              const isSelected = isMockMode ? mockAnswers[q.id] === optIdx : selectedOption === optIdx;
-                              const isCorrect = q.correct_answer === optIdx;
-                              const showStatus = isMockMode ? isMockFinished : showExplanation;
-                              const isEliminated = (eliminatedOptions[q.id] || []).includes(optIdx);
-                              const letter = String.fromCharCode(65 + optIdx);
-                              const statusHint = showStatus
-                                ? isCorrect
-                                  ? ', gabarito'
-                                  : isSelected
-                                    ? ', sua resposta'
-                                    : ''
-                                : isSelected
-                                  ? ', selecionada'
-                                  : '';
-                              
-                              let btnClass = `w-full text-left p-4 rounded-2xl border-2 transition-all duration-200 flex items-start gap-4 relative group ${QB_OPTION_FOCUS} `;
-                              
-                              if (!showStatus) {
-                                if (isSelected) {
-                                  btnClass += "border-blue-500 bg-blue-50 dark:bg-blue-900/20";
-                                } else {
-                                  btnClass += isEliminated 
-                                    ? "border-slate-100 dark:border-slate-800 opacity-40 grayscale" 
-                                    : "border-slate-200 dark:border-slate-700 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/10";
-                                }
-                              } else {
-                                if (isCorrect) {
-                                  btnClass += "border-green-500 bg-green-50 dark:bg-green-900/10";
-                                } else if (isSelected && !isCorrect) {
-                                  btnClass += "border-red-500 bg-red-50 dark:bg-red-900/10";
-                                } else {
-                                  btnClass += "border-slate-200 dark:border-slate-800 opacity-50";
-                                }
-                              }
-
-                              return (
-                                <div key={optIdx} className="relative">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleAnswer(optIdx, q)}
-                                    onContextMenu={(e) => {
-                                      e.preventDefault();
-                                      toggleElimination(q.id, optIdx);
-                                    }}
-                                    disabled={showStatus && !isMockMode}
-                                    className={btnClass}
-                                    aria-label={`Alternativa ${letter}${statusHint}. ${option}`}
-                                    aria-pressed={!showStatus ? isSelected : undefined}
-                                  >
-                                    <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center font-bold text-sm ${
-                                      showStatus && isCorrect ? 'bg-green-500 text-white' :
-                                      showStatus && isSelected && !isCorrect ? 'bg-red-500 text-white' :
-                                      isSelected && !showStatus ? 'bg-blue-500 text-white' :
-                                      'bg-slate-100 dark:bg-slate-800 text-slate-500'
-                                    }`}>
-                                      {letter}
-                                    </div>
-                                    <div className={`flex-1 pt-1 text-slate-700 dark:text-slate-300 ${isEliminated && !showStatus ? 'line-through' : ''}`}>
-                                      {option}
-                                    </div>
-                                    {showStatus && isCorrect && <CheckCircle2 className="text-green-500 shrink-0 mt-1" />}
-                                    {showStatus && isSelected && !isCorrect && <XCircle className="text-red-500 shrink-0 mt-1" />}
-                                  </button>
-                                  
-                                  {!showStatus && (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        toggleElimination(q.id, optIdx);
-                                      }}
-                                      className={`absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${
-                                        isEliminated ? 'text-orange-500 bg-orange-50 dark:bg-orange-900/20 opacity-100' : 'text-slate-300 hover:text-orange-400'
-                                      }`}
-                                      title={isEliminated ? "Restaurar alternativa" : "Riscar alternativa (Botão Direito)"}
-                                      aria-label={isEliminated ? `Restaurar alternativa ${letter}` : `Riscar alternativa ${letter}`}
-                                    >
-                                      {isEliminated ? <Eye size={16} /> : <EyeOff size={16} />}
-                                    </button>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-
-                          {showExplanation && (
-                            <div className="mt-8 space-y-4 animate-in slide-in-from-bottom-4">
-                              {loadingAiCommentary[q.id] ? (
-                                <div
-                                  className="p-8 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center gap-3"
-                                  aria-live="polite"
-                                  aria-busy="true"
-                                >
-                                  <Loader2 className="w-6 h-6 text-purple-500 animate-spin" aria-hidden />
-                                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Gerando Correção Estratégica...</p>
-                                </div>
-                              ) : aiCommentary[q.id] ? (
-                                <>
-                                  {typeof aiCommentary[q.id] === 'string' ? (
-                                  <div
-                                    className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700"
-                                    role="region"
-                                    aria-label="Correção em texto da inteligência artificial"
-                                  >
-                                    <div className="prose prose-sm dark:prose-invert max-w-none">
-                                      <Markdown remarkPlugins={[remarkGfm]}>{aiCommentary[q.id] as string}</Markdown>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  (() => {
-                                    const ac = aiCommentary[q.id] as QuestionAiCorrection;
-                                    return (
-                                  <div
-                                    className="space-y-4"
-                                    role="region"
-                                    aria-label="Correção comentada pela inteligência artificial"
-                                  >
-                                    {/* Doutrina e Contexto */}
-                                    <div className="p-4 bg-indigo-50 dark:bg-indigo-900/10 rounded-xl border border-indigo-100 dark:border-indigo-900/30">
-                                    <h4 className="font-black text-indigo-800 dark:text-indigo-400 text-[10px] uppercase tracking-widest mb-2 flex items-center gap-2">
-                                      <BookOpen size={14} aria-hidden /> Doutrina e Contexto
-                                    </h4>
-                                    <p className="text-indigo-900/80 dark:text-indigo-200/80 text-sm leading-relaxed">
-                                      {ac.doctrineAndContext}
-                                    </p>
-                                  </div>
-
-                                  {/* Fundamentação Legal */}
-                                  <div className="p-5 bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl border border-emerald-100 dark:border-emerald-900/30">
-                                    <h4 className="font-black text-emerald-800 dark:text-emerald-400 text-[10px] uppercase tracking-widest mb-2 flex items-center gap-2">
-                                      <Scale size={14} aria-hidden /> Fundamentação Legal
-                                    </h4>
-                                    <p className="text-emerald-900/80 dark:text-emerald-200/80 text-sm font-medium">
-                                      {ac.legalBasis}
-                                    </p>
-                                  </div>
-
-                                  {/* Análise das Alternativas */}
-                                  <div className="space-y-2">
-                                    <h4 id={`qb-alt-h-${q.id}`} className="font-black text-slate-700 dark:text-slate-300 text-[10px] uppercase tracking-widest mb-2 flex items-center gap-2">
-                                      <Gavel size={14} aria-hidden /> Análise das Alternativas
-                                    </h4>
-                                    <QuestionAlternativeAnalysisBlocks
-                                      analysis={ac.alternativesAnalysis}
-                                      headingId={`qb-alt-h-${q.id}`}
-                                    />
-                                  </div>
-
-                                  {/* Pulo do Gato */}
-                                  <div className="p-4 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-100 dark:border-amber-900/30 relative overflow-hidden">
-                                    <div className="absolute top-0 right-0 p-2 opacity-10" aria-hidden>
-                                      <Zap size={40} className="text-amber-500" />
-                                    </div>
-                                    <h4 className="font-black text-amber-800 dark:text-amber-400 text-[10px] uppercase tracking-widest mb-2 flex items-center gap-2">
-                                      <Lightbulb size={14} aria-hidden /> Pulo do Gato (Dica de Ouro)
-                                    </h4>
-                                    <p className="text-amber-900/80 dark:text-amber-200/80 text-sm font-bold italic">
-                                      "{ac.mnemonic}"
-                                    </p>
-                                  </div>
-                                </div>
-                                    );
-                                  })()
-                                )}
-                                  <div className="mt-6 pt-6 border-t border-slate-100 dark:border-white/5 space-y-4">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <MessageSquareText size={16} className="text-purple-500" />
-                                      <span className="text-[10px] font-black text-purple-600 uppercase tracking-widest">Aprofundar com Mentor IA</span>
-                                    </div>
-                                    
-                                    <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-2">
-                                      {(followUpChat[q.id] || []).map((msg, i) => (
-                                        <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                          <div className={`max-w-[90%] p-4 rounded-2xl text-xs font-bold shadow-sm ${
-                                            msg.role === 'user' 
-                                              ? 'bg-purple-600 text-white rounded-tr-none' 
-                                              : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-tl-none border border-slate-100 dark:border-white/5'
-                                          }`}>
-                                            <div className="prose prose-xs dark:prose-invert max-w-none">
-                                              <Markdown remarkPlugins={[remarkGfm]}>{msg.text}</Markdown>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      ))}
-                                      {isFollowUpLoading[q.id] && (
-                                        <div className="flex justify-start">
-                                          <div className="bg-slate-100 dark:bg-white/5 p-3 rounded-2xl rounded-tl-none">
-                                            <Loader2 size={14} className="animate-spin text-purple-500" />
-                                          </div>
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    <div className="flex gap-2">
-                                      <input 
-                                        type="text"
-                                        value={followUpInput[q.id] || ''}
-                                        onChange={(e) => setFollowUpInput(prev => ({ ...prev, [q.id]: e.target.value }))}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleFollowUp(q.id, q.statement)}
-                                        placeholder="Tire uma dúvida ou peça para aprofundar..."
-                                        className="flex-1 p-3 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold outline-none focus:border-purple-500"
-                                      />
-                                      <button 
-                                        onClick={() => handleFollowUp(q.id, q.statement)}
-                                        disabled={isFollowUpLoading[q.id] || !(followUpInput[q.id] || '').trim()}
-                                        className="p-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors disabled:opacity-50"
-                                      >
-                                        {isFollowUpLoading[q.id] ? (
-                                          <Loader2 className="w-4 h-4 animate-spin" />
-                                        ) : (
-                                          <Send className="w-4 h-4" />
-                                        )}
-                                      </button>
-                                    </div>
-                                  </div>
-
-                                  <div className="flex gap-3 pt-2">
-                                    <button
-                                      onClick={() => handleCreateFlashcardFromError(q)}
-                                      className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${selectedOption === q.correct_answer ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-purple-600 text-white hover:bg-purple-700 shadow-lg shadow-purple-900/20'}`}
-                                      disabled={selectedOption === q.correct_answer}
-                                    >
-                                      <PlusSquare size={16} /> Virar Flashcard do Erro
-                                    </button>
-                                  </div>
-
-                                  <QuestionComments 
-                                    questionId={q.id} 
-                                    userId={userId} 
-                                    isAnswered={correctQuestions.includes(q.id) || wrongQuestions.includes(q.id) || (expandedQuestionId === q.id && showExplanation)}
-                                    questionTitle={q.statement}
-                                    showNotification={showNotification}
-                                  />
-                                </>
-                              ) : (
-                                <div className="p-6 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30">
-                                  <h4 className="font-bold text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
-                                    <BookOpen size={18} /> Explicação Padrão
-                                  </h4>
-                                  <p className="text-blue-900/80 dark:text-blue-200/80 leading-relaxed text-sm whitespace-pre-wrap">
-                                    {q.explanation}
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    );
-                  })}
-                </div>
-                {filteredQuestions.length > listPageSize && (
-                  <div className="flex flex-wrap items-center justify-center gap-3 py-4">
-                    <button
-                      type="button"
-                      disabled={listPage <= 1}
-                      onClick={() => setListPage((p) => Math.max(1, p - 1))}
-                      className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-bold disabled:opacity-40"
-                    >
-                      Anterior
-                    </button>
-                    <span className="text-sm text-slate-600 dark:text-slate-400">
-                      Página {listPage} de {Math.max(1, Math.ceil(filteredQuestions.length / listPageSize))}
-                    </span>
-                    <button
-                      type="button"
-                      disabled={listPage >= Math.ceil(filteredQuestions.length / listPageSize)}
-                      onClick={() =>
-                        setListPage((p) =>
-                          Math.min(
-                            Math.max(1, Math.ceil(filteredQuestions.length / listPageSize)),
-                            p + 1
-                          )
-                        )
-                      }
-                      className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-bold disabled:opacity-40"
-                    >
-                      Seguinte
-                    </button>
-                  </div>
-                )}
-            </>
-            ) : (
-              <div className="flex flex-col gap-4">
-                <button 
-                  onClick={() => setViewMode('list')}
-                  className="self-start flex items-center gap-2 px-4 py-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors font-bold text-sm uppercase tracking-wider hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl"
-                >
-                  <ArrowLeft size={18} /> Voltar para a Lista
-                </button>
-            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden relative">
-              {/* Target & Delete Icons */}
-              {(() => {
-                const stats = getXRayStats(currentQuestion.id);
-                return (
-                  <div className="absolute top-6 right-6 z-10 flex items-center gap-3">
-                    {currentQuestion.user_id === userId && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteQuestion(currentQuestion.id);
-                        }}
-                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-all"
-                        title="Excluir questão permanentemente"
-                      >
-                        <X size={20} />
-                      </button>
-                    )}
-                    {stats.totalAttempts > 0 && (
-                      <div className={stats.lastAttemptCorrect ? 'text-green-500' : 'text-red-500'}>
-                        <Target size={32} />
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-              {/* Question Header */}
-              <div className="bg-slate-50 dark:bg-slate-800/50 p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
-                <div>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    <span className="inline-block px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold uppercase tracking-wider">
-                      {currentQuestion.subject}
-                    </span>
-                    {currentQuestion.topic && (
-                      <span className="inline-block px-3 py-1 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-full text-xs font-bold uppercase tracking-wider">
-                        {currentQuestion.topic}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-3">
-                    <div className="flex gap-4 text-xs font-medium text-slate-500">
-                      <span>Ano: <span className="text-slate-900 dark:text-white">{currentQuestion.year || 'N/A'}</span></span>
-                      <span>Banca: <span className="text-slate-900 dark:text-white">{currentQuestion.exam_board || 'N/A'}</span></span>
-                    </div>
-                    
-                    {showXRay && (
-                      <div className="flex flex-wrap items-center gap-2">
-                        {(() => {
-                          const stats = getXRayStats(currentQuestion.id);
-                          return (
-                            <>
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold shadow-sm border border-slate-200/50 dark:border-slate-700/50">
-                                <Target size={20} className="text-blue-500" />
-                                { /* Removed: Você acertou stats */ }
-                              </span>
-                              {!stats.lastAttemptCorrect && stats.totalAttempts > 0 && (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-xs font-semibold shadow-sm border border-red-100 dark:border-red-900/30">
-                                  <AlertCircle size={12} />
-                                  Última tentativa: Erro
-                                </span>
-                              )}
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-semibold shadow-sm border border-slate-200/50 dark:border-slate-700/50">
-                                <Clock size={12} />
-                                Tempo médio: {stats.avgTime}
-                              </span>
-                            </>
-                          );
-                        })()}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => toggleFavorite(currentQuestion.id)}
-                    className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-all duration-200 active:scale-90"
-                    title={favorites.includes(currentQuestion.id) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
-                  >
-                    <Star 
-                      size={20} 
-                      className={`transition-all duration-300 ${favorites.includes(currentQuestion.id) ? "fill-yellow-500 text-yellow-500 scale-110" : "text-slate-400"}`} 
-                    />
-                  </button>
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                    currentQuestion.difficulty === 'facil' ? 'bg-green-100 text-green-700' :
-                    currentQuestion.difficulty === 'media' ? 'bg-yellow-100 text-yellow-700' :
-                    'bg-red-100 text-red-700'
-                  }`}>
-                    {currentQuestion.difficulty}
-                  </span>
-                </div>
-              </div>
-
-              {/* Question Body */}
-              <div className="p-6 md:p-8">
-                <div
-                  id={`qb-statement-${currentQuestion.id}`}
-                  className="text-lg md:text-xl text-slate-800 dark:text-slate-200 font-medium leading-relaxed mb-4 whitespace-pre-wrap"
-                >
-                  {currentQuestion.statement}
-                </div>
-                {selectedText && (
-                  <button
-                    onClick={handleJuridiquesTranslate}
-                    disabled={loadingJuridiquesExplanation}
-                    className="mb-6 flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-bold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {loadingJuridiquesExplanation ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageSquareText size={18} />} Traduzir Juridiquês
-                  </button>
-                )}
-
-                <div
-                  className="space-y-3"
-                  role="group"
-                  aria-label="Alternativas da questão"
-                  aria-labelledby={`qb-statement-${currentQuestion.id}`}
-                >
-                  {currentQuestion.options.map((option, idx) => {
-                    const isSelected = isMockMode ? mockAnswers[currentQuestion.id] === idx : selectedOption === idx;
-                    const isCorrect = currentQuestion.correct_answer === idx;
-                    const showStatus = isMockMode ? isMockFinished : showExplanation;
-                    const isEliminated = (eliminatedOptions[currentQuestion.id] || []).includes(idx);
-                    const letter = String.fromCharCode(65 + idx);
-                    const statusHint = showStatus
-                      ? isCorrect
-                        ? ', gabarito'
-                        : isSelected
-                          ? ', sua resposta'
-                          : ''
-                      : isSelected
-                        ? ', selecionada'
-                        : '';
-                    
-                    let btnClass = `w-full text-left p-4 rounded-2xl border-2 transition-all duration-200 flex items-start gap-4 relative group ${QB_OPTION_FOCUS} `;
-                    
-                    if (!showStatus) {
-                      if (isSelected) {
-                        btnClass += "border-blue-500 bg-blue-50 dark:bg-blue-900/20";
-                      } else {
-                        btnClass += isEliminated 
-                          ? "border-slate-100 dark:border-slate-800 opacity-40 grayscale" 
-                          : "border-slate-200 dark:border-slate-700 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/10";
-                      }
-                    } else {
-                      if (isCorrect) {
-                        btnClass += "border-green-500 bg-green-50 dark:bg-green-900/10";
-                      } else if (isSelected && !isCorrect) {
-                        btnClass += "border-red-500 bg-red-50 dark:bg-red-900/10";
-                      } else {
-                        btnClass += "border-slate-200 dark:border-slate-800 opacity-50";
-                      }
-                    }
-
-                    return (
-                      <div key={idx} className="relative">
-                        <button
-                          type="button"
-                          onClick={() => handleAnswer(idx)}
-                          onContextMenu={(e) => {
-                            e.preventDefault();
-                            toggleElimination(currentQuestion.id, idx);
-                          }}
-                          disabled={showStatus && !isMockMode}
-                          className={btnClass}
-                          aria-label={`Alternativa ${letter}${statusHint}. ${option}`}
-                          aria-pressed={!showStatus ? isSelected : undefined}
-                        >
-                          <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center font-bold text-sm ${
-                            showStatus && isCorrect ? 'bg-green-500 text-white' :
-                            showStatus && isSelected && !isCorrect ? 'bg-red-500 text-white' :
-                            isSelected && !showStatus ? 'bg-blue-500 text-white' :
-                            'bg-slate-100 dark:bg-slate-800 text-slate-500'
-                          }`}>
-                            {letter}
-                          </div>
-                          <div className={`flex-1 pt-1 text-slate-700 dark:text-slate-300 ${isEliminated && !showStatus ? 'line-through' : ''}`}>
-                            {option}
-                          </div>
-                          {showStatus && isCorrect && <CheckCircle2 className="text-green-500 shrink-0 mt-1" />}
-                          {showStatus && isSelected && !isCorrect && <XCircle className="text-red-500 shrink-0 mt-1" />}
-                        </button>
-                        
-                        {!showStatus && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleElimination(currentQuestion.id, idx);
-                            }}
-                            className={`absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${
-                              isEliminated ? 'text-orange-500 bg-orange-50 dark:bg-orange-900/20 opacity-100' : 'text-slate-300 hover:text-orange-400'
-                            }`}
-                            title={isEliminated ? "Restaurar alternativa" : "Riscar alternativa (Botão Direito)"}
-                            aria-label={isEliminated ? `Restaurar alternativa ${letter}` : `Riscar alternativa ${letter}`}
-                          >
-                            {isEliminated ? <Eye size={16} /> : <EyeOff size={16} />}
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Explanation */}
-                {showExplanation && (
-                  <div className="mt-8 space-y-4 animate-in slide-in-from-bottom-4">
-                    {loadingAiCommentary[currentQuestion.id] ? (
-                      <div
-                        className="p-12 bg-slate-50 dark:bg-slate-800/50 rounded-[2rem] border-2 border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center gap-4"
-                        aria-live="polite"
-                        aria-busy="true"
-                      >
-                        <Loader2 className="w-8 h-8 text-purple-500 animate-spin" aria-hidden />
-                        <p className="text-xs font-black text-slate-500 uppercase tracking-[0.3em] animate-pulse">Consultando Jurisprudência...</p>
-                      </div>
-                    ) : aiCommentary[currentQuestion.id] ? (
-                      <>
-                        {typeof aiCommentary[currentQuestion.id] === 'string' ? (
-                        <div className="space-y-6" role="region" aria-label="Correção em texto da inteligência artificial">
-                          <div className="flex items-center gap-3 mb-2">
-                            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800"></div>
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Correção Comentada IA</span>
-                            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800"></div>
-                          </div>
-                          <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-[2rem] border-2 border-slate-200 dark:border-slate-700">
-                            <div className="prose prose-sm dark:prose-invert max-w-none">
-                              <Markdown remarkPlugins={[remarkGfm]}>{aiCommentary[currentQuestion.id] as string}</Markdown>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        (() => {
-                          const ac = aiCommentary[currentQuestion.id] as QuestionAiCorrection;
-                          return (
-                        <div
-                          className="space-y-6"
-                          role="region"
-                          aria-label="Correção comentada pela inteligência artificial"
-                        >
-                          <div className="flex items-center gap-3 mb-2">
-                            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800"></div>
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Correção Comentada IA</span>
-                            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800"></div>
-                          </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {/* Doutrina e Contexto */}
-                          <div className="p-6 bg-indigo-50 dark:bg-indigo-900/10 rounded-[2rem] border-2 border-indigo-100 dark:border-indigo-900/30">
-                            <h4 className="font-black text-indigo-800 dark:text-indigo-400 text-[11px] uppercase tracking-widest mb-3 flex items-center gap-2">
-                              <BookOpen size={16} aria-hidden /> Doutrina e Contexto
-                            </h4>
-                            <p className="text-indigo-900/80 dark:text-indigo-200/80 text-sm leading-relaxed">
-                              {ac.doctrineAndContext}
-                            </p>
-                          </div>
-
-                          <div className="p-6 bg-emerald-50 dark:bg-emerald-900/10 rounded-[2rem] border-2 border-emerald-100 dark:border-emerald-900/30">
-                            <h4 className="font-black text-emerald-800 dark:text-emerald-400 text-[11px] uppercase tracking-widest mb-3 flex items-center gap-2">
-                              <Scale size={16} aria-hidden /> Fundamentação Legal
-                            </h4>
-                            <p className="text-emerald-900/80 dark:text-emerald-200/80 text-sm font-bold leading-relaxed">
-                              {ac.legalBasis}
-                            </p>
-                          </div>
-
-                          <div className="p-6 bg-amber-50 dark:bg-amber-900/10 rounded-[2rem] border-2 border-amber-100 dark:border-amber-900/30 relative overflow-hidden">
-                            <div className="absolute -top-2 -right-2 opacity-10 rotate-12" aria-hidden>
-                              <Zap size={80} className="text-amber-500" />
-                            </div>
-                            <h4 className="font-black text-amber-800 dark:text-amber-400 text-[11px] uppercase tracking-widest mb-3 flex items-center gap-2">
-                              <Lightbulb size={16} aria-hidden /> Pulo do Gato
-                            </h4>
-                            <p className="text-amber-900/80 dark:text-amber-200/80 text-sm font-black italic leading-relaxed">
-                              "{ac.mnemonic}"
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-[2rem] border-2 border-slate-200 dark:border-slate-700 space-y-3">
-                          <h4 id={`qb-alt-h-single-${currentQuestion.id}`} className="font-black text-slate-700 dark:text-slate-300 text-[11px] uppercase tracking-widest mb-3 flex items-center gap-2">
-                            <Gavel size={16} aria-hidden /> Análise Técnica das Alternativas
-                          </h4>
-                          <QuestionAlternativeAnalysisBlocks
-                            analysis={ac.alternativesAnalysis}
-                            headingId={`qb-alt-h-single-${currentQuestion.id}`}
-                          />
-                        </div>
-                      </div>
-                          );
-                        })()
-                      )}
-                        <div className="mt-6 pt-6 border-t border-slate-100 dark:border-white/5 space-y-4">
-                          <div className="flex items-center gap-2 mb-2">
-                            <MessageSquareText size={16} className="text-purple-500" />
-                            <span className="text-[10px] font-black text-purple-600 uppercase tracking-widest">Aprofundar com Mentor IA</span>
-                          </div>
-                          
-                          <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-2">
-                            {(followUpChat[currentQuestion.id] || []).map((msg, i) => (
-                              <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[90%] p-4 rounded-2xl text-xs font-bold shadow-sm ${
-                                  msg.role === 'user' 
-                                    ? 'bg-purple-600 text-white rounded-tr-none' 
-                                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-tl-none border border-slate-100 dark:border-white/5'
-                                }`}>
-                                  <div className="prose prose-xs dark:prose-invert max-w-none">
-                                    <Markdown remarkPlugins={[remarkGfm]}>{msg.text}</Markdown>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                            {isFollowUpLoading[currentQuestion.id] && (
-                              <div className="flex justify-start">
-                                <div className="bg-slate-100 dark:bg-white/5 p-3 rounded-2xl rounded-tl-none">
-                                  <Loader2 size={14} className="animate-spin text-purple-500" />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="flex gap-2">
-                            <input 
-                              type="text"
-                              value={followUpInput[currentQuestion.id] || ''}
-                              onChange={(e) => setFollowUpInput(prev => ({ ...prev, [currentQuestion.id]: e.target.value }))}
-                              onKeyDown={(e) => e.key === 'Enter' && handleFollowUp(currentQuestion.id, currentQuestion.statement)}
-                              placeholder="Tire uma dúvida ou peça para aprofundar..."
-                              className="flex-1 p-3 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold outline-none focus:border-purple-500"
-                            />
-                            <button 
-                              onClick={() => handleFollowUp(currentQuestion.id, currentQuestion.statement)}
-                              disabled={isFollowUpLoading[currentQuestion.id] || !(followUpInput[currentQuestion.id] || '').trim()}
-                              className="p-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors disabled:opacity-50"
-                            >
-                              {isFollowUpLoading[currentQuestion.id] ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Send className="w-4 h-4" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="flex gap-4 pt-2">
-                          <button
-                            onClick={() => handleCreateFlashcardFromError(currentQuestion, selectedOption, selectedOption === currentQuestion.correct_answer)}
-                            className={`flex-1 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-3 transition-all ${
-                              (selectedOption === currentQuestion.correct_answer && confidenceLevel === 'certeza') 
-                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
-                                : 'bg-purple-600 text-white hover:bg-purple-700 shadow-xl shadow-purple-900/20 active:scale-95'
-                            }`}
-                            disabled={selectedOption === currentQuestion.correct_answer && confidenceLevel === 'certeza'}
-                          >
-                            <PlusSquare size={20} /> {selectedOption === currentQuestion.correct_answer ? 'Flashcard da Dúvida' : 'Flashcard do Erro'}
-                          </button>
-                          <button
-                            onClick={() => handleSaveAsPrecedent(currentQuestion)}
-                            disabled={isSavingPrecedent[currentQuestion.id]}
-                            className="flex-1 py-4 bg-white dark:bg-slate-800 border-2 border-purple-200 dark:border-purple-800 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-3 transition-all shadow-xl shadow-purple-900/5 active:scale-95"
-                          >
-                            {isSavingPrecedent[currentQuestion.id] ? <Loader2 className="w-5 h-5 animate-spin" /> : <Gavel size={20} />}
-                            Salvar como Precedente
-                          </button>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="p-6 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30">
-                        <h4 className="font-bold text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
-                          <BookOpen size={18} /> Explicação
-                        </h4>
-                        <p className="text-blue-900/80 dark:text-blue-200/80 leading-relaxed text-sm whitespace-pre-wrap">
-                          {currentQuestion.explanation}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Personal Notes */}
-                <div className="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800">
-                  <h4 className="font-bold text-slate-700 dark:text-slate-300 mb-4 flex items-center gap-2">
-                    <LayoutList size={18} /> Minhas Anotações
-                  </h4>
-                  <div className="relative">
-                    <textarea
-                      value={notes[currentQuestion.id] || ''}
-                      onChange={(e) => {
-                        const newNotes = { ...notes, [currentQuestion.id]: e.target.value };
-                        setNotes(newNotes);
-                      }}
-                      onBlur={(e) => {
-                        handleSaveNote(currentQuestion.id, e.target.value);
-                      }}
-                      className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none resize-none text-sm text-slate-700 dark:text-slate-300 min-h-[100px]"
-                      placeholder="Adicione suas observações sobre esta questão..."
-                    />
-                    <div className="absolute bottom-3 right-3">
-                      <button 
-                        onClick={() => handleSaveNote(currentQuestion.id, notes[currentQuestion.id] || '')}
-                        className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
-                        title="Salvar anotação"
-                      >
-                        <CheckCircle2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <QuestionComments 
-                  questionId={currentQuestion.id} 
-                  userId={userId} 
-                  isAnswered={correctQuestions.includes(currentQuestion.id) || wrongQuestions.includes(currentQuestion.id) || showExplanation}
-                  questionTitle={currentQuestion.statement}
+                <QuestionBankListView
+                  pagedQuestions={pagedQuestions}
+                  listPage={listPage}
+                  listPageSize={listPageSize}
+                  activeQuestionId={activeQuestionId}
+                  selectedQuestionsForNotebook={selectedQuestionsForNotebook}
+                  toggleQuestionSelection={toggleQuestionSelection}
+                  userId={userId}
+                  onDeleteQuestion={handleDeleteQuestion}
+                  getXRayStats={getXRayStats}
+                  correctQuestions={correctQuestions}
+                  wrongQuestions={wrongQuestions}
+                  showXRay={showXRay}
+                  expandedQuestionId={expandedQuestionId}
+                  setExpandedQuestionId={setExpandedQuestionId}
+                  setCurrentIndex={setCurrentIndex}
+                  setSelectedOption={setSelectedOption}
+                  setShowExplanation={setShowExplanation}
+                  onTermClick={handleTermClick}
+                  selectedText={selectedText}
+                  onJuridiquesTranslate={handleJuridiquesTranslate}
+                  loadingJuridiquesExplanation={loadingJuridiquesExplanation}
+                  isMockMode={isMockMode}
+                  onAudioHint={handleAudioHint}
+                  isGeneratingHint={isGeneratingHint}
+                  onSaveAsPrecedent={handleSaveAsPrecedent}
+                  isSavingPrecedent={isSavingPrecedent}
+                  onAnswerOption={handleAnswer}
+                  mockAnswers={mockAnswers}
+                  isMockFinished={isMockFinished}
+                  selectedOption={selectedOption}
+                  showExplanation={showExplanation}
+                  eliminatedOptions={eliminatedOptions}
+                  onToggleElimination={toggleElimination}
+                  loadingAiCommentary={loadingAiCommentary}
+                  aiCommentary={aiCommentary}
+                  followUpChat={followUpChat}
+                  followUpInput={followUpInput}
+                  setFollowUpInput={setFollowUpInput}
+                  isFollowUpLoading={isFollowUpLoading}
+                  onFollowUp={handleFollowUp}
+                  onCreateFlashcardFromError={handleCreateFlashcardFromError}
                   showNotification={showNotification}
+                  filteredQuestionCount={filteredQuestions.length}
+                  onPrevListPage={() => setListPage((p) => Math.max(1, p - 1))}
+                  onNextListPage={() =>
+                    setListPage((p) =>
+                      Math.min(Math.max(1, Math.ceil(filteredQuestions.length / listPageSize)), p + 1)
+                    )
+                  }
+                  onEnterFocusMode={() => setViewMode('single')}
                 />
-              </div>
-
-              {/* Footer / Navigation */}
-              <div className="bg-slate-50 dark:bg-slate-800/50 p-4 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={handlePrev}
-                  disabled={
-                    isMockMode && mockQuestions.length > 0
-                      ? mockNavUnansweredOnly
-                        ? getPrevUnansweredMockIndex(currentIndex) < 0
-                        : currentIndex === 0
-                      : currentIndex === 0
-                  }
-                  className="px-4 py-2 flex items-center gap-2 text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30 transition-colors font-bold text-sm uppercase tracking-wider"
-                >
-                  <ChevronLeft size={18} /> Anterior
-                </button>
-
-                <div className="flex flex-col items-center gap-1">
-                  <span className="text-sm font-bold text-slate-400">
-                    {currentIndex + 1} /{' '}
-                    {isMockMode && mockQuestions.length > 0 ? mockQuestions.length : filteredQuestions.length}
-                  </span>
-                  {isMockMode && currentQuestion && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setMockMarkReviewLater((prev) => ({
-                          ...prev,
-                          [currentQuestion.id]: !prev[currentQuestion.id],
-                        }))
-                      }
-                      className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest transition-colors ${
-                        mockMarkReviewLater[currentQuestion.id]
-                          ? 'bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-100'
-                          : 'bg-slate-200/80 text-slate-500 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300'
-                      }`}
-                    >
-                      <Bookmark size={12} className={mockMarkReviewLater[currentQuestion.id] ? 'fill-current' : ''} />
-                      Revisar depois
-                    </button>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleNext}
-                  disabled={
-                    isMockMode && mockQuestions.length > 0
-                      ? mockNavUnansweredOnly
-                        ? getNextUnansweredMockIndex(currentIndex) < 0
-                        : currentIndex === mockQuestions.length - 1
-                      : currentIndex === filteredQuestions.length - 1
-                  }
-                  className="px-4 py-2 flex items-center gap-2 text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30 transition-colors font-bold text-sm uppercase tracking-wider"
-                >
-                  Próxima <ChevronRight size={18} />
-                </button>
-              </div>
-            </div>
-            </div>
+            ) : (
+              <QuestionBankSingleQuestionView
+                onBackToList={() => setViewMode('list')}
+                currentQuestion={currentQuestion}
+                userId={userId}
+                getXRayStats={getXRayStats}
+                onDeleteQuestion={handleDeleteQuestion}
+                showXRay={showXRay}
+                favorites={favorites}
+                onToggleFavorite={toggleFavorite}
+                selectedText={selectedText}
+                onJuridiquesTranslate={handleJuridiquesTranslate}
+                loadingJuridiquesExplanation={loadingJuridiquesExplanation}
+                onAnswerOption={(idx) => handleAnswer(idx)}
+                isMockMode={isMockMode}
+                mockAnswers={mockAnswers}
+                isMockFinished={isMockFinished}
+                selectedOption={selectedOption}
+                showExplanation={showExplanation}
+                eliminatedOptions={eliminatedOptions}
+                onToggleElimination={toggleElimination}
+                loadingAiCommentary={loadingAiCommentary}
+                aiCommentary={aiCommentary}
+                followUpChat={followUpChat}
+                followUpInput={followUpInput}
+                setFollowUpInput={setFollowUpInput}
+                isFollowUpLoading={isFollowUpLoading}
+                onFollowUp={handleFollowUp}
+                onCreateFlashcardFromError={handleCreateFlashcardFromError}
+                confidenceLevel={confidenceLevel}
+                onSaveAsPrecedent={handleSaveAsPrecedent}
+                isSavingPrecedent={isSavingPrecedent}
+                notes={notes}
+                setNotes={setNotes}
+                onSaveNote={handleSaveNote}
+                correctQuestions={correctQuestions}
+                wrongQuestions={wrongQuestions}
+                showNotification={showNotification}
+                onPrev={handlePrev}
+                onNext={handleNext}
+                currentIndex={currentIndex}
+                filteredQuestionCount={filteredQuestions.length}
+                mockQuestionCount={mockQuestions.length}
+                mockNavUnansweredOnly={mockNavUnansweredOnly}
+                getPrevUnansweredMockIndex={getPrevUnansweredMockIndex}
+                getNextUnansweredMockIndex={getNextUnansweredMockIndex}
+                mockMarkReviewLater={mockMarkReviewLater}
+                setMockMarkReviewLater={setMockMarkReviewLater}
+              />
             )
           ) : (
-            <div className="bg-white dark:bg-slate-900 rounded-3xl p-12 text-center border border-slate-200 dark:border-slate-800">
-              <AlertCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-              <h3 className="text-xl font-bold text-slate-700 dark:text-slate-300 mb-2">Nenhuma questão encontrada</h3>
-              <p className="text-slate-500">
-                {questions.length === 0 
-                  ? "O banco de questões está vazio. Use o Gerador de IA para criar questões!" 
-                  : "Nenhuma questão corresponde aos filtros selecionados."}
-              </p>
-              {questions.length === 0 && (
-                <button
-                  onClick={() => setShowAIGenerator(true)}
-                  className="mt-6 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold transition-colors flex items-center gap-2 mx-auto"
-                >
-                  <Sparkles size={18} />
-                  Gerar Questões com IA
-                </button>
-              )}
-            </div>
+            <QuestionBankEmptyQuestions
+              totalQuestionsInDb={questions.length}
+              onOpenAiGenerator={() => setShowAIGenerator(true)}
+            />
           )}
             </div>
           </div>
           </>
         <div id="notification-portal">
-          {notification && (
-            <div className={`fixed bottom-6 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 z-50 animate-in slide-in-from-bottom-5 fade-in duration-300 ${
-              notification.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-            }`}>
-              {notification.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
-              <span className="font-bold text-sm">{notification.message}</span>
-            </div>
-          )}
+          <QuestionBankNotificationToast
+            message={notification?.message ?? null}
+            type={notification?.type ?? null}
+          />
         </div>
 
-      {showAiLesson && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[130] flex items-center justify-center p-4" role="presentation">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="qb-ai-lesson-title"
-            className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 md:p-10 shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-3xl animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-hidden flex flex-col"
-          >
-            <div className="flex justify-between items-center mb-8 shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-2xl" aria-hidden>
-                  <Sparkles className="text-purple-600 dark:text-purple-400" size={24} />
-                </div>
-                <div>
-                  <h2 id="qb-ai-lesson-title" className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Aula Resumida IA</h2>
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                    {selectedSubjects.length === 0
-                      ? '—'
-                      : selectedSubjects.length === 1
-                        ? selectedSubjects[0]
-                        : selectedSubjects.join(' · ')}
-                  </p>
-                </div>
-              </div>
-              <button type="button" onClick={() => setShowAiLesson(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all" aria-label="Fechar aula resumida">
-                <X size={24} aria-hidden />
-              </button>
-            </div>
+      <QuestionBankAiLessonModal
+        open={showAiLesson}
+        onClose={() => setShowAiLesson(false)}
+        loading={loadingAiLesson}
+        content={aiLessonContent}
+        subjectLine={
+          selectedSubjects.length === 0
+            ? '—'
+            : selectedSubjects.length === 1
+              ? selectedSubjects[0]
+              : selectedSubjects.join(' · ')
+        }
+      />
 
-            <div className="flex-1 overflow-y-auto pr-4 custom-scrollbar">
-              {loadingAiLesson ? (
-                <div className="flex flex-col items-center justify-center py-20">
-                  <div className="relative mb-8">
-                    <div className="w-20 h-20 border-4 border-purple-100 dark:border-purple-900/30 rounded-full animate-pulse"></div>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <BrainCircuit className="text-purple-500 animate-bounce" size={32} />
-                    </div>
-                  </div>
-                  <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2 uppercase tracking-tight">Preparando sua Aula...</h3>
-                  <p className="text-slate-500 text-center max-w-xs font-medium">
-                    Nossa IA está analisando seus erros e preparando um resumo focado para você vencer esse tema.
-                  </p>
-                </div>
-              ) : (
-                <div className="prose prose-slate dark:prose-invert max-w-none prose-headings:font-black prose-headings:uppercase prose-headings:tracking-tighter prose-p:font-medium prose-p:leading-relaxed prose-strong:text-purple-600 dark:prose-strong:text-purple-400">
-                  <Markdown remarkPlugins={[remarkGfm]}>{aiLessonContent}</Markdown>
-                </div>
-              )}
-            </div>
+      <QuestionBankJuridiquesModal
+        open={showJuridiquesModal}
+        onClose={() => setShowJuridiquesModal(false)}
+        selectedText={selectedText}
+        loading={loadingJuridiquesExplanation}
+        explanation={juridiquesExplanation}
+      />
 
-            <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 shrink-0">
-              <button
-                type="button"
-                onClick={() => setShowAiLesson(false)}
-                className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
-              >
-                Entendido, Vamos Praticar!
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Juridiquês Translator Modal */}
-      {showJuridiquesModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" role="presentation">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="qb-juridiques-title"
-            className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-2xl animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto"
-          >
-            <div className="flex justify-between items-center mb-6">
-              <h2 id="qb-juridiques-title" className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <MessageSquareText className="text-blue-500" aria-hidden />
-                Tradutor de Juridiquês
-              </h2>
-              <button type="button" onClick={() => setShowJuridiquesModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" aria-label="Fechar tradutor">
-                <X size={24} aria-hidden />
-              </button>
-            </div>
-
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">Trecho Selecionado</h3>
-                <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-400 italic">
-                  "{selectedText}"
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-xs font-black uppercase tracking-widest text-blue-500 mb-2">Explicação Simples</h3>
-                {loadingJuridiquesExplanation ? (
-                  <div className="flex flex-col items-center justify-center py-12">
-                    <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-4" />
-                    <p className="text-sm text-slate-500">A IA está simplificando o texto para você...</p>
-                  </div>
-                ) : (
-                  <div className="p-6 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800 text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">
-                    {juridiquesExplanation}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800">
-              <button
-                type="button"
-                onClick={() => setShowJuridiquesModal(false)}
-                className="w-full py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Manual Glossary Search Modal */}
-      {showManualGlossarySearch && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4" role="presentation">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="qb-glossary-title"
-            className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md animate-in zoom-in-95 duration-300"
-          >
-            <div className="flex justify-between items-center mb-6">
-              <h2 id="qb-glossary-title" className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Book className="text-indigo-500" aria-hidden />
-                Dicionário Jurídico
-              </h2>
-              <button type="button" onClick={() => setShowManualGlossarySearch(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" aria-label="Fechar dicionário">
-                <X size={24} aria-hidden />
-              </button>
-            </div>
-            
-            <form onSubmit={handleManualSearch} className="space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Termo ou Expressão</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    required
-                    autoFocus
-                    value={manualSearchTerm}
-                    onChange={e => setManualSearchTerm(e.target.value)}
-                    className="w-full p-4 pr-12 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 dark:text-white"
-                    placeholder="Ex: Habeas Corpus, Lide, Prescrição..."
-                  />
-                  <button
-                    type="submit"
-                    disabled={isLoadingGlossary}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
-                  >
-                    {isLoadingGlossary ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search size={20} />}
-                  </button>
-                </div>
-              </div>
-              <p className="text-xs text-slate-500 italic">
-                A IA da SanFran definirá o termo juridicamente para você.
-              </p>
-            </form>
-          </div>
-        </div>
-      )}
+      <QuestionBankManualGlossaryModal
+        open={showManualGlossarySearch}
+        onClose={() => setShowManualGlossarySearch(false)}
+        term={manualSearchTerm}
+        onTermChange={setManualSearchTerm}
+        onSubmit={handleManualSearch}
+        isLoading={isLoadingGlossary}
+      />
 
       {/* Glossary Popover */}
       <AnimatePresence>
@@ -4454,59 +3440,13 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
         />
       )}
 
-      {isDeckModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[120] flex items-center justify-center p-4" role="presentation">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="qb-deck-title"
-            className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md animate-in zoom-in-95 duration-300"
-          >
-            <div className="flex justify-between items-center mb-6">
-              <h2 id="qb-deck-title" className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <BrainCircuit className="text-indigo-500" aria-hidden />
-                Escolher Baralho
-              </h2>
-              <button type="button" onClick={() => setIsDeckModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" aria-label="Fechar seleção de baralho">
-                <X size={24} aria-hidden />
-              </button>
-            </div>
-
-            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-              {folders.length === 0 ? (
-                <p className="text-slate-500 text-center py-4">Nenhum baralho encontrado. Crie um primeiro no Anki.</p>
-              ) : (
-                folders.map(folder => (
-                  <button
-                    key={folder.id}
-                    disabled={isSubmitting}
-                    onClick={() => handleConfirmFlashcardCreation(folder.id)}
-                    className="w-full flex items-center gap-3 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-200 dark:hover:border-indigo-800 transition-all text-left disabled:opacity-50"
-                  >
-                    <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                      {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <FolderIcon size={20} />}
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-900 dark:text-white">{folder.name}</p>
-                      <p className="text-xs text-slate-500">{isSubmitting ? 'Criando...' : 'Adicionar a este baralho'}</p>
-                    </div>
-                  </button>
-                ))
-              )}
-            </div>
-
-            <div className="mt-8 flex gap-3">
-              <button
-                type="button"
-                onClick={() => setIsDeckModalOpen(false)}
-                className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <QuestionBankDeckPickerModal
+        open={isDeckModalOpen}
+        onClose={() => setIsDeckModalOpen(false)}
+        folders={folders}
+        isSubmitting={isSubmitting}
+        onPickFolder={(folderId) => handleConfirmFlashcardCreation(folderId)}
+      />
 
 
       <QuestionBankPdfHiddenShell active={isExporting} />
