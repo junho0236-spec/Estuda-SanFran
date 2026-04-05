@@ -1558,7 +1558,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setCurrentTime(Date.now());
       
       // Update time every 5 seconds to keep the queue fresh
-      const interval = setInterval(() => setCurrentTime(Date.now()), 5000);
+      const
       return () => clearInterval(interval);
     }
   }, [mode]);
@@ -2553,7 +2553,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               <button 
                 onClick={handleCreateFolder}
                 disabled={!newFolderName.trim()}
-                className="w-full py-4 bg-sanfran-rubi text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-sanfran-rubi/20 hover:bg-sanfran-rubiDark transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full py-4 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-sanfran-rubi/20 hover:bg-sanfran-rubiDark transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 <Check className="w-5 h-5" />
                 Criar Pasta
@@ -2635,7 +2635,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
               <button 
                 onClick={handleUpdateFolder}
                 disabled={!editingFolder.name.trim()}
-                className="w-full py-4 bg-sanfran-rubi text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-sanfran-rubi/20 hover:bg-sanfran-rubiDark transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full py-4 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-sanfran-rubi/20 hover:bg-sanfran-rubiDark transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 <Save className="w-5 h-5" />
                 Salvar Alterações
@@ -3612,7 +3612,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                                   <span className="text-xs font-black text-purple-600 uppercase tracking-[0.3em]">Avaliação IA</span>
                                   <button 
                                     onClick={(e) => { e.stopPropagation(); setAiEvaluation(null); setIsFlipped(false); setIsDissertativeMode(true); }}
-                                    className="p-1 text-slate-400 hover:text-purple-600 transition-colors"
+                                    className="p-1 text-slate
                                     title="Refazer Avaliação"
                                   >
                                     <RotateCcw size={14} />
