@@ -17,49 +17,15 @@ import { NotebookModal } from './NotebookModal';
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { GEMINI_MODEL, extractPrecedent } from '../services/geminiService';
 import { createTrailingDebounce } from '../utils/realtimeThrottle';
-import { 
-  BookOpen, 
-  CheckCircle2, 
-  Check,
-  XCircle, 
-  ChevronRight, 
+import {
+  ChevronRight,
   ChevronLeft,
   Plus,
-  Save,
   Loader2,
-  AlertCircle,
-  Download,
-  Star,
-  LayoutList,
-  Sparkles,
   X,
-  RotateCcw,
-  EyeOff,
-  Eye,
-  PlusSquare,
   NotebookText,
-  MessageSquareText,
-  Zap,
-  Lightbulb,
-  ExternalLink,
-  Scale,
-  Gavel,
-  ShieldCheck,
-  Clock,
-  History,
   Target,
-  Maximize2,
-  Minimize2,
-  Play,
-  CheckCircle,
-  AlertTriangle,
-  Book,
-  Settings,
-  Volume2,
-  Send,
-  MessageSquare,
-  Bookmark,
-  ListFilter
+  ListFilter,
 } from 'lucide-react';
 import { GlossaryPopover } from './GlossaryPopover.tsx';
 import { fetchTermDefinition } from '../services/geminiService';
