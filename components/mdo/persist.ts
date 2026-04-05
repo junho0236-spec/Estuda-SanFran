@@ -5,6 +5,50 @@ export function storageKey(userId: string) {
   return `sanfran_mdo_${userId}`;
 }
 
+export function metaStorageKey(userId: string) {
+  return `sanfran_mdo_meta_${userId}`;
+}
+
+/** Metadados locais para resolver conflitos com a nuvem (última edição neste browser). */
+export interface MdoLocalMeta {
+  lastLocalEditAt: string;
+}
+
+export function emptyMeta(): MdoLocalMeta {
+  return { lastLocalEditAt: '1970-01-01T00:00:00.000Z' };
+}
+
+export function parseMdoMeta(json: string | null): MdoLocalMeta {
+  if (!json) return emptyMeta();
+  try {
+    const o = JSON.parse(json) as unknown;
+    if (
+      o &&
+      typeof o === 'object' &&
+      'lastLocalEditAt' in o &&
+      typeof (o as MdoLocalMeta).lastLocalEditAt === 'string'
+    ) {
+      return { lastLocalEditAt: (o as MdoLocalMeta).lastLocalEditAt };
+    }
+  } catch {
+    /* ignore */
+  }
+  return emptyMeta();
+}
+
+export function isMdoPersistedEmpty(p: MdoPersisted): boolean {
+  return (
+    p.transactions.length === 0 &&
+    p.bills.length === 0 &&
+    Object.keys(p.monthlyBudgetCentsByMonth).length === 0 &&
+    p.debts.length === 0 &&
+    p.investments.length === 0 &&
+    p.creditCards.length === 0 &&
+    p.cardPurchases.length === 0 &&
+    Object.keys(p.categoryBudgetCentsByMonth).length === 0
+  );
+}
+
 export function emptyPersisted(): MdoPersisted {
   return {
     version: MDO_DATA_VERSION,

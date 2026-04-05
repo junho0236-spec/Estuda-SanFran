@@ -112,7 +112,7 @@ export enum View {
   ApprovalTrail = 'approval_trail',
   Connect = 'connect',
   Friends = 'friends',
-  /** Mini gestão financeira (localStorage), inspirada no MDO */
+  /** Mini gestão financeira (MDO: localStorage + sync Supabase) */
   MeuDinheiroOrganizado = 'meu_dinheiro_organizado',
   /** Sistema Forja (Life): iframe para app Express+tRPC em origem separada */
   SistemaForja = 'sistema_forja',
