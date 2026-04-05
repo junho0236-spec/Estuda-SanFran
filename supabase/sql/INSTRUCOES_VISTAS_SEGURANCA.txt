@@ -1,0 +1,49 @@
+================================================================================
+CORRIGIR O AVISO DO SUPABASE (vistas user_weak_topics e class_war_leaderboard)
+Para quem não é programador — só seguir a ordem
+================================================================================
+
+PORQUE NÃO HÁ UM FICHEIRO COM O "CÓDIGO GRANDE" PRONTO AQUI NO PC?
+  Esse código começa com CREATE OR REPLACE VIEW ... e é MUITO longo.
+  Ele tem de ser EXATAMENTE igual ao que já tens no Supabase. Como cada
+  projeto é diferente, esse texto só o teu servidor Postgres consegue montar.
+  Por isso o "Passo 1" abaixo PERGUNTA ao Supabase: "qual é o texto atual?"
+  e devolve-te o código completo para colares.
+
+--------------------------------------------------------------------------------
+PASSO 1 — Gerar os dois códigos
+--------------------------------------------------------------------------------
+  1. Abre o site do Supabase e entra no teu projeto.
+  2. Menu esquerdo → SQL Editor.
+  3. No Cursor/VS Code abre o ficheiro:
+       supabase/sql/PASSO1_gerar_codigos_das_vistas.sql
+  4. Seleciona TUDO no ficheiro (Ctrl+A), copia (Ctrl+C).
+  5. Cola no SQL Editor do Supabase.
+  6. Clica no botão RUN (▶) — NÃO cliques em Explain.
+
+  Resultado: uma tabela com 2 linhas e colunas view_name e run_this_sql.
+
+--------------------------------------------------------------------------------
+PASSO 2 — Colar o PRIMEIRO código gerado
+--------------------------------------------------------------------------------
+  1. Na linha em que view_name = user_weak_topics, clica na célula run_this_sql
+     (o texto grande) e copia TUDO.
+  2. No Supabase SQL Editor → novo separador de query (+).
+  3. Cola o texto.
+  4. RUN (▶).
+  5. Deve aparecer "Success" ou mensagem verde.
+
+--------------------------------------------------------------------------------
+PASSO 3 — Colar o SEGUNDO código gerado
+--------------------------------------------------------------------------------
+  1. Na linha em que view_name = class_war_leaderboard, copia run_this_sql inteiro.
+  2. Novo separador → cola → RUN (▶).
+
+--------------------------------------------------------------------------------
+PASSO 4 — Confirmar
+--------------------------------------------------------------------------------
+  Vai a Database → Advisor e vê se os avisos "Security Definer View" sumiram.
+
+Se algum RUN der erro em vermelho, guarda a mensagem ou tira print e pede ajuda.
+
+================================================================================
