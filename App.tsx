@@ -274,13 +274,24 @@ const App: React.FC = () => {
     setIsPomodoroMinimized(!isPomodoroMinimized);
   };
 
-  // --- Realtime Presence & Duel Listening ---
+  // Presence: subscribe once per login — do not tear down on every route/timer change (was hammering Realtime).
+  const presenceChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const presenceSubscribedRef = useRef(false);
+
   useEffect(() => {
-    if (!isAuthenticated || !session?.user) return;
+    presenceSubscribedRef.current = false;
+    if (!isAuthenticated || !session?.user) {
+      if (presenceChannelRef.current) {
+        supabase.removeChannel(presenceChannelRef.current);
+        presenceChannelRef.current = null;
+      }
+      return;
+    }
 
     const channel = supabase.channel('largo_presenca', {
       config: { presence: { key: session.user.id } },
     });
+    presenceChannelRef.current = channel;
 
     channel
       .on('presence', { event: 'sync' }, () => {
@@ -308,6 +319,7 @@ const App: React.FC = () => {
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
+          presenceSubscribedRef.current = true;
           const selectedSubject = subjects.find(s => s.id === timerSelectedSubjectId);
           await channel.track({
             user_id: session.user.id,
@@ -325,35 +337,84 @@ const App: React.FC = () => {
         }
       });
 
-    // LISTEN FOR DUELS
-    const duelsChannel = supabase.channel('global_duels')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'duels'
-      }, (payload) => {
-        const duel = payload.new as Duel;
-        if (!duel) return;
+    return () => {
+      presenceSubscribedRef.current = false;
+      supabase.removeChannel(channel);
+      presenceChannelRef.current = null;
+    };
+  }, [isAuthenticated, session?.user?.id]);
 
-        // SE EU SOU O OPONENTE E ESTÁ PENDENTE: Mostra notificação
-        if (duel.opponent_id === session.user.id && duel.status === 'pending') {
-          setIncomingDuel(duel);
-        }
+  useEffect(() => {
+    if (!isAuthenticated || !session?.user) return;
+    const channel = presenceChannelRef.current;
+    if (!channel || !presenceSubscribedRef.current) return;
 
-        // SE O DUELO FICOU ATIVO: Entra na arena
-        if ((duel.challenger_id === session.user.id || duel.opponent_id === session.user.id) && duel.status === 'active') {
-          setIncomingDuel(null);
-          setActiveDuel(duel);
-          setCurrentView(View.Duel);
-        }
-      })
+    const selectedSubject = subjects.find(s => s.id === timerSelectedSubjectId);
+    void channel.track({
+      user_id: session.user.id,
+      name: session.user.user_metadata?.full_name || 'Doutor(a)',
+      view: currentView,
+      subject_name: timerIsActive ? (selectedSubject?.name || 'Geral') : undefined,
+      is_timer_active: timerIsActive,
+      last_seen: new Date().toISOString(),
+      study_room_id: currentView === View.StudyRoom ? currentRoomId : null,
+      study_start_time: currentView === View.StudyRoom ? roomStartTime : null,
+      localizacao_atual: getViewLabel(currentView),
+      turma: userProfile?.turma,
+      cargo: userProfile?.experiencias_lideranca?.[0]?.cargo
+    });
+  }, [
+    isAuthenticated,
+    session?.user?.id,
+    session?.user?.user_metadata?.full_name,
+    currentView,
+    timerIsActive,
+    timerSelectedSubjectId,
+    subjects,
+    currentRoomId,
+    roomStartTime,
+    userProfile?.turma,
+    userProfile?.experiencias_lideranca,
+  ]);
+
+  // Duels: only rows where the user participates (avoids processing every duel row on the project).
+  useEffect(() => {
+    if (!isAuthenticated || !session?.user) return;
+    const uid = session.user.id;
+
+    const handleDuelPayload = (payload: { new: Record<string, unknown> }) => {
+      const duel = payload.new as Duel;
+      if (!duel) return;
+
+      if (duel.opponent_id === uid && duel.status === 'pending') {
+        setIncomingDuel(duel);
+      }
+
+      if ((duel.challenger_id === uid || duel.opponent_id === uid) && duel.status === 'active') {
+        setIncomingDuel(null);
+        setActiveDuel(duel);
+        setCurrentView(View.Duel);
+      }
+    };
+
+    const duelsChannel = supabase
+      .channel('global_duels_filtered')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'duels', filter: `challenger_id=eq.${uid}` },
+        handleDuelPayload
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'duels', filter: `opponent_id=eq.${uid}` },
+        handleDuelPayload
+      )
       .subscribe();
 
     return () => {
-      channel.unsubscribe();
       supabase.removeChannel(duelsChannel);
     };
-  }, [isAuthenticated, session, currentView, timerIsActive, timerSelectedSubjectId, subjects, currentRoomId, roomStartTime, userProfile]);
+  }, [isAuthenticated, session?.user?.id]);
 
   // Pomodoro Logic
   useEffect(() => {

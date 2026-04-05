@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../services/supabaseClient';
+import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import ChatSidebar from './chat/ChatSidebar';
 import MessageList from './chat/MessageList';
 import MessageItem from './chat/MessageItem';
@@ -768,18 +769,21 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   };
 
   const subscribeToCalls = () => {
+    const debouncedHistory = createTrailingDebounce(() => {
+      void fetchCallHistory();
+    }, 600);
+
     const channel = supabase
       .channel('chat_calls_history')
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
         table: 'chat_calls' 
-      }, () => {
-        fetchCallHistory();
-      })
+      }, () => debouncedHistory.schedule())
       .subscribe();
     
     return () => {
+      debouncedHistory.cancel();
       supabase.removeChannel(channel);
     };
   };
@@ -918,26 +922,27 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   };
 
   const subscribeToAllRooms = () => {
+    const debouncedRooms = createTrailingDebounce(() => {
+      void fetchRooms();
+    }, 550);
+
     const channel = supabase
       .channel('global-chat-updates')
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
         table: 'chat_rooms' 
-      }, () => {
-        fetchRooms();
-      })
+      }, () => debouncedRooms.schedule())
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
         table: 'chat_participants',
         filter: `user_id=eq.${userId}`
-      }, () => {
-        fetchRooms();
-      })
+      }, () => debouncedRooms.schedule())
       .subscribe();
     
     return () => {
+      debouncedRooms.cancel();
       supabase.removeChannel(channel);
     };
   };
@@ -1529,16 +1534,19 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   };
 
   const subscribeToPolls = (roomId: string) => {
+    const debouncedPolls = createTrailingDebounce(() => {
+      void fetchPolls(roomId);
+    }, 450);
+
     const channel = supabase
       .channel(`polls:${roomId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_poll_votes' }, () => {
-        fetchPolls(roomId);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_polls' }, () => {
-        fetchPolls(roomId);
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_poll_votes' }, () => debouncedPolls.schedule())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_polls' }, () => debouncedPolls.schedule())
       .subscribe();
-    return () => supabase.removeChannel(channel);
+    return () => {
+      debouncedPolls.cancel();
+      supabase.removeChannel(channel);
+    };
   };
 
   const fetchStories = async () => {
@@ -1557,13 +1565,18 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   };
 
   const subscribeToStories = () => {
+    const debouncedStories = createTrailingDebounce(() => {
+      void fetchStories();
+    }, 600);
+
     const channel = supabase
       .channel('chat_stories_channel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_stories' }, () => {
-        fetchStories();
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_stories' }, () => debouncedStories.schedule())
       .subscribe();
-    return () => supabase.removeChannel(channel);
+    return () => {
+      debouncedStories.cancel();
+      supabase.removeChannel(channel);
+    };
   };
 
   const createStory = async () => {
@@ -2436,51 +2449,72 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     setRemoteStream(null);
   };
 
-  // Listen for calls
+  // Listen for calls (filtered — avoid receiving every row in chat_calls)
   useEffect(() => {
     if (!userId) return;
 
-    const channel = supabase
-      .channel('chat_calls')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'chat_calls'
-      }, async (payload) => {
-        const call = payload.new as any;
-        
-        // Handle incoming call for me
-        if (payload.eventType === 'INSERT' && call.receiver_id === userId && call.status === 'ringing') {
-          // Fetch caller profile
-          const { data: callerProfile } = await supabase
-            .from('user_persona')
-            .select('nome, avatar_url')
-            .eq('id', call.caller_id)
-            .single();
-          
-          setIncomingCall({ ...call, caller_name: callerProfile?.nome || 'Colega', caller_avatar: callerProfile?.avatar_url });
-        } 
-        
-        // Handle updates for calls I'm part of
-        if (payload.eventType === 'UPDATE' && (call.caller_id === userId || call.receiver_id === userId)) {
-          if (call.status === 'ended') {
-            endCall();
-          } else if (call.status === 'ongoing' && call.caller_id === userId) {
-            setCallStatus('connected');
-          }
-          
-          if (call.signaling_data && call.signaling_data.from !== userId) {
-            const pc = peerConnectionRef.current;
-            if (pc) {
-              if (call.signaling_data.type === 'answer') {
-                await pc.setRemoteDescription(new RTCSessionDescription(call.signaling_data.sdp));
-              } else if (call.signaling_data.type === 'candidate') {
-                await pc.addIceCandidate(new RTCIceCandidate(call.signaling_data.candidate));
-              }
+    const onCallRow = async (payload: {
+      eventType: string;
+      new: Record<string, unknown>;
+    }) => {
+      const call = payload.new as any;
+
+      if (payload.eventType === 'INSERT' && call.receiver_id === userId && call.status === 'ringing') {
+        const { data: callerProfile } = await supabase
+          .from('user_persona')
+          .select('nome, avatar_url')
+          .eq('id', call.caller_id)
+          .single();
+
+        setIncomingCall({
+          ...call,
+          caller_name: callerProfile?.nome || 'Colega',
+          caller_avatar: callerProfile?.avatar_url,
+        });
+      }
+
+      if (payload.eventType === 'UPDATE' && (call.caller_id === userId || call.receiver_id === userId)) {
+        if (call.status === 'ended') {
+          endCall();
+        } else if (call.status === 'ongoing' && call.caller_id === userId) {
+          setCallStatus('connected');
+        }
+
+        if (call.signaling_data && call.signaling_data.from !== userId) {
+          const pc = peerConnectionRef.current;
+          if (pc) {
+            if (call.signaling_data.type === 'answer') {
+              await pc.setRemoteDescription(new RTCSessionDescription(call.signaling_data.sdp));
+            } else if (call.signaling_data.type === 'candidate') {
+              await pc.addIceCandidate(new RTCIceCandidate(call.signaling_data.candidate));
             }
           }
         }
-      })
+      }
+    };
+
+    const channel = supabase
+      .channel('chat_calls')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'chat_calls',
+          filter: `caller_id=eq.${userId}`,
+        },
+        (payload) => void onCallRow(payload as { eventType: string; new: Record<string, unknown> })
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'chat_calls',
+          filter: `receiver_id=eq.${userId}`,
+        },
+        (payload) => void onCallRow(payload as { eventType: string; new: Record<string, unknown> })
+      )
       .subscribe();
 
     return () => {
