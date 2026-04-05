@@ -169,6 +169,31 @@ function QuestionAlternativeAnalysisBlocks({
   );
 }
 
+/** Limita tokens/latência ao gerar questões a partir de uma pasta grande de flashcards. */
+const AI_FLASHCARD_CONTEXT_MAX_CARDS = 80;
+const AI_FLASHCARD_CONTEXT_MAX_CHARS = 48_000;
+
+function buildCappedFlashcardContextForAi(folderCards: Flashcard[]): string {
+  if (folderCards.length === 0) return '';
+  const capCards = folderCards.slice(0, AI_FLASHCARD_CONTEXT_MAX_CARDS);
+  const lines: string[] = [];
+  let used = 0;
+  for (const c of capCards) {
+    const line = `- ${c.front}: ${c.back}`;
+    const next = used + (lines.length > 0 ? 1 : 0) + line.length;
+    if (next > AI_FLASHCARD_CONTEXT_MAX_CHARS) break;
+    lines.push(line);
+    used = next;
+  }
+  const included = lines.length;
+  const base = `Baseie as questões no seguinte conteúdo jurídico (flashcards):\n${lines.join('\n')}`;
+  const omitted = folderCards.length - included;
+  if (omitted > 0) {
+    return `${base}\n(Nota: ${omitted} flashcard(s) omitidos por limite de tamanho do contexto; use o material acima como base principal.)`;
+  }
+  return base;
+}
+
 function migrateSavedFilterPresetRow(row: unknown): QuestionBankSavedFilterPreset | null {
   if (!row || typeof row !== 'object') return null;
   const x = row as Partial<QuestionBankSavedFilterPreset> & { selectedSubject?: string };
@@ -937,11 +962,12 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
       old: { id: string };
     }) => {
       if (payload.eventType === 'INSERT') {
-        setQuestions(prev => [normalizeQuestionFromApi(payload.new as Question), ...prev]);
+        setQuestions(prev => [normalizeQuestionFromApi(payload.new as unknown as Question), ...prev]);
       } else if (payload.eventType === 'UPDATE') {
+        const row = payload.new as unknown as Question;
         setQuestions(prev =>
           prev.map(q =>
-            q.id === (payload.new as Question).id ? normalizeQuestionFromApi(payload.new as Question) : q
+            q.id === row.id ? normalizeQuestionFromApi(row) : q
           )
         );
       } else if (payload.eventType === 'DELETE') {
@@ -954,7 +980,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
       questionsChannel = supabase
         .channel('question_bank_changes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'questions' }, (payload) => {
-          applyPayload(payload as { eventType: string; new: Record<string, unknown>; old: { id: string } });
+          applyPayload(payload as unknown as { eventType: string; new: Record<string, unknown>; old: { id: string } });
         })
         .subscribe();
     };
@@ -1414,57 +1440,71 @@ Forneça a explicação de forma concisa e didática.`;
       // Cenário B (Primeira Geração)
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
       
-      const prompt = `Como um professor de Direito especialista em concursos, forneça uma correção técnica e didática para esta questão:
+      const prompt = `Como um professor de Direito especialista em concursos, forneça uma correção técnica e didática para esta questão.
       
       ENUNCIADO: ${question.statement}
       ALTERNATIVAS: ${question.options.map((o, i) => `${String.fromCharCode(65 + i)}) ${o}`).join(' | ')}
       GABARITO: Alternativa ${String.fromCharCode(65 + question.correct_answer)}
       BANCA: ${question.exam_board || 'Geral'}
       
-      Siga RIGOROSAMENTE este formato JSON:
-      {
-        "doctrineAndContext": "Explicação didática do conceito central da questão (1 ou 2 parágrafos)",
-        "legalBasis": "Artigo da lei, súmula ou informativo que fundamenta a resposta",
-        "alternativesAnalysis": [
-          { "alternative": "A", "status": "Correta" ou "Incorreta", "explanation": "Explicação breve" },
-          ...
-        ],
-        "mnemonic": "Um 'Pulo do Gato' (dica ou mnemônico) para não errar mais",
-        "doctrineLink": "Referência curta ao tópico doutrinário (ex: Direito Penal - Teoria do Erro)",
-        "doctrineUrl": "URL de uma fonte externa confiável sobre o assunto"
-      }`;
+      Preencha todos os campos do JSON solicitado. Em alternativesAnalysis, use status exatamente "Correta" ou "Incorreta" por alternativa.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-flash-lite-preview",
-        contents: prompt
+        model: GEMINI_MODEL,
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              doctrineAndContext: { type: Type.STRING },
+              legalBasis: { type: Type.STRING },
+              alternativesAnalysis: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    alternative: { type: Type.STRING },
+                    status: { type: Type.STRING },
+                    explanation: { type: Type.STRING },
+                  },
+                },
+              },
+              mnemonic: { type: Type.STRING },
+              doctrineLink: { type: Type.STRING },
+              doctrineUrl: { type: Type.STRING },
+            },
+            required: [
+              'doctrineAndContext',
+              'legalBasis',
+              'alternativesAnalysis',
+              'mnemonic',
+              'doctrineLink',
+              'doctrineUrl',
+            ],
+          },
+        },
       });
 
       if (response.text) {
-        let data;
+        let data: QuestionAiCorrection;
         try {
-          // Remove potential markdown code blocks
-          const cleanedText = response.text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-          const firstBrace = cleanedText.indexOf('{');
-          const lastBrace = cleanedText.lastIndexOf('}');
-          const jsonStr = (firstBrace !== -1 && lastBrace !== -1)
-            ? cleanedText.substring(firstBrace, lastBrace + 1)
-            : cleanedText;
-          data = JSON.parse(jsonStr);
+          data = JSON.parse(response.text) as QuestionAiCorrection;
         } catch (e) {
           console.error('Failed to parse AI response as JSON:', e, response.text);
-          // Fallback to string if parsing fails completely
-          setAiCommentary(prev => ({ ...prev, [question.id]: response.text }));
+          setAiCommentary(prev => ({ ...prev, [question.id]: response.text as QuestionAiCommentary }));
           return;
         }
 
         setAiCommentary(prev => ({ ...prev, [question.id]: data as QuestionAiCommentary }));
-        
+        const serialized = response.text;
+
         // Imediatamente faça um UPDATE no banco de dados
         let { error: updateError } = await supabase
           .from('questions')
           .update({ 
-            texto_gabarito_ia: response.text, // Salva a string gerada
-            ai_correction: data, // Mantém para compatibilidade
+            texto_gabarito_ia: serialized,
+            ai_correction: data,
             explicacao_doutrinaria: data.doctrineAndContext
           })
           .eq('id', question.id);
@@ -1613,11 +1653,16 @@ Forneça a explicação de forma concisa e didática.`;
   ]);
 
   const fetchQuestions = async () => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const { data, error } = await supabase
         .from('questions')
         .select('*')
+        .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -1886,7 +1931,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
       if (aiConfig.baseOnFlashcards && aiConfig.selectedFolderId) {
         const folderCards = flashcards.filter(c => c.folderId === aiConfig.selectedFolderId);
         if (folderCards.length > 0) {
-          contextFromFlashcards = `Baseie as questões no seguinte conteúdo jurídico (flashcards):\n${folderCards.map(c => `- ${c.front}: ${c.back}`).join('\n')}`;
+          contextFromFlashcards = buildCappedFlashcardContextForAi(folderCards);
         }
       }
 
@@ -1909,7 +1954,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
       }
       
       const totalQuestions = aiConfig.count;
-      const chunkSize = 3;
+      const chunkSize = 5;
       const allGeneratedQuestions = [];
       const isMultipla = aiConfig.modality === 'multipla_escolha';
       const optionsSchemaDesc = isMultipla
@@ -2046,10 +2091,6 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
             throw new Error('AI response is not an array');
           }
           allGeneratedQuestions.push(...chunkParsed);
-        }
-
-        if (i + chunkSize < totalQuestions) {
-          await new Promise(resolve => setTimeout(resolve, 3000));
         }
       }
 

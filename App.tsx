@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map as MapIcon, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck, BookX, ScrollText, FileText, Repeat, UserX, ListTodo, Handshake, Eye, Key, CalendarCheck, Loader2, BarChart3, Search, Command, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -12,7 +12,11 @@ import { dataService } from './services/dataService';
 import { Toaster, toast } from 'sonner';
 import ErrorBoundary from './components/ErrorBoundary';
 import { getViewLabel, getBrasiliaDate, getBrasiliaISOString } from './utils';
-import { createScopedRealtimeDebounce, type UserDataSyncScope } from './utils/realtimeThrottle';
+import {
+  createScopedRealtimeDebounce,
+  type UserDataSyncScope,
+  type RealtimeUserDataScope,
+} from './utils/realtimeThrottle';
 
 /** Temporário: `*` até validar schema no Supabase; listas explícitas evitam colunas inexistentes ou omissões. */
 const FLASHCARD_CLOUD_COLUMNS = '*';
@@ -211,6 +215,8 @@ const App: React.FC = () => {
   }, [isSidebarMinimized]);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
+  /** Ignora refetch Realtime logo após sync em lote (rajada de postgres_changes). */
+  const realtimeMutedUntilRef = useRef(0);
   const [isLoadingFlashcards, setIsLoadingFlashcards] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [session, setSession] = useState<any>(null);
@@ -593,14 +599,7 @@ const App: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    if (isAuthenticated && session?.user) {
-      loadUserData();
-    }
-    // Só o id do utilizador: o objeto `session` muda de referência a cada refresh do JWT e re-disparava isto em loop.
-  }, [isAuthenticated, session?.user?.id]);
-
-  // --- Offline & Sync Logic ---
+  // --- Offline listeners ---
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
@@ -614,25 +613,40 @@ const App: React.FC = () => {
     };
   }, []);
 
+  /**
+   * Um único arranque: load completo uma vez; sync da fila Dexie só se houver itens (evita duplicar load+sync).
+   * Após sync em lote, silencia Realtime brevemente para não disparar outro full refetch.
+   */
   useEffect(() => {
-    if (isOnline && isAuthenticated && session?.user) {
-      handleSync();
-    }
-  }, [isOnline, isAuthenticated, session?.user?.id]);
+    if (!isAuthenticated || !session?.user) return;
+    let cancelled = false;
 
-  const handleSync = async () => {
-    if (!session?.user) return;
-    try {
-      setIsSyncing(true);
-      clearOldLocalStorage(session.user.id);
-      await dataService.syncOfflineData(session.user.id);
+    void (async () => {
       await loadUserData();
-    } catch (err) {
-      console.error("Sync failed:", err);
-    } finally {
-      setIsSyncing(false);
-    }
-  };
+      if (cancelled) return;
+
+      if (isOnline) {
+        const n = await db.syncQueue.count();
+        if (n > 0) {
+          try {
+            setIsSyncing(true);
+            realtimeMutedUntilRef.current = Date.now() + 2000;
+            clearOldLocalStorage(session.user.id);
+            await dataService.syncOfflineData(session.user.id);
+            if (!cancelled) await loadUserData();
+          } catch (err) {
+            console.error('Sync failed:', err);
+          } finally {
+            if (!cancelled) setIsSyncing(false);
+          }
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, session?.user?.id, isOnline]);
 
   const loadUserData = async (opts?: { scope?: UserDataSyncScope }) => {
     const scope: UserDataSyncScope = opts?.scope ?? 'full';
@@ -983,6 +997,10 @@ const App: React.FC = () => {
   const loadUserDataRef = useRef(loadUserData);
   loadUserDataRef.current = loadUserData;
 
+  const onQuestionBankProgressSynced = useCallback(() => {
+    void loadUserDataRef.current({ scope: 'user_progress' });
+  }, []);
+
   // --- Realtime Data Sync Listener (debounced + scoped refetch; after loadUserDataRef) ---
   useEffect(() => {
     if (!isAuthenticated || !session?.user) return;
@@ -990,12 +1008,16 @@ const App: React.FC = () => {
     const userId = session.user.id;
 
     const debounced = createScopedRealtimeDebounce(750, async (scopes) => {
-      if (scopes.size !== 1) {
-        await loadUserDataRef.current();
+      if (Date.now() < realtimeMutedUntilRef.current) return;
+      if (scopes.size === 1) {
+        const only = [...scopes][0];
+        await loadUserDataRef.current({ scope: only });
         return;
       }
-      const only = [...scopes][0];
-      await loadUserDataRef.current({ scope: only });
+      const order: RealtimeUserDataScope[] = ['folders', 'tasks', 'flashcards', 'user_progress'];
+      for (const s of order) {
+        if (scopes.has(s)) await loadUserDataRef.current({ scope: s });
+      }
     });
 
     const dataChannel = supabase.channel('realtime_data_sync')
@@ -1721,7 +1743,7 @@ const App: React.FC = () => {
                 <Route path={getPathFromView(View.PronunciationLab)} element={<PronunciationLab userId={session.user.id} />} />
                 <Route path={getPathFromView(View.LyricalVibes)} element={<LyricalVibes userId={session.user.id} />} />
                 <Route path={getPathFromView(View.TheExchangeStudent)} element={<TheExchangeStudent userId={session.user.id} />} />
-                <Route path={getPathFromView(View.QuestionBank)} element={<QuestionBank userId={session.user.id} folders={folders} flashcards={flashcards} isOnline={isOnline} onUserProgressSynced={loadUserData} />} />
+                <Route path={getPathFromView(View.QuestionBank)} element={<QuestionBank userId={session.user.id} folders={folders} flashcards={flashcards} isOnline={isOnline} onUserProgressSynced={onQuestionBankProgressSynced} />} />
                 <Route path={getPathFromView(View.IntelligentSummarizer)} element={<IntelligentSummarizer userId={session.user.id} />} />
                 <Route path={getPathFromView(View.StudyBuddy)} element={<StudyBuddy userId={session.user.id} />} />
                 <Route path={getPathFromView(View.Certificates)} element={<Certificates userId={session.user.id} userName={session.user.user_metadata?.full_name} />} />
@@ -1852,7 +1874,7 @@ const App: React.FC = () => {
                   />
                 } />
 
-                <Route path="/simulados" element={<QuestionBank userId={session.user.id} folders={folders} flashcards={flashcards} isOnline={isOnline} onUserProgressSynced={loadUserData} />} />
+                <Route path="/simulados" element={<QuestionBank userId={session.user.id} folders={folders} flashcards={flashcards} isOnline={isOnline} onUserProgressSynced={onQuestionBankProgressSynced} />} />
 
               </Routes>
 </ErrorBoundary>

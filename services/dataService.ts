@@ -145,12 +145,26 @@ function mapSyncQueueItemToRow(item: OfflineSyncQueue, userId: string): Record<s
   return payload;
 }
 
+/** Colunas aceites pelo PostgREST após o primeiro upsert bem-sucedido (evita N× strips na fila). */
+let notesRemoteColumnKeys: Set<string> | null = null;
+
+function projectNotePayloadToKnownColumns(payload: Record<string, unknown>): Record<string, unknown> {
+  if (!notesRemoteColumnKeys || notesRemoteColumnKeys.size === 0) return { ...payload };
+  const out: Record<string, unknown> = {};
+  for (const k of notesRemoteColumnKeys) {
+    if (Object.prototype.hasOwnProperty.call(payload, k)) out[k] = payload[k];
+  }
+  return out;
+}
+
 /**
  * Upsert a note row; strip columns missing from the remote schema (PostgREST PGRST204)
  * until the payload matches, so sync/backfill still works across Supabase projects.
  */
 async function upsertNoteToSupabase(payload: Record<string, unknown>) {
-  let current: Record<string, unknown> = { ...payload };
+  let current: Record<string, unknown> = notesRemoteColumnKeys
+    ? projectNotePayloadToKnownColumns(payload)
+    : { ...payload };
   const maxStrips = 12;
   let triedBareMinimum = false;
 
@@ -158,7 +172,10 @@ async function upsertNoteToSupabase(payload: Record<string, unknown>) {
     const { error } = await supabase
       .from('notes')
       .upsert(current, { onConflict: 'user_id' });
-    if (!error) return { error: null };
+    if (!error) {
+      notesRemoteColumnKeys = new Set(Object.keys(current));
+      return { error: null };
+    }
 
     const code = (error as { code?: string }).code;
     const msg = String((error as { message?: string }).message ?? '');
@@ -194,12 +211,16 @@ async function upsertNoteToSupabase(payload: Record<string, unknown>) {
   const { error: lastErr } = await supabase
     .from('notes')
     .upsert(current, { onConflict: 'user_id' });
+  if (!lastErr) {
+    notesRemoteColumnKeys = new Set(Object.keys(current));
+  }
   return { error: lastErr };
 }
 
 async function batchUpsertNotes(rows: Record<string, unknown>[]): Promise<{ error: { message?: string } | null }> {
   if (rows.length === 0) return { error: null };
-  const { error } = await supabase.from('notes').upsert(rows, { onConflict: 'id' });
+  const prepared = notesRemoteColumnKeys ? rows.map((r) => projectNotePayloadToKnownColumns(r)) : rows;
+  const { error } = await supabase.from('notes').upsert(prepared, { onConflict: 'id' });
   if (!error) return { error: null };
 
   for (const row of rows) {
