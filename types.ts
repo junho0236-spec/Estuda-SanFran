@@ -114,6 +114,8 @@ export enum View {
   Friends = 'friends',
   /** Mini gestão financeira (localStorage), inspirada no MDO */
   MeuDinheiroOrganizado = 'meu_dinheiro_organizado',
+  /** Sistema Forja (Life): iframe para app Express+tRPC em origem separada */
+  SistemaForja = 'sistema_forja',
 }
 
 export interface Folder {

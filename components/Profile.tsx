@@ -116,7 +116,11 @@ const Profile: React.FC = () => {
         setProfile(userProfile);
         
         // Fetch disciplines
-        const { data: discData } = await supabase.from('disciplinas').select('*').eq('user_id', session.user.id);
+        const { data: discData } = await supabase
+          .from('disciplinas')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .limit(500);
         if (discData) setDisciplinas(discData);
 
         setEditForm({

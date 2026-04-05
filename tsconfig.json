@@ -1,4 +1,5 @@
 {
+  "exclude": ["node_modules", "dist", "sistema-forja-replica-main", "components/forja/components/Map.tsx"],
   "compilerOptions": {
     "target": "ES2022",
     "experimentalDecorators": true,
@@ -21,6 +22,9 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@forja/*": [
+        "./components/forja/*"
       ]
     },
     "allowImportingTsExtensions": true,

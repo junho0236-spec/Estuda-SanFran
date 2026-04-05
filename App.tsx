@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map as MapIcon, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck, BookX, ScrollText, FileText, Repeat, UserX, ListTodo, Handshake, Eye, Key, CalendarCheck, Loader2, BarChart3, Search, Command, ChevronLeft, ChevronRight, Wallet } from 'lucide-react';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, HeartHandshake, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map as MapIcon, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck, BookX, ScrollText, FileText, Repeat, UserX, ListTodo, Handshake, Eye, Key, CalendarCheck, Loader2, BarChart3, Search, Command, ChevronLeft, ChevronRight, Wallet, Flame } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel, StudyMode, Board, Notification, Friendship, UserProfile } from './types';
 import Login from './components/Login';
 import Atmosphere from './components/Atmosphere';
@@ -13,6 +13,8 @@ import { dataService } from './services/dataService';
 import { Toaster, toast } from 'sonner';
 import ErrorBoundary from './components/ErrorBoundary';
 import { getViewLabel, getBrasiliaDate, getBrasiliaISOString } from './utils';
+import { SUPABASE_FLASHCARD_LOAD_COLUMNS } from './constants/supabaseFlashcardColumns';
+import { SUPABASE_ROW_LOAD_LIMITS as SFL, isPartialSupabasePage } from './constants/supabaseLoadLimits';
 
 // Lazy Load dos Componentes para Performance (Code Splitting)
 const Dashboard = React.lazy(() => import('./components/Dashboard'));
@@ -97,6 +99,7 @@ const SanFranImprovement = React.lazy(() => import('./components/SanFranImprovem
 const SanFranLanguages = React.lazy(() => import('./components/SanFranLanguages'));
 const SanFranLife = React.lazy(() => import('./components/SanFranLife'));
 const MeuDinheiroOrganizado = React.lazy(() => import('./components/MeuDinheiroOrganizado'));
+const SistemaForja = React.lazy(() => import('./components/SistemaForja'));
 const SanFranGames = React.lazy(() => import('./components/SanFranGames'));
 const SanFranHelp = React.lazy(() => import('./components/SanFranHelp'));
 const FAQ = React.lazy(() => import('./components/FAQ'));
@@ -179,7 +182,8 @@ const getViewFromPath = (pathname: string): View => {
   if (pathname === '/flashcards') return View.Anki;
   if (pathname === '/simulados') return View.QuestionBank;
   if (pathname === '/caderno-erros') return View.ErrorLog;
-  
+  if (pathname === '/sistema_forja' || pathname.startsWith('/sistema_forja/')) return View.SistemaForja;
+
   const pathWithoutSlash = pathname.substring(1);
   if (Object.values(View).includes(pathWithoutSlash as View)) {
     return pathWithoutSlash as View;
@@ -225,6 +229,35 @@ const App: React.FC = () => {
     productivityStats: { completedToday: 0, completedYesterday: 0, streak: 0 }
   });
 
+  /** Ref atualizado após definir loadUserData — usado pelo debounce do Realtime */
+  const loadUserDataRef = useRef<() => Promise<void>>(async () => {});
+  const loadMutexRef = useRef({ running: false, pending: false });
+  const realtimeDebounceTimerRef = useRef<number | null>(null);
+  const lastRealtimeLoadAtRef = useRef(0);
+
+  /** Evita rajadas de loadUserData (7+ queries) quando há muitas escritas seguidas (ex.: revisão de cards). */
+  const REALTIME_LOAD_DEBOUNCE_MS = 2500;
+  const REALTIME_LOAD_MIN_INTERVAL_MS = 9000;
+
+  const scheduleLoadUserDataFromRealtime = useCallback(() => {
+    if (realtimeDebounceTimerRef.current != null) clearTimeout(realtimeDebounceTimerRef.current);
+    realtimeDebounceTimerRef.current = window.setTimeout(() => {
+      realtimeDebounceTimerRef.current = null;
+      const elapsed = Date.now() - lastRealtimeLoadAtRef.current;
+      const extraDelay = Math.max(0, REALTIME_LOAD_MIN_INTERVAL_MS - elapsed);
+      window.setTimeout(() => {
+        lastRealtimeLoadAtRef.current = Date.now();
+        void loadUserDataRef.current();
+      }, extraDelay);
+    }, REALTIME_LOAD_DEBOUNCE_MS);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (realtimeDebounceTimerRef.current != null) clearTimeout(realtimeDebounceTimerRef.current);
+    };
+  }, []);
+
   // DUEL STATES
   const [activeDuel, setActiveDuel] = useState<Duel | null>(null);
   const [incomingDuel, setIncomingDuel] = useState<Duel | null>(null);
@@ -245,6 +278,34 @@ const App: React.FC = () => {
   const [wrongQuestionsCount, setWrongQuestionsCount] = useState(0);
   const [wrongQuestionIds, setWrongQuestionIds] = useState<string[]>([]);
   const [confidenceLevels, setConfidenceLevels] = useState<Record<string, 'certeza' | 'duvida' | 'chute'>>({});
+
+  /** Uma linha em user_progress — evita loadUserData completo a cada mudança (Realtime). */
+  const refreshUserProgressOnly = useCallback(async () => {
+    const uid = session?.user?.id;
+    if (!uid || !isOnline) return;
+    try {
+      const { data } = await supabase
+        .from('user_progress')
+        .select('correct_count, wrong_count, wrong_questions, wrong_question_ids, confidence_levels')
+        .eq('user_id', uid)
+        .maybeSingle();
+      if (data) {
+        setCorrectQuestionsCount(data.correct_count || 0);
+        setWrongQuestionsCount(data.wrong_count || 0);
+        setWrongQuestionIds(
+          (data as { wrong_questions?: string[]; wrong_question_ids?: string[] }).wrong_questions ??
+            (data as { wrong_question_ids?: string[] }).wrong_question_ids ??
+            []
+        );
+        setConfidenceLevels(
+          (data as { confidence_levels?: Record<string, 'certeza' | 'duvida' | 'chute'> }).confidence_levels ?? {}
+        );
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [session?.user?.id, isOnline]);
+
   const [selectedSubjectIdForNotes, setSelectedSubjectIdForNotes] = useState<string | null>(null);
   const [selectedSubjectIdForRepository, setSelectedSubjectIdForRepository] = useState<string | null>(null);
   const [selectedSubjectIdForAssignments, setSelectedSubjectIdForAssignments] = useState<string | null>(null);
@@ -370,7 +431,7 @@ const App: React.FC = () => {
         table: 'flashcards', 
         filter: `user_id=eq.${userId}` 
       }, () => {
-        loadUserData();
+        scheduleLoadUserDataFromRealtime();
       })
       .on('postgres_changes', { 
         event: '*', 
@@ -378,7 +439,7 @@ const App: React.FC = () => {
         table: 'tasks', 
         filter: `user_id=eq.${userId}` 
       }, () => {
-        loadUserData();
+        scheduleLoadUserDataFromRealtime();
       })
       .on('postgres_changes', { 
         event: '*', 
@@ -386,22 +447,22 @@ const App: React.FC = () => {
         table: 'folders', 
         filter: `user_id=eq.${userId}` 
       }, () => {
-        loadUserData();
+        scheduleLoadUserDataFromRealtime();
       })
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'user_progress', 
-        filter: `user_id=eq.${userId}` 
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'user_progress',
+        filter: `user_id=eq.${userId}`,
       }, () => {
-        loadUserData();
+        void refreshUserProgressOnly();
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(dataChannel);
     };
-  }, [isAuthenticated, session]);
+  }, [isAuthenticated, session, scheduleLoadUserDataFromRealtime, refreshUserProgressOnly]);
 
   // Pomodoro Logic
   useEffect(() => {
@@ -595,12 +656,6 @@ const App: React.FC = () => {
     };
   }, []);
 
-  useEffect(() => {
-    if (isOnline && isAuthenticated && session?.user) {
-      handleSync();
-    }
-  }, [isOnline, isAuthenticated, session]);
-
   const handleSync = async () => {
     if (!session?.user) return;
     setIsSyncing(true);
@@ -615,15 +670,27 @@ const App: React.FC = () => {
     }
   };
 
-  const loadUserData = async () => {
+  useEffect(() => {
+    if (!isOnline || !isAuthenticated || !session?.user?.id) return;
+    /** Atraso maior que o load inicial pós-login para não empilhar dois loadUserData completos. */
+    const timer = window.setTimeout(() => {
+      void handleSync();
+    }, 6500);
+    return () => clearTimeout(timer);
+  }, [isOnline, isAuthenticated, session?.user?.id]);
+
+  const runLoadUserDataOnce = async () => {
     if (!session?.user) return;
     const userId = session.user.id;
     
     try {
       setIsLoadingFlashcards(true);
       if (isOnline) {
-        // Fetch subjects first as they are often dependencies
-        const { data: subs } = await supabase.from('subjects').select('*').eq('user_id', userId);
+        const { data: subs } = await supabase
+          .from('subjects')
+          .select('*')
+          .eq('user_id', userId)
+          .limit(SFL.subjects);
         if (subs) setSubjects(subs);
         
         const profile = await dataService.getUserProfile(userId, isOnline);
@@ -645,14 +712,18 @@ const App: React.FC = () => {
           }
         }
 
-        // Fetch others in parallel but handle them individually to avoid one failure crashing everything
         const [resFlds, resCards, resTks, resBoards, resSessions, resReadings, resProgress] = await Promise.all([
-          supabase.from('folders').select('*').eq('user_id', userId),
-          supabase.from('flashcards').select('*').eq('user_id', userId).is('archived_at', null),
-          supabase.from('tasks').select('*').eq('user_id', userId).is('archived_at', null).order('created_at', { ascending: false }),
-          supabase.from('boards').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-          supabase.from('study_sessions').select('*').eq('user_id', userId).order('start_time', { ascending: false }),
-          supabase.from('readings').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+          supabase.from('folders').select('*').eq('user_id', userId).limit(SFL.folders),
+          supabase
+            .from('flashcards')
+            .select(SUPABASE_FLASHCARD_LOAD_COLUMNS)
+            .eq('user_id', userId)
+            .is('archived_at', null)
+            .limit(SFL.flashcards),
+          supabase.from('tasks').select('*').eq('user_id', userId).is('archived_at', null).order('created_at', { ascending: false }).limit(SFL.tasks),
+          supabase.from('boards').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(SFL.boards),
+          supabase.from('study_sessions').select('*').eq('user_id', userId).order('start_time', { ascending: false }).limit(SFL.study_sessions),
+          supabase.from('readings').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(SFL.readings),
           supabase.from('user_progress').select('*').eq('user_id', userId).maybeSingle()
         ]);
 
@@ -671,11 +742,15 @@ const App: React.FC = () => {
 
           const syncCount = await db.syncQueue.count();
           if (syncCount === 0) {
-            const localFolders = await db.folders.toArray();
-            const remoteIds = new Set(formattedFolders.map(f => f.id));
-            const idsToDelete = localFolders.filter(f => !remoteIds.has(f.id)).map(f => f.id);
-            if (idsToDelete.length > 0) await db.folders.bulkDelete(idsToDelete);
-            await db.folders.bulkPut(formattedFolders);
+            if (isPartialSupabasePage(formattedFolders.length, SFL.folders)) {
+              await db.folders.bulkPut(formattedFolders);
+            } else {
+              const localFolders = await db.folders.toArray();
+              const remoteIds = new Set(formattedFolders.map(f => f.id));
+              const idsToDelete = localFolders.filter(f => !remoteIds.has(f.id)).map(f => f.id);
+              if (idsToDelete.length > 0) await db.folders.bulkDelete(idsToDelete);
+              await db.folders.bulkPut(formattedFolders);
+            }
           }
           setFolders(formattedFolders);
         }
@@ -683,11 +758,15 @@ const App: React.FC = () => {
         if (subs) {
           const syncCount = await db.syncQueue.count();
           if (syncCount === 0) {
-            const localSubs = await db.subjects.toArray();
-            const remoteIds = new Set(subs.map(s => s.id));
-            const idsToDelete = localSubs.filter(s => !remoteIds.has(s.id)).map(s => s.id);
-            if (idsToDelete.length > 0) await db.subjects.bulkDelete(idsToDelete);
-            await db.subjects.bulkPut(subs);
+            if (isPartialSupabasePage(subs.length, SFL.subjects)) {
+              await db.subjects.bulkPut(subs);
+            } else {
+              const localSubs = await db.subjects.toArray();
+              const remoteIds = new Set(subs.map(s => s.id));
+              const idsToDelete = localSubs.filter(s => !remoteIds.has(s.id)).map(s => s.id);
+              if (idsToDelete.length > 0) await db.subjects.bulkDelete(idsToDelete);
+              await db.subjects.bulkPut(subs);
+            }
           }
           setSubjects(subs);
         }
@@ -754,11 +833,15 @@ const App: React.FC = () => {
 
           const syncCount = await db.syncQueue.count();
           if (syncCount === 0) {
-            const localTasks = await db.tasks.toArray();
-            const remoteIds = new Set(formattedTasks.map(t => t.id));
-            const idsToDelete = localTasks.filter(t => !remoteIds.has(t.id)).map(t => t.id);
-            if (idsToDelete.length > 0) await db.tasks.bulkDelete(idsToDelete);
-            await db.tasks.bulkPut(formattedTasks as Task[]);
+            if (isPartialSupabasePage(formattedTasks.length, SFL.tasks)) {
+              await db.tasks.bulkPut(formattedTasks as Task[]);
+            } else {
+              const localTasks = await db.tasks.toArray();
+              const remoteIds = new Set(formattedTasks.map(t => t.id));
+              const idsToDelete = localTasks.filter(t => !remoteIds.has(t.id)).map(t => t.id);
+              if (idsToDelete.length > 0) await db.tasks.bulkDelete(idsToDelete);
+              await db.tasks.bulkPut(formattedTasks as Task[]);
+            }
           }
           setTasks(formattedTasks as Task[]);
         }
@@ -769,7 +852,15 @@ const App: React.FC = () => {
           }));
           const syncCount = await db.syncQueue.count();
           if (syncCount === 0) {
-            await db.boards.bulkPut(formattedBoards);
+            if (isPartialSupabasePage(formattedBoards.length, SFL.boards)) {
+              await db.boards.bulkPut(formattedBoards);
+            } else {
+              const localBoards = await db.boards.toArray();
+              const remoteIds = new Set(formattedBoards.map(b => b.id));
+              const idsToDelete = localBoards.filter(b => !remoteIds.has(b.id)).map(b => b.id);
+              if (idsToDelete.length > 0) await db.boards.bulkDelete(idsToDelete);
+              await db.boards.bulkPut(formattedBoards);
+            }
           }
           setBoards(formattedBoards);
         }
@@ -777,11 +868,15 @@ const App: React.FC = () => {
         if (resSessions.data) {
           const syncCount = await db.syncQueue.count();
           if (syncCount === 0) {
-            const localSessions = await db.study_sessions.toArray();
-            const remoteIds = new Set(resSessions.data.map(s => s.id));
-            const idsToDelete = localSessions.filter(s => !remoteIds.has(s.id)).map(s => s.id);
-            if (idsToDelete.length > 0) await db.study_sessions.bulkDelete(idsToDelete);
-            await db.study_sessions.bulkPut(resSessions.data);
+            if (isPartialSupabasePage(resSessions.data.length, SFL.study_sessions)) {
+              await db.study_sessions.bulkPut(resSessions.data);
+            } else {
+              const localSessions = await db.study_sessions.toArray();
+              const remoteIds = new Set(resSessions.data.map(s => s.id));
+              const idsToDelete = localSessions.filter(s => !remoteIds.has(s.id)).map(s => s.id);
+              if (idsToDelete.length > 0) await db.study_sessions.bulkDelete(idsToDelete);
+              await db.study_sessions.bulkPut(resSessions.data);
+            }
           }
           setStudySessions(resSessions.data);
         }
@@ -815,6 +910,25 @@ const App: React.FC = () => {
       setIsLoadingFlashcards(false);
     }
   };
+
+  const loadUserData = async () => {
+    if (loadMutexRef.current.running) {
+      loadMutexRef.current.pending = true;
+      return;
+    }
+    loadMutexRef.current.running = true;
+    try {
+      for (;;) {
+        loadMutexRef.current.pending = false;
+        await runLoadUserDataOnce();
+        if (!loadMutexRef.current.pending) break;
+      }
+    } finally {
+      loadMutexRef.current.running = false;
+    }
+  };
+
+  loadUserDataRef.current = loadUserData;
 
   useEffect(() => {
     if (!isAuthenticated || !session?.user) return;
@@ -931,7 +1045,7 @@ const App: React.FC = () => {
     { id: View.Tasks, icon: CheckSquare, label: 'Tarefas', color: 'text-emerald-600', bg: 'bg-emerald-100' },
     { id: View.Anki, icon: BrainCircuit, label: 'FLASHCARDS', color: 'text-slate-900', bg: 'bg-slate-200' },
     { id: View.Connect, icon: MessageSquare, label: 'CONNECT', color: 'text-blue-600', bg: 'bg-blue-100' },
-    { id: View.Friends, icon: Users, label: 'FRIENDS', color: 'text-emerald-600', bg: 'bg-emerald-100' },
+    { id: View.Friends, icon: HeartHandshake, label: 'FRIENDS', color: 'text-emerald-600', bg: 'bg-emerald-100' },
     { id: View.Statistics, icon: BarChart3, label: 'Estatísticas', color: 'text-usp-gold', bg: 'bg-usp-gold/10' },
     { id: View.Timer, icon: TimerIcon, label: 'Controle de Tempo', color: 'text-red-600', bg: 'bg-red-100' },
     {
@@ -940,6 +1054,13 @@ const App: React.FC = () => {
       label: 'MDO',
       color: 'text-teal-700',
       bg: 'bg-teal-100',
+    },
+    {
+      id: View.SistemaForja,
+      icon: Flame,
+      label: 'FORJA',
+      color: 'text-orange-700',
+      bg: 'bg-orange-100',
     },
 
     // HUBS
@@ -1607,6 +1728,22 @@ const App: React.FC = () => {
                 <Route
                   path={getPathFromView(View.MeuDinheiroOrganizado)}
                   element={<MeuDinheiroOrganizado userId={session.user.id} />}
+                />
+
+                <Route
+                  path={`${getPathFromView(View.SistemaForja)}/*`}
+                  element={
+                    <SistemaForja
+                      userId={session.user.id}
+                      email={session.user.email ?? null}
+                      displayName={
+                        (session.user.user_metadata?.full_name as string | undefined) ??
+                        (session.user.user_metadata?.name as string | undefined) ??
+                        null
+                      }
+                      onLeaveForja={() => navigate('/')}
+                    />
+                  }
                 />
 
                 <Route path={getPathFromView(View.OralArgument)} element={<OralArgument />} />
