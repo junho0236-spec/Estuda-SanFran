@@ -463,8 +463,8 @@ const App: React.FC = () => {
   const saveStudySession = async (duration: number) => {
     if (!session?.user) return;
     const brDate = getBrasiliaISOString();
-    const newSessionId = Math.random().toString(36).substr(2, 9);
-    
+    const newSessionId = crypto.randomUUID();
+
     const newSession: StudySession = {
       id: newSessionId,
       user_id: session.user.id,

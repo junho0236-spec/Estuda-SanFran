@@ -11,6 +11,14 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
   return out;
 }
 
+/** Postgres `study_sessions.id` é UUID; IDs curtos (ex. do Pomodoro) quebram o upsert em lote. */
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isValidUuid(id: string): boolean {
+  return typeof id === 'string' && UUID_RE.test(id.trim());
+}
+
 /**
  * Chave estável para “último evento na fila ganha” (evita upsert+delete contraditórios duplicados).
  */
@@ -969,18 +977,20 @@ export const dataService = {
 
   // STUDY SESSIONS
   async saveStudySession(session: any, userId: string, isOnline: boolean) {
-    await db.study_sessions.put(session);
+    const sid = String(session?.id ?? '');
+    const normalized = isValidUuid(sid) ? session : { ...session, id: crypto.randomUUID() };
+    await db.study_sessions.put(normalized);
 
     if (isOnline) {
       const { error } = await supabase.from('study_sessions').insert({
-        ...session,
+        ...normalized,
         user_id: userId
       });
       if (error) {
-        await addToSyncQueue({ table: 'study_sessions', action: 'insert', data: session });
+        await addToSyncQueue({ table: 'study_sessions', action: 'insert', data: normalized });
       }
     } else {
-      await addToSyncQueue({ table: 'study_sessions', action: 'insert', data: session });
+      await addToSyncQueue({ table: 'study_sessions', action: 'insert', data: normalized });
     }
   },
 
@@ -1227,6 +1237,18 @@ export const dataService = {
       const rows = [...rowMap.values()];
       if (rows.length === 0) return;
 
+      const studySessionIdRewrites = new Map<string, string>();
+      if (table === 'study_sessions') {
+        for (const row of rows) {
+          const sid = String(row.id ?? '');
+          if (!isValidUuid(sid)) {
+            const nid = crypto.randomUUID();
+            studySessionIdRewrites.set(sid, nid);
+            row.id = nid;
+          }
+        }
+      }
+
       for (const chunk of chunkArray(rows, SYNC_UPSERT_CHUNK)) {
         let error: { message?: string } | null = null;
         if (table === 'notes') {
@@ -1241,6 +1263,21 @@ export const dataService = {
           throw error;
         }
       }
+
+      if (table === 'study_sessions' && studySessionIdRewrites.size > 0) {
+        for (const [oldId, newId] of studySessionIdRewrites) {
+          try {
+            const rec = await db.study_sessions.get(oldId);
+            if (rec) {
+              await db.study_sessions.delete(oldId);
+              await db.study_sessions.put({ ...rec, id: newId });
+            }
+          } catch (e) {
+            console.warn('[sync] não foi possível reescrever id local de study_session', oldId, e);
+          }
+        }
+      }
+
       winnerIdsSucceeded.push(...qids);
     };
 
