@@ -14,13 +14,10 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { getViewLabel, getBrasiliaDate, getBrasiliaISOString } from './utils';
 import { createScopedRealtimeDebounce, type UserDataSyncScope } from './utils/realtimeThrottle';
 
-/** Colunas realmente usadas pelo estado global — evita `SELECT *` (menos RAM/IO no Postgres e no cliente). */
-const FLASHCARD_CLOUD_COLUMNS =
-  'id, subject_id, folder_id, front, back, notes, tags, source, next_review, interval, status, learning_step, ease_factor, total_errors, archived_at, is_suspended';
-const TASK_CLOUD_COLUMNS =
-  'id, title, description, status, subject_id, due_date, completed_at, priority, category, archived_at, notes, subtasks, delegated_to, delegated_by, created_at, google_event_id';
-const USER_PROGRESS_CLOUD_COLUMNS =
-  'user_id, correct_count, wrong_count, wrong_questions, wrong_question_ids, confidence_levels, updated_at';
+/** Temporário: `*` até validar schema no Supabase; listas explícitas evitam colunas inexistentes ou omissões. */
+const FLASHCARD_CLOUD_COLUMNS = '*';
+const TASK_CLOUD_COLUMNS = '*';
+const USER_PROGRESS_CLOUD_COLUMNS = '*';
 
 // Lazy Load dos Componentes para Performance (Code Splitting)
 const Dashboard = React.lazy(() => import('./components/Dashboard'));
@@ -625,8 +622,8 @@ const App: React.FC = () => {
 
   const handleSync = async () => {
     if (!session?.user) return;
-    setIsSyncing(true);
     try {
+      setIsSyncing(true);
       clearOldLocalStorage(session.user.id);
       await dataService.syncOfflineData(session.user.id);
       await loadUserData();
@@ -638,13 +635,18 @@ const App: React.FC = () => {
   };
 
   const loadUserData = async (opts?: { scope?: UserDataSyncScope }) => {
-    if (!session?.user) return;
-    const userId = session.user.id;
     const scope: UserDataSyncScope = opts?.scope ?? 'full';
     const showFlashLoading = scope === 'full' || scope === 'flashcards';
 
     try {
-      if (showFlashLoading) setIsLoadingFlashcards(true);
+      if (!session?.user) {
+        return;
+      }
+      const userId = session.user.id;
+
+      if (showFlashLoading) {
+        setIsLoadingFlashcards(true);
+      }
 
       if (!isOnline) {
         if (scope !== 'full') return;
@@ -956,19 +958,25 @@ const App: React.FC = () => {
     } catch (err) {
       console.error("Erro no carregamento dos dados:", err);
       if (scope === 'full') {
-        const [localTasks, localBoards, localSessions, localFolders] = await Promise.all([
-          db.tasks.toArray(),
-          db.boards.toArray(),
-          db.study_sessions.toArray(),
-          db.folders.toArray()
-        ]);
-        setTasks(localTasks);
-        setBoards(localBoards);
-        setStudySessions(localSessions);
-        setFolders(localFolders);
+        try {
+          const [localTasks, localBoards, localSessions, localFolders] = await Promise.all([
+            db.tasks.toArray(),
+            db.boards.toArray(),
+            db.study_sessions.toArray(),
+            db.folders.toArray()
+          ]);
+          setTasks(localTasks);
+          setBoards(localBoards);
+          setStudySessions(localSessions);
+          setFolders(localFolders);
+        } catch (fallbackErr) {
+          console.error("Erro ao hidratar dados locais após falha na nuvem:", fallbackErr);
+        }
       }
     } finally {
-      if (showFlashLoading) setIsLoadingFlashcards(false);
+      if (showFlashLoading) {
+        setIsLoadingFlashcards(false);
+      }
     }
   };
 
