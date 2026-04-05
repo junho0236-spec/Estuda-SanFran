@@ -67,9 +67,7 @@ import { QuestionBankMockHud } from './question-bank/QuestionBankMockHud';
 import { QuestionBankMainHeader } from './question-bank/QuestionBankMainHeader';
 import { QuestionBankErrorInsightBanner } from './question-bank/QuestionBankErrorInsightBanner';
 import { QuestionBankPdfHiddenShell } from './question-bank/QuestionBankPdfHiddenShell';
-import { QuestionBankListView } from './question-bank/QuestionBankListView';
-import { QuestionBankSingleQuestionView } from './question-bank/QuestionBankSingleQuestionView';
-import { QuestionBankEmptyQuestions } from './question-bank/QuestionBankEmptyQuestions';
+import { QuestionBankQuestionArea } from './question-bank/QuestionBankQuestionArea';
 import { QuestionBankAiLessonModal } from './question-bank/QuestionBankAiLessonModal';
 import { QuestionBankJuridiquesModal } from './question-bank/QuestionBankJuridiquesModal';
 import { QuestionBankManualGlossaryModal } from './question-bank/QuestionBankManualGlossaryModal';
@@ -3046,123 +3044,117 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
           </QuestionBankStatsGoalsNotebookShell>
 
           {/* Question Area */}
-          <div key="question-area-container" className="w-full" ref={resultsSectionRef}>
-            <div
-              className="flex-1"
-              style={{ fontSize: `${listFontScalePercent}%` }}
-            >
-              {(isMockMode ? mockQuestions.length > 0 : filteredQuestions.length > 0) && currentQuestion ? (
-                viewMode === 'list' ? (
-                <QuestionBankListView
-                  pagedQuestions={pagedQuestions}
-                  listPage={listPage}
-                  listPageSize={listPageSize}
-                  activeQuestionId={activeQuestionId}
-                  selectedQuestionsForNotebook={selectedQuestionsForNotebook}
-                  toggleQuestionSelection={toggleQuestionSelection}
-                  userId={userId}
-                  onDeleteQuestion={handleDeleteQuestion}
-                  getXRayStats={getXRayStats}
-                  correctQuestions={correctQuestions}
-                  wrongQuestions={wrongQuestions}
-                  showXRay={showXRay}
-                  expandedQuestionId={expandedQuestionId}
-                  setExpandedQuestionId={setExpandedQuestionId}
-                  setCurrentIndex={setCurrentIndex}
-                  setSelectedOption={setSelectedOption}
-                  setShowExplanation={setShowExplanation}
-                  onTermClick={handleTermClick}
-                  selectedText={selectedText}
-                  onJuridiquesTranslate={handleJuridiquesTranslate}
-                  loadingJuridiquesExplanation={loadingJuridiquesExplanation}
-                  isMockMode={isMockMode}
-                  onAudioHint={handleAudioHint}
-                  isGeneratingHint={isGeneratingHint}
-                  onSaveAsPrecedent={handleSaveAsPrecedent}
-                  isSavingPrecedent={isSavingPrecedent}
-                  onAnswerOption={handleAnswer}
-                  mockAnswers={mockAnswers}
-                  isMockFinished={isMockFinished}
-                  selectedOption={selectedOption}
-                  showExplanation={showExplanation}
-                  eliminatedOptions={eliminatedOptions}
-                  onToggleElimination={toggleElimination}
-                  loadingAiCommentary={loadingAiCommentary}
-                  aiCommentary={aiCommentary}
-                  followUpChat={followUpChat}
-                  followUpInput={followUpInput}
-                  setFollowUpInput={setFollowUpInput}
-                  isFollowUpLoading={isFollowUpLoading}
-                  onFollowUp={handleFollowUp}
-                  onCreateFlashcardFromError={handleCreateFlashcardFromError}
-                  showNotification={showNotification}
-                  filteredQuestionCount={filteredQuestions.length}
-                  onPrevListPage={() => setListPage((p) => Math.max(1, p - 1))}
-                  onNextListPage={() =>
-                    setListPage((p) =>
-                      Math.min(Math.max(1, Math.ceil(filteredQuestions.length / listPageSize)), p + 1)
-                    )
-                  }
-                  onEnterFocusMode={() => setViewMode('single')}
-                />
-            ) : (
-              <QuestionBankSingleQuestionView
-                onBackToList={() => setViewMode('list')}
-                currentQuestion={currentQuestion}
-                userId={userId}
-                getXRayStats={getXRayStats}
-                onDeleteQuestion={handleDeleteQuestion}
-                showXRay={showXRay}
-                favorites={favorites}
-                onToggleFavorite={toggleFavorite}
-                selectedText={selectedText}
-                onJuridiquesTranslate={handleJuridiquesTranslate}
-                loadingJuridiquesExplanation={loadingJuridiquesExplanation}
-                onAnswerOption={(idx) => handleAnswer(idx)}
-                isMockMode={isMockMode}
-                mockAnswers={mockAnswers}
-                isMockFinished={isMockFinished}
-                selectedOption={selectedOption}
-                showExplanation={showExplanation}
-                eliminatedOptions={eliminatedOptions}
-                onToggleElimination={toggleElimination}
-                loadingAiCommentary={loadingAiCommentary}
-                aiCommentary={aiCommentary}
-                followUpChat={followUpChat}
-                followUpInput={followUpInput}
-                setFollowUpInput={setFollowUpInput}
-                isFollowUpLoading={isFollowUpLoading}
-                onFollowUp={handleFollowUp}
-                onCreateFlashcardFromError={handleCreateFlashcardFromError}
-                confidenceLevel={confidenceLevel}
-                onSaveAsPrecedent={handleSaveAsPrecedent}
-                isSavingPrecedent={isSavingPrecedent}
-                notes={notes}
-                setNotes={setNotes}
-                onSaveNote={handleSaveNote}
-                correctQuestions={correctQuestions}
-                wrongQuestions={wrongQuestions}
-                showNotification={showNotification}
-                onPrev={handlePrev}
-                onNext={handleNext}
-                currentIndex={currentIndex}
-                filteredQuestionCount={filteredQuestions.length}
-                mockQuestionCount={mockQuestions.length}
-                mockNavUnansweredOnly={mockNavUnansweredOnly}
-                getPrevUnansweredMockIndex={getPrevUnansweredMockIndex}
-                getNextUnansweredMockIndex={getNextUnansweredMockIndex}
-                mockMarkReviewLater={mockMarkReviewLater}
-                setMockMarkReviewLater={setMockMarkReviewLater}
-              />
-            )
-          ) : (
-            <QuestionBankEmptyQuestions
-              totalQuestionsInDb={questions.length}
-              onOpenAiGenerator={() => setShowAIGenerator(true)}
-            />
-          )}
-            </div>
-          </div>
+          <QuestionBankQuestionArea
+            resultsSectionRef={resultsSectionRef}
+            listFontScalePercent={listFontScalePercent}
+            showQuestionChrome={
+              Boolean(
+                (isMockMode ? mockQuestions.length > 0 : filteredQuestions.length > 0) && currentQuestion
+              )
+            }
+            viewMode={viewMode}
+            listViewProps={{
+              pagedQuestions,
+              listPage,
+              listPageSize,
+              activeQuestionId,
+              selectedQuestionsForNotebook,
+              toggleQuestionSelection,
+              userId,
+              onDeleteQuestion: handleDeleteQuestion,
+              getXRayStats,
+              correctQuestions,
+              wrongQuestions,
+              showXRay,
+              expandedQuestionId,
+              setExpandedQuestionId,
+              setCurrentIndex,
+              setSelectedOption,
+              setShowExplanation,
+              onTermClick: handleTermClick,
+              selectedText,
+              onJuridiquesTranslate: handleJuridiquesTranslate,
+              loadingJuridiquesExplanation,
+              isMockMode,
+              onAudioHint: handleAudioHint,
+              isGeneratingHint,
+              onSaveAsPrecedent: handleSaveAsPrecedent,
+              isSavingPrecedent,
+              onAnswerOption: handleAnswer,
+              mockAnswers,
+              isMockFinished,
+              selectedOption,
+              showExplanation,
+              eliminatedOptions,
+              onToggleElimination: toggleElimination,
+              loadingAiCommentary,
+              aiCommentary,
+              followUpChat,
+              followUpInput,
+              setFollowUpInput,
+              isFollowUpLoading,
+              onFollowUp: handleFollowUp,
+              onCreateFlashcardFromError: handleCreateFlashcardFromError,
+              showNotification,
+              filteredQuestionCount: filteredQuestions.length,
+              onPrevListPage: () => setListPage((p) => Math.max(1, p - 1)),
+              onNextListPage: () =>
+                setListPage((p) =>
+                  Math.min(Math.max(1, Math.ceil(filteredQuestions.length / listPageSize)), p + 1)
+                ),
+              onEnterFocusMode: () => setViewMode('single'),
+            }}
+            singleCurrentQuestion={currentQuestion ?? undefined}
+            singleViewProps={{
+              onBackToList: () => setViewMode('list'),
+              userId,
+              getXRayStats,
+              onDeleteQuestion: handleDeleteQuestion,
+              showXRay,
+              favorites,
+              onToggleFavorite: toggleFavorite,
+              selectedText,
+              onJuridiquesTranslate: handleJuridiquesTranslate,
+              loadingJuridiquesExplanation,
+              onAnswerOption: (idx) => handleAnswer(idx),
+              isMockMode,
+              mockAnswers,
+              isMockFinished,
+              selectedOption,
+              showExplanation,
+              eliminatedOptions,
+              onToggleElimination: toggleElimination,
+              loadingAiCommentary,
+              aiCommentary,
+              followUpChat,
+              followUpInput,
+              setFollowUpInput,
+              isFollowUpLoading,
+              onFollowUp: handleFollowUp,
+              onCreateFlashcardFromError: handleCreateFlashcardFromError,
+              confidenceLevel,
+              onSaveAsPrecedent: handleSaveAsPrecedent,
+              isSavingPrecedent,
+              notes,
+              setNotes,
+              onSaveNote: handleSaveNote,
+              correctQuestions,
+              wrongQuestions,
+              showNotification,
+              onPrev: handlePrev,
+              onNext: handleNext,
+              currentIndex,
+              filteredQuestionCount: filteredQuestions.length,
+              mockQuestionCount: mockQuestions.length,
+              mockNavUnansweredOnly,
+              getPrevUnansweredMockIndex,
+              getNextUnansweredMockIndex,
+              mockMarkReviewLater,
+              setMockMarkReviewLater,
+            }}
+            emptyTotalQuestionsInDb={questions.length}
+            onOpenAiGenerator={() => setShowAIGenerator(true)}
+          />
           </>
         <div id="notification-portal">
           <QuestionBankNotificationToast
