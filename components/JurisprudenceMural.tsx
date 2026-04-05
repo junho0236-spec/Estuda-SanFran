@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Gavel, Scale, Send, MessageSquare, AlertCircle, TrendingUp, User, Trash2, CheckCircle, XCircle, Info, Plus, BrainCircuit } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { JurisCase, JurisVote, View } from '../types';
 
 interface JurisprudenceMuralProps {
@@ -28,23 +29,21 @@ const JurisprudenceMural: React.FC<JurisprudenceMuralProps> = ({ userId, userNam
   const [currentFoundation, setCurrentFoundation] = useState<Record<string, string>>({});
 
   useEffect(() => {
+    const debounced = createTrailingDebounce(() => {
+      void fetchData();
+    }, 700);
+
     fetchData();
 
-    // Subscribe to cases
-    const casesChannel = supabase
-      .channel('juris_cases_updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'juris_cases' }, () => fetchData())
-      .subscribe();
-
-    // Subscribe to votes
-    const votesChannel = supabase
-      .channel('juris_votes_updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'juris_votes' }, () => fetchData())
+    const merged = supabase
+      .channel('jurisprudence_mural_coalesced')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'juris_cases' }, () => debounced.schedule())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'juris_votes' }, () => debounced.schedule())
       .subscribe();
 
     return () => {
-      supabase.removeChannel(casesChannel);
-      supabase.removeChannel(votesChannel);
+      debounced.cancel();
+      supabase.removeChannel(merged);
     };
   }, [userId]);
 

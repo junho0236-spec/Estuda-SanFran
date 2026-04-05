@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { MapPin, Coffee, Utensils, Beer, Printer, BookOpen, Star, Plus, Map, Filter, X, MessageSquare, Info } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { Place, PlaceReview } from '../types';
 
 interface GuiaSobrevivenciaProps {
@@ -46,19 +47,21 @@ const GuiaSobrevivencia: React.FC<GuiaSobrevivenciaProps> = ({ userId, userName 
   const [veteranTip, setVeteranTip] = useState('');
 
   useEffect(() => {
+    const debounced = createTrailingDebounce(() => {
+      void fetchData();
+    }, 700);
+
     fetchData();
 
-    const subPlaces = supabase.channel('places_sub')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_places' }, () => fetchData())
-        .subscribe();
-
-    const subReviews = supabase.channel('reviews_sub')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_place_reviews' }, () => fetchData())
-        .subscribe();
+    const merged = supabase
+      .channel('guia_sobrevivencia_coalesced')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_places' }, () => debounced.schedule())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_place_reviews' }, () => debounced.schedule())
+      .subscribe();
 
     return () => {
-        supabase.removeChannel(subPlaces);
-        supabase.removeChannel(subReviews);
+      debounced.cancel();
+      supabase.removeChannel(merged);
     };
   }, []);
 

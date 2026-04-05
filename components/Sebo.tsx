@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingBag, RefreshCw, Plus, Trash2, ArrowRight, User, Package, Scale, Star, Info, X } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { OfficeTrade } from '../types';
 import { CATALOG, OfficeItem, ItemCategory } from './VirtualOffice';
 import confetti from 'canvas-confetti';
@@ -22,14 +23,19 @@ const Sebo: React.FC<SeboProps> = ({ userId, userName }) => {
   const [selectedToRequest, setSelectedToRequest] = useState<string>('');
 
   useEffect(() => {
+    const debounced = createTrailingDebounce(() => {
+      void fetchData();
+    }, 700);
+
     fetchData();
 
     const channel = supabase
       .channel('sebo_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'office_trades' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'office_trades' }, () => debounced.schedule())
       .subscribe();
 
     return () => {
+      debounced.cancel();
       supabase.removeChannel(channel);
     };
   }, [userId]);

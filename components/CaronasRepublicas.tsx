@@ -16,6 +16,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { MobilityPost } from '../types';
 
 interface CaronasRepublicasProps {
@@ -39,14 +40,19 @@ const CaronasRepublicas: React.FC<CaronasRepublicasProps> = ({ userId, userName 
   const [newSpots, setNewSpots] = useState(3);
 
   useEffect(() => {
+    const debounced = createTrailingDebounce(() => {
+      void fetchPosts();
+    }, 700);
+
     fetchPosts();
-    
+
     const channel = supabase
       .channel('mobility_updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_mobility_posts' }, () => fetchPosts())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_mobility_posts' }, () => debounced.schedule())
       .subscribe();
 
     return () => {
+      debounced.cancel();
       supabase.removeChannel(channel);
     };
   }, [activeTab]); // Refetch when tab changes to keep focus

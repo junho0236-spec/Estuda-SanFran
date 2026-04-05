@@ -19,6 +19,7 @@ import { dataService } from '../services/dataService';
 import { NotebookModal } from './NotebookModal';
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { GEMINI_MODEL, extractPrecedent } from '../services/geminiService';
+import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { QuestionComments } from './QuestionComments';
@@ -958,15 +959,20 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
     fetchQuestionStats();
 
     if (userId) {
+      const debouncedProgress = createTrailingDebounce(() => {
+        void fetchUserProgress();
+      }, 650);
+      const debouncedNotebooks = createTrailingDebounce(() => {
+        void fetchNotebooks();
+      }, 650);
+
       const channel = supabase.channel(`user_progress_${userId}`)
         .on('postgres_changes', {
           event: '*',
           schema: 'public',
           table: 'user_progress',
           filter: `user_id=eq.${userId}`
-        }, () => {
-          fetchUserProgress();
-        })
+        }, () => debouncedProgress.schedule())
         .subscribe();
 
       const notebookChannel = supabase.channel(`notebooks_${userId}`)
@@ -975,12 +981,12 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
           schema: 'public',
           table: 'question_notebooks',
           filter: `user_id=eq.${userId}`
-        }, () => {
-          fetchNotebooks();
-        })
+        }, () => debouncedNotebooks.schedule())
         .subscribe();
 
       return () => {
+        debouncedProgress.cancel();
+        debouncedNotebooks.cancel();
         supabase.removeChannel(channel);
         supabase.removeChannel(notebookChannel);
       };

@@ -11,6 +11,7 @@ import {
   Share2
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { Poll, PollComment } from '../types';
 
 interface TribunalOpiniaoProps {
@@ -26,15 +27,20 @@ const TribunalOpiniao: React.FC<TribunalOpiniaoProps> = ({ userId, userName }) =
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const debounced = createTrailingDebounce(() => {
+      void fetchPoll();
+    }, 700);
+
     fetchPoll();
 
     const channel = supabase
       .channel('poll_updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_polls' }, () => fetchPoll())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_poll_comments' }, () => fetchComments(currentPoll?.id))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_polls' }, () => debounced.schedule())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_poll_comments' }, () => debounced.schedule())
       .subscribe();
 
     return () => {
+      debounced.cancel();
       supabase.removeChannel(channel);
     };
   }, []);

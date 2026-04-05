@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Megaphone, Search, Plus, TrendingUp, Users, Book, Clock, Phone, Mail, Pin, Star, Coins, Trash2, X } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { ClassifiedAd, StudySession } from '../types';
 import confetti from 'canvas-confetti';
 
@@ -46,15 +47,20 @@ const ClassificadosPatio: React.FC<ClassificadosPatioProps> = ({ userId, userNam
   const currentBalance = Math.max(0, earnedCoins - spentCoins);
 
   useEffect(() => {
+    const debounced = createTrailingDebounce(() => {
+      void fetchAds();
+    }, 700);
+
     fetchAds();
     fetchSpentCoins();
 
     const channel = supabase
       .channel('patio_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'patio_classifieds' }, () => fetchAds())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'patio_classifieds' }, () => debounced.schedule())
       .subscribe();
 
     return () => {
+      debounced.cancel();
       supabase.removeChannel(channel);
     };
   }, [userId]);

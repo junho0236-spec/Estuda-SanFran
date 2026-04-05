@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Gavel, Scale, FileText, User, Scroll, Trophy, Coins, Clock, ChevronRight, PenTool, ThumbsUp, ThumbsDown, CheckCircle2, XCircle, Shield, Users } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { MockJurySession } from '../types';
 import confetti from 'canvas-confetti';
 
@@ -25,15 +26,20 @@ const MockJury: React.FC<MockJuryProps> = ({ userId, userName }) => {
   const [draftArgument, setDraftArgument] = useState('');
 
   useEffect(() => {
+    const debounced = createTrailingDebounce(() => {
+      void fetchSessions();
+    }, 700);
+
     fetchSessions();
     fetchWallet();
 
     const channel = supabase
       .channel('mock_jury_updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'mock_jury_sessions' }, () => fetchSessions())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mock_jury_sessions' }, () => debounced.schedule())
       .subscribe();
 
     return () => {
+      debounced.cancel();
       supabase.removeChannel(channel);
     };
   }, [userId]);

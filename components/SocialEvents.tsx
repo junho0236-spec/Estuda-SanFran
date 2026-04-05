@@ -15,6 +15,7 @@ import {
   Clock
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { SanFranEvent, EventRSVP } from '../types';
 import confetti from 'canvas-confetti';
 
@@ -57,22 +58,21 @@ const SocialEvents: React.FC<SocialEventsProps> = ({ userId, userName }) => {
   const [newOrganizer, setNewOrganizer] = useState(ORGANIZERS[0]);
 
   useEffect(() => {
+    const debounced = createTrailingDebounce(() => {
+      void fetchData();
+    }, 700);
+
     fetchData();
 
-    // Realtime subscriptions
     const eventsChannel = supabase
-      .channel('events_updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_events' }, () => fetchData())
-      .subscribe();
-
-    const rsvpsChannel = supabase
-      .channel('rsvps_updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_event_rsvps' }, () => fetchData())
+      .channel('social_events_coalesced')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_events' }, () => debounced.schedule())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_event_rsvps' }, () => debounced.schedule())
       .subscribe();
 
     return () => {
+      debounced.cancel();
       supabase.removeChannel(eventsChannel);
-      supabase.removeChannel(rsvpsChannel);
     };
   }, []);
 

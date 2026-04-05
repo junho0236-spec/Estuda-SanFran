@@ -16,6 +16,7 @@ import {
   User
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { VaultItem } from '../types';
 import confetti from 'canvas-confetti';
 
@@ -46,14 +47,19 @@ const TheVault: React.FC<TheVaultProps> = ({ userId, userName }) => {
   const [newFileUrl, setNewFileUrl] = useState('');
 
   useEffect(() => {
+    const debounced = createTrailingDebounce(() => {
+      void fetchItems();
+    }, 700);
+
     fetchItems();
-    
+
     const channel = supabase
       .channel('vault_updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_vault_items' }, () => fetchItems())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_vault_items' }, () => debounced.schedule())
       .subscribe();
 
     return () => {
+      debounced.cancel();
       supabase.removeChannel(channel);
     };
   }, []);

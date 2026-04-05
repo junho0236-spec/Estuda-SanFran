@@ -14,6 +14,7 @@ import {
   Check
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { createTrailingDebounce } from '../utils/realtimeThrottle';
 
 interface BussolaOptativasProps {
   userId: string;
@@ -61,14 +62,21 @@ const BussolaOptativas: React.FC<BussolaOptativasProps> = ({ userId, userName })
   const [isAnonymous, setIsAnonymous] = useState(false);
 
   useEffect(() => {
+    const debounced = createTrailingDebounce(() => {
+      void fetchReviews();
+    }, 700);
+
     fetchReviews();
-    
+
     const channel = supabase
       .channel('reviews_update')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_reviews' }, () => fetchReviews())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_reviews' }, () => debounced.schedule())
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      debounced.cancel();
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchReviews = async () => {

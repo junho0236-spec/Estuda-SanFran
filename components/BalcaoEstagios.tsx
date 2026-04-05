@@ -14,6 +14,7 @@ import {
   GraduationCap
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { InternshipPost } from '../types';
 
 interface BalcaoEstagiosProps {
@@ -39,14 +40,19 @@ const BalcaoEstagios: React.FC<BalcaoEstagiosProps> = ({ userId, userName }) => 
   const AREAS = ['Todas', 'Cível', 'Penal', 'Trabalhista', 'Tributário', 'Empresarial', 'Público', 'Outros'];
 
   useEffect(() => {
+    const debounced = createTrailingDebounce(() => {
+      void fetchPosts();
+    }, 700);
+
     fetchPosts();
 
     const channel = supabase
       .channel('internships_updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_internships' }, () => fetchPosts())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_internships' }, () => debounced.schedule())
       .subscribe();
 
     return () => {
+      debounced.cancel();
       supabase.removeChannel(channel);
     };
   }, []);

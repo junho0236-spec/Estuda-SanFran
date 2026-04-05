@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Quote, Send, Plus, Laugh, AlertTriangle, Crown, X, MessageCircle } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { createTrailingDebounce } from '../utils/realtimeThrottle';
 
 interface PerolasTribunaProps {
   userId: string;
@@ -33,14 +34,19 @@ const PerolasTribuna: React.FC<PerolasTribunaProps> = ({ userId, userName }) => 
   const [votedQuotes, setVotedQuotes] = useState<Set<string>>(new Set());
 
   useEffect(() => {
+    const debounced = createTrailingDebounce(() => {
+      void fetchQuotes();
+    }, 700);
+
     fetchQuotes();
 
     const channel = supabase
       .channel('quotes_update')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_quotes' }, () => fetchQuotes())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_quotes' }, () => debounced.schedule())
       .subscribe();
 
     return () => {
+      debounced.cancel();
       supabase.removeChannel(channel);
     };
   }, []);

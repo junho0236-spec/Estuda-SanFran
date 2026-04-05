@@ -12,6 +12,7 @@ import { dataService } from './services/dataService';
 import { Toaster, toast } from 'sonner';
 import ErrorBoundary from './components/ErrorBoundary';
 import { getViewLabel, getBrasiliaDate, getBrasiliaISOString } from './utils';
+import { createScopedRealtimeDebounce, type UserDataSyncScope } from './utils/realtimeThrottle';
 
 // Lazy Load dos Componentes para Performance (Code Splitting)
 const Dashboard = React.lazy(() => import('./components/Dashboard'));
@@ -354,53 +355,6 @@ const App: React.FC = () => {
     };
   }, [isAuthenticated, session, currentView, timerIsActive, timerSelectedSubjectId, subjects, currentRoomId, roomStartTime, userProfile]);
 
-  // --- Realtime Data Sync Listener ---
-  useEffect(() => {
-    if (!isAuthenticated || !session?.user) return;
-
-    const userId = session.user.id;
-
-    const dataChannel = supabase.channel('realtime_data_sync')
-      // questions: não escutar aqui — loadUserData não lê essa tabela; QuestionBank já inscreve em `question_bank_changes`.
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'flashcards', 
-        filter: `user_id=eq.${userId}` 
-      }, () => {
-        loadUserData();
-      })
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'tasks', 
-        filter: `user_id=eq.${userId}` 
-      }, () => {
-        loadUserData();
-      })
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'folders', 
-        filter: `user_id=eq.${userId}` 
-      }, () => {
-        loadUserData();
-      })
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'user_progress', 
-        filter: `user_id=eq.${userId}` 
-      }, () => {
-        loadUserData();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(dataChannel);
-    };
-  }, [isAuthenticated, session]);
-
   // Pomodoro Logic
   useEffect(() => {
     if (timerIsActive && timerSecondsLeft > 0) {
@@ -613,12 +567,151 @@ const App: React.FC = () => {
     }
   };
 
-  const loadUserData = async () => {
+  const loadUserData = async (opts?: { scope?: UserDataSyncScope }) => {
     if (!session?.user) return;
     const userId = session.user.id;
-    
+    const scope: UserDataSyncScope = opts?.scope ?? 'full';
+    const showFlashLoading = scope === 'full' || scope === 'flashcards';
+
     try {
-      setIsLoadingFlashcards(true);
+      if (showFlashLoading) setIsLoadingFlashcards(true);
+
+      if (!isOnline) {
+        if (scope !== 'full') return;
+        const [localTasks, localBoards, localSessions, localFolders] = await Promise.all([
+          db.tasks.toArray(),
+          db.boards.toArray(),
+          db.study_sessions.toArray(),
+          db.folders.toArray()
+        ]);
+        setTasks(localTasks);
+        setBoards(localBoards);
+        setStudySessions(localSessions);
+        setFolders(localFolders);
+        return;
+      }
+
+      // Realtime: one table changed — avoid reloading the entire user dataset
+      if (scope === 'user_progress') {
+        const { data } = await supabase.from('user_progress').select('*').eq('user_id', userId).maybeSingle();
+        if (data) {
+          setCorrectQuestionsCount(data.correct_count || 0);
+          setWrongQuestionsCount(data.wrong_count || 0);
+          setWrongQuestionIds(data.wrong_questions || data.wrong_question_ids || []);
+          setConfidenceLevels(data.confidence_levels || {});
+        }
+        return;
+      }
+
+      if (scope === 'folders') {
+        const { data } = await supabase
+          .from('folders')
+          .select('id, name, parent_id, color, icon, target_date, shared, original_deck_id, version')
+          .eq('user_id', userId);
+        if (data) {
+          const formattedFolders = data.map(f => ({
+            id: f.id,
+            name: f.name,
+            parentId: f.parent_id,
+            color: f.color,
+            icon: f.icon || undefined,
+            targetDate: f.target_date || undefined,
+            shared: f.shared || false,
+            original_deck_id: f.original_deck_id || undefined,
+            version: f.version || 1
+          }));
+          const syncCount = await db.syncQueue.count();
+          if (syncCount === 0) {
+            const localFolders = await db.folders.toArray();
+            const remoteIds = new Set(formattedFolders.map(f => f.id));
+            const idsToDelete = localFolders.filter(f => !remoteIds.has(f.id)).map(f => f.id);
+            if (idsToDelete.length > 0) await db.folders.bulkDelete(idsToDelete);
+            await db.folders.bulkPut(formattedFolders);
+          }
+          setFolders(formattedFolders);
+        }
+        return;
+      }
+
+      if (scope === 'tasks') {
+        const { data } = await supabase
+          .from('tasks')
+          .select('*')
+          .eq('user_id', userId)
+          .is('archived_at', null)
+          .order('created_at', { ascending: false });
+        if (data) {
+          const formattedTasks = data.map(t => {
+            const desc = t.description ? JSON.parse(t.description as string) : {};
+            return {
+              id: t.id,
+              title: t.title,
+              completed: t.status === 'Concluido',
+              status: t.status,
+              subjectId: desc.subjectId || t.subject_id,
+              dueDate: t.due_date,
+              completedAt: t.completed_at,
+              priority: desc.originalPriority || (t.priority === 'Alta' ? 'alta' : 'normal'),
+              category: t.category || 'geral',
+              archived_at: t.archived_at,
+              boardId: desc.boardId,
+              columnId: desc.columnId,
+              notes: t.notes,
+              subtasks: t.subtasks || [],
+              delegatedTo: t.delegated_to,
+              delegatedBy: t.delegated_by,
+              delegatedByName: desc.delegatedByName,
+              delegatedToName: desc.delegatedToName,
+              syllabusLink: desc.syllabusLink,
+              importantCitations: desc.importantCitations,
+              revisionStatus: desc.revisionStatus,
+              created_at: t.created_at,
+              google_event_id:
+                (t as { google_event_id?: string }).google_event_id ?? desc.google_event_id,
+            };
+          });
+          const syncCount = await db.syncQueue.count();
+          if (syncCount === 0) {
+            const localTasks = await db.tasks.toArray();
+            const remoteIds = new Set(formattedTasks.map(t => t.id));
+            const idsToDelete = localTasks.filter(t => !remoteIds.has(t.id)).map(t => t.id);
+            if (idsToDelete.length > 0) await db.tasks.bulkDelete(idsToDelete);
+            await db.tasks.bulkPut(formattedTasks as Task[]);
+          }
+          setTasks(formattedTasks as Task[]);
+        }
+        return;
+      }
+
+      if (scope === 'flashcards') {
+        const { data } = await supabase
+          .from('flashcards')
+          .select('*')
+          .eq('user_id', userId)
+          .is('archived_at', null);
+        if (data) {
+          const formattedCards = data.map(c => ({
+            id: c.id,
+            front: (c as { front?: string; question?: string }).front ?? (c as { question?: string }).question ?? '',
+            back: (c as { back?: string; answer?: string }).back ?? (c as { answer?: string }).answer ?? '',
+            notes: c.notes || '',
+            tags: c.tags || [],
+            source: c.source || '',
+            subjectId: c.subject_id || '',
+            folderId: c.folder_id || null,
+            nextReview: c.next_review != null ? Number(c.next_review) : Date.now(),
+            interval: c.interval != null ? c.interval : 0,
+            status: c.status || 'new',
+            learningStep: c.learning_step != null ? c.learning_step : 0,
+            easeFactor: c.ease_factor != null ? c.ease_factor : 2.5,
+            total_errors: c.total_errors != null ? c.total_errors : 0,
+            archived_at: c.archived_at || null
+          }));
+          setFlashcards(formattedCards);
+        }
+        return;
+      }
+
       if (isOnline) {
         // Fetch subjects first as they are often dependencies
         const { data: subs } = await supabase.from('subjects').select('id, name').eq('user_id', userId);
@@ -645,13 +738,13 @@ const App: React.FC = () => {
 
         // Fetch others in parallel but handle them individually to avoid one failure crashing everything
         const [resFlds, resCards, resTks, resBoards, resSessions, resReadings, resProgress] = await Promise.all([
-          supabase.from('folders').select('id, name').eq('user_id', userId),
-          supabase.from('flashcards').select('id, question, answer').eq('user_id', userId).is('archived_at', null),
-          supabase.from('tasks').select('id, title, description').eq('user_id', userId).is('archived_at', null).order('created_at', { ascending: false }),
-          supabase.from('boards').select('id, name').eq('user_id', userId).order('created_at', { ascending: false }),
+          supabase.from('folders').select('id, name, parent_id, color, icon, target_date, shared, original_deck_id, version').eq('user_id', userId),
+          supabase.from('flashcards').select('*').eq('user_id', userId).is('archived_at', null),
+          supabase.from('tasks').select('*').eq('user_id', userId).is('archived_at', null).order('created_at', { ascending: false }),
+          supabase.from('boards').select('id, name, columns, user_id, created_at').eq('user_id', userId).order('created_at', { ascending: false }),
           supabase.from('study_sessions').select('id, start_time, end_time').eq('user_id', userId).order('start_time', { ascending: false }),
           supabase.from('readings').select('id, title, author').eq('user_id', userId).order('created_at', { ascending: false }),
-          supabase.from('user_progress').select('id, progress').eq('user_id', userId).maybeSingle()
+          supabase.from('user_progress').select('*').eq('user_id', userId).maybeSingle()
         ]);
 
         if (resFlds.data) {
@@ -700,8 +793,8 @@ const App: React.FC = () => {
         if (resCards.data) {
           const formattedCards = resCards.data.map(c => ({
             id: c.id, 
-            front: c.front, 
-            back: c.back, 
+            front: (c as { front?: string; question?: string }).front ?? (c as { question?: string }).question ?? '', 
+            back: (c as { back?: string; answer?: string }).back ?? (c as { answer?: string }).answer ?? '', 
             notes: c.notes || '',
             tags: c.tags || [],
             source: c.source || '',
@@ -785,7 +878,10 @@ const App: React.FC = () => {
         }
 
         if (resReadings.data) setReadings(resReadings.data);
-      } else {
+      }
+    } catch (err) {
+      console.error("Erro no carregamento dos dados:", err);
+      if (scope === 'full') {
         const [localTasks, localBoards, localSessions, localFolders] = await Promise.all([
           db.tasks.toArray(),
           db.boards.toArray(),
@@ -797,22 +893,62 @@ const App: React.FC = () => {
         setStudySessions(localSessions);
         setFolders(localFolders);
       }
-    } catch (err) {
-      console.error("Erro no carregamento dos dados:", err);
-      const [localTasks, localBoards, localSessions, localFolders] = await Promise.all([
-        db.tasks.toArray(),
-        db.boards.toArray(),
-        db.study_sessions.toArray(),
-        db.folders.toArray()
-      ]);
-      setTasks(localTasks);
-      setBoards(localBoards);
-      setStudySessions(localSessions);
-      setFolders(localFolders);
     } finally {
-      setIsLoadingFlashcards(false);
+      if (showFlashLoading) setIsLoadingFlashcards(false);
     }
   };
+
+  const loadUserDataRef = useRef(loadUserData);
+  loadUserDataRef.current = loadUserData;
+
+  // --- Realtime Data Sync Listener (debounced + scoped refetch; after loadUserDataRef) ---
+  useEffect(() => {
+    if (!isAuthenticated || !session?.user) return;
+
+    const userId = session.user.id;
+
+    const debounced = createScopedRealtimeDebounce(750, async (scopes) => {
+      if (scopes.size !== 1) {
+        await loadUserDataRef.current();
+        return;
+      }
+      const only = [...scopes][0];
+      await loadUserDataRef.current({ scope: only });
+    });
+
+    const dataChannel = supabase.channel('realtime_data_sync')
+      // questions: não escutar aqui — loadUserData não lê essa tabela; QuestionBank já inscreve em `question_bank_changes`.
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'flashcards',
+        filter: `user_id=eq.${userId}`
+      }, () => debounced.schedule('flashcards'))
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'tasks',
+        filter: `user_id=eq.${userId}`
+      }, () => debounced.schedule('tasks'))
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'folders',
+        filter: `user_id=eq.${userId}`
+      }, () => debounced.schedule('folders'))
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'user_progress',
+        filter: `user_id=eq.${userId}`
+      }, () => debounced.schedule('user_progress'))
+      .subscribe();
+
+    return () => {
+      debounced.cancel();
+      supabase.removeChannel(dataChannel);
+    };
+  }, [isAuthenticated, session?.user?.id]);
 
   useEffect(() => {
     if (!isAuthenticated || !session?.user) return;

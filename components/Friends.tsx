@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../services/supabaseClient';
+import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { dataService } from '../services/dataService';
 import { Friendship, UserProfile, View } from '../types';
 import { toast } from 'sonner';
@@ -29,35 +30,21 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   useEffect(() => {
+    const debounced = createTrailingDebounce(() => {
+      void fetchData();
+    }, 700);
+
     fetchData();
 
-    // Set up Realtime listener for friendships
-    const friendshipsChannel = supabase
-      .channel('friendships_realtime')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'friendships' 
-      }, () => {
-        fetchData();
-      })
-      .subscribe();
-
-    // Set up Realtime listener for user_persona to update names/profiles
-    const personaChannel = supabase
-      .channel('persona_realtime')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'user_persona'
-      }, () => {
-        fetchData();
-      })
+    const merged = supabase
+      .channel('friends_coalesced')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, () => debounced.schedule())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_persona' }, () => debounced.schedule())
       .subscribe();
 
     return () => {
-      supabase.removeChannel(friendshipsChannel);
-      supabase.removeChannel(personaChannel);
+      debounced.cancel();
+      supabase.removeChannel(merged);
     };
   }, [userId]);
 

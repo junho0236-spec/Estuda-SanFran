@@ -15,6 +15,7 @@ import {
   BookType
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { BookCycle, BookChatMessage } from '../types';
 import confetti from 'canvas-confetti';
 
@@ -52,10 +53,14 @@ const ClubeLivro: React.FC<ClubeLivroProps> = ({ userId, userName }) => {
        fetchVotes(cycle.id);
        fetchCheckins(cycle.id);
        fetchChat(cycle.id);
+
+       const debouncedVotes = createTrailingDebounce(() => {
+         void fetchVotes(cycle.id);
+       }, 650);
        
        // Realtime
        const votesSub = supabase.channel(`votes:${cycle.id}`)
-         .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_book_votes', filter: `cycle_id=eq.${cycle.id}` }, () => fetchVotes(cycle.id))
+         .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_book_votes', filter: `cycle_id=eq.${cycle.id}` }, () => debouncedVotes.schedule())
          .subscribe();
          
        const chatSub = supabase.channel(`chat:${cycle.id}`)
@@ -66,6 +71,7 @@ const ClubeLivro: React.FC<ClubeLivroProps> = ({ userId, userName }) => {
          .subscribe();
        
        return () => {
+         debouncedVotes.cancel();
          supabase.removeChannel(votesSub);
          supabase.removeChannel(chatSub);
        };

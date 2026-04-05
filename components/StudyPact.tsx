@@ -13,6 +13,7 @@ import {
   X
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { StudyPact as StudyPactType } from '../types';
 import confetti from 'canvas-confetti';
 
@@ -34,15 +35,20 @@ const StudyPact: React.FC<StudyPactProps> = ({ userId, userName }) => {
   const [stakeAmount, setStakeAmount] = useState(50);
 
   useEffect(() => {
+    const debounced = createTrailingDebounce(() => {
+      void fetchPacts();
+    }, 700);
+
     fetchPacts();
     fetchWallet();
 
     const channel = supabase
       .channel('pact_updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'study_pacts' }, () => fetchPacts())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'study_pacts' }, () => debounced.schedule())
       .subscribe();
 
     return () => {
+      debounced.cancel();
       supabase.removeChannel(channel);
     };
   }, [userId]);

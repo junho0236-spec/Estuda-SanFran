@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Plus, MapPin, Phone, Clock, AlertCircle, CheckCircle, X, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { createTrailingDebounce } from '../utils/realtimeThrottle';
 
 interface AchadosPerdidosProps {
   userId: string;
@@ -35,14 +36,19 @@ const AchadosPerdidos: React.FC<AchadosPerdidosProps> = ({ userId, userName }) =
   const [newImageUrl, setNewImageUrl] = useState('');
 
   useEffect(() => {
+    const debounced = createTrailingDebounce(() => {
+      void fetchItems();
+    }, 700);
+
     fetchItems();
-    
+
     const channel = supabase
       .channel('lost_found_updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_lost_found' }, () => fetchItems())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_lost_found' }, () => debounced.schedule())
       .subscribe();
 
     return () => {
+      debounced.cancel();
       supabase.removeChannel(channel);
     };
   }, []);

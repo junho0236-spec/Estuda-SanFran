@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Trophy, Medal, Gavel, Award, Scale, Briefcase, GraduationCap, Crown, User, TrendingUp, Clock, RefreshCw, AlertTriangle, Zap, Star } from 'lucide-react';
 import { Flashcard, RankingEntry } from '../types';
 import { supabase } from '../services/supabaseClient';
+import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { toast } from 'sonner';
 
 interface RankingProps {
@@ -138,6 +139,10 @@ const Ranking: React.FC<RankingProps> = ({ userId, session, flashcards }) => {
   };
 
   useEffect(() => {
+    const debounced = createTrailingDebounce(() => {
+      void fetchRankingData();
+    }, 700);
+
     fetchRankingData();
 
     const channel = supabase
@@ -145,16 +150,17 @@ const Ranking: React.FC<RankingProps> = ({ userId, session, flashcards }) => {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'study_sessions' },
-        () => fetchRankingData()
+        () => debounced.schedule()
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'user_persona' },
-        () => fetchRankingData()
+        () => debounced.schedule()
       )
       .subscribe();
 
     return () => {
+      debounced.cancel();
       supabase.removeChannel(channel);
     };
   }, [userId, session, view]);
