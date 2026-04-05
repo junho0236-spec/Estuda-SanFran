@@ -14,6 +14,14 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { getViewLabel, getBrasiliaDate, getBrasiliaISOString } from './utils';
 import { createScopedRealtimeDebounce, type UserDataSyncScope } from './utils/realtimeThrottle';
 
+/** Colunas realmente usadas pelo estado global — evita `SELECT *` (menos RAM/IO no Postgres e no cliente). */
+const FLASHCARD_CLOUD_COLUMNS =
+  'id, subject_id, folder_id, front, back, notes, tags, source, next_review, interval, status, learning_step, ease_factor, total_errors, archived_at, is_suspended';
+const TASK_CLOUD_COLUMNS =
+  'id, title, description, status, subject_id, due_date, completed_at, priority, category, archived_at, notes, subtasks, delegated_to, delegated_by, created_at, google_event_id';
+const USER_PROGRESS_CLOUD_COLUMNS =
+  'user_id, correct_count, wrong_count, wrong_questions, wrong_question_ids, confidence_levels, updated_at';
+
 // Lazy Load dos Componentes para Performance (Code Splitting)
 const Dashboard = React.lazy(() => import('./components/Dashboard'));
 const Profile = React.lazy(() => import('./components/Profile'));
@@ -592,7 +600,8 @@ const App: React.FC = () => {
     if (isAuthenticated && session?.user) {
       loadUserData();
     }
-  }, [isAuthenticated, session]);
+    // Só o id do utilizador: o objeto `session` muda de referência a cada refresh do JWT e re-disparava isto em loop.
+  }, [isAuthenticated, session?.user?.id]);
 
   // --- Offline & Sync Logic ---
   useEffect(() => {
@@ -612,7 +621,7 @@ const App: React.FC = () => {
     if (isOnline && isAuthenticated && session?.user) {
       handleSync();
     }
-  }, [isOnline, isAuthenticated, session]);
+  }, [isOnline, isAuthenticated, session?.user?.id]);
 
   const handleSync = async () => {
     if (!session?.user) return;
@@ -654,7 +663,11 @@ const App: React.FC = () => {
 
       // Realtime: one table changed — avoid reloading the entire user dataset
       if (scope === 'user_progress') {
-        const { data } = await supabase.from('user_progress').select('*').eq('user_id', userId).maybeSingle();
+        const { data } = await supabase
+          .from('user_progress')
+          .select(USER_PROGRESS_CLOUD_COLUMNS)
+          .eq('user_id', userId)
+          .maybeSingle();
         if (data) {
           setCorrectQuestionsCount(data.correct_count || 0);
           setWrongQuestionsCount(data.wrong_count || 0);
@@ -697,7 +710,7 @@ const App: React.FC = () => {
       if (scope === 'tasks') {
         const { data } = await supabase
           .from('tasks')
-          .select('*')
+          .select(TASK_CLOUD_COLUMNS)
           .eq('user_id', userId)
           .is('archived_at', null)
           .order('created_at', { ascending: false });
@@ -747,7 +760,7 @@ const App: React.FC = () => {
       if (scope === 'flashcards') {
         const { data } = await supabase
           .from('flashcards')
-          .select('*')
+          .select(FLASHCARD_CLOUD_COLUMNS)
           .eq('user_id', userId)
           .is('archived_at', null);
         if (data) {
@@ -800,12 +813,12 @@ const App: React.FC = () => {
         // Fetch others in parallel but handle them individually to avoid one failure crashing everything
         const [resFlds, resCards, resTks, resBoards, resSessions, resReadings, resProgress] = await Promise.all([
           supabase.from('folders').select('id, name, parent_id, color, icon, target_date, shared, original_deck_id, version').eq('user_id', userId),
-          supabase.from('flashcards').select('*').eq('user_id', userId).is('archived_at', null),
-          supabase.from('tasks').select('*').eq('user_id', userId).is('archived_at', null).order('created_at', { ascending: false }),
+          supabase.from('flashcards').select(FLASHCARD_CLOUD_COLUMNS).eq('user_id', userId).is('archived_at', null),
+          supabase.from('tasks').select(TASK_CLOUD_COLUMNS).eq('user_id', userId).is('archived_at', null).order('created_at', { ascending: false }),
           supabase.from('boards').select('id, name, columns, user_id, created_at').eq('user_id', userId).order('created_at', { ascending: false }),
           supabase.from('study_sessions').select('id, start_time, end_time').eq('user_id', userId).order('start_time', { ascending: false }),
           supabase.from('readings').select('id, title, author').eq('user_id', userId).order('created_at', { ascending: false }),
-          supabase.from('user_progress').select('*').eq('user_id', userId).maybeSingle()
+          supabase.from('user_progress').select(USER_PROGRESS_CLOUD_COLUMNS).eq('user_id', userId).maybeSingle()
         ]);
 
         if (resFlds.data) {

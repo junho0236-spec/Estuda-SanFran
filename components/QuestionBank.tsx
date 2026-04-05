@@ -116,6 +116,18 @@ import {
   type QuestionStatForReview,
 } from './question-bank/questionReviewQueue';
 
+/** Campos usados na UI — evita `select('*')` na tabela `questions` (pode ser enorme). */
+const QB_QUESTIONS_LIST_COLUMNS =
+  'id, subject, topic, statement, options, correct_answer, explanation, difficulty, user_id, exam_board, institution, exam_name, modality, legal_diploma, year, created_at, audio_hint, listen_count, status, is_reinforcement, texto_gabarito_ia, legislation_tags, jurisprudence_tags, ai_summary, ai_correction, career, formation_area, education_level, job_position, is_annulled, is_outdated, video_url';
+
+const QB_USER_PROGRESS_COLUMNS =
+  'user_id, favorites, wrong_questions, wrong_question_ids, correct_questions, notes, correct_count, wrong_count, error_mastery, confidence_levels, question_answer_goals, updated_at';
+
+const QB_USER_QUESTION_STATS_COLUMNS =
+  'question_id, user_id, total_attempts, correct_attempts, last_attempt_correct, updated_at';
+
+const QB_NOTEBOOKS_COLUMNS = 'id, user_id, name, description, question_ids, created_at';
+
 function normalizeQuestionFromApi(q: Question): Question {
   const m = normalizeQuestionModality((q as { modality?: string | null }).modality);
   return { ...q, modality: m };
@@ -1068,7 +1080,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
     try {
       const { data, error } = await supabase
         .from('user_question_stats')
-        .select('*')
+        .select(QB_USER_QUESTION_STATS_COLUMNS)
         .eq('user_id', userId);
       
       if (!error && data) {
@@ -1092,7 +1104,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
     try {
       const { data, error } = await supabase
         .from('user_progress')
-        .select('*')
+        .select(QB_USER_PROGRESS_COLUMNS)
         .eq('user_id', userId)
         .maybeSingle();
 
@@ -1203,7 +1215,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
     try {
       const { data, error } = await supabase
         .from('notebooks')
-        .select('*')
+        .select(QB_NOTEBOOKS_COLUMNS)
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
@@ -1617,7 +1629,7 @@ Forneça a explicação de forma concisa e didática.`;
       setLoading(true);
       const { data, error } = await supabase
         .from('questions')
-        .select('*')
+        .select(QB_QUESTIONS_LIST_COLUMNS)
         .order('created_at', { ascending: false });
 
       if (error) {

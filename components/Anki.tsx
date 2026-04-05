@@ -219,6 +219,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     }
   };
 
+  // Sem setters no array (estáveis). Mantém `subjects` para resolver matéria ao abrir flashcard via state da rota.
   useEffect(() => {
     if (state && (state as any).newFlashcard) {
       const { newFlashcard } = state as any;
@@ -229,7 +230,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       // Clear the state so it doesn't persist on subsequent visits
       window.history.replaceState({}, document.title, location.pathname);
     }
-  }, [state, subjects, selectedSubjectId, setManualFront, setManualBack, setSelectedSubjectId, setMode, location.pathname]);
+  }, [state, subjects, selectedSubjectId, location.pathname]);
 
   useEffect(() => {
     if (!selectedSubjectId && subjects && subjects.length > 0) {
