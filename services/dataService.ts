@@ -1,6 +1,141 @@
 import { supabase } from './supabaseClient';
-import { db, addToSyncQueue } from './offlineService';
+import { db, addToSyncQueue, type OfflineSyncQueue } from './offlineService';
 import { Flashcard, Task, StudySession, Note, SubjectFile, Folder, Board, UserProgress, Friendship, Notification } from '../types';
+
+/** Tamanho máximo de linhas por pedido upsert/delete em lote (menos pressão no PostgREST / nano). */
+const SYNC_UPSERT_CHUNK = 80;
+
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+/**
+ * Chave estável para “último evento na fila ganha” (evita upsert+delete contraditórios duplicados).
+ */
+function getSyncResolutionKey(item: OfflineSyncQueue, userId: string): string {
+  if (item.table === 'user_profile') {
+    return `user_profile::${userId}`;
+  }
+  if (item.action === 'delete') {
+    if (item.table === 'folders' && item.data?.recursive) {
+      return `folders_recursive::${item.data.id}`;
+    }
+    return `delete::${item.table}::${item.data.id}`;
+  }
+  const rawId = item.data?.id;
+  const eid = rawId != null && rawId !== '' ? String(rawId) : `noid_${item.timestamp}`;
+  return `upsert::${item.table}::${eid}`;
+}
+
+function mapSyncQueueItemToRow(item: OfflineSyncQueue, userId: string): Record<string, unknown> | null {
+  if (item.table === 'user_profile') return null;
+
+  if (item.table === 'flashcards') {
+    const card = item.data as Flashcard & Record<string, unknown>;
+    return {
+      id: card.id,
+      user_id: userId,
+      subject_id: card.subjectId || null,
+      folder_id: card.folderId || null,
+      front: card.front,
+      back: card.back,
+      notes: card.notes || null,
+      next_review: card.nextReview != null ? Math.floor(Number(card.nextReview)) : Date.now(),
+      interval: card.interval ?? 0,
+      status: card.status || 'new',
+      learning_step: card.learningStep ?? 0,
+      ease_factor: card.easeFactor ?? 2.5,
+      archived_at: card.archived_at || null,
+      tags: card.tags || [],
+      source: card.source || null,
+      is_suspended: card.is_suspended || false,
+      total_errors: card.total_errors ?? 0,
+    };
+  }
+
+  const payload: Record<string, unknown> = { ...item.data, user_id: userId };
+
+  if (item.table === 'tasks') {
+    const task = item.data as Task;
+    payload.user_id = userId;
+    payload.title = task.title;
+    payload.notes = task.notes || null;
+    payload.due_date = task.dueDate || null;
+    payload.completed_at = task.completedAt || null;
+    payload.category = task.category || 'Geral';
+    payload.priority = task.priority === 'urgente' || task.priority === 'alta' ? 'Alta' : 'Média';
+    payload.status = task.status || (task.completed ? 'Concluido' : 'Pendente');
+    payload.subtasks = task.subtasks || [];
+    payload.delegated_to = task.delegatedTo || null;
+    payload.delegated_by = task.delegatedBy || null;
+    payload.created_at =
+      (task as { created_at?: string }).created_at ||
+      (task as { createdAt?: string }).createdAt ||
+      new Date().toISOString();
+    payload.description = JSON.stringify({
+      syllabusLink: task.syllabusLink,
+      importantCitations: task.importantCitations,
+      revisionStatus: task.revisionStatus,
+      boardId: task.boardId,
+      columnId: task.columnId,
+      subjectId: task.subjectId,
+      delegatedByName: task.delegatedByName,
+      delegatedToName: task.delegatedToName,
+      originalPriority: task.priority,
+      recurrence: task.recurrence,
+      library_attachments: task.library_attachments,
+      total_focus_time: task.total_focus_time,
+      parentTaskId: task.parentTaskId,
+      dependencies: task.dependencies,
+      storyPoints: task.storyPoints,
+      comments: task.comments,
+      google_event_id: task.google_event_id,
+    });
+    delete payload.subjectId;
+    delete payload.dueDate;
+    delete payload.completedAt;
+    delete payload.boardId;
+    delete payload.columnId;
+    delete payload.syllabusLink;
+    delete payload.importantCitations;
+    delete payload.revisionStatus;
+    delete payload.completed;
+    delete payload.delegatedTo;
+    delete payload.delegatedBy;
+  }
+
+  if (item.table === 'boards') {
+    payload.user_id = userId;
+    payload.created_at = payload.createdAt;
+    delete payload.createdAt;
+    delete payload.userId;
+  }
+
+  if (item.table === 'folders') {
+    payload.parent_id = payload.parentId || null;
+    payload.target_date = payload.targetDate || null;
+    payload.icon = payload.icon || null;
+    delete payload.parentId;
+    delete payload.targetDate;
+  }
+
+  if (item.table === 'notes') {
+    payload.user_id = userId;
+    payload.subject_id = (item.data as Note).subject_id || payload.subjectId;
+    payload.handwriting_data = (item.data as Note).handwriting_data ?? null;
+    payload.is_starred = (item.data as Note).is_starred || false;
+    delete payload.subjectId;
+  }
+
+  if (item.table === 'subject_files') {
+    payload.subject_id = payload.subject_id || payload.subjectId;
+    delete payload.subjectId;
+  }
+
+  return payload;
+}
 
 /**
  * Upsert a note row; strip columns missing from the remote schema (PostgREST PGRST204)
@@ -53,6 +188,30 @@ async function upsertNoteToSupabase(payload: Record<string, unknown>) {
     .upsert(current, { onConflict: 'user_id' });
   return { error: lastErr };
 }
+
+async function batchUpsertNotes(rows: Record<string, unknown>[]): Promise<{ error: { message?: string } | null }> {
+  if (rows.length === 0) return { error: null };
+  const { error } = await supabase.from('notes').upsert(rows, { onConflict: 'id' });
+  if (!error) return { error: null };
+
+  for (const row of rows) {
+    const { error: oneErr } = await upsertNoteToSupabase(row);
+    if (oneErr) return { error: oneErr };
+  }
+  return { error: null };
+}
+
+const SYNC_UPSERT_TABLE_ORDER = [
+  'subjects',
+  'folders',
+  'boards',
+  'tasks',
+  'flashcards',
+  'notes',
+  'study_sessions',
+  'subject_files',
+  'legal_frontiers',
+] as const;
 
 export const dataService = {
   // BOARDS
@@ -922,16 +1081,21 @@ export const dataService = {
             await db.notes.bulkPut(merged);
 
             if (isOnline) {
-              for (const loc of localNotes) {
+              const newerLocals = localNotes.filter((loc) => {
                 const r = remoteById.get(loc.id);
-                if (!r || new Date(loc.updated_at).getTime() > new Date(r.updated_at).getTime()) {
-                  void upsertNoteToSupabase({
-                    ...loc,
-                    user_id: userId,
-                    subject_id: loc.subject_id,
-                    handwriting_data: loc.handwriting_data ?? null,
-                    is_starred: loc.is_starred || false
-                  });
+                return !r || new Date(loc.updated_at).getTime() > new Date(r.updated_at).getTime();
+              });
+              if (newerLocals.length > 0) {
+                const rows = newerLocals.map((loc) => ({
+                  ...loc,
+                  user_id: userId,
+                  subject_id: loc.subject_id,
+                  handwriting_data: loc.handwriting_data ?? null,
+                  is_starred: loc.is_starred || false,
+                })) as Record<string, unknown>[];
+                for (const chunk of chunkArray(rows, SYNC_UPSERT_CHUNK)) {
+                  const { error: batchErr } = await batchUpsertNotes(chunk);
+                  if (batchErr) console.warn('[notes] lote após merge falhou', batchErr);
                 }
               }
             }
@@ -942,15 +1106,19 @@ export const dataService = {
           // Cloud empty but this device has notes (e.g. upsert failed earlier, or only IndexedDB was used).
           // Push locals so other browsers / Simple Browser see the same list after refetch.
           if (localNotes.length > 0) {
+            const rows = localNotes.map(
+              (n) =>
+                ({
+                  ...n,
+                  user_id: userId,
+                  subject_id: n.subject_id,
+                  handwriting_data: n.handwriting_data ?? null,
+                  is_starred: n.is_starred || false,
+                }) as Record<string, unknown>
+            );
             let anySynced = false;
-            for (const n of localNotes) {
-              const { error: upErr } = await upsertNoteToSupabase({
-                ...n,
-                user_id: userId,
-                subject_id: n.subject_id,
-                handwriting_data: n.handwriting_data ?? null,
-                is_starred: n.is_starred || false
-              });
+            for (const chunk of chunkArray(rows, SYNC_UPSERT_CHUNK)) {
+              const { error: upErr } = await batchUpsertNotes(chunk);
               if (!upErr) anySynced = true;
             }
             if (anySynced) {
@@ -989,124 +1157,175 @@ export const dataService = {
     }
   },
 
-  // SYNC ALL
+  // SYNC ALL — lote (batch) para não disparar centenas de pedidos HTTP ao PostgREST de uma vez.
   async syncOfflineData(userId: string) {
-    const queue = await db.syncQueue.toArray();
+    const queue = await db.syncQueue.orderBy('id').toArray();
     if (queue.length === 0) return;
 
-    console.log(`Syncing ${queue.length} items...`);
+    const n = queue.length;
+    const lastWinIndex = new Map<string, number>();
+    for (let i = 0; i < n; i++) {
+      const key = getSyncResolutionKey(queue[i], userId);
+      lastWinIndex.set(key, i);
+    }
 
-    for (const item of queue) {
-      try {
-        if (item.action === 'delete') {
-          if (item.table === 'folders' && item.data.recursive) {
-             // Handle recursive folder deletion during sync
-             // Fetch all folders to find descendants in JS
-             const { data: allFolders } = await supabase.from('folders').select('id, parent_id').eq('user_id', userId);
-             
-             const getDescendantIds = (folderId: string, folders: any[]): string[] => {
-               let ids: string[] = [];
-               const children = folders.filter(f => f.parent_id === folderId);
-               for (const child of children) {
-                 ids.push(child.id);
-                 ids.push(...getDescendantIds(child.id, folders));
-               }
-               return ids;
-             };
-             
-             const ids = [item.data.id, ...getDescendantIds(item.data.id, allFolders || [])];
-             
-             await supabase.from('flashcards').delete().in('folder_id', ids).eq('user_id', userId);
-             await supabase.from('folders').delete().in('id', ids).eq('user_id', userId);
-          } else {
-            await supabase.from(item.table).delete().eq('id', item.data.id).eq('user_id', userId);
-          }
-        } else {
-          const payload = { ...item.data, user_id: userId };
-          // Map camelCase to snake_case for Supabase if needed
-          if (item.table === 'tasks') {
-             const task = item.data as Task;
-             payload.user_id = userId;
-             payload.title = task.title;
-             payload.notes = task.notes || null;
-             payload.due_date = task.dueDate || null;
-             payload.completed_at = task.completedAt || null;
-             payload.category = task.category || 'Geral';
-             payload.priority = task.priority === 'urgente' || task.priority === 'alta' ? 'Alta' : 'Média';
-             payload.status = task.completed ? 'Concluido' : 'Pendente';
-             payload.subtasks = task.subtasks || [];
-             payload.description = JSON.stringify({
-               syllabusLink: task.syllabusLink,
-               importantCitations: task.importantCitations,
-               revisionStatus: task.revisionStatus,
-               boardId: task.boardId,
-               columnId: task.columnId,
-               subjectId: task.subjectId
-             });
-             // Remove camelCase fields
-             delete payload.subjectId;
-             delete payload.dueDate;
-             delete payload.completedAt;
-             delete payload.boardId;
-             delete payload.columnId;
-             delete payload.syllabusLink;
-             delete payload.importantCitations;
-             delete payload.revisionStatus;
-             delete payload.completed;
-          }
-          if (item.table === 'boards') {
-             payload.user_id = userId;
-             payload.created_at = payload.createdAt;
-             delete payload.createdAt;
-             delete payload.userId;
-          }
-          if (item.table === 'flashcards') {
-             payload.subject_id = payload.subjectId || null;
-             payload.folder_id = payload.folderId || null;
-             payload.next_review = payload.nextReview;
-             payload.status = payload.status || 'new';
-             delete payload.subjectId;
-             delete payload.folderId;
-             delete payload.nextReview;
-          }
-          
-          if (item.table === 'folders') {
-             payload.parent_id = payload.parentId || null;
-             payload.target_date = payload.targetDate || null;
-             payload.icon = payload.icon || null;
-             delete payload.parentId;
-             delete payload.targetDate;
-          }
-          
-          if (item.table === 'notes') {
-            // Ensure correct mapping if needed, though Note is already snake_case
-            payload.subject_id = payload.subject_id || payload.subjectId;
-            delete payload.subjectId;
-          }
+    const supersededIds = queue
+      .map((item, i) =>
+        item.id != null && lastWinIndex.get(getSyncResolutionKey(item, userId)) !== i ? item.id : null
+      )
+      .filter((x): x is number => x != null);
 
-          if (item.table === 'subject_files') {
-            payload.subject_id = payload.subject_id || payload.subjectId;
-            delete payload.subjectId;
-          }
+    if (supersededIds.length > 0) {
+      await db.syncQueue.bulkDelete(supersededIds);
+    }
 
-          const tableName = item.table as string;
-          if (tableName === 'user_profile') {
-            // Use the same logic as saveUserProfile
-            await this.saveUserProfile(item.data, userId, true);
-            await db.syncQueue.delete(item.id!);
-            continue;
-          }
+    const winners = queue.filter(
+      (item, i) => lastWinIndex.get(getSyncResolutionKey(item, userId)) === i
+    );
+    if (winners.length === 0) return;
 
-          const { error } =
-            item.table === 'notes'
-              ? await upsertNoteToSupabase(payload)
-              : await supabase.from(item.table as any).upsert(payload);
-          if (error) throw error;
+    console.log(
+      `[sync] ${n} entradas na fila → ${winners.length} operações efetivas após dedupe (lotes de ${SYNC_UPSERT_CHUNK})`
+    );
+
+    const winnerIdsSucceeded: number[] = [];
+
+    const collectProfile = winners.filter((w) => w.table === 'user_profile');
+    const collectRecursive = winners.filter(
+      (w) => w.action === 'delete' && w.table === 'folders' && w.data?.recursive
+    );
+    const collectSimpleDeletes = winners.filter(
+      (w) => w.action === 'delete' && !(w.table === 'folders' && w.data?.recursive)
+    );
+    const collectUpserts = winners.filter((w) => w.action !== 'delete' && w.table !== 'user_profile');
+
+    const byUpsertTable = new Map<string, OfflineSyncQueue[]>();
+    for (const w of collectUpserts) {
+      if (!byUpsertTable.has(w.table)) byUpsertTable.set(w.table, []);
+      byUpsertTable.get(w.table)!.push(w);
+    }
+
+    const runUpsertTable = async (table: string) => {
+      const group = byUpsertTable.get(table);
+      if (!group?.length) return;
+
+      const rowMap = new Map<string, Record<string, unknown>>();
+      const qids: number[] = [];
+
+      for (const item of group) {
+        const row = mapSyncQueueItemToRow(item, userId);
+        if (!row) continue;
+        const rid = row.id;
+        if (rid == null || rid === '') {
+          console.warn('[sync] upsert sem id, ignorando', table, item.id);
+          continue;
         }
-        await db.syncQueue.delete(item.id!);
-      } catch (err) {
-        console.error(`Failed to sync item ${item.id}`, err);
+        rowMap.set(String(rid), row);
+        if (item.id != null) qids.push(item.id);
       }
+
+      const rows = [...rowMap.values()];
+      if (rows.length === 0) return;
+
+      for (const chunk of chunkArray(rows, SYNC_UPSERT_CHUNK)) {
+        let error: { message?: string } | null = null;
+        if (table === 'notes') {
+          const r = await batchUpsertNotes(chunk);
+          error = r.error;
+        } else {
+          const res = await supabase.from(table).upsert(chunk, { onConflict: 'id' });
+          error = res.error;
+        }
+        if (error) {
+          console.error(`[sync] upsert em lote falhou (tabela=${table})`, error);
+          throw error;
+        }
+      }
+      winnerIdsSucceeded.push(...qids);
+    };
+
+    try {
+      const handledTables = new Set<string>();
+      for (const table of SYNC_UPSERT_TABLE_ORDER) {
+        handledTables.add(table);
+        await runUpsertTable(table);
+      }
+      for (const table of byUpsertTable.keys()) {
+        if (handledTables.has(table)) continue;
+        await runUpsertTable(table);
+      }
+
+      const delByTable = new Map<string, OfflineSyncQueue[]>();
+      for (const w of collectSimpleDeletes) {
+        if (!delByTable.has(w.table)) delByTable.set(w.table, []);
+        delByTable.get(w.table)!.push(w);
+      }
+
+      for (const [table, group] of delByTable) {
+        const ids = [...new Set(group.map((g) => String(g.data.id)))];
+        const qids = group.map((g) => g.id!).filter((id): id is number => id != null);
+        for (const chunk of chunkArray(ids, SYNC_UPSERT_CHUNK)) {
+          const { error } = await supabase.from(table).delete().in('id', chunk).eq('user_id', userId);
+          if (error) {
+            console.error(`[sync] delete em lote falhou (tabela=${table})`, error);
+            throw error;
+          }
+        }
+        winnerIdsSucceeded.push(...qids);
+      }
+
+      if (collectRecursive.length > 0) {
+        const { data: allFolders } = await supabase
+          .from('folders')
+          .select('id, parent_id')
+          .eq('user_id', userId);
+        const tree = allFolders || [];
+
+        const getDescendantIds = (folderId: string, folders: { id: string; parent_id: string | null }[]): string[] => {
+          const ids: string[] = [];
+          const children = folders.filter((f) => f.parent_id === folderId);
+          for (const child of children) {
+            ids.push(child.id);
+            ids.push(...getDescendantIds(child.id, folders));
+          }
+          return ids;
+        };
+
+        for (const item of collectRecursive) {
+          const ids = [item.data.id as string, ...getDescendantIds(item.data.id, tree)];
+          const { error: cardsErr } = await supabase
+            .from('flashcards')
+            .delete()
+            .in('folder_id', ids)
+            .eq('user_id', userId);
+          if (cardsErr) throw cardsErr;
+          const { error: foldErr } = await supabase
+            .from('folders')
+            .delete()
+            .in('id', ids)
+            .eq('user_id', userId);
+          if (foldErr) throw foldErr;
+          if (item.id != null) winnerIdsSucceeded.push(item.id);
+        }
+      }
+
+      if (collectProfile.length > 0) {
+        const last = collectProfile.reduce((a, b) =>
+          (a.timestamp || '') >= (b.timestamp || '') ? a : b
+        );
+        await this.saveUserProfile(last.data, userId, true);
+        for (const p of collectProfile) {
+          if (p.id != null) winnerIdsSucceeded.push(p.id);
+        }
+      }
+    } catch (e) {
+      console.error('[sync] sincronização em lote abortada; itens falhados permanecem na fila', e);
+      return;
+    }
+
+    const uniq = [...new Set(winnerIdsSucceeded)];
+    if (uniq.length > 0) {
+      await db.syncQueue.bulkDelete(uniq);
     }
   },
 
