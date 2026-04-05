@@ -1558,7 +1558,9 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
       setCurrentTime(Date.now());
       
       // Update time every 5 seconds to keep the queue fresh
-      const
+      const interval = setInterval(() => {
+        setCurrentTime(Date.now());
+      }, 5000);
       return () => clearInterval(interval);
     }
   }, [mode]);
@@ -2479,6 +2481,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
             </>
           )}
         </div>
+        </div>
       )}
 
       {showFolderInput && (
@@ -2527,7 +2530,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                       <button
                         key={iconObj.value}
                         onClick={() => setNewFolderIcon(iconObj.value)}
-                        className={`w-full aspect-square rounded-xl transition-all flex items-center justify-center border-2 ${(newFolderIcon === iconObj.value ? 'bg-slate-100 dark:bg-white/10 border-sanfran-rubi text-sanfran-rubi' : 'border-slate-100 dark:border-white/5 text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}
+                        className={`w-full aspect-square rounded-xl transition-all flex items-center justify-center border-2 ${(newFolderIcon === iconObj.value ? 'bg-slate-100 dark:bg-white/10 border-sanfran-rubi text-sanfran-rubi' : 'border-slate-100 dark:border-white/5 text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5')}`}
                         title={iconObj.name}
                       >
                         <IconComp className="w-6 h-6" />
@@ -3612,7 +3615,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                                   <span className="text-xs font-black text-purple-600 uppercase tracking-[0.3em]">Avaliação IA</span>
                                   <button 
                                     onClick={(e) => { e.stopPropagation(); setAiEvaluation(null); setIsFlipped(false); setIsDissertativeMode(true); }}
-                                    className="p-1 text-slate
+                                    className="p-1 text-slate-400 hover:text-purple-600 rounded-lg transition-colors"
                                     title="Refazer Avaliação"
                                   >
                                     <RotateCcw size={14} />
