@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1772999725518,
+      "tag": "0000_typical_ezekiel_stane",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1772999818235,
+      "tag": "0001_bright_silver_surfer",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1773001529895,
+      "tag": "0002_nervous_wendell_rand",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1773002292974,
+      "tag": "0003_simple_jocasta",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1773090650750,
+      "tag": "0004_overconfident_arclight",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+# Screenshot Analysis
+- Dashboard está renderizando corretamente com tema dark
+- Top bar mostra XP (+5), Coins (1), sino com badge vermelho (1), e ícones de perfil
+- Card "Instalar App" visível no topo
+- Card "Março" com 0% e "Precisa melhorar" em vermelho
+- Badges de Sono, Energia, Humor com traço (-)
+- Hábitos da Semana com 0% e gráfico de barras por dia
+- Tarefas da Semana com 0/0 0%
+- Bottom nav com 6 abas: Dashboard, Hábitos, Tarefas, Metas, Finanças, Foco
+- Nome "sistemalife.com" no header
+- Tudo parece correto e funcional
