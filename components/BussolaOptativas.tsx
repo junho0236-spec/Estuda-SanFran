@@ -73,7 +73,7 @@ const BussolaOptativas: React.FC<BussolaOptativasProps> = ({ userId, userName })
 
   const fetchReviews = async () => {
     setLoading(true);
-    const { data } = await supabase.from('sf_reviews').select('*').order('created_at', { ascending: false });
+    const { data } = await supabase.from('sf_reviews').select('id, subject_name, professor_name, created_at').order('created_at', { ascending: false });
     if (data) setReviews(data);
     setLoading(false);
   };

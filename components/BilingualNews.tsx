@@ -92,7 +92,7 @@ const BilingualNews: React.FC<BilingualNewsProps> = ({ userId }) => {
     try {
       const { data, error } = await supabase
         .from('bilingual_articles')
-        .select('*')
+        .select('id, title, author, created_at')
         .eq('language', currentLang)
         .order('created_at', { ascending: false });
 

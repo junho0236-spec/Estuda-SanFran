@@ -859,7 +859,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     try {
       const { data, error } = await supabase
         .from('public_decks')
-        .select('*')
+        .select('id, name, downloads')
         .order('downloads', { ascending: false });
       
       if (error) throw error;
@@ -2479,8 +2479,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
             </>
           )}
         </div>
-      </div>
-    )}
+      )}
 
       {showFolderInput && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
@@ -2528,7 +2527,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                       <button
                         key={iconObj.value}
                         onClick={() => setNewFolderIcon(iconObj.value)}
-                        className={`w-full aspect-square rounded-xl transition-all flex items-center justify-center border-2 ${newFolderIcon === iconObj.value ? 'bg-slate-100 dark:bg-white/10 border-sanfran-rubi text-sanfran-rubi' : 'border-slate-100 dark:border-white/5 text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}
+                        className={`w-full aspect-square rounded-xl transition-all flex items-center justify-center border-2 ${(newFolderIcon === iconObj.value ? 'bg-slate-100 dark:bg-white/10 border-sanfran-rubi text-sanfran-rubi' : 'border-slate-100 dark:border-white/5 text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}
                         title={iconObj.name}
                       >
                         <IconComp className="w-6 h-6" />
@@ -2571,7 +2570,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-black uppercase tracking-tighter text-slate-900 dark:text-white">Editar Pasta</h3>
               <button onClick={() => setEditingFolder(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
-                <X className="w-6 h-6 text-slate-400" />
+                <X className="w-6 h-6" />
               </button>
             </div>
             
@@ -2650,6 +2649,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="bg-gradient-to-br from-purple-600 to-indigo-700 p-10 rounded-[3rem] text-white shadow-2xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-500/20 rounded-full blur-2xl -ml-24 -mb-24"></div>
+              
             <div className="relative z-10">
               <h3 className="text-3xl font-black uppercase tracking-tighter mb-2">Hub da Comunidade</h3>
               <p className="text-purple-100 font-bold max-w-xl">Explore e baixe decks criados por outros estudantes da SanFran. Conhecimento compartilhado é conhecimento multiplicado.</p>
@@ -3202,7 +3203,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                     )}
                   </div>
 
-                  <h4 className="font-black text-slate-950 dark:text-white uppercase text-lg leading-tight tracking-tight mb-6 line-clamp-3 break-words">
+                  <h4 className="font-black text-slate-950 dark:text-white uppercase text-lg leading-tight mb-6 line-clamp-3 break-words">
                     {folder.name}
                   </h4>
                 </div>
@@ -3817,7 +3818,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
              <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
 
              <div className="flex items-center gap-4 mb-8 relative z-10">
-               <button onClick={() => setMode('browse')} className="p-3"><ArrowLeft className="w-8 h-8 text-slate-700 dark:text-slate-300" /></button>
+               <button onClick={() => setMode('browse')} className="p-3"><ArrowLeft className="w-8 h-8 text-slate-400" /></button>
                <div>
                   <div className="flex items-center gap-2">
                      <Sparkles className="text-purple-500 w-6 h-6 animate-pulse" />
@@ -3868,7 +3869,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                                ? 'border-purple-500 bg-purple-500 text-white shadow-lg shadow-purple-500/20' 
                                 : 'border-slate-200 text-slate-400 hover:border-purple-200'
                            }`}
-                         >
+                           >
                            {type}
                          </button>
                        ))}
@@ -4151,7 +4152,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                <button 
                  onClick={handleSaveAIGeneratedCards} 
                  disabled={isLoading || aiGeneratedCardsPreview.length === 0}
-                 className="py-4 px-8 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black uppercase text-sm shadow-xl hover:scale-105 transition-transform flex items-center gap-2 disabled:opacity-50"
+                 className="py-4 px-8 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-[2rem] font-black uppercase text-sm shadow-xl hover:scale-105 transition-transform flex items-center gap-2 disabled:opacity-50"
                >
                  {isLoading ? <div className="animate-spin w-5 h-5 border-4 border-white/30 border-t-white rounded-full"></div> : <><Save size={18} /> Salvar {aiGeneratedCardsPreview.length} Cards</>}
                </button>
@@ -4195,7 +4196,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                              value={card.notes || ''} 
                              onChange={(e) => updatePreviewCard(index, 'notes', e.target.value)} 
                              placeholder="Adicione mnemônicos ou observações..."
-                             className="w-full h-16 p-3 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-700/30 rounded-xl font-medium resize-none outline-none focus:border-yellow-500" 
+                             className="w-full h-16 p-3 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-700/30 rounded-xl font-medium resize-none outline-none" 
                            />
                          </div>
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -4236,7 +4237,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         <div className="bg-white dark:bg-sanfran-rubiDark p-10 rounded-[3rem] border-4 border-usp-blue shadow-2xl">
           <div className="flex items-center gap-4 mb-8">
             <button onClick={() => setMode('browse')} className="p-3"><ArrowLeft className="w-8 h-8 text-slate-400" /></button>
-            <h3 className="text-3xl font-black text-slate-950 dark:text-white uppercase">Importação em Lote</h3>
+            <h3 className="text-3xl font-black text-slate-950 dark:text-white uppercase tracking-tight">Importação em Lote</h3>
           </div>
           
           <div className="space-y-6">
@@ -4294,9 +4295,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
           <div className="space-y-6" onPaste={handlePaste}>
             <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Disciplina</label>
-                <select value={selectedSubjectId} onChange={(e) => setSelectedSubjectId(e.target.value)} className="w-full p-4 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-2xl font-bold">
-                   {(subjects || []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
+                <select value={selectedSubjectId} onChange={(e) => setSelectedSubjectId(e.target.value)} className="w-full p-4 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-2xl font-bold outline-none" />
             </div>
             <input value={manualFront} onChange={(e) => setManualFront(e.target.value)} placeholder="Enunciado / Pergunta" className="w-full p-6 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 rounded-2xl font-bold outline-none" />
             <div className="relative">
@@ -4411,67 +4410,80 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-in fade-in duration-300">
           <div className="bg-white dark:bg-sanfran-rubiDark rounded-[3.5rem] w-full max-w-3xl shadow-2xl border-4 border-purple-500/30 relative overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
             <div className="p-10 border-b border-slate-100 dark:border-white/5 bg-gradient-to-br from-purple-600 to-indigo-700 text-white">
-              <div className="flex justify-between items-start mb-6">
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Eye className="w-6 h-6 text-purple-200" />
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-purple-200">Amostra Grátis</span>
-                  </div>
-                  <h3 className="text-3xl font-black uppercase tracking-tighter">{previewDeck.name}</h3>
-                  <p className="text-purple-100 font-bold text-sm">Visualizando 5 cards aleatórios para conferência de estilo.</p>
-                </div>
+              <div className="flex justify-between items-center mb-4">
+                <Activity className="w-10 h-10 text-white/20" />
                 <button onClick={() => setIsPreviewModalOpen(false)} className="p-3 bg-white/10 hover:bg-white/20 rounded-full transition-colors">
                   <X className="w-6 h-6" />
                 </button>
               </div>
-              
-              <div className="flex flex-wrap gap-4">
-                <div className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-2xl border border-white/20">
-                  <Star size={14} className="text-usp-gold fill-usp-gold" />
-                  <span className="text-xs font-black">{previewDeck.rating || 'N/A'}</span>
-                </div>
-                <div className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-2xl border border-white/20">
-                  <FileDown size={14} />
-                  <span className="text-xs font-black">{previewDeck.downloads || 0} Downloads</span>
-                </div>
-                {previewDeck.is_verified && (
-                  <div className="flex items-center gap-2 px-4 py-2 bg-usp-gold/20 rounded-2xl border border-usp-gold/40">
-                    <ShieldCheck size={14} className="text-usp-gold" />
-                    <span className="text-xs font-black text-usp-gold uppercase tracking-widest">Verificado</span>
-                  </div>
-                )}
-              </div>
+              <h3 className="text-3xl font-black tracking-tighter capitalize">
+                {new Date(selectedHeatmapDate + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+              </h3>
+              <p className="text-emerald-100 font-bold text-sm mt-2 uppercase tracking-widest">Resumo Diário de Estudo</p>
             </div>
-
-            <div className="flex-1 overflow-y-auto p-10 space-y-6 custom-scrollbar">
-              {(previewDeck.cards?.slice(0, 5) || []).map((card: any, idx: number) => (
-                <div key={idx} className="p-8 bg-slate-50 dark:bg-white/5 rounded-[2rem] border-2 border-slate-100 dark:border-white/5 relative group">
-                  <span className="absolute top-6 right-8 text-[10px] font-black text-slate-300 uppercase">Card {idx + 1}</span>
-                  <div className="mb-4">
-                    <span className="text-[9px] font-black text-purple-500 uppercase tracking-widest block mb-2">Pergunta</span>
-                    <p className="text-lg font-black text-slate-900 dark:text-white leading-tight">{card.front}</p>
+            
+            <div className="p-10">
+              {isDailySummaryLoading ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                  <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Carregando resumo...</p>
+                </div>
+              ) : dailySummaryData.length === 0 ? (
+                <div className="text-center py-12 border-4 border-dashed border-slate-100 dark:border-white/5 rounded-[2rem]">
+                  <Activity className="w-16 h-16 text-slate-200 dark:text-white/10 mx-auto mb-4" />
+                  <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Nenhuma atividade registrada para este dia.</p>
+                </div>
+              ) : (
+                <div className="space-y-8">
+                  {/* Metrics */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="bg-slate-50 dark:bg-white/5 p-6 rounded-3xl border border-slate-100 dark:border-white/5 text-center">
+                      <span className="text-3xl font-black text-slate-900 dark:text-white block mb-1">{dailySummaryData.length}</span>
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Cards Revisados</span>
+                    </div>
+                    <div className="bg-emerald-50 dark:bg-emerald-900/20 p-6 rounded-3xl border border-emerald-100 dark:border-emerald-500/20 text-center">
+                      <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400 block mb-1">
+                        {Math.round((dailySummaryData.filter(s => s.rating && s.rating >= 3).length / dailySummaryData.length) * 100) || 0}%
+                      </span>
+                      <span className="text-[9px] font-black text-emerald-600/70 dark:text-emerald-400/70 uppercase tracking-widest">Acerto (Bom/Fácil)</span>
+                    </div>
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-3xl border border-blue-100 dark:border-blue-500/20 text-center">
+                      <span className="text-3xl font-black text-blue-600 dark:text-blue-400 block mb-1">
+                        {Math.round(dailySummaryData.reduce((acc, curr) => acc + (curr.duration || 0), 0) / 60)}m
+                      </span>
+                      <span className="text-[9px] font-black text-blue-600/70 dark:text-blue-400/70 uppercase tracking-widest">Tempo Total</span>
+                    </div>
                   </div>
-                  <div className="pt-4 border-t border-slate-200 dark:border-white/10">
-                    <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest block mb-2">Resposta</span>
-                    <p className="text-sm font-bold text-slate-600 dark:text-slate-300 leading-relaxed">{card.back}</p>
+
+                  {/* Activity by Folder */}
+                  <div>
+                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                      <FolderIcon size={14} /> Atividade por Disciplina
+                    </h4>
+                    <div className="space-y-3">
+                      {Object.entries(
+                        dailySummaryData.reduce((acc: any, curr: any) => {
+                          const folderId = curr.folder_id || curr.subject_id;
+                          acc[folderId] = (acc[folderId] || 0) + 1;
+                          return acc;
+                        }, {})
+                      ).map(([folderId, count]: [string, any]) => {
+                        const folder = folders?.find(f => f.id === folderId);
+                        const subject = subjects?.find(s => s.id === folderId);
+                        const name = folder?.name || subject?.name || 'Geral';
+                        const color = folder?.color || 'border-l-slate-500';
+                        
+                        return (
+                          <div key={folderId} className={`flex items-center justify-between p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border-l-4 ${color}`}>
+                            <span className="font-bold text-slate-700 dark:text-slate-200">{name}</span>
+                            <span className="text-xs font-black bg-white dark:bg-slate-800 px-3 py-1 rounded-full text-slate-500">{count} cards</span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
-
-            <div className="p-10 bg-slate-50 dark:bg-black/20 border-t border-slate-100 dark:border-white/5 flex gap-4">
-              <button 
-                onClick={() => setIsPreviewModalOpen(false)}
-                className="flex-1 py-5 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-[2rem] font-black uppercase text-xs tracking-widest border-2 border-slate-200 dark:border-white/10"
-              >
-                Voltar
-              </button>
-              <button 
-                onClick={() => { handleDownloadDeck(previewDeck); setIsPreviewModalOpen(false); }}
-                className="flex-[2] py-5 bg-purple-600 text-white rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl shadow-purple-500/20"
-              >
-                Gostei, Baixar Agora
-              </button>
+              )}
             </div>
           </div>
         </div>
@@ -4510,7 +4522,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   <div className="grid grid-cols-3 gap-4">
                     <div className="bg-slate-50 dark:bg-white/5 p-6 rounded-3xl border border-slate-100 dark:border-white/5 text-center">
                       <span className="text-3xl font-black text-slate-900 dark:text-white block mb-1">{dailySummaryData.length}</span>
-                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Cards Revisados</span>
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Cards Revisados</span>
                     </div>
                     <div className="bg-emerald-50 dark:bg-emerald-900/20 p-6 rounded-3xl border border-emerald-100 dark:border-emerald-500/20 text-center">
                       <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400 block mb-1">

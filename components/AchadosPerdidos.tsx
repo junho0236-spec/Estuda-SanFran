@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Search, Plus, MapPin, Phone, Clock, AlertCircle, CheckCircle, X, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
@@ -56,7 +55,7 @@ const AchadosPerdidos: React.FC<AchadosPerdidosProps> = ({ userId, userName }) =
     
     const { data } = await supabase
       .from('sf_lost_found')
-      .select('*')
+      .select('id, title, contact, created_at')
       .gte('created_at', sevenDaysAgo.toISOString())
       .order('created_at', { ascending: false });
     

@@ -621,7 +621,7 @@ const App: React.FC = () => {
       setIsLoadingFlashcards(true);
       if (isOnline) {
         // Fetch subjects first as they are often dependencies
-        const { data: subs } = await supabase.from('subjects').select('*').eq('user_id', userId);
+        const { data: subs } = await supabase.from('subjects').select('id, name').eq('user_id', userId);
         if (subs) setSubjects(subs);
         
         const profile = await dataService.getUserProfile(userId, isOnline);
@@ -645,13 +645,13 @@ const App: React.FC = () => {
 
         // Fetch others in parallel but handle them individually to avoid one failure crashing everything
         const [resFlds, resCards, resTks, resBoards, resSessions, resReadings, resProgress] = await Promise.all([
-          supabase.from('folders').select('*').eq('user_id', userId),
-          supabase.from('flashcards').select('*').eq('user_id', userId).is('archived_at', null),
-          supabase.from('tasks').select('*').eq('user_id', userId).is('archived_at', null).order('created_at', { ascending: false }),
-          supabase.from('boards').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-          supabase.from('study_sessions').select('*').eq('user_id', userId).order('start_time', { ascending: false }),
-          supabase.from('readings').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-          supabase.from('user_progress').select('*').eq('user_id', userId).maybeSingle()
+          supabase.from('folders').select('id, name').eq('user_id', userId),
+          supabase.from('flashcards').select('id, question, answer').eq('user_id', userId).is('archived_at', null),
+          supabase.from('tasks').select('id, title, description').eq('user_id', userId).is('archived_at', null).order('created_at', { ascending: false }),
+          supabase.from('boards').select('id, name').eq('user_id', userId).order('created_at', { ascending: false }),
+          supabase.from('study_sessions').select('id, start_time, end_time').eq('user_id', userId).order('start_time', { ascending: false }),
+          supabase.from('readings').select('id, title, author').eq('user_id', userId).order('created_at', { ascending: false }),
+          supabase.from('user_progress').select('id, progress').eq('user_id', userId).maybeSingle()
         ]);
 
         if (resFlds.data) {
