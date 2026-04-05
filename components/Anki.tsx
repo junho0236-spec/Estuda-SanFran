@@ -2365,7 +2365,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                     disabled={reviewQueue.length === 0} 
                     className="flex flex-col items-center justify-center px-8 py-2.5 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest disabled:opacity-50 hover:bg-sanfran-rubiDark shadow-xl"
                   >
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-1 mb-1">
                       <RotateCcw className="w-5 h-5" /> 
                       Estudar
                     </div>
@@ -2458,8 +2458,8 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   </div>
 
                   <div className="relative group">
-                    <button onClick={() => setIsSelectionMode(true)} className="p-3.5 bg-white dark:bg-sanfran-rubiDark text-slate-500 border-2 border-slate-200 rounded-2xl shadow-xl">
-                      <CheckSquare className="w-5 h-5" />
+                    <button onClick={() => setIsSelectionMode(true)} className="p-3.5 bg-white dark:bg-sanfran-rubiDark text-slate-500 border-2 border-slate-200 rounded-2xl shadow-sm">
+                      <CheckSquare className="w-6 h-6" />
                     </button>
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1 bg-slate-900 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
                       Modo Seleção
@@ -2487,7 +2487,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-black uppercase tracking-tighter text-slate-900 dark:text-white">Nova Pasta</h3>
               <button onClick={() => setShowFolderInput(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
-                <X className="w-6 h-6 text-slate-400" />
+                <X className="w-6 h-6" />
               </button>
             </div>
             
@@ -2581,7 +2581,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   autoFocus
                   value={editingFolder.name} 
                   onChange={(e) => setEditingFolder({ ...editingFolder, name: e.target.value })} 
-                  className="w-full p-4 bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-white/10 rounded-2xl font-bold outline-none focus:border-sanfran-rubi transition-colors"
+                  className="w-full p-4 bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-white/10 rounded-2xl font-bold outline-none focus:border-purple-500 transition-colors"
                   onKeyDown={(e) => e.key === 'Enter' && handleUpdateFolder()}
                 />
               </div>
@@ -3584,7 +3584,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                               disabled={isEvaluating || !userWrittenAnswer.trim()}
                               className="flex-1 py-4 bg-sanfran-rubi text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
                             >
-                              {isEvaluating ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
+                              {isEvaluating ? <Loader2 className="animate-spin" /> : <Sparkles size={16} />}
                               {isEvaluating ? 'Avaliando...' : 'Enviar para Correção IA'}
                             </button>
                           </div>
@@ -3752,7 +3752,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                   className="w-full p-6 bg-orange-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3 hover:scale-105 transition-transform"
                 >
                   Próximo Card <ArrowRight size={18} />
-                  <span className="px-2 py-0.5 bg-black/20 rounded text-[8px] ml-2">Enter</span>
+                  <span className="px-2 py-0.5 bg-black/20 rounded text-[8px]">Enter</span>
                 </button>
               ) : (
                 <div className="grid grid-cols-4 gap-4 w-full">
@@ -4187,7 +4187,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                            <textarea 
                              value={card.back} 
                              onChange={(e) => updatePreviewCard(index, 'back', e.target.value)} 
-                             className="w-full h-24 p-3 bg-white dark:bg-black/50 border border-slate-200 dark:border-white/10 rounded-xl font-medium resize-none outline-none focus:border-purple-500" 
+                             className="w-full h-24 p-3 bg-white dark:bg-black/50 border border-slate-200 dark:border-white/10 rounded-xl font-medium resize-none outline-none" 
                            />
                          </div>
                          <div>
