@@ -82,7 +82,22 @@ const BussolaOptativas: React.FC<BussolaOptativasProps> = ({ userId, userName })
   const fetchReviews = async () => {
     setLoading(true);
     const { data } = await supabase.from('sf_reviews').select('id, subject_name, professor_name, created_at').order('created_at', { ascending: false });
-    if (data) setReviews(data);
+    if (data) {
+      setReviews(
+        data.map((d) => ({
+          id: d.id,
+          subject_name: d.subject_name,
+          professor_name: d.professor_name,
+          rating_didactics: 0,
+          rating_attendance: 0,
+          rating_difficulty: 0,
+          rating_relevance: 0,
+          comment: '',
+          is_anonymous: false,
+          created_at: d.created_at,
+        }))
+      );
+    }
     setLoading(false);
   };
 

@@ -135,7 +135,7 @@ export function useGlobalChatPresence({
 
     /** ~2.4× fewer presence round-trips than 25s; pauses while tab is hidden (saves Realtime messages). */
     const HEARTBEAT_MS = 60_000;
-    let heartbeatId: ReturnType<typeof setInterval> | null = null;
+    let heartbeatId: number | null = null;
 
     const clearHeartbeat = () => {
       if (heartbeatId !== null) {

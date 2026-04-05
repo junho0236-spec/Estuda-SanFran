@@ -97,7 +97,17 @@ const BilingualNews: React.FC<BilingualNewsProps> = ({ userId }) => {
         .order('created_at', { ascending: false });
 
       if (data && data.length > 0) {
-        setArticles(data);
+        setArticles(
+          data.map((d) => ({
+            id: d.id,
+            title: d.title,
+            content: '',
+            category: 'tech',
+            language: currentLang,
+            created_at: d.created_at,
+            source_name: d.author,
+          }))
+        );
       } else {
         // Fallback to mocks filtering by lang
         setArticles(MOCK_ARTICLES.filter(a => a.language === currentLang));

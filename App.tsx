@@ -28,6 +28,18 @@ const TASK_CLOUD_COLUMNS =
  * por utilizador é aceitável; o PostgREST devolve 400 se algum nome na lista não existir.
  */
 const USER_PROGRESS_CLOUD_COLUMNS = '*';
+/** Esquemas antigos variam (`end_time` vs `duration`, com ou sem `subject_id`). `*` evita 400. */
+const STUDY_SESSION_CLOUD_COLUMNS = '*';
+
+function sortStudySessionsNewestFirst<T extends { id: string; start_time?: string; created_at?: string }>(
+  rows: T[]
+): T[] {
+  return [...rows].sort((a, b) => {
+    const ka = String(a.start_time ?? a.created_at ?? a.id);
+    const kb = String(b.start_time ?? b.created_at ?? b.id);
+    return kb.localeCompare(ka);
+  });
+}
 
 // Lazy Load dos Componentes para Performance (Code Splitting)
 const Dashboard = React.lazy(() => import('./components/Dashboard'));
@@ -400,7 +412,7 @@ const App: React.FC = () => {
     const uid = session.user.id;
 
     const handleDuelPayload = (payload: { new: Record<string, unknown> }) => {
-      const duel = payload.new as Duel;
+      const duel = payload.new as unknown as Duel;
       if (!duel) return;
 
       if (duel.opponent_id === uid && duel.status === 'pending') {
@@ -811,9 +823,16 @@ const App: React.FC = () => {
       if (isOnline) {
         const syncQueueCount = await db.syncQueue.count();
 
-        // Fetch subjects first as they are often dependencies
-        const { data: subs } = await supabase.from('subjects').select('id, name').eq('user_id', userId);
-        if (subs) setSubjects(subs);
+        // Fetch subjects first as they are often dependencies (`color` por defeito — tipo Subject exige-o).
+        const { data: subsRows, error: subjectsFetchError } = await supabase
+          .from('subjects')
+          .select('id, name')
+          .eq('user_id', userId);
+        const subs: Subject[] = (subsRows ?? []).map((s) => ({
+          id: s.id,
+          name: s.name,
+          color: '#94a3b8',
+        }));
         
         const profile = await dataService.getUserProfile(userId, isOnline);
         if (profile) {
@@ -840,11 +859,7 @@ const App: React.FC = () => {
           supabase.from('flashcards').select(FLASHCARD_CLOUD_COLUMNS).eq('user_id', userId).is('archived_at', null),
           supabase.from('tasks').select(TASK_CLOUD_COLUMNS).eq('user_id', userId).is('archived_at', null).order('created_at', { ascending: false }),
           supabase.from('boards').select('id, name, columns, user_id, created_at').eq('user_id', userId).order('created_at', { ascending: false }),
-          supabase
-            .from('study_sessions')
-            .select('id, user_id, start_time, duration, subject_id')
-            .eq('user_id', userId)
-            .order('start_time', { ascending: false }),
+          supabase.from('study_sessions').select(STUDY_SESSION_CLOUD_COLUMNS).eq('user_id', userId),
           supabase.from('readings').select('id, title, author').eq('user_id', userId).order('created_at', { ascending: false }),
           supabase.from('user_progress').select(USER_PROGRESS_CLOUD_COLUMNS).eq('user_id', userId).maybeSingle()
         ]);
@@ -872,11 +887,11 @@ const App: React.FC = () => {
           setFolders(formattedFolders);
         }
         
-        if (subs) {
+        if (!subjectsFetchError) {
           if (syncQueueCount === 0) {
             const localSubs = await db.subjects.toArray();
-            const remoteIds = new Set(subs.map(s => s.id));
-            const idsToDelete = localSubs.filter(s => !remoteIds.has(s.id)).map(s => s.id);
+            const remoteIds = new Set(subs.map((s) => s.id));
+            const idsToDelete = localSubs.filter((s) => !remoteIds.has(s.id)).map((s) => s.id);
             if (idsToDelete.length > 0) await db.subjects.bulkDelete(idsToDelete);
             await db.subjects.bulkPut(subs);
           }
@@ -964,17 +979,32 @@ const App: React.FC = () => {
         }
         
         if (resSessions.data) {
+          const sessionsSorted = sortStudySessionsNewestFirst(
+            resSessions.data as { id: string; start_time?: string; created_at?: string }[]
+          ) as StudySession[];
           if (syncQueueCount === 0) {
             const localSessions = await db.study_sessions.toArray();
-            const remoteIds = new Set(resSessions.data.map(s => s.id));
+            const remoteIds = new Set(sessionsSorted.map(s => s.id));
             const idsToDelete = localSessions.filter(s => !remoteIds.has(s.id)).map(s => s.id);
             if (idsToDelete.length > 0) await db.study_sessions.bulkDelete(idsToDelete);
-            await db.study_sessions.bulkPut(resSessions.data);
+            await db.study_sessions.bulkPut(sessionsSorted);
           }
-          setStudySessions(resSessions.data);
+          setStudySessions(sessionsSorted);
         }
 
-        if (resReadings.data) setReadings(resReadings.data);
+        if (resReadings.data) {
+          setReadings(
+            resReadings.data.map((r) => ({
+              id: r.id,
+              user_id: userId,
+              title: r.title ?? '',
+              author: r.author ?? '',
+              total_pages: 0,
+              current_page: 0,
+              status: 'lendo' as Reading['status'],
+            }))
+          );
+        }
       }
     } catch (err) {
       console.error("Erro no carregamento dos dados:", err);

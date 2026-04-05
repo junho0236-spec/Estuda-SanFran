@@ -65,7 +65,21 @@ const AchadosPerdidos: React.FC<AchadosPerdidosProps> = ({ userId, userName }) =
       .gte('created_at', sevenDaysAgo.toISOString())
       .order('created_at', { ascending: false });
     
-    if (data) setItems(data);
+    if (data) {
+      setItems(
+        data.map((row) => ({
+          id: row.id,
+          user_id: '',
+          user_name: '',
+          title: row.title,
+          description: '',
+          location: '',
+          status: 'lost' as const,
+          contact_info: row.contact,
+          created_at: row.created_at,
+        }))
+      );
+    }
     setLoading(false);
   };
 
