@@ -11,21 +11,17 @@ import {
   formatAlternativesAnalysisPlain,
   type QuestionAiCommentary,
   type QuestionAiCorrection,
+  type GlossaryTerm,
 } from '../types';
 import { dataService } from '../services/dataService';
-import { NotebookModal } from './NotebookModal';
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { GEMINI_MODEL, extractPrecedent } from '../services/geminiService';
 import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { Loader2 } from 'lucide-react';
-import { GlossaryPopover } from './GlossaryPopover.tsx';
 import { fetchTermDefinition } from '../services/geminiService';
-import { GlossaryTerm } from '../types';
-import { motion, AnimatePresence } from 'motion/react';
 import { exportQuestionBankPdf } from './question-bank/exportQuestionBankPdf';
 import { MockResultsView } from './question-bank/MockResultsView';
 import { MockSetupModal } from './question-bank/MockSetupModal';
-import { QuestionBankAIGeneratorModal } from './question-bank/QuestionBankAIGeneratorModal';
 import {
   QuestionBankFiltersPanel,
   type ActiveFilterChip,
@@ -66,13 +62,8 @@ import { QuestionBankConfidenceModal } from './question-bank/QuestionBankConfide
 import { QuestionBankMockHud } from './question-bank/QuestionBankMockHud';
 import { QuestionBankMainHeader } from './question-bank/QuestionBankMainHeader';
 import { QuestionBankErrorInsightBanner } from './question-bank/QuestionBankErrorInsightBanner';
-import { QuestionBankPdfHiddenShell } from './question-bank/QuestionBankPdfHiddenShell';
 import { QuestionBankQuestionArea } from './question-bank/QuestionBankQuestionArea';
-import { QuestionBankAiLessonModal } from './question-bank/QuestionBankAiLessonModal';
-import { QuestionBankJuridiquesModal } from './question-bank/QuestionBankJuridiquesModal';
-import { QuestionBankManualGlossaryModal } from './question-bank/QuestionBankManualGlossaryModal';
-import { QuestionBankDeckPickerModal } from './question-bank/QuestionBankDeckPickerModal';
-import { QuestionBankNotificationToast } from './question-bank/QuestionBankNotificationToast';
+import { QuestionBankModalsLayer } from './question-bank/QuestionBankModalsLayer';
 import { QuestionBankMockSessionPanel } from './question-bank/QuestionBankMockSessionPanel';
 import { QuestionBankStatsGoalsNotebookShell } from './question-bank/QuestionBankStatsGoalsNotebookShell';
 
@@ -2891,23 +2882,115 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
         />
       )}
 
-      <div id="ai-generator-portal">
-        <QuestionBankAIGeneratorModal
-          open={showAIGenerator}
-          onClose={() => setShowAIGenerator(false)}
-          aiConfig={aiConfig}
-          setAiConfig={setAiConfig}
-          folders={folders}
-          onSubmit={handleGenerateAI}
-          isGenerating={isGenerating}
-          generatingStatus={generatingStatus}
-          aiCooldown={aiCooldown}
-        />
-      </div>
+      <QuestionBankModalsLayer
+        aiGenerator={{
+          open: showAIGenerator,
+          onClose: () => setShowAIGenerator(false),
+          aiConfig,
+          setAiConfig,
+          folders,
+          onSubmit: handleGenerateAI,
+          isGenerating,
+          generatingStatus,
+          aiCooldown,
+        }}
+        notification={{
+          message: notification?.message ?? null,
+          type: notification?.type ?? null,
+        }}
+        aiLesson={{
+          open: showAiLesson,
+          onClose: () => setShowAiLesson(false),
+          loading: loadingAiLesson,
+          content: aiLessonContent,
+          subjectLine:
+            selectedSubjects.length === 0
+              ? '—'
+              : selectedSubjects.length === 1
+                ? selectedSubjects[0]
+                : selectedSubjects.join(' · '),
+        }}
+        juridiques={{
+          open: showJuridiquesModal,
+          onClose: () => setShowJuridiquesModal(false),
+          selectedText,
+          loading: loadingJuridiquesExplanation,
+          explanation: juridiquesExplanation,
+        }}
+        manualGlossary={{
+          open: showManualGlossarySearch,
+          onClose: () => setShowManualGlossarySearch(false),
+          term: manualSearchTerm,
+          onTermChange: setManualSearchTerm,
+          onSubmit: handleManualSearch,
+          isLoading: isLoadingGlossary,
+        }}
+        glossaryPopover={{
+          activeTerm: activeGlossaryTerm,
+          data: glossaryData,
+          onClose: () => {
+            setActiveGlossaryTerm(null);
+            setGlossaryData(null);
+          },
+          userId,
+          isOnline,
+          position: glossaryPosition,
+        }}
+        glossaryLoadingOverlay={{
+          visible: isLoadingGlossary && !glossaryData,
+          position: glossaryPosition,
+        }}
+        notebookModal={{
+          isOpen: isNotebookModalOpen,
+          onClose: () => setIsNotebookModalOpen(false),
+          notebooks,
+          selectedQuestionIds: Array.from(selectedQuestionsForNotebook),
+          onCreateNotebook: async (name, description) => {
+            setNewNotebookName(name);
+            setNewNotebookDescription(description);
+            await handleCreateNotebook();
+            setIsNotebookModalOpen(false);
+          },
+          onAddToNotebook: async (notebookId) => {
+            try {
+              setIsSubmitting(true);
+              const notebook = notebooks.find((n) => n.id === notebookId);
+              if (!notebook) return;
 
-      <div id="add-form-portal">
-      </div>
+              const updatedQuestionIds = Array.from(
+                new Set([...notebook.question_ids, ...Array.from(selectedQuestionsForNotebook)])
+              );
 
+              const { error } = await supabase
+                .from('notebooks')
+                .update({ question_ids: updatedQuestionIds })
+                .eq('id', notebookId);
+
+              if (error) throw error;
+
+              setNotebooks((prev) =>
+                prev.map((n) => (n.id === notebookId ? { ...n, question_ids: updatedQuestionIds } : n))
+              );
+              showNotification('Questões adicionadas ao caderno!', 'success');
+              setSelectedQuestionsForNotebook(new Set());
+              setIsNotebookModalOpen(false);
+            } catch {
+              showNotification('Erro ao adicionar ao caderno.', 'error');
+            } finally {
+              setIsSubmitting(false);
+            }
+          },
+          isSubmitting,
+        }}
+        deckPicker={{
+          open: isDeckModalOpen,
+          onClose: () => setIsDeckModalOpen(false),
+          folders,
+          isSubmitting,
+          onPickFolder: (folderId) => handleConfirmFlashcardCreation(folderId),
+        }}
+        pdfExportActive={isExporting}
+      >
           <>
             {/* Filters & Stats */}
           <QuestionBankStatsGoalsNotebookShell
@@ -3156,120 +3239,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
             onOpenAiGenerator={() => setShowAIGenerator(true)}
           />
           </>
-        <div id="notification-portal">
-          <QuestionBankNotificationToast
-            message={notification?.message ?? null}
-            type={notification?.type ?? null}
-          />
-        </div>
-
-      <QuestionBankAiLessonModal
-        open={showAiLesson}
-        onClose={() => setShowAiLesson(false)}
-        loading={loadingAiLesson}
-        content={aiLessonContent}
-        subjectLine={
-          selectedSubjects.length === 0
-            ? '—'
-            : selectedSubjects.length === 1
-              ? selectedSubjects[0]
-              : selectedSubjects.join(' · ')
-        }
-      />
-
-      <QuestionBankJuridiquesModal
-        open={showJuridiquesModal}
-        onClose={() => setShowJuridiquesModal(false)}
-        selectedText={selectedText}
-        loading={loadingJuridiquesExplanation}
-        explanation={juridiquesExplanation}
-      />
-
-      <QuestionBankManualGlossaryModal
-        open={showManualGlossarySearch}
-        onClose={() => setShowManualGlossarySearch(false)}
-        term={manualSearchTerm}
-        onTermChange={setManualSearchTerm}
-        onSubmit={handleManualSearch}
-        isLoading={isLoadingGlossary}
-      />
-
-      {/* Glossary Popover */}
-      <AnimatePresence>
-        {activeGlossaryTerm && glossaryData && (
-          <GlossaryPopover
-            data={glossaryData}
-            onClose={() => {
-              setActiveGlossaryTerm(null);
-              setGlossaryData(null);
-            }}
-            userId={userId}
-            isOnline={isOnline}
-            position={glossaryPosition}
-          />
-        )}
-      </AnimatePresence>
-
-      {isLoadingGlossary && !glossaryData && (
-        <div 
-          className="fixed z-[100] p-4 bg-white rounded-2xl shadow-2xl border border-slate-200 flex items-center gap-3 animate-in fade-in duration-200"
-          style={{ left: glossaryPosition.x, top: glossaryPosition.y + 20 }}
-        >
-          <Loader2 className="w-4 h-4 text-indigo-600 animate-spin" />
-          <span className="text-sm font-bold text-slate-600">Buscando definição...</span>
-        </div>
-      )}
-      {isNotebookModalOpen && (
-        <NotebookModal
-          isOpen={isNotebookModalOpen}
-          onClose={() => setIsNotebookModalOpen(false)}
-          notebooks={notebooks}
-          selectedQuestionIds={Array.from(selectedQuestionsForNotebook)}
-          onCreateNotebook={async (name, description) => {
-            setNewNotebookName(name);
-            setNewNotebookDescription(description);
-            await handleCreateNotebook();
-            setIsNotebookModalOpen(false);
-          }}
-          onAddToNotebook={async (notebookId) => {
-            try {
-              setIsSubmitting(true);
-              const notebook = notebooks.find(n => n.id === notebookId);
-              if (!notebook) return;
-              
-              const updatedQuestionIds = Array.from(new Set([...notebook.question_ids, ...Array.from(selectedQuestionsForNotebook)]));
-              
-              const { error } = await supabase
-                .from('notebooks')
-                .update({ question_ids: updatedQuestionIds })
-                .eq('id', notebookId);
-              
-              if (error) throw error;
-              
-              setNotebooks(prev => prev.map(n => n.id === notebookId ? {...n, question_ids: updatedQuestionIds} : n));
-              showNotification('Questões adicionadas ao caderno!', 'success');
-              setSelectedQuestionsForNotebook(new Set());
-              setIsNotebookModalOpen(false);
-            } catch (error: any) {
-              showNotification('Erro ao adicionar ao caderno.', 'error');
-            } finally {
-              setIsSubmitting(false);
-            }
-          }}
-          isSubmitting={isSubmitting}
-        />
-      )}
-
-      <QuestionBankDeckPickerModal
-        open={isDeckModalOpen}
-        onClose={() => setIsDeckModalOpen(false)}
-        folders={folders}
-        isSubmitting={isSubmitting}
-        onPickFolder={(folderId) => handleConfirmFlashcardCreation(folderId)}
-      />
-
-
-      <QuestionBankPdfHiddenShell active={isExporting} />
+      </QuestionBankModalsLayer>
       </div>
   );
 };
