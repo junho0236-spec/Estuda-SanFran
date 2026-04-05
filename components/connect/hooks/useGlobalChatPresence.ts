@@ -58,6 +58,7 @@ export function useGlobalChatPresence({
   setTypingFromPresenceRef.current = setTypingStatusFromPresence;
 
   const trackPayload = useCallback(() => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
     const ch = channelRef.current;
     if (!ch || !subscribedRef.current || !userId) return;
     void ch
@@ -132,12 +133,43 @@ export function useGlobalChatPresence({
         }
       });
 
-    const heartbeat = window.setInterval(() => {
+    /** ~2.4× fewer presence round-trips than 25s; pauses while tab is hidden (saves Realtime messages). */
+    const HEARTBEAT_MS = 60_000;
+    let heartbeatId: ReturnType<typeof setInterval> | null = null;
+
+    const clearHeartbeat = () => {
+      if (heartbeatId !== null) {
+        window.clearInterval(heartbeatId);
+        heartbeatId = null;
+      }
+    };
+
+    const startHeartbeat = () => {
+      clearHeartbeat();
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      heartbeatId = window.setInterval(() => trackPayload(), HEARTBEAT_MS);
+    };
+
+    const onVisibility = () => {
+      if (typeof document === 'undefined') return;
+      if (document.visibilityState === 'hidden') {
+        clearHeartbeat();
+        return;
+      }
       trackPayload();
-    }, 25000);
+      startHeartbeat();
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibility);
+    }
+    startHeartbeat();
 
     return () => {
-      window.clearInterval(heartbeat);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibility);
+      }
+      clearHeartbeat();
       subscribedRef.current = false;
       channelRef.current = null;
       void supabase.removeChannel(channel);

@@ -926,30 +926,76 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
   };
 
   useEffect(() => {
-    // Set up real-time listener for questions
-    const questionsChannel = supabase
-      .channel('question_bank_changes')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'questions' 
-      }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          setQuestions(prev => [normalizeQuestionFromApi(payload.new as Question), ...prev]);
-        } else if (payload.eventType === 'UPDATE') {
-          setQuestions(prev =>
-            prev.map(q =>
-              q.id === (payload.new as Question).id ? normalizeQuestionFromApi(payload.new as Question) : q
-            )
-          );
-        } else if (payload.eventType === 'DELETE') {
-          setQuestions(prev => prev.filter(q => q.id !== payload.old.id));
+    // Unsubscribe while tab is in background so Supabase stops sending DB change fan-out (saves Realtime + egress).
+    const HIDE_UNSUB_MS = 8000;
+    let questionsChannel: ReturnType<typeof supabase.channel> | null = null;
+    let hideTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const applyPayload = (payload: {
+      eventType: string;
+      new: Record<string, unknown>;
+      old: { id: string };
+    }) => {
+      if (payload.eventType === 'INSERT') {
+        setQuestions(prev => [normalizeQuestionFromApi(payload.new as Question), ...prev]);
+      } else if (payload.eventType === 'UPDATE') {
+        setQuestions(prev =>
+          prev.map(q =>
+            q.id === (payload.new as Question).id ? normalizeQuestionFromApi(payload.new as Question) : q
+          )
+        );
+      } else if (payload.eventType === 'DELETE') {
+        setQuestions(prev => prev.filter(q => q.id !== payload.old.id));
+      }
+    };
+
+    const attach = () => {
+      if (questionsChannel) return;
+      questionsChannel = supabase
+        .channel('question_bank_changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'questions' }, (payload) => {
+          applyPayload(payload as { eventType: string; new: Record<string, unknown>; old: { id: string } });
+        })
+        .subscribe();
+    };
+
+    const detach = () => {
+      if (questionsChannel) {
+        supabase.removeChannel(questionsChannel);
+        questionsChannel = null;
+      }
+    };
+
+    const onVisibility = () => {
+      if (typeof document === 'undefined') return;
+      if (document.visibilityState === 'visible') {
+        if (hideTimer) {
+          clearTimeout(hideTimer);
+          hideTimer = null;
         }
-      })
-      .subscribe();
+        attach();
+      } else {
+        if (hideTimer) clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => {
+          hideTimer = null;
+          detach();
+        }, HIDE_UNSUB_MS);
+      }
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibility);
+      if (document.visibilityState === 'visible') attach();
+    } else {
+      attach();
+    }
 
     return () => {
-      supabase.removeChannel(questionsChannel);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibility);
+      }
+      if (hideTimer) clearTimeout(hideTimer);
+      detach();
     };
   }, []);
 
