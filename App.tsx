@@ -1366,7 +1366,7 @@ const App: React.FC = () => {
         <div className={`p-6 border-b border-slate-100 dark:border-sanfran-rubi/20 flex flex-col ${isSidebarMinimized ? 'items-center px-2' : ''}`}>
           <div className="flex items-center justify-between mb-4 w-full">
             <Link
-              to={getPathFromView(View.Profile)}
+              to={getPathFromView(View.Dashboard)}
               onClick={() => closeSidebar()}
               className={`group text-left p-2 -m-2 rounded-xl transition-all duration-200 hover:bg-slate-50 dark:hover:bg-white/5 block ${isSidebarMinimized ? 'mx-auto' : 'w-full'}`}
             >
