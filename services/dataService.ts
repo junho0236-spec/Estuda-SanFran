@@ -12,7 +12,9 @@ async function upsertNoteToSupabase(payload: Record<string, unknown>) {
   let triedBareMinimum = false;
 
   for (let i = 0; i < maxStrips; i++) {
-    const { error } = await supabase.from('notes').upsert(current);
+    const { error } = await supabase
+      .from('notes')
+      .upsert(current, { onConflict: 'user_id' });
     if (!error) return { error: null };
 
     const code = (error as { code?: string }).code;
@@ -46,7 +48,9 @@ async function upsertNoteToSupabase(payload: Record<string, unknown>) {
     return { error };
   }
 
-  const { error: lastErr } = await supabase.from('notes').upsert(current);
+  const { error: lastErr } = await supabase
+    .from('notes')
+    .upsert(current, { onConflict: 'user_id' });
   return { error: lastErr };
 }
 
