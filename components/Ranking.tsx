@@ -79,9 +79,9 @@ const Ranking: React.FC<RankingProps> = ({ userId, session, flashcards }) => {
       // 2. Busca nomes e pontos de prestígio da tabela 'user_persona'
       let profileMap: Record<string, { name: string, prestige: number, league: any, weeklyCards: number, mascotLevel: number }> = {};
       try {
-        const { data: personaData } = await supabase.from('user_persona').select('user_id, full_name, persona_data');
+        const { data: personaData } = await supabase.from('user_persona').select('id, full_name, persona_data');
         personaData?.forEach(p => { 
-          profileMap[p.user_id] = { 
+          profileMap[p.id] = { 
             name: p.full_name, 
             prestige: p.persona_data?.prestigePoints || 0,
             league: p.persona_data?.league_division || 'Bronze',

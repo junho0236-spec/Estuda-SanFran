@@ -946,7 +946,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
         .on('postgres_changes', {
           event: '*',
           schema: 'public',
-          table: 'question_notebooks',
+          table: 'notebooks',
           filter: `user_id=eq.${userId}`
         }, () => debouncedNotebooks.schedule())
         .subscribe();
