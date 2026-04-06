@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
+import { QUESTION_COMMENTS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { QuestionComment, type QuestionCommentAuthorKind } from '../types';
 import { Send, User, MessageSquare, Loader2, Trash2, Reply, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -84,7 +85,7 @@ export const QuestionComments: React.FC<QuestionCommentsProps> = ({
       try {
         const { data, error: fallbackError } = await supabase
           .from('question_comments')
-          .select('*')
+          .select(QUESTION_COMMENTS_LIST_COLUMNS)
           .eq('question_id', questionId)
           .order('created_at', { ascending: true });
         if (!fallbackError) setComments(data || []);

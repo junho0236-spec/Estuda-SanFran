@@ -13,6 +13,7 @@ import imageCompression from 'browser-image-compression';
 import { dataService } from '../services/dataService';
 import { geminiService } from '../services/geminiService';
 import { supabase } from '../services/supabaseClient';
+import { DISCIPLINAS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { db } from '../services/offlineService';
@@ -116,7 +117,10 @@ const Profile: React.FC = () => {
         setProfile(userProfile);
         
         // Fetch disciplines
-        const { data: discData } = await supabase.from('disciplinas').select('*').eq('user_id', session.user.id);
+        const { data: discData } = await supabase
+          .from('disciplinas')
+          .select(DISCIPLINAS_LIST_COLUMNS)
+          .eq('user_id', session.user.id);
         if (discData) setDisciplinas(discData);
 
         setEditForm({

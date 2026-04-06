@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { ScrollText, Calendar, Plus, Trash2, CheckCircle2, Circle, AlertCircle, BookOpen } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { CODE_READING_PLANS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { CodeReadingPlan } from '../types';
 
 interface CodeTrackerProps {
@@ -36,7 +37,7 @@ const CodeTracker: React.FC<CodeTrackerProps> = ({ userId }) => {
     setLoading(true);
     const { data, error } = await supabase
       .from('code_reading_plans')
-      .select('*')
+      .select(CODE_READING_PLANS_LIST_COLUMNS)
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     
@@ -59,7 +60,9 @@ const CodeTracker: React.FC<CodeTrackerProps> = ({ userId }) => {
         target_days: targetDays,
         articles_per_day: articlesPerDay,
         completed_days: []
-      }).select().single();
+      })
+        .select(CODE_READING_PLANS_LIST_COLUMNS)
+        .single();
 
       if (error) throw error;
       if (data) setPlans([data, ...plans]);

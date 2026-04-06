@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Gavel, Languages, Play, RotateCcw, AlertTriangle, ShieldAlert, Siren, Trophy, ArrowRight, HeartCrack } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { supabase } from '../services/supabaseClient';
+import { LATIN_TERMS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { LatinTerm } from '../types';
 
 interface LatinGameProps {
@@ -45,7 +46,7 @@ const LatinGame: React.FC<LatinGameProps> = ({ userId }) => {
   const fetchTerms = async () => {
     setLoading(true);
     try {
-      const { data } = await supabase.from('latin_terms').select('*');
+      const { data } = await supabase.from('latin_terms').select(LATIN_TERMS_LIST_COLUMNS);
       if (data && data.length > 0) {
         setTerms(data);
       } else {

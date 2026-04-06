@@ -5,6 +5,7 @@ import { summarizeText, extractKeyPoints, generateMindMap } from '../services/ge
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { supabase } from '../services/supabaseClient';
+import { SUMMARIES_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 
 interface IntelligentSummarizerProps {
   userId: string;
@@ -50,7 +51,7 @@ export const IntelligentSummarizer: React.FC<IntelligentSummarizerProps> = ({ us
     try {
       const { data, error } = await supabase
         .from('summaries')
-        .select('*')
+        .select(SUMMARIES_LIST_COLUMNS)
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(10);
@@ -92,7 +93,9 @@ export const IntelligentSummarizer: React.FC<IntelligentSummarizerProps> = ({ us
           original_text: inputText,
           generated_text: finalResult,
           type: generationType
-        }).select().single();
+        })
+          .select(SUMMARIES_LIST_COLUMNS)
+          .single();
 
         if (!error && data) {
           setHistory(prev => [data, ...prev].slice(0, 10));

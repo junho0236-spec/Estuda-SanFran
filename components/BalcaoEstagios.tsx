@@ -14,6 +14,7 @@ import {
   GraduationCap
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { SF_INTERNSHIPS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { InternshipPost } from '../types';
 
@@ -61,7 +62,7 @@ const BalcaoEstagios: React.FC<BalcaoEstagiosProps> = ({ userId, userName }) => 
     setLoading(true);
     const { data } = await supabase
       .from('sf_internships')
-      .select('*')
+      .select(SF_INTERNSHIPS_LIST_COLUMNS)
       .order('created_at', { ascending: false });
     
     if (data) setPosts(data);

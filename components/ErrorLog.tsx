@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { BookX, AlertTriangle, PenTool, TrendingUp, Plus, Trash2, Save, X } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { ERROR_LOGS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { ErrorLogEntry, ErrorReason } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as ReTooltip, BarChart, Bar, XAxis, YAxis } from 'recharts';
 import { toast } from 'sonner';
@@ -50,7 +51,7 @@ const ErrorLog: React.FC<ErrorLogProps> = ({ userId }) => {
     try {
       const { data, error } = await supabase
         .from('error_logs')
-        .select('*')
+        .select(ERROR_LOGS_LIST_COLUMNS)
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
       
@@ -77,7 +78,9 @@ const ErrorLog: React.FC<ErrorLogProps> = ({ userId }) => {
         topic: newTopic,
         reason: newReason,
         justification: newJustification
-      }).select().single();
+      })
+        .select(ERROR_LOGS_LIST_COLUMNS)
+        .single();
 
       if (error) throw error;
       if (data) setLogs([data, ...logs]);

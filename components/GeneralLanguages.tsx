@@ -18,6 +18,7 @@ import {
   X
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { GENERAL_LANG_PROGRESS_ROW_COLUMNS } from '../utils/supabaseSelectColumns';
 import confetti from 'canvas-confetti';
 
 interface GeneralLanguagesProps {
@@ -117,7 +118,7 @@ const GeneralLanguages: React.FC<GeneralLanguagesProps> = ({ userId }) => {
     try {
       const { data, error } = await supabase
         .from('general_lang_progress')
-        .select('*')
+        .select(GENERAL_LANG_PROGRESS_ROW_COLUMNS)
         .eq('user_id', userId)
         .single();
 

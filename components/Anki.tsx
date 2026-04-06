@@ -64,6 +64,7 @@ import {
 import JSZip from 'jszip';
 import { Flashcard, Subject, Folder, DeckRequest, StudySession, GlossaryTerm } from '../types';
 import { supabase } from '../services/supabaseClient';
+import { DECK_REQUESTS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { dataService } from '../services/dataService';
 import { updateQuestProgress } from '../services/questService';
 import { generateFlashcards, generateFlashcardsStream, evaluateDissertativeAnswer, fetchTermDefinition } from '../services/geminiService';
@@ -1275,7 +1276,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
     try {
       const { data, error } = await supabase
         .from('deck_requests')
-        .select('*')
+        .select(DECK_REQUESTS_LIST_COLUMNS)
         .order('votes', { ascending: false });
       if (error) throw error;
       setDeckRequests(data);

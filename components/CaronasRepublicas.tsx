@@ -16,6 +16,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { SF_MOBILITY_POSTS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { MobilityPost } from '../types';
 
@@ -61,7 +62,7 @@ const CaronasRepublicas: React.FC<CaronasRepublicasProps> = ({ userId, userName 
     setLoading(true);
     const { data } = await supabase
       .from('sf_mobility_posts')
-      .select('*')
+      .select(SF_MOBILITY_POSTS_LIST_COLUMNS)
       .eq('type', activeTab)
       .order('created_at', { ascending: false });
     

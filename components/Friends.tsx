@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../services/supabaseClient';
+import { FRIENDSHIPS_LIST_COLUMNS, USER_PERSONA_COMMUNITY_LIST } from '../utils/supabaseSelectColumns';
 import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { dataService } from '../services/dataService';
 import { Friendship, UserProfile, View } from '../types';
@@ -55,7 +56,7 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
       // Fetch all users from user_persona
       const { data: usersData, error: usersError } = await supabase
         .from('user_persona')
-        .select('*');
+        .select(USER_PERSONA_COMMUNITY_LIST);
       
       if (usersError) throw usersError;
 
@@ -63,7 +64,7 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
       // Using a more robust query format
       const { data: friendshipsData, error: friendshipsError } = await supabase
         .from('friendships')
-        .select('*')
+        .select(FRIENDSHIPS_LIST_COLUMNS)
         .or(`user_id.eq.${userId},friend_id.eq.${userId}`);
 
       if (friendshipsError) throw friendshipsError;

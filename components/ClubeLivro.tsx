@@ -15,6 +15,7 @@ import {
   BookType
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { SF_BOOK_CHAT_LIST_COLUMNS, SF_BOOK_CYCLES_ROW_COLUMNS } from '../utils/supabaseSelectColumns';
 import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { BookCycle, BookChatMessage } from '../types';
 import confetti from 'canvas-confetti';
@@ -87,7 +88,7 @@ const ClubeLivro: React.FC<ClubeLivroProps> = ({ userId, userName }) => {
       
       const { data: existingCycle } = await supabase
         .from('sf_book_cycles')
-        .select('*')
+        .select(SF_BOOK_CYCLES_ROW_COLUMNS)
         .eq('month_year', monthStart)
         .single();
       
@@ -105,7 +106,9 @@ const ClubeLivro: React.FC<ClubeLivroProps> = ({ userId, userName }) => {
           candidates: DEFAULT_CANDIDATES,
           selected_book: status === 'reading' ? DEFAULT_CANDIDATES[0] : null,
           current_week: Math.ceil(today.getDate() / 7)
-        }).select().single();
+        })
+          .select(SF_BOOK_CYCLES_ROW_COLUMNS)
+          .single();
         
         if (newCycle) setCycle(newCycle);
       }
@@ -134,7 +137,11 @@ const ClubeLivro: React.FC<ClubeLivroProps> = ({ userId, userName }) => {
   };
 
   const fetchChat = async (cycleId: string) => {
-    const { data } = await supabase.from('sf_book_chat').select('*').eq('cycle_id', cycleId).order('created_at', { ascending: true });
+    const { data } = await supabase
+      .from('sf_book_chat')
+      .select(SF_BOOK_CHAT_LIST_COLUMNS)
+      .eq('cycle_id', cycleId)
+      .order('created_at', { ascending: true });
     if (data) setMessages(data);
     scrollToBottom();
   };

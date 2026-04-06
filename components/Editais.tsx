@@ -19,6 +19,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { EDITAIS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { Edital } from '../types';
 import { toast } from 'sonner';
 
@@ -101,7 +102,7 @@ const Editais: React.FC<EditaisProps> = ({ userId }) => {
       // Tenta buscar do Supabase, se falhar ou estiver vazio, usa mock
       const { data, error } = await supabase
         .from('editais')
-        .select('*')
+        .select(EDITAIS_LIST_COLUMNS)
         .order('created_at', { ascending: false });
 
       if (error || !data || data.length === 0) {

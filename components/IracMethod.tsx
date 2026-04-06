@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Plus, Trash2, Save, X, BookOpen, Scale, Gavel, FileSearch, Check, Archive, Bookmark } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { IRAC_ENTRIES_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { IracEntry } from '../types';
 
 interface IracMethodProps {
@@ -33,7 +34,7 @@ const IracMethod: React.FC<IracMethodProps> = ({ userId }) => {
     setLoading(true);
     const { data, error } = await supabase
       .from('irac_entries')
-      .select('*')
+      .select(IRAC_ENTRIES_LIST_COLUMNS)
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     

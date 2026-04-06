@@ -17,6 +17,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { STUDY_PLANS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { StudyPlan, PlanSubject, DailyPlan } from '../types';
 import { GoogleGenAI, Type, ThinkingLevel } from '@google/genai';
 import { GEMINI_MODEL } from '../services/geminiService';
@@ -54,7 +55,11 @@ const ReverseStudyPlanner: React.FC<ReverseStudyPlannerProps> = ({ userId }) => 
   }, [userId]);
 
   const fetchPlans = async () => {
-    const { data } = await supabase.from('study_plans').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+    const { data } = await supabase
+      .from('study_plans')
+      .select(STUDY_PLANS_LIST_COLUMNS)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
     if (data) setPlans(data);
   };
 

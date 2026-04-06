@@ -11,6 +11,7 @@ import {
   Share2
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { SF_POLLS_LIST_COLUMNS, SF_POLL_COMMENTS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { Poll, PollComment } from '../types';
 
@@ -50,7 +51,7 @@ const TribunalOpiniao: React.FC<TribunalOpiniaoProps> = ({ userId, userName }) =
     // Fetch latest poll for today
     const { data } = await supabase
       .from('sf_polls')
-      .select('*')
+      .select(SF_POLLS_LIST_COLUMNS)
       .order('created_at', { ascending: false })
       .limit(1)
       .single();
@@ -78,7 +79,7 @@ const TribunalOpiniao: React.FC<TribunalOpiniaoProps> = ({ userId, userName }) =
     if (!pollId) return;
     const { data } = await supabase
       .from('sf_poll_comments')
-      .select('*')
+      .select(SF_POLL_COMMENTS_LIST_COLUMNS)
       .eq('poll_id', pollId)
       .order('created_at', { ascending: false });
     

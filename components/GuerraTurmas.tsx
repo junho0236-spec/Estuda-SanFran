@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, Crown, Target, Zap, Clock, Calendar, Users, ArrowRight } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { CLASS_WAR_LEADERBOARD_COLUMNS } from '../utils/supabaseSelectColumns';
 import { ClassWarStats } from '../types';
 
 interface GuerraTurmasProps {
@@ -29,7 +30,9 @@ const GuerraTurmas: React.FC<GuerraTurmasProps> = ({ userId }) => {
     }
 
     // 2. Fetch Leaderboard View
-    const { data: leaderboard, error } = await supabase.from('class_war_leaderboard').select('*');
+    const { data: leaderboard, error } = await supabase
+      .from('class_war_leaderboard')
+      .select(CLASS_WAR_LEADERBOARD_COLUMNS);
     if (error) {
       console.error("Erro ao buscar leaderboard:", error);
     } else if (leaderboard) {

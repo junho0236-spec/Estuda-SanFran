@@ -13,6 +13,7 @@ import {
   X
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { STUDY_PACTS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { StudyPact as StudyPactType } from '../types';
 import confetti from 'canvas-confetti';
@@ -58,7 +59,7 @@ const StudyPact: React.FC<StudyPactProps> = ({ userId, userName }) => {
     try {
       const { data, error } = await supabase
         .from('study_pacts')
-        .select('*')
+        .select(STUDY_PACTS_LIST_COLUMNS)
         .order('created_at', { ascending: false });
       
       if (error) throw error;

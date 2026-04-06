@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Megaphone, Search, Plus, TrendingUp, Users, Book, Clock, Phone, Mail, Pin, Star, Coins, Trash2, X } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { PATIO_CLASSIFIEDS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { ClassifiedAd, StudySession } from '../types';
 import confetti from 'canvas-confetti';
@@ -70,7 +71,7 @@ const ClassificadosPatio: React.FC<ClassificadosPatioProps> = ({ userId, userNam
     try {
       const { data } = await supabase
         .from('patio_classifieds')
-        .select('*')
+        .select(PATIO_CLASSIFIEDS_LIST_COLUMNS)
         .order('is_boosted', { ascending: false }) // Boosted first
         .order('created_at', { ascending: false }); // Then newest
       

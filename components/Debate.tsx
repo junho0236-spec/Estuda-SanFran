@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Megaphone, Timer, Shuffle, ThumbsUp, ThumbsDown, Play, Pause, RotateCcw, Check, History, Clock, FileText } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { DEBATE_HISTORY_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 
 interface DebateProps {
   userId: string;
@@ -42,7 +43,7 @@ const Debate: React.FC<DebateProps> = ({ userId }) => {
     try {
       const { data } = await supabase
         .from('debate_history')
-        .select('*')
+        .select(DEBATE_HISTORY_LIST_COLUMNS)
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
       if (data) setHistory(data);

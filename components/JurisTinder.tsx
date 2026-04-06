@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { ThumbsUp, ThumbsDown, Info, RotateCcw, Check, X, Gavel, Scale } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { JURIS_TINDER_CARDS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { JurisTinderCard } from '../types';
 
 // Mock data para fallback
@@ -57,7 +58,9 @@ const JurisTinder: React.FC = () => {
 
   const fetchCards = async () => {
     try {
-      const { data } = await supabase.from('juris_tinder_cards').select('*');
+      const { data } = await supabase
+        .from('juris_tinder_cards')
+        .select(JURIS_TINDER_CARDS_LIST_COLUMNS);
       if (data && data.length > 0) {
         setCards(data.sort(() => Math.random() - 0.5));
       } else {

@@ -5,6 +5,7 @@ import {
   AlertCircle, RefreshCw, Trophy, Globe, User, Briefcase, Coffee, Hotel
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { EXCHANGE_RPG_SAVES_ROW_COLUMNS } from '../utils/supabaseSelectColumns';
 import { ExchangeCity, ExchangeRPGScenario, RPGScenarioOption } from '../types';
 import confetti from 'canvas-confetti';
 
@@ -143,7 +144,7 @@ const TheExchangeStudent: React.FC<TheExchangeStudentProps> = ({ userId }) => {
     try {
       const { data } = await supabase
         .from('exchange_rpg_saves')
-        .select('*')
+        .select(EXCHANGE_RPG_SAVES_ROW_COLUMNS)
         .eq('user_id', userId)
         .single();
 

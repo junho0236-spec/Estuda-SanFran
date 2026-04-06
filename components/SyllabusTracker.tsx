@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { ListTodo, Plus, Trash2, CheckCircle2, Circle, AlertCircle, TrafficCone, GripVertical, FileText, Download, X } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { SYLLABUS_TOPICS_LIST_COLUMNS, SYLLABUS_TRACKERS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { SyllabusTracker as Tracker, SyllabusTopic, ConfidenceLevel } from '../types';
 
 interface SyllabusTrackerProps {
@@ -36,7 +37,11 @@ const SyllabusTracker: React.FC<SyllabusTrackerProps> = ({ userId }) => {
   const fetchTrackers = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('syllabus_trackers').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+      const { data, error } = await supabase
+        .from('syllabus_trackers')
+        .select(SYLLABUS_TRACKERS_LIST_COLUMNS)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
       
       if (error) {
         console.error("Erro ao buscar editais:", error);
@@ -61,7 +66,11 @@ const SyllabusTracker: React.FC<SyllabusTrackerProps> = ({ userId }) => {
   }, [activeTracker]);
 
   const fetchTopics = async (trackerId: string) => {
-    const { data } = await supabase.from('syllabus_topics').select('*').eq('tracker_id', trackerId).order('created_at', { ascending: true });
+    const { data } = await supabase
+      .from('syllabus_topics')
+      .select(SYLLABUS_TOPICS_LIST_COLUMNS)
+      .eq('tracker_id', trackerId)
+      .order('created_at', { ascending: true });
     if (data) setTopics(data);
   };
 

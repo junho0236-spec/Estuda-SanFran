@@ -25,14 +25,10 @@ import {
   formatCloudFolderRow,
 } from './utils/supabaseCloudRowFormatters';
 import { bulkPutInChunks, bulkDeleteIdsInChunks } from './utils/dexieBulkYield';
-
-/**
- * Lista mínima quebrou em alguns projetos (colunas com nomes diferentes). `*` numa única linha
- * por utilizador é aceitável; o PostgREST devolve 400 se algum nome na lista não existir.
- */
-const USER_PROGRESS_CLOUD_COLUMNS = '*';
-/** Esquemas antigos variam (`end_time` vs `duration`, com ou sem `subject_id`). `*` evita 400. */
-const STUDY_SESSION_CLOUD_COLUMNS = '*';
+import {
+  STUDY_SESSIONS_LIST_COLUMNS as STUDY_SESSION_CLOUD_COLUMNS,
+  USER_PROGRESS_CLOUD_COLUMNS,
+} from './utils/supabaseSelectColumns';
 
 /** Tabelas na fila offline que exigem `loadUserData` completo (sem scope dedicado). */
 const SYNC_TABLES_REQUIRING_FULL_LOAD = new Set([

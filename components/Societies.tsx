@@ -2,6 +2,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Briefcase, Building, Users, Gavel, Scale, Send, LogOut, Plus, Trophy, Crown, Clock, Calendar, AlertTriangle, FileText, Bookmark, Trash2, Home, Search } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import {
+  SOCIETIES_LIST_COLUMNS,
+  SOCIETY_DEADLINES_LIST_COLUMNS,
+  SOCIETY_MESSAGES_LIST_COLUMNS,
+} from '../utils/supabaseSelectColumns';
 import { Society, SocietyMember, SocietyMessage, SocietyDeadline } from '../types';
 
 interface SocietiesProps {
@@ -97,7 +102,7 @@ const Societies: React.FC<SocietiesProps> = ({ userId, userName }) => {
 
   const loadLobby = async () => {
     try {
-      const { data: societies } = await supabase.from('societies').select('*');
+      const { data: societies } = await supabase.from('societies').select(SOCIETIES_LIST_COLUMNS);
       if (!societies) return;
 
       // Calcular stats básicos para o lobby (membros e horas)
@@ -148,7 +153,7 @@ const Societies: React.FC<SocietiesProps> = ({ userId, userName }) => {
     // 2. Chat
     const { data: msgs } = await supabase
       .from('society_messages')
-      .select('*')
+      .select(SOCIETY_MESSAGES_LIST_COLUMNS)
       .eq('society_id', societyId)
       .order('created_at', { ascending: true })
       .limit(50);
@@ -162,7 +167,7 @@ const Societies: React.FC<SocietiesProps> = ({ userId, userName }) => {
   const fetchDeadlines = async (societyId: string) => {
     const { data } = await supabase
       .from('society_deadlines')
-      .select('*')
+      .select(SOCIETY_DEADLINES_LIST_COLUMNS)
       .eq('society_id', societyId)
       .gte('date', new Date().toISOString().split('T')[0])
       .order('date', { ascending: true });

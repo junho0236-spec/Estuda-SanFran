@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Book, ChevronRight, CheckCircle2, Circle, ArrowLeft, BarChart3, Scale, Search, PenTool, Highlighter, Paperclip, X, Save, Trash2, Flame, Thermometer, ExternalLink, Eye } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { USER_ANNOTATIONS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { ArticleAnnotation } from '../types';
 import { SmartText } from './SmartVadeMecum';
 
@@ -190,7 +191,7 @@ const LeiSeca: React.FC<LeiSecaProps> = ({ userId }) => {
     setLoading(true);
     const { data } = await supabase
       .from('user_annotations')
-      .select('*')
+      .select(USER_ANNOTATIONS_LIST_COLUMNS)
       .eq('user_id', userId)
       .eq('law_id', lawId);
     

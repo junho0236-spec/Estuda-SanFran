@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserX, Plus, Minus, Trash2, AlertTriangle, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { ATTENDANCE_RECORDS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { AttendanceRecord } from '../types';
 
 interface AttendanceCalculatorProps {
@@ -25,7 +26,7 @@ const AttendanceCalculator: React.FC<AttendanceCalculatorProps> = ({ userId }) =
     setIsLoading(true);
     const { data, error } = await supabase
       .from('attendance_records')
-      .select('*')
+      .select(ATTENDANCE_RECORDS_LIST_COLUMNS)
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     
@@ -45,7 +46,9 @@ const AttendanceCalculator: React.FC<AttendanceCalculatorProps> = ({ userId }) =
         subject_name: subjectName,
         total_hours: Number(totalHours),
         absences: 0
-      }).select().single();
+      })
+        .select(ATTENDANCE_RECORDS_LIST_COLUMNS)
+        .single();
 
       if (error) throw error;
       if (data) setRecords([data, ...records]);

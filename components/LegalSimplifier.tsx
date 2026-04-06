@@ -5,6 +5,7 @@ import { simplifyLegalText, explainLegalTerm } from '../services/geminiService';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { supabase } from '../services/supabaseClient';
+import { LEGAL_TRANSLATIONS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 
 interface LegalSimplifierProps {
   userId?: string;
@@ -40,7 +41,7 @@ const LegalSimplifier: React.FC<LegalSimplifierProps> = ({ userId }) => {
     try {
       const { data, error } = await supabase
         .from('legal_translations')
-        .select('*')
+        .select(LEGAL_TRANSLATIONS_LIST_COLUMNS)
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(10);
@@ -68,7 +69,9 @@ const LegalSimplifier: React.FC<LegalSimplifierProps> = ({ userId }) => {
           user_id: userId,
           original_text: inputText,
           simplified_text: finalResult
-        }).select().single();
+        })
+          .select(LEGAL_TRANSLATIONS_LIST_COLUMNS)
+          .single();
 
         if (!error && data) {
           setHistory(prev => [data, ...prev].slice(0, 10));

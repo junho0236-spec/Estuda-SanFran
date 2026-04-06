@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Image as ImageIcon, File, Video, Download, ExternalLink, Loader2 } from 'lucide-react';
 import { supabase } from '../../services/supabaseClient';
+import { CONNECT_CHAT_MESSAGES_COLUMNS } from '../../utils/supabaseSelectColumns';
 import { ChatMessage, ChatRoom } from '../../types';
 
 interface MediaGalleryProps {
@@ -23,7 +24,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({ room, onClose }) => {
     try {
       const { data, error } = await supabase
         .from('chat_messages')
-        .select('*')
+        .select(CONNECT_CHAT_MESSAGES_COLUMNS)
         .eq('room_id', room.id)
         .not('attachment_url', 'is', null)
         .order('created_at', { ascending: false });

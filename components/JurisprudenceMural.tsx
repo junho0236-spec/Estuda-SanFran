@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Gavel, Scale, Send, MessageSquare, AlertCircle, TrendingUp, User, Trash2, CheckCircle, XCircle, Info, Plus, BrainCircuit } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { JURIS_CASES_LIST_COLUMNS, JURIS_VOTES_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { JurisCase, JurisVote, View } from '../types';
 
@@ -52,14 +53,14 @@ const JurisprudenceMural: React.FC<JurisprudenceMuralProps> = ({ userId, userNam
     try {
       const { data: casesData, error: casesError } = await supabase
         .from('juris_cases')
-        .select('*')
+        .select(JURIS_CASES_LIST_COLUMNS)
         .order('created_at', { ascending: false });
 
       if (casesError) throw casesError;
 
       const { data: votesData, error: votesError } = await supabase
         .from('juris_votes')
-        .select('*');
+        .select(JURIS_VOTES_LIST_COLUMNS);
 
       if (votesError) throw votesError;
 

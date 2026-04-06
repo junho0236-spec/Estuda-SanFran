@@ -15,6 +15,7 @@ import {
   ArrowUpRight
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { PETITION_WIKI_POSTS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { PetitionWikiPost } from '../types';
 import confetti from 'canvas-confetti';
 
@@ -62,7 +63,7 @@ const PetitionWiki: React.FC<PetitionWikiProps> = ({ userId, userName }) => {
     setLoading(true);
     const { data, error } = await supabase
       .from('petition_wiki_posts')
-      .select('*')
+      .select(PETITION_WIKI_POSTS_LIST_COLUMNS)
       .order('validation_count', { ascending: false }) // Mais validados primeiro
       .order('created_at', { ascending: false });
     

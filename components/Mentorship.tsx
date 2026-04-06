@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserPlus, Star, BookOpen, MessageSquare, Briefcase, GraduationCap, CheckCircle2, Search, ArrowRight, User } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { MENTOR_PROFILES_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { MentorProfile, MentorshipConnection } from '../types';
 
 interface MentorshipProps {
@@ -38,7 +39,11 @@ const Mentorship: React.FC<MentorshipProps> = ({ userId, userName }) => {
 
   const checkStatus = async () => {
     // Check if user is a mentor
-    const { data: mentorData } = await supabase.from('mentor_profiles').select('*').eq('user_id', userId).single();
+    const { data: mentorData } = await supabase
+      .from('mentor_profiles')
+      .select(MENTOR_PROFILES_LIST_COLUMNS)
+      .eq('user_id', userId)
+      .single();
     if (mentorData) setIsMentor(true);
 
     // Fetch My Connections (as Mentor or Mentee)
@@ -52,7 +57,7 @@ const Mentorship: React.FC<MentorshipProps> = ({ userId, userName }) => {
 
   const fetchMentors = async () => {
     setLoading(true);
-    const { data } = await supabase.from('mentor_profiles').select('*');
+    const { data } = await supabase.from('mentor_profiles').select(MENTOR_PROFILES_LIST_COLUMNS);
     if (data) setMentors(data);
     setLoading(false);
   };

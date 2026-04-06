@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { supabase } from '../services/supabaseClient';
+import { OFFICE_STATE_FULL_COLUMNS } from '../utils/supabaseSelectColumns';
 
 interface VirtualOfficeProps {
   studySessions: StudySession[];
@@ -154,7 +155,7 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
 
         let { data, error } = await supabase
           .from('office_state')
-          .select('*')
+          .select(OFFICE_STATE_FULL_COLUMNS)
           .eq('user_id', user.id)
           .single();
 
@@ -176,7 +177,7 @@ const VirtualOffice: React.FC<VirtualOfficeProps> = ({ studySessions, userName }
               boxes_opened: 0,
               bonus_boxes: 0
             })
-            .select()
+            .select(OFFICE_STATE_FULL_COLUMNS)
             .single();
           
           if (insertError) throw insertError;

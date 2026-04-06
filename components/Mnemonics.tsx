@@ -20,6 +20,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { MNEMONICS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { Mnemonic } from '../types';
 import confetti from 'canvas-confetti';
 import { generateMnemonic } from '../services/geminiService';
@@ -120,7 +121,7 @@ const Mnemonics: React.FC<MnemonicsProps> = ({ userId }) => {
 
   const fetchMnemonics = async () => {
     try {
-      const { data } = await supabase.from('mnemonics').select('*');
+      const { data } = await supabase.from('mnemonics').select(MNEMONICS_LIST_COLUMNS);
       if (data && data.length > 0) {
         setMnemonics([...DEFAULT_MNEMONICS, ...data]); // Merge defaults with DB
       } else {

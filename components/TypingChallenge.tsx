@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Keyboard, Play, RotateCcw, Trophy, Timer, Target } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { TYPING_SCORES_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 
 interface TypingChallengeProps {
   userId: string;
@@ -53,7 +54,7 @@ const TypingChallenge: React.FC<TypingChallengeProps> = ({ userId, userName }) =
     try {
       const { data } = await supabase
         .from('typing_scores')
-        .select('*')
+        .select(TYPING_SCORES_LIST_COLUMNS)
         .order('wpm', { ascending: false })
         .limit(5);
       

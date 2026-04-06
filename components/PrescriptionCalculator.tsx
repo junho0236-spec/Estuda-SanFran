@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Hourglass, Calculator, AlertCircle, CheckCircle2, History, RotateCcw, Calendar, Scale } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { PRESCRIPTION_LOGS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 
 interface PrescriptionCalculatorProps {
   userId: string;
@@ -153,7 +154,11 @@ const PrescriptionCalculator: React.FC<PrescriptionCalculatorProps> = ({ userId 
   };
 
   const fetchLogs = async () => {
-    const { data } = await supabase.from('prescription_logs').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+    const { data } = await supabase
+      .from('prescription_logs')
+      .select(PRESCRIPTION_LOGS_LIST_COLUMNS)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
     if(data) setLogs(data);
     setShowLogs(true);
   };

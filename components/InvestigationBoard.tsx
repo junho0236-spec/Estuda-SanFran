@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ScanSearch, User, FileText, Fingerprint, Plus, Trash2, Save, Move, MousePointer2, AlertCircle, GripHorizontal, X } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { INVESTIGATION_BOARDS_ROW_COLUMNS } from '../utils/supabaseSelectColumns';
 import { BoardNode, BoardEdge, NodeType, InvestigationBoardData } from '../types';
 
 interface InvestigationBoardProps {
@@ -33,7 +34,7 @@ const InvestigationBoard: React.FC<InvestigationBoardProps> = ({ userId }) => {
     try {
       const { data, error } = await supabase
         .from('investigation_boards')
-        .select('*')
+        .select(INVESTIGATION_BOARDS_ROW_COLUMNS)
         .eq('user_id', userId)
         .order('updated_at', { ascending: false })
         .limit(1)

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Gavel, Clock, Coins, Plus, AlertCircle, TrendingUp, CheckCircle2, X } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { AUCTIONS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { Auction } from '../types';
 import confetti from 'canvas-confetti';
 
@@ -52,7 +53,7 @@ const LargoAuction: React.FC<LargoAuctionProps> = ({ userId, userName }) => {
     setLoading(true);
     const { data } = await supabase
       .from('auctions')
-      .select('*')
+      .select(AUCTIONS_LIST_COLUMNS)
       .order('ends_at', { ascending: true }); // Ending soonest first
     if (data) setAuctions(data);
     setLoading(false);

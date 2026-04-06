@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Quote, Send, Plus, Laugh, AlertTriangle, Crown, X, MessageCircle } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { SF_QUOTES_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { createTrailingDebounce } from '../utils/realtimeThrottle';
 
 interface PerolasTribunaProps {
@@ -59,7 +60,7 @@ const PerolasTribuna: React.FC<PerolasTribunaProps> = ({ userId, userName }) => 
 
     const { data } = await supabase
       .from('sf_quotes')
-      .select('*')
+      .select(SF_QUOTES_LIST_COLUMNS)
       .gte('created_at', thirtyDaysAgo.toISOString())
       .order('created_at', { ascending: false });
     

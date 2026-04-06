@@ -1,6 +1,6 @@
-
 import { supabase } from './supabaseClient';
 import { Quest, DailyQuestData, QuestType } from '../types';
+import { DAILY_QUESTS_ROW_COLUMNS } from '../utils/supabaseSelectColumns';
 
 export const getTodayDateStr = () => {
   return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
@@ -47,7 +47,7 @@ export const fetchDailyQuests = async (userId: string): Promise<DailyQuestData |
   try {
     const { data, error } = await supabase
       .from('daily_quests')
-      .select('*')
+      .select(DAILY_QUESTS_ROW_COLUMNS)
       .eq('user_id', userId)
       .eq('date', today)
       .single();
@@ -65,7 +65,7 @@ export const fetchDailyQuests = async (userId: string): Promise<DailyQuestData |
           quests: newQuests,
           claimed: false
         })
-        .select()
+        .select(DAILY_QUESTS_ROW_COLUMNS)
         .single();
       
       if (insertError) throw insertError;
@@ -85,7 +85,7 @@ export const updateQuestProgress = async (userId: string, type: QuestType, amoun
   try {
     const { data: currentData } = await supabase
       .from('daily_quests')
-      .select('*')
+      .select(DAILY_QUESTS_ROW_COLUMNS)
       .eq('user_id', userId)
       .eq('date', today)
       .single();

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calculator, Scale, AlertCircle, ArrowDown, ArrowUp, Info, Check, RotateCcw, Gavel, Save, History, Trash2, Clock } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { DOSIMETRIA_LOGS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 
 interface DosimetriaProps {
   userId: string;
@@ -69,7 +70,7 @@ const Dosimetria: React.FC<DosimetriaProps> = ({ userId }) => {
   const fetchHistory = async () => {
     const { data } = await supabase
       .from('dosimetria_logs')
-      .select('*')
+      .select(DOSIMETRIA_LOGS_LIST_COLUMNS)
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     
@@ -181,7 +182,9 @@ const Dosimetria: React.FC<DosimetriaProps> = ({ userId }) => {
         increase_fraction: increaseFraction,
         decrease_fraction: decreaseFraction,
         final_result_months: penaFinalMonths
-      }).select().single();
+      })
+        .select(DOSIMETRIA_LOGS_LIST_COLUMNS)
+        .single();
 
       if (error) throw error;
       if (data) setHistory(prev => [data, ...prev]);

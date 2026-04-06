@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Banknote, Calculator, FileText, TrendingUp, DollarSign, History, Save, Trash2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { HONORARIOS_LOGS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 
 interface HonorariosProps {
   userId: string;
@@ -73,7 +74,7 @@ const Honorarios: React.FC<HonorariosProps> = ({ userId }) => {
   const fetchHistory = async () => {
     const { data } = await supabase
       .from('honorarios_logs')
-      .select('*')
+      .select(HONORARIOS_LOGS_LIST_COLUMNS)
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     

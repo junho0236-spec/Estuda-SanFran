@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { MapPin, Coffee, Utensils, Beer, Printer, BookOpen, Star, Plus, Map, Filter, X, MessageSquare, Info } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { SF_PLACES_LIST_COLUMNS, SF_PLACE_REVIEWS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { Place, PlaceReview } from '../types';
 
@@ -68,10 +69,14 @@ const GuiaSobrevivencia: React.FC<GuiaSobrevivenciaProps> = ({ userId, userName 
   const fetchData = async () => {
     setLoading(true);
     try {
-        const { data: placesData, error: placesError } = await supabase.from('sf_places').select('*');
+        const { data: placesData, error: placesError } = await supabase
+          .from('sf_places')
+          .select(SF_PLACES_LIST_COLUMNS);
         if (placesError) throw placesError;
 
-        const { data: reviewsData, error: reviewsError } = await supabase.from('sf_place_reviews').select('*');
+        const { data: reviewsData, error: reviewsError } = await supabase
+          .from('sf_place_reviews')
+          .select(SF_PLACE_REVIEWS_LIST_COLUMNS);
         if (reviewsError) throw reviewsError;
 
         const enriched: PlaceWithStats[] = placesData.map(p => {

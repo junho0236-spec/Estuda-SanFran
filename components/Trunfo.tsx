@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Sword, Trophy, Shield, Zap, Users, Play, RefreshCw, Scroll, BookOpen, Scale, Gavel } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { supabase } from '../services/supabaseClient';
+import { TRUNFO_SCORES_ROW_COLUMNS } from '../utils/supabaseSelectColumns';
 
 interface TrunfoCard {
   id: string;
@@ -70,14 +71,22 @@ const Trunfo: React.FC<TrunfoProps> = ({ userId, userName }) => {
       if (isWin) {
         setTotalWins(prev => prev + 1);
         // Supabase Upsert
-        const { data: current } = await supabase.from('trunfo_scores').select('*').eq('user_id', userId).single();
+        const { data: current } = await supabase
+          .from('trunfo_scores')
+          .select(TRUNFO_SCORES_ROW_COLUMNS)
+          .eq('user_id', userId)
+          .single();
         if (current) {
            await supabase.from('trunfo_scores').update({ wins: current.wins + 1 }).eq('user_id', userId);
         } else {
            await supabase.from('trunfo_scores').insert({ user_id: userId, user_name: userName || 'Doutor(a)', wins: 1, losses: 0 });
         }
       } else {
-        const { data: current } = await supabase.from('trunfo_scores').select('*').eq('user_id', userId).single();
+        const { data: current } = await supabase
+          .from('trunfo_scores')
+          .select(TRUNFO_SCORES_ROW_COLUMNS)
+          .eq('user_id', userId)
+          .single();
         if (current) {
            await supabase.from('trunfo_scores').update({ losses: current.losses + 1 }).eq('user_id', userId);
         } else {

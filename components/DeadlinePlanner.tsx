@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Hourglass, Plus, Trash2, CheckCircle2, AlertTriangle, Calendar, Circle } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { DEADLINE_PLANNER_ITEMS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { DeadlineItem } from '../types';
 
 interface DeadlinePlannerProps {
@@ -26,7 +27,7 @@ const DeadlinePlanner: React.FC<DeadlinePlannerProps> = ({ userId }) => {
     try {
       const { data } = await supabase
         .from('deadline_planner_items')
-        .select('*')
+        .select(DEADLINE_PLANNER_ITEMS_LIST_COLUMNS)
         .eq('user_id', userId)
         .eq('is_completed', false)
         .order('due_date', { ascending: true }); // Initial sort by date, refined locally

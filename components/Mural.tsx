@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Pin, Trash2, MessageSquare, Quote, AlertCircle, RefreshCw } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { MURAL_MESSAGES_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { MuralMessage } from '../types';
 
 import { toast } from 'sonner';
@@ -43,7 +44,7 @@ const Mural: React.FC<MuralProps> = ({ userId, userName }) => {
     setFetchError(null);
     const { data, error } = await supabase
       .from('mural_messages')
-      .select('*')
+      .select(MURAL_MESSAGES_LIST_COLUMNS)
       .order('created_at', { ascending: false })
       .limit(50);
 

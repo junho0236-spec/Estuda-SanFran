@@ -36,6 +36,7 @@ import ical from 'ical-generator';
 import { saveAs } from 'file-saver';
 import { dataService } from '../services/dataService';
 import { supabase } from '../services/supabaseClient';
+import { SUBJECT_FILES_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { suggestSubtasks } from '../services/geminiService';
 
 const STORY_POINTS = [1, 2, 3, 5, 8];
@@ -572,7 +573,10 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   const fetchLibraryFiles = async () => {
     if (!selectedTask?.subjectId) {
       // Fetch all files if no subject
-      const { data } = await supabase.from('subject_files').select('*').eq('user_id', userId);
+      const { data } = await supabase
+        .from('subject_files')
+        .select(SUBJECT_FILES_LIST_COLUMNS)
+        .eq('user_id', userId);
       setAvailableFiles(data || []);
     } else {
       const files = await dataService.getFilesBySubjectId(selectedTask.subjectId, userId, isOnline);

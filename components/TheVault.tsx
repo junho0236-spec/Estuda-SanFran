@@ -16,6 +16,7 @@ import {
   User
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { SF_VAULT_ITEMS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { VaultItem } from '../types';
 import confetti from 'canvas-confetti';
@@ -68,7 +69,7 @@ const TheVault: React.FC<TheVaultProps> = ({ userId, userName }) => {
     setLoading(true);
     const { data } = await supabase
       .from('sf_vault_items')
-      .select('*')
+      .select(SF_VAULT_ITEMS_LIST_COLUMNS)
       .order('created_at', { ascending: false });
     
     if (data) setItems(data);

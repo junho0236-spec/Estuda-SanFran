@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { FileSignature, Book, Copy, Check, Info, FileText, ChevronRight, Gavel, Scale, Briefcase, Plus, Search } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { PETITUM_TEMPLATES_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { PetitumTemplate, PetitumSection } from '../types';
 
 interface PetitumProps {
@@ -24,7 +25,10 @@ const Petitum: React.FC<PetitumProps> = ({ userId }) => {
   const fetchTemplates = async () => {
     setIsLoading(true);
     try {
-      const { data } = await supabase.from('petitum_templates').select('*').order('created_at', { ascending: false });
+      const { data } = await supabase
+        .from('petitum_templates')
+        .select(PETITUM_TEMPLATES_LIST_COLUMNS)
+        .order('created_at', { ascending: false });
       if (data) setTemplates(data);
     } catch (e) {
       console.error("Erro ao carregar modelos:", e);

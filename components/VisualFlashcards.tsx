@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Check, X, RotateCcw, Trophy, Image as ImageIcon, Flame } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { VISUAL_FLASHCARDS_PROGRESS_ROW_COLUMNS } from '../utils/supabaseSelectColumns';
 import confetti from 'canvas-confetti';
 
 interface VisualFlashcardsProps {
@@ -59,7 +60,7 @@ const VisualFlashcards: React.FC<VisualFlashcardsProps> = ({ userId }) => {
     try {
       const { data } = await supabase
         .from('visual_flashcards_progress')
-        .select('*')
+        .select(VISUAL_FLASHCARDS_PROGRESS_ROW_COLUMNS)
         .eq('user_id', userId)
         .eq('language', currentLang)
         .single();

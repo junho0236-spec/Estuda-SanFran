@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../services/supabaseClient';
+import { SPACED_TOPICS_LIST_COLUMNS, USER_PERSONA_FOR_APP_PROFILE } from '../utils/supabaseSelectColumns';
 import { SpacedTopic, UserProfile, SrsAlgorithm, SpacedMaterialKind } from '../types';
 import confetti from 'canvas-confetti';
 import { toast } from 'sonner';
@@ -626,7 +627,7 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
     setProfileLoadError(null);
     const { data, error } = await supabase
       .from('user_persona')
-      .select('*')
+      .select(USER_PERSONA_FOR_APP_PROFILE)
       .eq('id', userId)
       .single();
 
@@ -644,7 +645,7 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
       return;
     }
 
-    setProfile(data as UserProfile);
+    setProfile(data as unknown as UserProfile);
     setProfileLoadError(null);
     setProfileSettled(true);
   }, [userId]);
@@ -656,7 +657,7 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
       }
       const { data, error } = await supabase
         .from('spaced_topics')
-        .select('*')
+        .select(SPACED_TOPICS_LIST_COLUMNS)
         .eq('user_id', userId)
         .order('study_date', { ascending: false });
 
@@ -985,11 +986,11 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
     if (!effectiveProfile) {
       const { data, error } = await supabase
         .from('user_persona')
-        .select('*')
+        .select(USER_PERSONA_FOR_APP_PROFILE)
         .eq('id', userId)
         .single();
       if (!error && data) {
-        effectiveProfile = data as UserProfile;
+        effectiveProfile = data as unknown as UserProfile;
         setProfile(effectiveProfile);
         setProfileLoadError(null);
       }

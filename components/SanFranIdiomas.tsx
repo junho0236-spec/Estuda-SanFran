@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Globe, BookOpen, CheckCircle2, Lock, X, Flame, Trophy, Volume2, Star, Quote, Heart, ArrowRight, Flag, BrainCircuit, Ear, Search, GraduationCap, Zap, Calendar, Shuffle, FileText, Coffee, Languages } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { IDIOMAS_PROGRESS_ROW_COLUMNS } from '../utils/supabaseSelectColumns';
 import { IdiomaLesson, IdiomaProgress } from '../types';
 import confetti from 'canvas-confetti';
 
@@ -195,7 +196,7 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
     try {
       let { data, error } = await supabase
         .from('idiomas_progress')
-        .select('*')
+        .select(IDIOMAS_PROGRESS_ROW_COLUMNS)
         .eq('user_id', userId)
         .single();
 
@@ -212,7 +213,7 @@ const SanFranIdiomas: React.FC<SanFranIdiomasProps> = ({ userId }) => {
         const { data: newData } = await supabase
           .from('idiomas_progress')
           .insert(initialProgress)
-          .select()
+          .select(IDIOMAS_PROGRESS_ROW_COLUMNS)
           .single();
         data = newData;
       }

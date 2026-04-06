@@ -15,6 +15,7 @@ import {
   Clock
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { SF_EVENTS_LIST_COLUMNS, SF_EVENT_RSVPS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { SanFranEvent, EventRSVP } from '../types';
 import confetti from 'canvas-confetti';
@@ -79,8 +80,12 @@ const SocialEvents: React.FC<SocialEventsProps> = ({ userId, userName }) => {
   const fetchData = async () => {
     setLoading(true);
     const [eventsRes, rsvpsRes] = await Promise.all([
-      supabase.from('sf_events').select('*').gte('event_date', new Date().toISOString()).order('event_date', { ascending: true }),
-      supabase.from('sf_event_rsvps').select('*')
+      supabase
+        .from('sf_events')
+        .select(SF_EVENTS_LIST_COLUMNS)
+        .gte('event_date', new Date().toISOString())
+        .order('event_date', { ascending: true }),
+      supabase.from('sf_event_rsvps').select(SF_EVENT_RSVPS_LIST_COLUMNS)
     ]);
 
     if (eventsRes.data) setEvents(eventsRes.data);

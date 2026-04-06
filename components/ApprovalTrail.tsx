@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { View, TrailStep, UserTrail } from '../types';
 import { supabase } from '../services/supabaseClient';
+import { USER_TRAILS_ROW_COLUMNS } from '../utils/supabaseSelectColumns';
 import { toast } from 'sonner';
 
 interface ApprovalTrailProps {
@@ -109,7 +110,7 @@ const ApprovalTrail: React.FC<ApprovalTrailProps> = ({ userId, onNavigate }) => 
       try {
         const { data, error } = await supabase
           .from('user_trails')
-          .select('*')
+          .select(USER_TRAILS_ROW_COLUMNS)
           .eq('user_id', userId)
           .eq('goal', selectedCareer)
           .single();

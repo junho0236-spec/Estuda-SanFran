@@ -9,6 +9,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { dataService } from '../services/dataService';
 import { supabase } from '../services/supabaseClient';
+import { DISCIPLINAS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { UserProfile } from '../types';
 import { toast } from 'sonner';
 
@@ -45,7 +46,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
       // Fetch disciplines
       const { data: discData } = await supabase
         .from('disciplinas')
-        .select('*')
+        .select(DISCIPLINAS_LIST_COLUMNS)
         .eq('user_id', userId);
       if (discData) setDisciplinas(discData);
     } catch (err) {

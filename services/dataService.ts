@@ -1,6 +1,15 @@
 import { supabase } from './supabaseClient';
 import { db, addToSyncQueue, type OfflineSyncQueue } from './offlineService';
 import { Flashcard, Task, StudySession, Note, SubjectFile, Folder, Board, UserProgress, Friendship, Notification } from '../types';
+import { TASK_CLOUD_COLUMNS } from '../utils/supabaseCloudRowFormatters';
+import {
+  FRIENDSHIPS_LIST_COLUMNS,
+  NOTES_LIST_COLUMNS,
+  NOTIFICATIONS_LIST_COLUMNS,
+  STUDY_SESSIONS_LIST_COLUMNS,
+  SUBJECT_FILES_LIST_COLUMNS,
+  USER_PERSONA_FOR_APP_PROFILE,
+} from '../utils/supabaseSelectColumns';
 
 /** Tamanho máximo de linhas por pedido upsert/delete em lote (menos pressão no PostgREST / nano). */
 const SYNC_UPSERT_CHUNK = 120;
@@ -436,7 +445,11 @@ export const dataService = {
     };
 
     if (isOnline) {
-      const { data, error } = await supabase.from('user_persona').select('*').eq('id', userId).single();
+      const { data, error } = await supabase
+        .from('user_persona')
+        .select(USER_PERSONA_FOR_APP_PROFILE)
+        .eq('id', userId)
+        .single();
       if (!error && data) {
         const profile = sanitizeProfile({
           ...data.persona_data,
@@ -607,7 +620,11 @@ export const dataService = {
     const localFiles = await db.subject_files.where('subject_id').equals(subjectId).filter(f => f.user_id === userId).toArray();
     if (isOnline) {
       try {
-        const { data, error } = await supabase.from('subject_files').select('*').eq('subject_id', subjectId).eq('user_id', userId);
+        const { data, error } = await supabase
+          .from('subject_files')
+          .select(SUBJECT_FILES_LIST_COLUMNS)
+          .eq('subject_id', subjectId)
+          .eq('user_id', userId);
         if (error) throw error;
         if (data) {
           await db.subject_files.bulkPut(data as SubjectFile[]);
@@ -756,7 +773,7 @@ export const dataService = {
     if (isOnline) {
       const { data, error } = await supabase
         .from('tasks')
-        .select('*')
+        .select(TASK_CLOUD_COLUMNS)
         .or(`user_id.eq.${userId},delegated_to.eq.${userId}`);
       
       if (!error && data) {
@@ -804,7 +821,7 @@ export const dataService = {
   async getFriendships(userId: string) {
     const { data, error } = await supabase
       .from('friendships')
-      .select('*')
+      .select(FRIENDSHIPS_LIST_COLUMNS)
       .or(`user_id.eq.${userId},friend_id.eq.${userId}`);
     
     if (error || !data) return [];
@@ -834,7 +851,7 @@ export const dataService = {
         friend_id: friendId,
         status: 'pending'
       })
-      .select()
+      .select(FRIENDSHIPS_LIST_COLUMNS)
       .single();
 
     if (error) throw error;
@@ -848,7 +865,7 @@ export const dataService = {
         status
       })
       .eq('id', friendshipId)
-      .select()
+      .select(FRIENDSHIPS_LIST_COLUMNS)
       .single();
 
     if (error) {
@@ -861,7 +878,7 @@ export const dataService = {
   async getNotifications(userId: string) {
     const { data, error } = await supabase
       .from('notifications')
-      .select('*')
+      .select(NOTIFICATIONS_LIST_COLUMNS)
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     if (error) {
@@ -1019,7 +1036,7 @@ export const dataService = {
     if (isOnline) {
       const { data, error } = await supabase
         .from('study_sessions')
-        .select('*')
+        .select(STUDY_SESSIONS_LIST_COLUMNS)
         .eq('user_id', userId)
         .gte('start_time', `${dateStr}T00:00:00.000Z`)
         .lte('start_time', `${dateStr}T23:59:59.999Z`);
@@ -1076,7 +1093,7 @@ export const dataService = {
       try {
         const { data, error } = await supabase
           .from('notes')
-          .select('*')
+          .select(NOTES_LIST_COLUMNS)
           .eq('subject_id', subjectId)
           .eq('user_id', userId)
           .order('updated_at', { ascending: false });
@@ -1155,7 +1172,7 @@ export const dataService = {
             if (anySynced) {
               const { data: data2, error: err2 } = await supabase
                 .from('notes')
-                .select('*')
+                .select(NOTES_LIST_COLUMNS)
                 .eq('subject_id', subjectId)
                 .eq('user_id', userId)
                 .order('updated_at', { ascending: false });

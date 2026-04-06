@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Gavel, Scale, FileText, User, Scroll, Trophy, Coins, Clock, ChevronRight, PenTool, ThumbsUp, ThumbsDown, CheckCircle2, XCircle, Shield, Users } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { MOCK_JURY_SESSIONS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { MockJurySession } from '../types';
 import confetti from 'canvas-confetti';
@@ -49,7 +50,7 @@ const MockJury: React.FC<MockJuryProps> = ({ userId, userName }) => {
     try {
       const { data, error } = await supabase
         .from('mock_jury_sessions')
-        .select('*')
+        .select(MOCK_JURY_SESSIONS_LIST_COLUMNS)
         .order('created_at', { ascending: false });
       
       if (error) throw error;

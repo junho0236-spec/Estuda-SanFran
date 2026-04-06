@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingBag, RefreshCw, Plus, Trash2, ArrowRight, User, Package, Scale, Star, Info, X } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { OFFICE_TRADES_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { createTrailingDebounce } from '../utils/realtimeThrottle';
 import { OfficeTrade } from '../types';
 import { CATALOG, OfficeItem, ItemCategory } from './VirtualOffice';
@@ -46,7 +47,7 @@ const Sebo: React.FC<SeboProps> = ({ userId, userName }) => {
       // 1. Fetch trades
       const { data: tradesData } = await supabase
         .from('office_trades')
-        .select('*')
+        .select(OFFICE_TRADES_LIST_COLUMNS)
         .eq('status', 'open')
         .order('created_at', { ascending: false });
 
