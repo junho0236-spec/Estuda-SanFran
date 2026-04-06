@@ -71,6 +71,25 @@ import {
   stripControlChars,
 } from './connect/chatContentLimits';
 import { logConnectError } from './connect/chatFeatureLog';
+import {
+  CONNECT_CHAT_CALLS_FULL_COLUMNS,
+  CONNECT_CHAT_CALLS_LIST_COLUMNS,
+  CONNECT_CHAT_MESSAGES_COLUMNS,
+  CONNECT_CHAT_PARTICIPANTS_COLUMNS,
+  CONNECT_CHAT_POLLS_WITH_VOTES,
+  CONNECT_CHAT_REACTIONS_COLUMNS,
+  CONNECT_CHAT_ROOM_SETTINGS_COLUMNS,
+  CONNECT_CHAT_ROOMS_COLUMNS,
+  CONNECT_CHAT_SCHEDULED_ITEMS_COLUMNS,
+  CONNECT_CHAT_STORIES_COLUMNS,
+  CONNECT_FRIENDSHIPS_COLUMNS,
+  CONNECT_USER_PERSONA_CALL_ENRICH_COLUMNS,
+  CONNECT_USER_PERSONA_DISCOVERY_COLUMNS,
+  CONNECT_USER_PERSONA_LAST_SEEN,
+  CONNECT_USER_PERSONA_PEER_COLUMNS,
+  CONNECT_USER_PERSONA_SELF_COLUMNS,
+  CONNECT_USER_PERSONA_SHARE_COLUMNS,
+} from './connect/connectSupabaseColumns';
 import { useGlobalChatPresence } from './connect/hooks/useGlobalChatPresence';
 import { useConnectInit } from './connect/hooks/useConnectInit';
 import { useActiveRoomLifecycle } from './connect/hooks/useActiveRoomLifecycle';
@@ -203,7 +222,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     }
     const { data, error } = await supabase
       .from('chat_scheduled_items')
-      .select('*')
+      .select(CONNECT_CHAT_SCHEDULED_ITEMS_COLUMNS)
       .eq('room_id', activeRoomId)
       .eq('user_id', userId)
       .eq('status', 'pending')
@@ -740,7 +759,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     try {
       const { data, error } = await supabase
         .from('chat_calls')
-        .select('*')
+        .select(CONNECT_CHAT_CALLS_LIST_COLUMNS)
         .or(`caller_id.eq.${userId},receiver_id.eq.${userId}`)
         .order('created_at', { ascending: false });
 
@@ -751,13 +770,13 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
         const otherId = call.caller_id === userId ? call.receiver_id : call.caller_id;
         const { data: userData } = await supabase
           .from('user_persona')
-          .select('nome, avatar_url')
+          .select(CONNECT_USER_PERSONA_CALL_ENRICH_COLUMNS)
           .eq('id', otherId)
           .single();
         
         return {
           ...call,
-          other_name: userData?.nome || 'Colega',
+          other_name: userData?.full_name || 'Colega',
           other_avatar: userData?.avatar_url
         };
       }));
@@ -792,7 +811,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     try {
       const { data, error } = await supabase
         .from('chat_room_settings')
-        .select('*')
+        .select(CONNECT_CHAT_ROOM_SETTINGS_COLUMNS)
         .eq('room_id', roomId)
         .eq('user_id', userId)
         .single();
@@ -967,20 +986,12 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   const fetchOtherUserLastSeen = async (otherId: string) => {
     const { data, error } = await supabase
       .from('user_persona')
-      .select('persona_data')
+      .select(CONNECT_USER_PERSONA_LAST_SEEN)
       .eq('id', otherId)
       .single();
-    
-    // Check if last_seen is inside persona_data or a separate column
-    // For now we'll check if it's in the DB directly if we add the column
-    const { data: rawData } = await supabase
-      .from('user_persona')
-      .select('*')
-      .eq('id', otherId)
-      .single();
-    
-    if (rawData && rawData.last_seen) {
-      setOtherUserLastSeen(rawData.last_seen);
+
+    if (!error && data?.last_seen) {
+      setOtherUserLastSeen(data.last_seen);
     }
   };
 
@@ -1014,7 +1025,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   const fetchUserProfile = async () => {
     const { data, error } = await supabase
       .from('user_persona')
-      .select('*')
+      .select(CONNECT_USER_PERSONA_SELF_COLUMNS)
       .eq('id', userId)
       .single();
     if (!error && data) {
@@ -1028,12 +1039,19 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     try {
       const { data, error } = await supabase
         .from('user_persona')
-        .select('*')
+        .select(CONNECT_USER_PERSONA_PEER_COLUMNS)
         .eq('id', targetUserId)
         .single();
       
       if (error) throw error;
-      setShowUserProfileModal(data);
+      const pd = (data as { persona_data?: { nome?: string; email?: string; avatar_url?: string } })
+        .persona_data;
+      setShowUserProfileModal({
+        ...data,
+        nome: pd?.nome ?? data.full_name,
+        email: pd?.email ?? '',
+        avatar_url: data.avatar_url ?? pd?.avatar_url,
+      });
     } catch (error) {
       console.error('Error fetching user profile:', error);
       toast.error('Erro ao carregar perfil');
@@ -1083,7 +1101,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
 
         let request = supabase
           .from('chat_messages')
-          .select('*')
+          .select(CONNECT_CHAT_MESSAGES_COLUMNS)
           .in('room_id', myRoomIds)
           .order('created_at', { ascending: false })
           .limit(q ? 280 : 420);
@@ -1177,7 +1195,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
 
         const { data: roomData, error: roomError } = await supabase
           .from('chat_rooms')
-          .select('*')
+          .select(CONNECT_CHAT_ROOMS_COLUMNS)
           .in('id', roomIds);
 
         if (roomError) throw roomError;
@@ -1196,7 +1214,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
         // Fetch participants for these rooms
         const { data: allParticipants, error: pError } = await supabase
           .from('chat_participants')
-          .select('*')
+          .select(CONNECT_CHAT_PARTICIPANTS_COLUMNS)
           .in('room_id', roomIds);
 
         if (!pError && allParticipants) {
@@ -1286,7 +1304,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     try {
       let query = supabase
         .from('user_persona')
-        .select('*')
+        .select(CONNECT_USER_PERSONA_DISCOVERY_COLUMNS)
         .neq('id', userId);
       
       if (userSearchQuery) {
@@ -1297,7 +1315,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
 
       const { data, error } = await query;
       if (error) throw error;
-      setAvailableUsers(data || []);
+      setAvailableUsers((data || []) as UserProfile[]);
     } catch (error) {
       console.error('Error fetching users:', error);
       toast.error('Erro ao carregar lista de contatos');
@@ -1333,7 +1351,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
       const { data: newRoom, error: roomError } = await supabase
         .from('chat_rooms')
         .insert({ is_group: false })
-        .select()
+        .select(CONNECT_CHAT_ROOMS_COLUMNS)
         .single();
 
       if (roomError) throw roomError;
@@ -1377,7 +1395,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
         try {
           const { data, error } = await supabase
             .from('chat_messages')
-            .select('*')
+            .select(CONNECT_CHAT_MESSAGES_COLUMNS)
             .eq('room_id', roomId)
             .gt('created_at', lastIso)
             .order('created_at', { ascending: true });
@@ -1403,7 +1421,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
 
       const { data, error } = await supabase
         .from('chat_messages')
-        .select('*')
+        .select(CONNECT_CHAT_MESSAGES_COLUMNS)
         .eq('room_id', roomId)
         .order('created_at', { ascending: false })
         .range(start, end);
@@ -1512,7 +1530,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     try {
       const { data, error } = await supabase
         .from('chat_polls')
-        .select('*, chat_messages!inner(room_id), chat_poll_votes(*)')
+        .select(CONNECT_CHAT_POLLS_WITH_VOTES)
         .eq('chat_messages.room_id', roomId)
         .order('created_at', { ascending: true });
       if (error) throw error;
@@ -1553,7 +1571,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     try {
       const { data, error } = await supabase
         .from('chat_stories')
-        .select('*')
+        .select(CONNECT_CHAT_STORIES_COLUMNS)
         .gt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false });
 
@@ -1623,7 +1641,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     try {
       const { data: targetProfile, error: profileError } = await supabase
         .from('user_persona')
-        .select('*')
+        .select(CONNECT_USER_PERSONA_SHARE_COLUMNS)
         .eq('id', targetUserId)
         .single();
 
@@ -1701,7 +1719,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
       const ids = messageIds.map(m => m.id);
       const { data, error } = await supabase
         .from('chat_reactions')
-        .select('*')
+        .select(CONNECT_CHAT_REACTIONS_COLUMNS)
         .in('message_id', ids);
       
       if (!error && data) {
@@ -2343,7 +2361,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
           type,
           status: 'ringing'
         }])
-        .select()
+        .select(CONNECT_CHAT_CALLS_FULL_COLUMNS)
         .single();
 
       if (error) throw error;
@@ -2588,7 +2606,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
       // Get accepted friendships
       const { data: friendships, error: fError } = await supabase
         .from('friendships')
-        .select('*')
+        .select(CONNECT_FRIENDSHIPS_COLUMNS)
         .or(`user_id.eq.${userId},friend_id.eq.${userId}`)
         .eq('status', 'accepted');
       
@@ -2640,7 +2658,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
           // Room exists in DB but not in local state, fetch it
           const { data: fetchedRoom, error: fetchError } = await supabase
             .from('chat_rooms')
-            .select('*')
+            .select(CONNECT_CHAT_ROOMS_COLUMNS)
             .eq('id', roomId)
             .single();
           
@@ -2651,7 +2669,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
             // Fetch participants for this room specifically
             const { data: pData } = await supabase
               .from('chat_participants')
-              .select('*')
+              .select(CONNECT_CHAT_PARTICIPANTS_COLUMNS)
               .eq('room_id', roomId);
             
             if (pData) {
@@ -2666,7 +2684,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
       const { data: newRoom, error: roomError } = await supabase
         .from('chat_rooms')
         .insert({ is_group: false })
-        .select()
+        .select(CONNECT_CHAT_ROOMS_COLUMNS)
         .single();
 
       if (roomError) throw roomError;
