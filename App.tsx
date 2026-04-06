@@ -31,6 +31,38 @@ const USER_PROGRESS_CLOUD_COLUMNS = '*';
 /** Esquemas antigos variam (`end_time` vs `duration`, com ou sem `subject_id`). `*` evita 400. */
 const STUDY_SESSION_CLOUD_COLUMNS = '*';
 
+function formatCloudFlashcardRow(c: Record<string, unknown>): Flashcard {
+  const id = String(c.id ?? '');
+  const front =
+    (typeof c.front === 'string' ? c.front : undefined) ??
+    (typeof c.question === 'string' ? c.question : undefined) ??
+    '';
+  const back =
+    (typeof c.back === 'string' ? c.back : undefined) ??
+    (typeof c.answer === 'string' ? c.answer : undefined) ??
+    '';
+  const nextRaw = c.next_review;
+  const nextReview =
+    nextRaw != null && nextRaw !== '' ? Number(nextRaw) : Date.now();
+  return {
+    id,
+    front,
+    back: back ?? '',
+    notes: typeof c.notes === 'string' ? c.notes : '',
+    tags: Array.isArray(c.tags) ? (c.tags as string[]) : [],
+    source: typeof c.source === 'string' ? c.source : '',
+    subjectId: typeof c.subject_id === 'string' ? c.subject_id : '',
+    folderId: (c.folder_id as string | null) ?? null,
+    nextReview: Number.isFinite(nextReview) ? nextReview : Date.now(),
+    interval: c.interval != null ? Number(c.interval) : 0,
+    status: (c.status as Flashcard['status']) || 'new',
+    learningStep: c.learning_step != null ? Number(c.learning_step) : 0,
+    easeFactor: c.ease_factor != null ? Number(c.ease_factor) : 2.5,
+    total_errors: c.total_errors != null ? Number(c.total_errors) : 0,
+    archived_at: (c.archived_at as string | null) ?? null,
+  };
+}
+
 function sortStudySessionsNewestFirst<T extends { id: string; start_time?: string; created_at?: string }>(
   rows: T[]
 ): T[] {
@@ -798,24 +830,9 @@ const App: React.FC = () => {
           .eq('user_id', userId)
           .is('archived_at', null);
         if (data) {
-          const formattedCards = data.map(c => ({
-            id: c.id,
-            front: (c as { front?: string; question?: string }).front ?? (c as { question?: string }).question ?? '',
-            back: (c as { back?: string; answer?: string }).back ?? (c as { answer?: string }).answer ?? '',
-            notes: c.notes || '',
-            tags: c.tags || [],
-            source: c.source || '',
-            subjectId: c.subject_id || '',
-            folderId: c.folder_id || null,
-            nextReview: c.next_review != null ? Number(c.next_review) : Date.now(),
-            interval: c.interval != null ? c.interval : 0,
-            status: c.status || 'new',
-            learningStep: c.learning_step != null ? c.learning_step : 0,
-            easeFactor: c.ease_factor != null ? c.ease_factor : 2.5,
-            total_errors: c.total_errors != null ? c.total_errors : 0,
-            archived_at: c.archived_at || null
-          }));
-          setFlashcards(formattedCards);
+          setFlashcards(
+            data.map((row) => formatCloudFlashcardRow(row as unknown as Record<string, unknown>))
+          );
         }
         return;
       }
@@ -823,11 +840,47 @@ const App: React.FC = () => {
       if (isOnline) {
         const syncQueueCount = await db.syncQueue.count();
 
+        const [
+          subsRes,
+          profile,
+          [resFlds, resCards, resTks, resBoards, resSessions, resReadings, resProgress],
+        ] = await Promise.all([
+          supabase.from('subjects').select('*').eq('user_id', userId),
+          dataService.getUserProfile(userId, isOnline),
+          Promise.all([
+            supabase
+              .from('folders')
+              .select('id, name, parent_id, color, icon, target_date, shared, original_deck_id, version')
+              .eq('user_id', userId),
+            supabase
+              .from('flashcards')
+              .select(FLASHCARD_CLOUD_COLUMNS)
+              .eq('user_id', userId)
+              .is('archived_at', null),
+            supabase
+              .from('tasks')
+              .select(TASK_CLOUD_COLUMNS)
+              .eq('user_id', userId)
+              .is('archived_at', null)
+              .order('created_at', { ascending: false }),
+            supabase
+              .from('boards')
+              .select('id, name, columns, user_id, created_at')
+              .eq('user_id', userId)
+              .order('created_at', { ascending: false }),
+            supabase.from('study_sessions').select(STUDY_SESSION_CLOUD_COLUMNS).eq('user_id', userId),
+            supabase
+              .from('readings')
+              .select('id, title, author')
+              .eq('user_id', userId)
+              .order('created_at', { ascending: false }),
+            supabase.from('user_progress').select(USER_PROGRESS_CLOUD_COLUMNS).eq('user_id', userId).maybeSingle(),
+          ]),
+        ]);
+
+        const { data: subsRows, error: subjectsFetchError } = subsRes;
+
         // Subjects: incluir `color` e metadados — `select('id, name')` fazia todos os círculos caírem no cinza (#94a3b8).
-        const { data: subsRows, error: subjectsFetchError } = await supabase
-          .from('subjects')
-          .select('*')
-          .eq('user_id', userId);
         const subs: Subject[] = (subsRows ?? []).map((s) => {
           const row = s as Record<string, unknown>;
           const colorRaw = row.color;
@@ -851,8 +904,7 @@ const App: React.FC = () => {
             topics: Array.isArray(row.topics) ? (row.topics as Subject['topics']) : undefined,
           };
         });
-        
-        const profile = await dataService.getUserProfile(userId, isOnline);
+
         if (profile) {
           const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
           if (profile.lastInteractionDate && profile.lastInteractionDate !== today) {
@@ -870,17 +922,6 @@ const App: React.FC = () => {
             setUserProfile(profile);
           }
         }
-
-        // Fetch others in parallel but handle them individually to avoid one failure crashing everything
-        const [resFlds, resCards, resTks, resBoards, resSessions, resReadings, resProgress] = await Promise.all([
-          supabase.from('folders').select('id, name, parent_id, color, icon, target_date, shared, original_deck_id, version').eq('user_id', userId),
-          supabase.from('flashcards').select(FLASHCARD_CLOUD_COLUMNS).eq('user_id', userId).is('archived_at', null),
-          supabase.from('tasks').select(TASK_CLOUD_COLUMNS).eq('user_id', userId).is('archived_at', null).order('created_at', { ascending: false }),
-          supabase.from('boards').select('id, name, columns, user_id, created_at').eq('user_id', userId).order('created_at', { ascending: false }),
-          supabase.from('study_sessions').select(STUDY_SESSION_CLOUD_COLUMNS).eq('user_id', userId),
-          supabase.from('readings').select('id, title, author').eq('user_id', userId).order('created_at', { ascending: false }),
-          supabase.from('user_progress').select(USER_PROGRESS_CLOUD_COLUMNS).eq('user_id', userId).maybeSingle()
-        ]);
 
         if (resFlds.data) {
           const formattedFolders = resFlds.data.map(f => ({ 
@@ -924,25 +965,9 @@ const App: React.FC = () => {
         }
         
         if (resCards.data) {
-          const formattedCards = resCards.data.map(c => ({
-            id: c.id, 
-            front: (c as { front?: string; question?: string }).front ?? (c as { question?: string }).question ?? '', 
-            back: (c as { back?: string; answer?: string }).back ?? (c as { answer?: string }).answer ?? '', 
-            notes: c.notes || '',
-            tags: c.tags || [],
-            source: c.source || '',
-            subjectId: c.subject_id || '', 
-            folderId: c.folder_id || null, 
-            nextReview: c.next_review != null ? Number(c.next_review) : Date.now(), 
-            interval: c.interval != null ? c.interval : 0, 
-            status: c.status || 'new',
-            learningStep: c.learning_step != null ? c.learning_step : 0,
-            easeFactor: c.ease_factor != null ? c.ease_factor : 2.5,
-            total_errors: c.total_errors != null ? c.total_errors : 0,
-            archived_at: c.archived_at || null
-          }));
-          
-          setFlashcards(formattedCards);
+          setFlashcards(
+            resCards.data.map((row) => formatCloudFlashcardRow(row as unknown as Record<string, unknown>))
+          );
         }
 
         if (resTks.data) {
@@ -1062,26 +1087,58 @@ const App: React.FC = () => {
 
     const userId = session.user.id;
 
-    const debounced = createScopedRealtimeDebounce(750, async (scopes) => {
+    const debounced = createScopedRealtimeDebounce(1000, async (scopes) => {
       if (Date.now() < realtimeMutedUntilRef.current) return;
       if (scopes.size === 1) {
         const only = [...scopes][0];
         await loadUserDataRef.current({ scope: only });
         return;
       }
-      const order: RealtimeUserDataScope[] = ['folders', 'tasks', 'flashcards', 'user_progress'];
+      const order: RealtimeUserDataScope[] = ['folders', 'tasks', 'user_progress'];
       const toRun = order.filter((s) => scopes.has(s));
       await Promise.all(toRun.map((s) => loadUserDataRef.current({ scope: s })));
     });
 
     const dataChannel = supabase.channel('realtime_data_sync')
       // questions: não escutar aqui — loadUserData não lê essa tabela; QuestionBank já inscreve em `question_bank_changes`.
+      // Flashcards: merge incremental (evita refetch de todo o deck a cada cartão estudado).
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'flashcards',
         filter: `user_id=eq.${userId}`
-      }, () => debounced.schedule('flashcards'))
+      }, (payload) => {
+        if (Date.now() < realtimeMutedUntilRef.current) return;
+        const p = payload as {
+          eventType: string;
+          new: Record<string, unknown> | null;
+          old: Partial<{ id: string }> | null;
+        };
+        if (p.eventType === 'DELETE') {
+          const id = p.old?.id;
+          if (id) setFlashcards((prev) => prev.filter((c) => c.id !== id));
+          return;
+        }
+        if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
+          const row = p.new;
+          if (!row || typeof row !== 'object') return;
+          const archived = row.archived_at;
+          if (archived != null && archived !== '') {
+            const rid = String(row.id ?? '');
+            if (rid) setFlashcards((prev) => prev.filter((c) => c.id !== rid));
+            return;
+          }
+          const card = formatCloudFlashcardRow(row);
+          if (!card.id) return;
+          setFlashcards((prev) => {
+            const i = prev.findIndex((c) => c.id === card.id);
+            if (i === -1) return [...prev, card];
+            const next = [...prev];
+            next[i] = card;
+            return next;
+          });
+        }
+      })
       .on('postgres_changes', {
         event: '*',
         schema: 'public',

@@ -2,6 +2,13 @@ import type { Flashcard, Question } from '../../types';
 import { normalizeQuestionModality } from '../../types';
 import type { QuestionBankSavedFilterPreset } from './types';
 
+/**
+ * Colunas para listagem/filtros no Banco de Questões — evita `select('*')` e JSON pesado
+ * (`ai_correction`, `texto_gabarito_ia`, `explicacao_doutrinaria`). Correções IA carregam sob demanda.
+ */
+export const QUESTION_BANK_LIST_COLUMNS =
+  'id, user_id, subject, topic, statement, options, correct_answer, explanation, difficulty, exam_board, institution, exam_name, modality, legal_diploma, year, created_at, audio_hint, listen_count, status, is_reinforcement, legislation_tags, jurisprudence_tags, ai_summary, career, formation_area, education_level, job_position, is_annulled, is_outdated, video_url';
+
 export function normalizeQuestionFromApi(q: Question): Question {
   const m = normalizeQuestionModality((q as { modality?: string | null }).modality);
   return { ...q, modality: m };

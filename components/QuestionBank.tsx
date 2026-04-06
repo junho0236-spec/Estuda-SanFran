@@ -56,6 +56,7 @@ import {
   normalizeQuestionFromApi,
   buildCappedFlashcardContextForAi,
   migrateSavedFilterPresetRow,
+  QUESTION_BANK_LIST_COLUMNS,
 } from './question-bank/questionBankHelpers';
 import { filterAndSortBankQuestions } from './question-bank/filterBankQuestions';
 import { QuestionBankConfidenceModal } from './question-bank/QuestionBankConfidenceModal';
@@ -64,6 +65,7 @@ import { QuestionBankMainHeader } from './question-bank/QuestionBankMainHeader';
 import { QuestionBankErrorInsightBanner } from './question-bank/QuestionBankErrorInsightBanner';
 import { QuestionBankQuestionArea } from './question-bank/QuestionBankQuestionArea';
 import { QuestionBankModalsLayer } from './question-bank/QuestionBankModalsLayer';
+import { useQuestionBankModalsLayerSections } from './question-bank/useQuestionBankModalsLayerSections';
 import { QuestionBankMockSessionPanel } from './question-bank/QuestionBankMockSessionPanel';
 import { QuestionBankStatsGoalsNotebookShell } from './question-bank/QuestionBankStatsGoalsNotebookShell';
 
@@ -1482,7 +1484,7 @@ Forneça a explicação de forma concisa e didática.`;
       setLoading(true);
       const { data, error } = await supabase
         .from('questions')
-        .select('*')
+        .select(QUESTION_BANK_LIST_COLUMNS)
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
@@ -1503,17 +1505,6 @@ Forneça a explicação de forma concisa e didática.`;
           const normalized = (data as Question[]).map(normalizeQuestionFromApi);
           setQuestions(normalized);
           updateFilters(normalized);
-          
-          // Pre-populate aiCommentary from existing data in DB
-          const existingCommentaries: Record<string, QuestionAiCommentary> = {};
-          normalized.forEach(q => {
-            if (q.ai_correction) {
-              existingCommentaries[q.id] = q.ai_correction;
-            }
-          });
-          if (Object.keys(existingCommentaries).length > 0) {
-            setAiCommentary(prev => ({ ...prev, ...existingCommentaries }));
-          }
         }
       }
     } catch (error) {
@@ -2758,6 +2749,58 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
     selectedJobPosition,
   ]);
 
+  const modalsLayerSections = useQuestionBankModalsLayerSections({
+    showAIGenerator,
+    setShowAIGenerator,
+    aiConfig,
+    setAiConfig,
+    folders,
+    handleGenerateAI,
+    isGenerating,
+    generatingStatus,
+    aiCooldown,
+    notification,
+    showAiLesson,
+    setShowAiLesson,
+    loadingAiLesson,
+    aiLessonContent,
+    selectedSubjects,
+    showJuridiquesModal,
+    setShowJuridiquesModal,
+    selectedText,
+    loadingJuridiquesExplanation,
+    juridiquesExplanation,
+    showManualGlossarySearch,
+    setShowManualGlossarySearch,
+    manualSearchTerm,
+    setManualSearchTerm,
+    handleManualSearch,
+    isLoadingGlossary,
+    activeGlossaryTerm,
+    glossaryData,
+    setActiveGlossaryTerm,
+    setGlossaryData,
+    userId,
+    isOnline,
+    glossaryPosition,
+    isNotebookModalOpen,
+    setIsNotebookModalOpen,
+    notebooks,
+    selectedQuestionsForNotebook,
+    setNewNotebookName,
+    setNewNotebookDescription,
+    handleCreateNotebook,
+    setNotebooks,
+    setSelectedQuestionsForNotebook,
+    setIsSubmitting,
+    showNotification,
+    isSubmitting,
+    isDeckModalOpen,
+    setIsDeckModalOpen,
+    handleConfirmFlashcardCreation,
+    isExporting,
+  });
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-full w-full">
@@ -2882,115 +2925,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
         />
       )}
 
-      <QuestionBankModalsLayer
-        aiGenerator={{
-          open: showAIGenerator,
-          onClose: () => setShowAIGenerator(false),
-          aiConfig,
-          setAiConfig,
-          folders,
-          onSubmit: handleGenerateAI,
-          isGenerating,
-          generatingStatus,
-          aiCooldown,
-        }}
-        notification={{
-          message: notification?.message ?? null,
-          type: notification?.type ?? null,
-        }}
-        aiLesson={{
-          open: showAiLesson,
-          onClose: () => setShowAiLesson(false),
-          loading: loadingAiLesson,
-          content: aiLessonContent,
-          subjectLine:
-            selectedSubjects.length === 0
-              ? '—'
-              : selectedSubjects.length === 1
-                ? selectedSubjects[0]
-                : selectedSubjects.join(' · '),
-        }}
-        juridiques={{
-          open: showJuridiquesModal,
-          onClose: () => setShowJuridiquesModal(false),
-          selectedText,
-          loading: loadingJuridiquesExplanation,
-          explanation: juridiquesExplanation,
-        }}
-        manualGlossary={{
-          open: showManualGlossarySearch,
-          onClose: () => setShowManualGlossarySearch(false),
-          term: manualSearchTerm,
-          onTermChange: setManualSearchTerm,
-          onSubmit: handleManualSearch,
-          isLoading: isLoadingGlossary,
-        }}
-        glossaryPopover={{
-          activeTerm: activeGlossaryTerm,
-          data: glossaryData,
-          onClose: () => {
-            setActiveGlossaryTerm(null);
-            setGlossaryData(null);
-          },
-          userId,
-          isOnline,
-          position: glossaryPosition,
-        }}
-        glossaryLoadingOverlay={{
-          visible: isLoadingGlossary && !glossaryData,
-          position: glossaryPosition,
-        }}
-        notebookModal={{
-          isOpen: isNotebookModalOpen,
-          onClose: () => setIsNotebookModalOpen(false),
-          notebooks,
-          selectedQuestionIds: Array.from(selectedQuestionsForNotebook),
-          onCreateNotebook: async (name, description) => {
-            setNewNotebookName(name);
-            setNewNotebookDescription(description);
-            await handleCreateNotebook();
-            setIsNotebookModalOpen(false);
-          },
-          onAddToNotebook: async (notebookId) => {
-            try {
-              setIsSubmitting(true);
-              const notebook = notebooks.find((n) => n.id === notebookId);
-              if (!notebook) return;
-
-              const updatedQuestionIds = Array.from(
-                new Set([...notebook.question_ids, ...Array.from(selectedQuestionsForNotebook)])
-              );
-
-              const { error } = await supabase
-                .from('notebooks')
-                .update({ question_ids: updatedQuestionIds })
-                .eq('id', notebookId);
-
-              if (error) throw error;
-
-              setNotebooks((prev) =>
-                prev.map((n) => (n.id === notebookId ? { ...n, question_ids: updatedQuestionIds } : n))
-              );
-              showNotification('Questões adicionadas ao caderno!', 'success');
-              setSelectedQuestionsForNotebook(new Set());
-              setIsNotebookModalOpen(false);
-            } catch {
-              showNotification('Erro ao adicionar ao caderno.', 'error');
-            } finally {
-              setIsSubmitting(false);
-            }
-          },
-          isSubmitting,
-        }}
-        deckPicker={{
-          open: isDeckModalOpen,
-          onClose: () => setIsDeckModalOpen(false),
-          folders,
-          isSubmitting,
-          onPickFolder: (folderId) => handleConfirmFlashcardCreation(folderId),
-        }}
-        pdfExportActive={isExporting}
-      >
+      <QuestionBankModalsLayer {...modalsLayerSections}>
           <>
             {/* Filters & Stats */}
           <QuestionBankStatsGoalsNotebookShell

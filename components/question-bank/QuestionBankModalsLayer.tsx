@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Loader2 } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import { NotebookModal } from '../NotebookModal';
@@ -73,7 +73,7 @@ export type QuestionBankModalsLayerProps = {
   pdfExportActive: boolean;
 };
 
-export function QuestionBankModalsLayer({
+function QuestionBankModalsLayerInner({
   children,
   aiGenerator,
   notification,
@@ -174,3 +174,5 @@ export function QuestionBankModalsLayer({
     </>
   );
 }
+
+export const QuestionBankModalsLayer = memo(QuestionBankModalsLayerInner);
