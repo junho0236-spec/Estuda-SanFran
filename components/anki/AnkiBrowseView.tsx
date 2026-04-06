@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
+import { TableVirtuoso } from 'react-virtuoso';
 import {
   Folder as FolderIcon,
   Flame,
@@ -33,6 +34,28 @@ import type {
   Subject,
 } from './ankiBrowseTypes';
 import type { SessionStats } from './types';
+
+const ANKI_BROWSE_TABLE_COMPONENTS = {
+  Table: (props: React.ComponentPropsWithoutRef<'table'>) => (
+    <table {...props} className="w-full text-left border-collapse" />
+  ),
+  TableHead: React.forwardRef<HTMLTableSectionElement, React.ComponentPropsWithoutRef<'thead'>>(
+    function TableHead(props, ref) {
+      return <thead {...props} ref={ref} />;
+    }
+  ),
+  TableBody: React.forwardRef<HTMLTableSectionElement, React.ComponentPropsWithoutRef<'tbody'>>(
+    function TableBody(props, ref) {
+      return <tbody {...props} ref={ref} />;
+    }
+  ),
+  TableRow: (props: React.ComponentPropsWithoutRef<'tr'>) => (
+    <tr
+      {...props}
+      className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/5 transition-colors group"
+    />
+  ),
+};
 
 export interface AnkiBrowseViewProps {
   showRootDashboard: boolean;
@@ -428,28 +451,54 @@ export const AnkiBrowseView: React.FC<AnkiBrowseViewProps> = ({
     {isTableView ? (
       <div className="bg-white dark:bg-sanfran-rubiDark/50 rounded-[2rem] border-2 border-slate-200 dark:border-sanfran-rubi/40 shadow-xl overflow-hidden animate-in fade-in duration-500">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50 dark:bg-white/5 border-b-2 border-slate-100 dark:border-white/5">
-                <th className="p-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Frente</th>
-                <th className="p-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Verso</th>
-                {isGlobalSearch && (
-                  <th className="p-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Pasta</th>
-                )}
-                <th className="p-6 text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">
-                  Status
-                </th>
-                <th className="p-6 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">
-                  Ações
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {currentCards.map((card) => (
-                <tr
-                  key={card.id}
-                  className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/5 transition-colors group"
-                >
+          {currentCards.length === 0 ? (
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 dark:bg-white/5 border-b-2 border-slate-100 dark:border-white/5">
+                  <th className="p-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Frente</th>
+                  <th className="p-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Verso</th>
+                  {isGlobalSearch && (
+                    <th className="p-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Pasta</th>
+                  )}
+                  <th className="p-6 text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">
+                    Status
+                  </th>
+                  <th className="p-6 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">
+                    Ações
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td colSpan={isGlobalSearch ? 5 : 4} className="p-20 text-center">
+                    <Search className="w-12 h-12 text-slate-100 dark:text-white/5 mx-auto mb-4" />
+                    <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Nenhum card encontrado.</p>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          ) : (
+            <TableVirtuoso
+              style={{ height: 'min(70vh, 640px)', width: '100%' }}
+              data={currentCards}
+              components={ANKI_BROWSE_TABLE_COMPONENTS}
+              fixedHeaderContent={() => (
+                <tr className="bg-slate-50 dark:bg-white/5 border-b-2 border-slate-100 dark:border-white/5">
+                  <th className="p-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Frente</th>
+                  <th className="p-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Verso</th>
+                  {isGlobalSearch && (
+                    <th className="p-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Pasta</th>
+                  )}
+                  <th className="p-6 text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">
+                    Status
+                  </th>
+                  <th className="p-6 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">
+                    Ações
+                  </th>
+                </tr>
+              )}
+              itemContent={(_index, card) => (
+                <>
                   <td className="p-6">
                     <p className="font-bold text-slate-900 dark:text-white text-sm line-clamp-2">{card.front}</p>
                   </td>
@@ -475,7 +524,7 @@ export const AnkiBrowseView: React.FC<AnkiBrowseViewProps> = ({
                     )}
                   </td>
                   <td className="p-6 text-right">
-                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center justify-end gap-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                       <button
                         type="button"
                         onClick={() => setEditingCard(card)}
@@ -502,18 +551,10 @@ export const AnkiBrowseView: React.FC<AnkiBrowseViewProps> = ({
                       </button>
                     </div>
                   </td>
-                </tr>
-              ))}
-              {currentCards.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="p-20 text-center">
-                    <Search className="w-12 h-12 text-slate-100 dark:text-white/5 mx-auto mb-4" />
-                    <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Nenhum card encontrado.</p>
-                  </td>
-                </tr>
+                </>
               )}
-            </tbody>
-          </table>
+            />
+          )}
         </div>
       </div>
     ) : (

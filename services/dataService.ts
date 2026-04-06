@@ -3,7 +3,7 @@ import { db, addToSyncQueue, type OfflineSyncQueue } from './offlineService';
 import { Flashcard, Task, StudySession, Note, SubjectFile, Folder, Board, UserProgress, Friendship, Notification } from '../types';
 
 /** Tamanho máximo de linhas por pedido upsert/delete em lote (menos pressão no PostgREST / nano). */
-const SYNC_UPSERT_CHUNK = 80;
+const SYNC_UPSERT_CHUNK = 120;
 
 function chunkArray<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];

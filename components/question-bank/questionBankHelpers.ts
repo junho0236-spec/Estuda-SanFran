@@ -9,6 +9,19 @@ import type { QuestionBankSavedFilterPreset } from './types';
 export const QUESTION_BANK_LIST_COLUMNS =
   'id, user_id, subject, topic, statement, options, correct_answer, explanation, difficulty, exam_board, institution, exam_name, modality, legal_diploma, year, created_at, audio_hint, listen_count, status, is_reinforcement, legislation_tags, jurisprudence_tags, ai_summary, career, formation_area, education_level, job_position, is_annulled, is_outdated, video_url';
 
+/** Só metadados para filtros — consulta paralela à listagem paginada. */
+export const QUESTION_BANK_FACET_COLUMNS =
+  'topic, subject, exam_board, year, legislation_tags, jurisprudence_tags, institution, exam_name, legal_diploma, career, formation_area, education_level, job_position';
+
+export const QB_USER_QUESTION_STATS_COLUMNS =
+  'question_id, total_attempts, correct_attempts, last_attempt_correct, updated_at, user_id';
+
+export const QB_NOTEBOOK_LIST_COLUMNS =
+  'id, user_id, name, description, question_ids, created_at';
+
+export const QB_USER_PROGRESS_COLUMNS =
+  'user_id, favorites, wrong_questions, wrong_question_ids, correct_questions, notes, correct_count, wrong_count, error_mastery, confidence_levels, question_answer_goals, updated_at';
+
 export function normalizeQuestionFromApi(q: Question): Question {
   const m = normalizeQuestionModality((q as { modality?: string | null }).modality);
   return { ...q, modality: m };

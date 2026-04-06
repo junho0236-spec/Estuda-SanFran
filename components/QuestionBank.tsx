@@ -57,6 +57,10 @@ import {
   buildCappedFlashcardContextForAi,
   migrateSavedFilterPresetRow,
   QUESTION_BANK_LIST_COLUMNS,
+  QUESTION_BANK_FACET_COLUMNS,
+  QB_USER_QUESTION_STATS_COLUMNS,
+  QB_NOTEBOOK_LIST_COLUMNS,
+  QB_USER_PROGRESS_COLUMNS,
 } from './question-bank/questionBankHelpers';
 import { filterAndSortBankQuestions } from './question-bank/filterBankQuestions';
 import { QuestionBankConfidenceModal } from './question-bank/QuestionBankConfidenceModal';
@@ -76,6 +80,9 @@ interface QuestionBankProps {
   isOnline?: boolean;
 }
 
+const QUESTION_FETCH_PAGE_SIZE = 200;
+const QUESTION_FACET_BOOTSTRAP_LIMIT = 5000;
+
 const QuestionBank: React.FC<QuestionBankProps> = ({ 
   userId, 
   folders = [], 
@@ -84,10 +91,14 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
 }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const qbDeepLinkApplied = useRef(false);
+  const nextQuestionRangeStartRef = useRef(0);
+  const facetBootstrapRef = useRef<Question[]>([]);
 
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [questionsHasMore, setQuestionsHasMore] = useState(true);
+  const [loadingMoreQuestions, setLoadingMoreQuestions] = useState(false);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
@@ -805,17 +816,30 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
       new: Record<string, unknown>;
       old: { id: string };
     }) => {
+      const mergeFilters = (next: Question[]) => {
+        updateFilters([...facetBootstrapRef.current, ...next] as Question[]);
+      };
       if (payload.eventType === 'INSERT') {
-        setQuestions(prev => [normalizeQuestionFromApi(payload.new as unknown as Question), ...prev]);
+        setQuestions((prev) => {
+          const next = [normalizeQuestionFromApi(payload.new as unknown as Question), ...prev];
+          mergeFilters(next);
+          return next;
+        });
       } else if (payload.eventType === 'UPDATE') {
         const row = payload.new as unknown as Question;
-        setQuestions(prev =>
-          prev.map(q =>
+        setQuestions((prev) => {
+          const next = prev.map((q) =>
             q.id === row.id ? normalizeQuestionFromApi(row) : q
-          )
-        );
+          );
+          mergeFilters(next);
+          return next;
+        });
       } else if (payload.eventType === 'DELETE') {
-        setQuestions(prev => prev.filter(q => q.id !== payload.old.id));
+        setQuestions((prev) => {
+          const next = prev.filter((q) => q.id !== payload.old.id);
+          mergeFilters(next);
+          return next;
+        });
       }
     };
 
@@ -938,7 +962,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
     try {
       const { data, error } = await supabase
         .from('user_question_stats')
-        .select('*')
+        .select(QB_USER_QUESTION_STATS_COLUMNS)
         .eq('user_id', userId);
       
       if (!error && data) {
@@ -962,7 +986,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
     try {
       const { data, error } = await supabase
         .from('user_progress')
-        .select('*')
+        .select(QB_USER_PROGRESS_COLUMNS)
         .eq('user_id', userId)
         .maybeSingle();
 
@@ -1052,7 +1076,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
     try {
       const { data, error } = await supabase
         .from('notebooks')
-        .select('*')
+        .select(QB_NOTEBOOK_LIST_COLUMNS)
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
@@ -1475,45 +1499,101 @@ Forneça a explicação de forma concisa e didática.`;
     isNotebookModalOpen,
   ]);
 
-  const fetchQuestions = async () => {
+  const fetchQuestions = async (
+    mode: 'reset' | 'append' = 'reset',
+    opts?: { quiet?: boolean }
+  ) => {
     if (!userId) {
       setLoading(false);
       return;
     }
-    try {
+    const quiet = Boolean(opts?.quiet);
+    if (mode === 'reset' && !quiet) {
       setLoading(true);
-      const { data, error } = await supabase
+    }
+    if (mode === 'append') {
+      setLoadingMoreQuestions(true);
+    }
+    try {
+      if (mode === 'reset') {
+        nextQuestionRangeStartRef.current = 0;
+      }
+      const from = nextQuestionRangeStartRef.current;
+      const to = from + QUESTION_FETCH_PAGE_SIZE - 1;
+
+      const listQuery = supabase
         .from('questions')
         .select(QUESTION_BANK_LIST_COLUMNS)
         .eq('user_id', userId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      const facetPromise =
+        mode === 'reset'
+          ? supabase
+              .from('questions')
+              .select(QUESTION_BANK_FACET_COLUMNS)
+              .eq('user_id', userId)
+              .limit(QUESTION_FACET_BOOTSTRAP_LIMIT)
+          : Promise.resolve({ data: [] as unknown[] | null, error: null });
+
+      const [listRes, facetRes] = await Promise.all([listQuery, facetPromise]);
+
+      const error = listRes.error;
+      const data = listRes.data;
 
       if (error) {
         if (error.code === '42P01') {
           setQuestions([]);
           updateFilters([]);
           setAiCommentary({});
+          facetBootstrapRef.current = [];
+          setQuestionsHasMore(false);
         } else {
           throw error;
         }
       } else if (data) {
-        if (data.length === 0) {
-          setQuestions([]);
-          updateFilters([]);
+        const normalized = (data as Question[]).map(normalizeQuestionFromApi);
+        nextQuestionRangeStartRef.current = from + data.length;
+        setQuestionsHasMore(data.length === QUESTION_FETCH_PAGE_SIZE);
+
+        if (mode === 'reset') {
+          if (facetRes.data && Array.isArray(facetRes.data)) {
+            facetBootstrapRef.current = facetRes.data as Question[];
+          } else {
+            facetBootstrapRef.current = [];
+          }
+          setQuestions(normalized);
+          updateFilters([...facetBootstrapRef.current, ...normalized] as Question[]);
           setAiCommentary({});
         } else {
-          const normalized = (data as Question[]).map(normalizeQuestionFromApi);
-          setQuestions(normalized);
-          updateFilters(normalized);
+          setQuestions((prev) => {
+            const merged = [...prev, ...normalized];
+            updateFilters([...facetBootstrapRef.current, ...merged] as Question[]);
+            return merged;
+          });
         }
       }
     } catch (error) {
       console.error('Error fetching questions:', error);
-      setQuestions([]);
-      updateFilters([]);
+      if (mode === 'reset') {
+        setQuestions([]);
+        updateFilters([]);
+        facetBootstrapRef.current = [];
+      }
     } finally {
-      setLoading(false);
+      if (mode === 'reset' && !quiet) {
+        setLoading(false);
+      }
+      if (mode === 'append') {
+        setLoadingMoreQuestions(false);
+      }
     }
+  };
+
+  const loadMoreQuestions = () => {
+    if (!questionsHasMore || loadingMoreQuestions || loading) return;
+    void fetchQuestions('append');
   };
 
   const updateFilters = (data: Question[]) => {
@@ -1713,7 +1793,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
           : 'Reforço gerado com sucesso!',
         'success'
       );
-      await fetchQuestions(); // Refresh list
+      await fetchQuestions('reset'); // Refresh list
 
     } catch (error) {
       console.error('Error generating smart review:', error);
@@ -1984,8 +2064,6 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
         if (error) throw error;
 
         if (data) {
-          const inserted = (data as Question[]).map(normalizeQuestionFromApi);
-          setQuestions([...inserted, ...questions]);
           setShowAIGenerator(false);
           showNotification(
             droppedSimilar.length > 0
@@ -1993,16 +2071,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
               : `${data.length} questões geradas com sucesso!`,
             'success'
           );
-          
-          const newTopics = Array.from(new Set([...topics, ...data.map(q => q.topic)])).filter(Boolean);
-          setTopics(newTopics);
-
-          const newExamBoards = Array.from(new Set([...examBoards, ...data.map(q => q.exam_board)])).filter(Boolean) as string[];
-          setExamBoards(newExamBoards);
-
-          const newYears = Array.from(new Set([...years, ...data.map(q => q.year?.toString())])).filter(Boolean) as string[];
-          setYears(newYears.sort((a, b) => b.localeCompare(a)));
-          
+          await fetchQuestions('reset', { quiet: true });
           setViewMode('list');
         }
       } else {
@@ -2882,6 +2951,25 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
             }
           }}
         />
+      )}
+
+      {!isMockMode && (questionsHasMore || questions.length > 0) && (
+        <div className="mb-6 flex flex-col items-center gap-2">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 text-center">
+            {questions.length} questão(ões) carregada(s)
+            {questionsHasMore ? ' — há mais no servidor.' : ' — acervo completo carregado.'}
+          </p>
+          {questionsHasMore && (
+            <button
+              type="button"
+              onClick={() => loadMoreQuestions()}
+              disabled={loadingMoreQuestions || loading}
+              className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-black uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50"
+            >
+              {loadingMoreQuestions ? 'A carregar…' : 'Carregar mais questões'}
+            </button>
+          )}
+        </div>
       )}
 
       {isErrorNotebookMode && !isMockMode && !isMockFinished && (

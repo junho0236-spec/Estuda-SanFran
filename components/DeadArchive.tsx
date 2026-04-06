@@ -3,6 +3,12 @@ import React, { useState, useEffect } from 'react';
 import { Archive, Trash2, RotateCcw, Ghost, FileText, BrainCircuit, AlertTriangle, RefreshCw } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { Task, Flashcard } from '../types';
+import {
+  FLASHCARD_CLOUD_COLUMNS,
+  TASK_CLOUD_COLUMNS,
+  formatCloudFlashcardRow,
+  formatCloudTaskRow,
+} from '../utils/supabaseCloudRowFormatters';
 
 interface DeadArchiveProps {
   userId: string;
@@ -22,21 +28,30 @@ const DeadArchive: React.FC<DeadArchiveProps> = ({ userId }) => {
     setIsLoading(true);
     try {
       const [tasksRes, cardsRes] = await Promise.all([
-        supabase.from('tasks').select('*').eq('user_id', userId).not('archived_at', 'is', null).order('archived_at', { ascending: false }),
-        supabase.from('flashcards').select('*').eq('user_id', userId).not('archived_at', 'is', null).order('archived_at', { ascending: false })
+        supabase
+          .from('tasks')
+          .select(TASK_CLOUD_COLUMNS)
+          .eq('user_id', userId)
+          .not('archived_at', 'is', null)
+          .order('archived_at', { ascending: false }),
+        supabase
+          .from('flashcards')
+          .select(FLASHCARD_CLOUD_COLUMNS)
+          .eq('user_id', userId)
+          .not('archived_at', 'is', null)
+          .order('archived_at', { ascending: false }),
       ]);
 
       if (tasksRes.data) {
-        setArchivedTasks(tasksRes.data.map(t => ({
-          id: t.id, title: t.title, completed: t.completed, subjectId: t.subject_id, dueDate: t.due_date, completedAt: t.completed_at,
-          priority: t.priority || 'normal', category: t.category || 'geral', archived_at: t.archived_at
-        })));
+        setArchivedTasks(
+          tasksRes.data.map((t) => formatCloudTaskRow(t as unknown as Record<string, unknown>))
+        );
       }
 
       if (cardsRes.data) {
-        setArchivedCards(cardsRes.data.map(c => ({
-          id: c.id, front: c.front, back: c.back, subjectId: c.subject_id, folderId: c.folder_id, nextReview: c.next_review, interval: c.interval, archived_at: c.archived_at
-        })));
+        setArchivedCards(
+          cardsRes.data.map((c) => formatCloudFlashcardRow(c as unknown as Record<string, unknown>))
+        );
       }
 
     } catch (e) {

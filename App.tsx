@@ -15,14 +15,17 @@ import { getViewLabel, getBrasiliaDate, getBrasiliaISOString } from './utils';
 import {
   createScopedRealtimeDebounce,
   type UserDataSyncScope,
-  type RealtimeUserDataScope,
 } from './utils/realtimeThrottle';
+import {
+  FLASHCARD_CLOUD_COLUMNS,
+  TASK_CLOUD_COLUMNS,
+  SUBJECT_CLOUD_COLUMNS,
+  formatCloudFlashcardRow,
+  formatCloudTaskRow,
+  formatCloudFolderRow,
+} from './utils/supabaseCloudRowFormatters';
+import { bulkPutInChunks, bulkDeleteIdsInChunks } from './utils/dexieBulkYield';
 
-/** Colunas usadas em `loadUserData` (menos payload que `*`). Ajustar se o schema Supabase diferir. */
-const FLASHCARD_CLOUD_COLUMNS =
-  'id, front, back, notes, tags, source, subject_id, folder_id, next_review, interval, status, learning_step, ease_factor, total_errors, archived_at';
-const TASK_CLOUD_COLUMNS =
-  'id, title, status, subject_id, due_date, completed_at, category, priority, notes, subtasks, description, archived_at, delegated_to, delegated_by, created_at, google_event_id';
 /**
  * Lista mínima quebrou em alguns projetos (colunas com nomes diferentes). `*` numa única linha
  * por utilizador é aceitável; o PostgREST devolve 400 se algum nome na lista não existir.
@@ -31,37 +34,16 @@ const USER_PROGRESS_CLOUD_COLUMNS = '*';
 /** Esquemas antigos variam (`end_time` vs `duration`, com ou sem `subject_id`). `*` evita 400. */
 const STUDY_SESSION_CLOUD_COLUMNS = '*';
 
-function formatCloudFlashcardRow(c: Record<string, unknown>): Flashcard {
-  const id = String(c.id ?? '');
-  const front =
-    (typeof c.front === 'string' ? c.front : undefined) ??
-    (typeof c.question === 'string' ? c.question : undefined) ??
-    '';
-  const back =
-    (typeof c.back === 'string' ? c.back : undefined) ??
-    (typeof c.answer === 'string' ? c.answer : undefined) ??
-    '';
-  const nextRaw = c.next_review;
-  const nextReview =
-    nextRaw != null && nextRaw !== '' ? Number(nextRaw) : Date.now();
-  return {
-    id,
-    front,
-    back: back ?? '',
-    notes: typeof c.notes === 'string' ? c.notes : '',
-    tags: Array.isArray(c.tags) ? (c.tags as string[]) : [],
-    source: typeof c.source === 'string' ? c.source : '',
-    subjectId: typeof c.subject_id === 'string' ? c.subject_id : '',
-    folderId: (c.folder_id as string | null) ?? null,
-    nextReview: Number.isFinite(nextReview) ? nextReview : Date.now(),
-    interval: c.interval != null ? Number(c.interval) : 0,
-    status: (c.status as Flashcard['status']) || 'new',
-    learningStep: c.learning_step != null ? Number(c.learning_step) : 0,
-    easeFactor: c.ease_factor != null ? Number(c.ease_factor) : 2.5,
-    total_errors: c.total_errors != null ? Number(c.total_errors) : 0,
-    archived_at: (c.archived_at as string | null) ?? null,
-  };
-}
+/** Tabelas na fila offline que exigem `loadUserData` completo (sem scope dedicado). */
+const SYNC_TABLES_REQUIRING_FULL_LOAD = new Set([
+  'study_sessions',
+  'notes',
+  'subject_files',
+  'subjects',
+  'boards',
+  'user_profile',
+  'legal_frontiers',
+]);
 
 function sortStudySessionsNewestFirst<T extends { id: string; start_time?: string; created_at?: string }>(
   rows: T[]
@@ -682,8 +664,28 @@ const App: React.FC = () => {
             setIsSyncing(true);
             realtimeMutedUntilRef.current = Date.now() + 2000;
             clearOldLocalStorage(session.user.id);
+            const pendingTables = [
+              ...new Set((await db.syncQueue.orderBy('id').toArray()).map((q) => q.table)),
+            ];
             await dataService.syncOfflineData(session.user.id);
-            if (!cancelled) await loadUserData();
+            if (!cancelled) {
+              const needsFull = pendingTables.some((t) =>
+                SYNC_TABLES_REQUIRING_FULL_LOAD.has(t)
+              );
+              if (needsFull) {
+                await loadUserData();
+              } else {
+                const scopes: UserDataSyncScope[] = [];
+                if (pendingTables.includes('flashcards')) scopes.push('flashcards');
+                if (pendingTables.includes('tasks')) scopes.push('tasks');
+                if (pendingTables.includes('folders')) scopes.push('folders');
+                if (scopes.length === 0) {
+                  await loadUserData();
+                } else {
+                  await Promise.all(scopes.map((s) => loadUserData({ scope: s })));
+                }
+              }
+            }
           } catch (err) {
             console.error('Sync failed:', err);
           } finally {
@@ -749,24 +751,16 @@ const App: React.FC = () => {
           .select('id, name, parent_id, color, icon, target_date, shared, original_deck_id, version')
           .eq('user_id', userId);
         if (data) {
-          const formattedFolders = data.map(f => ({
-            id: f.id,
-            name: f.name,
-            parentId: f.parent_id,
-            color: f.color,
-            icon: f.icon || undefined,
-            targetDate: f.target_date || undefined,
-            shared: f.shared || false,
-            original_deck_id: f.original_deck_id || undefined,
-            version: f.version || 1
-          }));
+          const formattedFolders = data.map((f) =>
+            formatCloudFolderRow(f as unknown as Record<string, unknown>)
+          );
           const syncCount = await db.syncQueue.count();
           if (syncCount === 0) {
             const localFolders = await db.folders.toArray();
-            const remoteIds = new Set(formattedFolders.map(f => f.id));
-            const idsToDelete = localFolders.filter(f => !remoteIds.has(f.id)).map(f => f.id);
-            if (idsToDelete.length > 0) await db.folders.bulkDelete(idsToDelete);
-            await db.folders.bulkPut(formattedFolders);
+            const remoteIds = new Set(formattedFolders.map((f) => f.id));
+            const idsToDelete = localFolders.filter((f) => !remoteIds.has(f.id)).map((f) => f.id);
+            if (idsToDelete.length > 0) await bulkDeleteIdsInChunks(db.folders, idsToDelete);
+            await bulkPutInChunks(db.folders, formattedFolders);
           }
           setFolders(formattedFolders);
         }
@@ -781,42 +775,16 @@ const App: React.FC = () => {
           .is('archived_at', null)
           .order('created_at', { ascending: false });
         if (data) {
-          const formattedTasks = data.map(t => {
-            const desc = t.description ? JSON.parse(t.description as string) : {};
-            return {
-              id: t.id,
-              title: t.title,
-              completed: t.status === 'Concluido',
-              status: t.status,
-              subjectId: desc.subjectId || t.subject_id,
-              dueDate: t.due_date,
-              completedAt: t.completed_at,
-              priority: desc.originalPriority || (t.priority === 'Alta' ? 'alta' : 'normal'),
-              category: t.category || 'geral',
-              archived_at: t.archived_at,
-              boardId: desc.boardId,
-              columnId: desc.columnId,
-              notes: t.notes,
-              subtasks: t.subtasks || [],
-              delegatedTo: t.delegated_to,
-              delegatedBy: t.delegated_by,
-              delegatedByName: desc.delegatedByName,
-              delegatedToName: desc.delegatedToName,
-              syllabusLink: desc.syllabusLink,
-              importantCitations: desc.importantCitations,
-              revisionStatus: desc.revisionStatus,
-              created_at: t.created_at,
-              google_event_id:
-                (t as { google_event_id?: string }).google_event_id ?? desc.google_event_id,
-            };
-          });
+          const formattedTasks = data.map((t) =>
+            formatCloudTaskRow(t as unknown as Record<string, unknown>)
+          );
           const syncCount = await db.syncQueue.count();
           if (syncCount === 0) {
             const localTasks = await db.tasks.toArray();
-            const remoteIds = new Set(formattedTasks.map(t => t.id));
-            const idsToDelete = localTasks.filter(t => !remoteIds.has(t.id)).map(t => t.id);
-            if (idsToDelete.length > 0) await db.tasks.bulkDelete(idsToDelete);
-            await db.tasks.bulkPut(formattedTasks as Task[]);
+            const remoteIds = new Set(formattedTasks.map((t) => t.id));
+            const idsToDelete = localTasks.filter((t) => !remoteIds.has(t.id)).map((t) => t.id);
+            if (idsToDelete.length > 0) await bulkDeleteIdsInChunks(db.tasks, idsToDelete);
+            await bulkPutInChunks(db.tasks, formattedTasks as Task[]);
           }
           setTasks(formattedTasks as Task[]);
         }
@@ -845,7 +813,7 @@ const App: React.FC = () => {
           profile,
           [resFlds, resCards, resTks, resBoards, resSessions, resReadings, resProgress],
         ] = await Promise.all([
-          supabase.from('subjects').select('*').eq('user_id', userId),
+          supabase.from('subjects').select(SUBJECT_CLOUD_COLUMNS).eq('user_id', userId),
           dataService.getUserProfile(userId, isOnline),
           Promise.all([
             supabase
@@ -924,24 +892,16 @@ const App: React.FC = () => {
         }
 
         if (resFlds.data) {
-          const formattedFolders = resFlds.data.map(f => ({ 
-            id: f.id, 
-            name: f.name, 
-            parentId: f.parent_id,
-            color: f.color,
-            icon: f.icon || undefined,
-            targetDate: f.target_date || undefined,
-            shared: f.shared || false,
-            original_deck_id: f.original_deck_id || undefined,
-            version: f.version || 1
-          }));
+          const formattedFolders = resFlds.data.map((f) =>
+            formatCloudFolderRow(f as unknown as Record<string, unknown>)
+          );
 
           if (syncQueueCount === 0) {
             const localFolders = await db.folders.toArray();
-            const remoteIds = new Set(formattedFolders.map(f => f.id));
-            const idsToDelete = localFolders.filter(f => !remoteIds.has(f.id)).map(f => f.id);
-            if (idsToDelete.length > 0) await db.folders.bulkDelete(idsToDelete);
-            await db.folders.bulkPut(formattedFolders);
+            const remoteIds = new Set(formattedFolders.map((f) => f.id));
+            const idsToDelete = localFolders.filter((f) => !remoteIds.has(f.id)).map((f) => f.id);
+            if (idsToDelete.length > 0) await bulkDeleteIdsInChunks(db.folders, idsToDelete);
+            await bulkPutInChunks(db.folders, formattedFolders);
           }
           setFolders(formattedFolders);
         }
@@ -951,8 +911,8 @@ const App: React.FC = () => {
             const localSubs = await db.subjects.toArray();
             const remoteIds = new Set(subs.map((s) => s.id));
             const idsToDelete = localSubs.filter((s) => !remoteIds.has(s.id)).map((s) => s.id);
-            if (idsToDelete.length > 0) await db.subjects.bulkDelete(idsToDelete);
-            await db.subjects.bulkPut(subs);
+            if (idsToDelete.length > 0) await bulkDeleteIdsInChunks(db.subjects, idsToDelete);
+            await bulkPutInChunks(db.subjects, subs);
           }
           setSubjects(subs);
         }
@@ -971,42 +931,16 @@ const App: React.FC = () => {
         }
 
         if (resTks.data) {
-          const formattedTasks = resTks.data.map(t => {
-            const desc = t.description ? JSON.parse(t.description) : {};
-            return {
-              id: t.id, 
-              title: t.title, 
-              completed: t.status === 'Concluido', 
-              status: t.status,
-              subjectId: desc.subjectId || t.subject_id, 
-              dueDate: t.due_date, 
-              completedAt: t.completed_at,
-              priority: desc.originalPriority || (t.priority === 'Alta' ? 'alta' : 'normal'), 
-              category: t.category || 'geral', 
-              archived_at: t.archived_at,
-              boardId: desc.boardId,
-              columnId: desc.columnId,
-              notes: t.notes,
-              subtasks: t.subtasks || [],
-              delegatedTo: t.delegated_to,
-              delegatedBy: t.delegated_by,
-              delegatedByName: desc.delegatedByName,
-              delegatedToName: desc.delegatedToName,
-              syllabusLink: desc.syllabusLink,
-              importantCitations: desc.importantCitations,
-              revisionStatus: desc.revisionStatus,
-              created_at: t.created_at,
-              google_event_id:
-                (t as { google_event_id?: string }).google_event_id ?? desc.google_event_id,
-            };
-          });
+          const formattedTasks = resTks.data.map((t) =>
+            formatCloudTaskRow(t as unknown as Record<string, unknown>)
+          );
 
           if (syncQueueCount === 0) {
             const localTasks = await db.tasks.toArray();
-            const remoteIds = new Set(formattedTasks.map(t => t.id));
-            const idsToDelete = localTasks.filter(t => !remoteIds.has(t.id)).map(t => t.id);
-            if (idsToDelete.length > 0) await db.tasks.bulkDelete(idsToDelete);
-            await db.tasks.bulkPut(formattedTasks as Task[]);
+            const remoteIds = new Set(formattedTasks.map((t) => t.id));
+            const idsToDelete = localTasks.filter((t) => !remoteIds.has(t.id)).map((t) => t.id);
+            if (idsToDelete.length > 0) await bulkDeleteIdsInChunks(db.tasks, idsToDelete);
+            await bulkPutInChunks(db.tasks, formattedTasks as Task[]);
           }
           setTasks(formattedTasks as Task[]);
         }
@@ -1016,7 +950,7 @@ const App: React.FC = () => {
             id: b.id, name: b.name, columns: b.columns, userId: b.user_id, createdAt: b.created_at
           }));
           if (syncQueueCount === 0) {
-            await db.boards.bulkPut(formattedBoards);
+            await bulkPutInChunks(db.boards, formattedBoards);
           }
           setBoards(formattedBoards);
         }
@@ -1029,8 +963,8 @@ const App: React.FC = () => {
             const localSessions = await db.study_sessions.toArray();
             const remoteIds = new Set(sessionsSorted.map(s => s.id));
             const idsToDelete = localSessions.filter(s => !remoteIds.has(s.id)).map(s => s.id);
-            if (idsToDelete.length > 0) await db.study_sessions.bulkDelete(idsToDelete);
-            await db.study_sessions.bulkPut(sessionsSorted);
+            if (idsToDelete.length > 0) await bulkDeleteIdsInChunks(db.study_sessions, idsToDelete);
+            await bulkPutInChunks(db.study_sessions, sessionsSorted);
           }
           setStudySessions(sessionsSorted);
         }
@@ -1089,14 +1023,9 @@ const App: React.FC = () => {
 
     const debounced = createScopedRealtimeDebounce(1000, async (scopes) => {
       if (Date.now() < realtimeMutedUntilRef.current) return;
-      if (scopes.size === 1) {
-        const only = [...scopes][0];
-        await loadUserDataRef.current({ scope: only });
-        return;
+      if (scopes.has('user_progress')) {
+        await loadUserDataRef.current({ scope: 'user_progress' });
       }
-      const order: RealtimeUserDataScope[] = ['folders', 'tasks', 'user_progress'];
-      const toRun = order.filter((s) => scopes.has(s));
-      await Promise.all(toRun.map((s) => loadUserDataRef.current({ scope: s })));
     });
 
     const dataChannel = supabase.channel('realtime_data_sync')
@@ -1144,13 +1073,69 @@ const App: React.FC = () => {
         schema: 'public',
         table: 'tasks',
         filter: `user_id=eq.${userId}`
-      }, () => debounced.schedule('tasks'))
+      }, (payload) => {
+        if (Date.now() < realtimeMutedUntilRef.current) return;
+        const p = payload as {
+          eventType: string;
+          new: Record<string, unknown> | null;
+          old: Partial<{ id: string }> | null;
+        };
+        if (p.eventType === 'DELETE') {
+          const id = p.old?.id;
+          if (id) setTasks((prev) => prev.filter((t) => t.id !== id));
+          return;
+        }
+        if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
+          const row = p.new;
+          if (!row || typeof row !== 'object') return;
+          const archived = row.archived_at;
+          if (archived != null && archived !== '') {
+            const rid = String(row.id ?? '');
+            if (rid) setTasks((prev) => prev.filter((t) => t.id !== rid));
+            return;
+          }
+          const task = formatCloudTaskRow(row);
+          if (!task.id) return;
+          setTasks((prev) => {
+            const i = prev.findIndex((t) => t.id === task.id);
+            if (i === -1) return [...prev, task];
+            const next = [...prev];
+            next[i] = task;
+            return next;
+          });
+        }
+      })
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'folders',
         filter: `user_id=eq.${userId}`
-      }, () => debounced.schedule('folders'))
+      }, (payload) => {
+        if (Date.now() < realtimeMutedUntilRef.current) return;
+        const p = payload as {
+          eventType: string;
+          new: Record<string, unknown> | null;
+          old: Partial<{ id: string }> | null;
+        };
+        if (p.eventType === 'DELETE') {
+          const id = p.old?.id;
+          if (id) setFolders((prev) => prev.filter((f) => f.id !== id));
+          return;
+        }
+        if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
+          const row = p.new;
+          if (!row || typeof row !== 'object') return;
+          const folder = formatCloudFolderRow(row);
+          if (!folder.id) return;
+          setFolders((prev) => {
+            const i = prev.findIndex((f) => f.id === folder.id);
+            if (i === -1) return [...prev, folder];
+            const next = [...prev];
+            next[i] = folder;
+            return next;
+          });
+        }
+      })
       .on('postgres_changes', {
         event: '*',
         schema: 'public',

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:analyze": "vite build --mode analyze",
     "lint": "tsc",
     "preview": "vite preview"
   },
@@ -51,6 +52,7 @@
     "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "rollup-plugin-visualizer": "^7.0.1",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
     "vite-plugin-react-click-to-component": "3.1.1"
