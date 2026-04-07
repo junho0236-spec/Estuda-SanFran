@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Task, Subject, Board, BoardColumn, SubTask, StudySession, UserProfile, TaskPriority, TaskCategory, Notification, Friendship, SubjectFile } from '../types';
 import { 
@@ -40,6 +40,7 @@ import { SUBJECT_FILES_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { suggestSubtasks } from '../services/geminiService';
 
 const STORY_POINTS = [1, 2, 3, 5, 8];
+const DEFAULT_TASK_CATEGORIES: TaskCategory[] = ['estudo', 'peticao', 'audiencia', 'admin', 'geral'];
 
 const TASK_TEMPLATES = [
   {
@@ -113,6 +114,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   const [mentionSuggestions, setMentionSuggestions] = useState<Friendship[]>([]);
   const [isBulkSelectMode, setIsBulkSelectMode] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [newCategoryInput, setNewCategoryInput] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
   /** Prazo vindo da Agenda (`/tasks?due=YYYY-MM-DD`) para o próximo Quick Entry. Deep link: `task` ou `taskId` com UUID. */
   const [pendingCalendarDue, setPendingCalendarDue] = useState<string | null>(null);
@@ -1434,6 +1436,20 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     return true;
   });
 
+  const availableTaskCategories = useMemo(() => {
+    const fromTasks = tasks
+      .map((task) => task.category)
+      .filter((category): category is string => typeof category === 'string' && category.trim().length > 0);
+    const unique = Array.from(new Set([...DEFAULT_TASK_CATEGORIES, ...fromTasks]));
+    return unique;
+  }, [tasks]);
+
+  const formatCategoryLabel = (category: string) => {
+    const trimmed = category.trim();
+    if (!trimmed) return '';
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  };
+
   return (
     <DndContext 
       sensors={sensors}
@@ -1879,15 +1895,43 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                               <Layout size={14} /> Categoria
                             </div>
                             <div className="flex flex-wrap gap-2">
-                              {(['estudo', 'peticao', 'audiencia', 'admin', 'geral'] as const).map(cat => (
+                              {availableTaskCategories.map(cat => (
                                 <button 
                                   key={cat}
-                                  onClick={() => handleUpdateTask({ category: cat })}
+                                  onClick={() => handleUpdateTask({ category: cat as TaskCategory })}
                                   className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border capitalize ${selectedTask.category === cat ? 'bg-amber-500 text-white border-transparent shadow-md' : 'bg-white border-slate-200 text-slate-400 hover:border-amber-500/30'}`}
                                 >
-                                  {cat}
+                                  {formatCategoryLabel(cat)}
                                 </button>
                               ))}
+                            </div>
+                            <div className="flex items-center gap-2 mt-3">
+                              <input
+                                type="text"
+                                value={newCategoryInput}
+                                onChange={(e) => setNewCategoryInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key !== 'Enter') return;
+                                  const normalized = newCategoryInput.trim().toLowerCase();
+                                  if (!normalized) return;
+                                  handleUpdateTask({ category: normalized as TaskCategory });
+                                  setNewCategoryInput('');
+                                }}
+                                placeholder="Nova categoria..."
+                                className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-medium focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const normalized = newCategoryInput.trim().toLowerCase();
+                                  if (!normalized) return;
+                                  handleUpdateTask({ category: normalized as TaskCategory });
+                                  setNewCategoryInput('');
+                                }}
+                                className="px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+                              >
+                                Criar
+                              </button>
                             </div>
                           </div>
 
