@@ -51,6 +51,13 @@ CREATE TABLE IF NOT EXISTS public.tasks_history (
   payload jsonb NOT NULL DEFAULT '{}'::jsonb
 );
 
+ALTER TABLE public.tasks_history ADD COLUMN IF NOT EXISTS task_id uuid;
+ALTER TABLE public.tasks_history ADD COLUMN IF NOT EXISTS title text;
+ALTER TABLE public.tasks_history ADD COLUMN IF NOT EXISTS status text;
+ALTER TABLE public.tasks_history ADD COLUMN IF NOT EXISTS completed_at timestamptz;
+ALTER TABLE public.tasks_history ADD COLUMN IF NOT EXISTS archived_at timestamptz DEFAULT now();
+ALTER TABLE public.tasks_history ADD COLUMN IF NOT EXISTS payload jsonb DEFAULT '{}'::jsonb;
+
 CREATE INDEX IF NOT EXISTS idx_tasks_history_user_archived
   ON public.tasks_history (user_id, archived_at DESC);
 
