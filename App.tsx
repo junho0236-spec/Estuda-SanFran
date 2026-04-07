@@ -1735,7 +1735,7 @@ const App: React.FC = () => {
               <span className="text-[10px] font-black uppercase tracking-widest">Sincronizando...</span>
             </div>
           )}
-          <div className={`${isExtremeFocus ? 'max-w-none h-full flex items-center justify-center' : 'max-w-6xl mx-auto w-full h-full'}`}>
+          <div className={`${isExtremeFocus ? 'max-w-none h-full flex items-center justify-center' : currentView === View.Tasks ? 'max-w-7xl mx-auto w-full h-full' : 'max-w-6xl mx-auto w-full h-full'}`}>
              <Suspense fallback={<PageLoader />}>
 <ErrorBoundary>
 <Routes>

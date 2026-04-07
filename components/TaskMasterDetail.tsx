@@ -1309,7 +1309,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
           }
           setSelectedTaskId(task.id);
         }}
-        className={`p-4 rounded-2xl cursor-pointer transition-all border relative overflow-hidden group ${selectedTaskId === task.id ? 'bg-[#800000] text-white border-transparent shadow-lg scale-[1.02]' : 'bg-white text-slate-700 border-slate-100 hover:border-[#800000]/30 hover:shadow-sm'} ${task.completed ? 'opacity-50' : 'opacity-100'} ${task.priority === 'urgente' ? 'border-l-4 border-l-red-500' : task.priority === 'alta' ? 'border-l-4 border-l-amber-500' : ''}`}
+        className={`p-4 md:p-5 rounded-2xl cursor-pointer transition-all border relative overflow-hidden group ${selectedTaskId === task.id ? 'bg-[#800000] text-white border-transparent shadow-lg scale-[1.02]' : 'bg-white text-slate-700 border-slate-100 hover:border-[#800000]/30 hover:shadow-sm'} ${task.completed ? 'opacity-50' : 'opacity-100'} ${task.priority === 'urgente' ? 'border-l-4 border-l-red-500' : task.priority === 'alta' ? 'border-l-4 border-l-amber-500' : ''}`}
       >
         {(task.priority === 'urgente' || task.priority === 'alta') && !task.completed && (
           <div className={`absolute inset-0 pointer-events-none animate-pulse ${task.priority === 'urgente' ? 'bg-red-500/5' : 'bg-amber-500/5'}`} />
@@ -1327,7 +1327,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <div className={`font-medium text-sm truncate transition-all ${task.completed ? 'line-through' : ''}`}>{task.title}</div>
+              <div className={`font-medium text-base truncate transition-all ${task.completed ? 'line-through' : ''}`}>{task.title}</div>
               {task.priority === 'urgente' && <AlertCircle size={12} className="text-red-500 shrink-0" />}
               {task.waitingOn && <Clock size={12} className="text-amber-500 shrink-0 animate-pulse" />}
             </div>
@@ -1346,17 +1346,17 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
             <div className="flex items-center justify-between mt-1">
               <div className="flex flex-col gap-1">
                 {task.boardId && (
-                  <div className={`text-[9px] font-bold uppercase tracking-tighter ${selectedTaskId === task.id ? 'text-white/60' : 'text-[#800000]/60'}`}>
+                  <div className={`text-[11px] font-bold uppercase tracking-tight ${selectedTaskId === task.id ? 'text-white/60' : 'text-[#800000]/60'}`}>
                     {boards.find((b: any) => b.id === task.boardId)?.name}
                   </div>
                 )}
                 {task.delegatedBy && task.delegatedBy !== userId && (
-                  <div className={`text-[9px] font-bold italic ${selectedTaskId === task.id ? 'text-white/70' : 'text-blue-600'}`}>
+                  <div className={`text-[11px] font-bold italic ${selectedTaskId === task.id ? 'text-white/70' : 'text-blue-600'}`}>
                     De: {task.delegatedByName || 'Amigo'}
                   </div>
                 )}
                 {task.delegatedTo && task.delegatedTo !== userId && (
-                  <div className={`text-[9px] font-bold italic ${selectedTaskId === task.id ? 'text-white/70' : 'text-amber-600'}`}>
+                  <div className={`text-[11px] font-bold italic ${selectedTaskId === task.id ? 'text-white/70' : 'text-amber-600'}`}>
                     Para: {task.delegatedToName || 'Amigo'}
                   </div>
                 )}
@@ -1364,12 +1364,12 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
               
               <div className="flex items-center gap-2">
                 {task.waitingOn && (
-                  <span className={`text-[9px] font-bold italic ${selectedTaskId === task.id ? 'text-white/60' : 'text-amber-600'}`}>
+                  <span className={`text-[11px] font-bold italic ${selectedTaskId === task.id ? 'text-white/60' : 'text-amber-600'}`}>
                     Aguardando: {task.waitingOn}
                   </span>
                 )}
                 {task.subtasks && task.subtasks.length > 0 && (
-                  <span className={`text-[9px] font-bold ${selectedTaskId === task.id ? 'text-white/60' : 'text-slate-400'}`}>
+                  <span className={`text-[11px] font-bold ${selectedTaskId === task.id ? 'text-white/60' : 'text-slate-400'}`}>
                     {task.subtasks.filter((s: any) => s.completed).length}/{task.subtasks.length}
                   </span>
                 )}
@@ -1457,7 +1457,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="h-[calc(100vh-120px)] flex flex-col bg-slate-50 rounded-[32px] overflow-hidden border border-slate-200 shadow-2xl">
+      <div className="h-[calc(100vh-120px)] flex flex-col bg-slate-50 rounded-[32px] overflow-hidden border border-slate-200 shadow-2xl text-[13px]">
         {/* Header Tabs */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white sticky top-0 z-20">
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar max-w-full md:max-w-[calc(100%-350px)]">
@@ -1733,7 +1733,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                   <button
                     key={f.id}
                     onClick={() => setFilter(f.id as any)}
-                    className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition-all border ${filter === f.id ? 'bg-[#800000] text-white border-transparent shadow-sm' : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-[#800000]/30'}`}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border ${filter === f.id ? 'bg-[#800000] text-white border-transparent shadow-sm' : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-[#800000]/30'}`}
                   >
                     <f.icon size={10} />
                     {f.label}
@@ -1749,7 +1749,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                     }
                     setIsBulkSelectMode(true);
                   }}
-                  className={`ml-auto flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition-all border ${isBulkSelectMode ? 'bg-slate-900 text-white border-transparent shadow-sm' : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-[#800000]/30'}`}
+                  className={`ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border ${isBulkSelectMode ? 'bg-slate-900 text-white border-transparent shadow-sm' : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-[#800000]/30'}`}
                 >
                   <CheckSquare size={10} />
                   {isBulkSelectMode ? 'Cancelar seleção' : 'Selecionar'}
