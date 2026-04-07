@@ -678,6 +678,7 @@ export interface UserProfile {
   last_updated?: string;
   lastInteractionDate?: string;
   viewPreferences?: Record<string, 'list' | 'kanban'>;
+  hiddenTaskTabs?: string[];
   productivityStats?: {
     completedToday: number;
     completedYesterday: number;

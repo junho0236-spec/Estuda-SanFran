@@ -115,6 +115,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   const [isBulkSelectMode, setIsBulkSelectMode] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [newCategoryInput, setNewCategoryInput] = useState('');
+  const [hiddenTaskTabs, setHiddenTaskTabs] = useState<string[]>(userProfile?.hiddenTaskTabs || []);
   const [searchParams, setSearchParams] = useSearchParams();
   /** Prazo vindo da Agenda (`/tasks?due=YYYY-MM-DD`) para o próximo Quick Entry. Deep link: `task` ou `taskId` com UUID. */
   const [pendingCalendarDue, setPendingCalendarDue] = useState<string | null>(null);
@@ -270,12 +271,47 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     );
   }, [searchParams, tasks, setSearchParams]);
 
+  useEffect(() => {
+    setHiddenTaskTabs(userProfile?.hiddenTaskTabs || []);
+  }, [userProfile?.hiddenTaskTabs]);
+
+  const persistHiddenTaskTabs = (nextHiddenTabs: string[]) => {
+    setHiddenTaskTabs(nextHiddenTabs);
+    if (!userProfile) return;
+    const updatedProfile = { ...userProfile, hiddenTaskTabs: nextHiddenTabs };
+    setUserProfile(updatedProfile);
+    dataService.saveUserProfile(updatedProfile, userId, isOnline);
+  };
+
   const TABS = [
-    { id: 'Geral', name: 'Geral' },
-    { id: 'Leituras', name: 'Leituras' },
-    { id: 'Entidades', name: 'Entidades' },
-    ...boards.map(b => ({ id: b.id, name: b.name }))
-  ];
+    { id: 'Geral', name: 'Geral', deletable: false },
+    { id: 'Leituras', name: 'Leituras', deletable: true },
+    { id: 'Entidades', name: 'Entidades', deletable: true },
+    ...boards.map(b => ({ id: b.id, name: b.name, deletable: true }))
+  ].filter(tab => !hiddenTaskTabs.includes(tab.id));
+
+  const handleDeleteTab = (tabId: string) => {
+    const board = boards.find((b) => b.id === tabId);
+    if (board) {
+      void handleDeleteBoard(tabId);
+      return;
+    }
+
+    if (tabId === 'Leituras' || tabId === 'Entidades') {
+      setConfirmModal({
+        isOpen: true,
+        title: `Ocultar aba ${tabId}`,
+        message: `Deseja ocultar a aba ${tabId}? Você pode restaurá-la depois.`,
+        onConfirm: () => {
+          const nextHidden = Array.from(new Set([...hiddenTaskTabs, tabId]));
+          persistHiddenTaskTabs(nextHidden);
+          if (activeTab === tabId) setActiveTab('Geral');
+          setConfirmModal(null);
+          toast.success(`Aba ${tabId} ocultada`);
+        }
+      });
+    }
+  };
 
   const handleNLPAddTask = async (text: string) => {
     if (!text.trim()) return;
@@ -1181,7 +1217,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     );
   };
 
-  const DroppableTab = ({ tab, activeTab, onClick, onDelete }: { tab: { id: string, name: string }, activeTab: string, onClick: () => void, onDelete?: (id: string) => void }) => {
+  const DroppableTab = ({ tab, activeTab, onClick, onDelete }: { tab: { id: string, name: string, deletable?: boolean }, activeTab: string, onClick: () => void, onDelete?: (id: string) => void }) => {
     const { isOver, setNodeRef } = useDroppable({
       id: tab.id,
     });
@@ -1200,7 +1236,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
           }`}
         >
           {tab.name}
-          {onDelete && activeTab === tab.id && (
+          {onDelete && tab.deletable && activeTab === tab.id && (
             <span 
               onClick={(e) => {
                 e.stopPropagation();
@@ -1467,9 +1503,22 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                 tab={tab} 
                 activeTab={activeTab} 
                 onClick={() => setActiveTab(tab.id)} 
-                onDelete={tab.id !== 'inbox' ? handleDeleteBoard : undefined}
+                onDelete={handleDeleteTab}
               />
             ))}
+            {hiddenTaskTabs.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  persistHiddenTaskTabs([]);
+                  toast.success("Abas padrão restauradas");
+                }}
+                className="px-3 py-2 rounded-full text-xs font-bold text-slate-500 hover:text-[#800000] hover:bg-slate-50 border border-slate-100 whitespace-nowrap"
+                title="Restaurar abas ocultas"
+              >
+                Restaurar abas
+              </button>
+            )}
             <button 
               onClick={() => setIsAddingBoard(true)}
               className="p-2 rounded-full text-slate-400 hover:text-[#800000] hover:bg-slate-50 transition-all shrink-0"
