@@ -1700,7 +1700,7 @@ const App: React.FC = () => {
           <div className="w-10"></div>
         </header>
 
-        <main className={`flex-1 min-h-0 overflow-y-auto ${isExtremeFocus ? 'p-0' : 'p-4 md:p-10'} relative transition-all duration-700`}>
+        <main className={`flex-1 min-h-0 overflow-y-auto ${isExtremeFocus ? 'p-0' : currentView === View.Tasks ? 'p-2 md:p-4' : 'p-4 md:p-10'} relative transition-all duration-700`}>
           {!isExtremeFocus && (
             <div className="flex justify-end mb-6">
               <HeaderActions 
@@ -1735,7 +1735,7 @@ const App: React.FC = () => {
               <span className="text-[10px] font-black uppercase tracking-widest">Sincronizando...</span>
             </div>
           )}
-          <div className={`${isExtremeFocus ? 'max-w-none h-full flex items-center justify-center' : currentView === View.Tasks ? 'max-w-7xl mx-auto w-full h-full' : 'max-w-6xl mx-auto w-full h-full'}`}>
+          <div className={`${isExtremeFocus ? 'max-w-none h-full flex items-center justify-center' : currentView === View.Tasks ? 'max-w-none w-full h-full' : 'max-w-6xl mx-auto w-full h-full'}`}>
              <Suspense fallback={<PageLoader />}>
 <ErrorBoundary>
 <Routes>
