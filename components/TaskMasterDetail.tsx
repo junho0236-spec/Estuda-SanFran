@@ -111,6 +111,8 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [mentionSuggestions, setMentionSuggestions] = useState<Friendship[]>([]);
+  const [isBulkSelectMode, setIsBulkSelectMode] = useState(false);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
   /** Prazo vindo da Agenda (`/tasks?due=YYYY-MM-DD`) para o próximo Quick Entry. Deep link: `task` ou `taskId` com UUID. */
   const [pendingCalendarDue, setPendingCalendarDue] = useState<string | null>(null);
@@ -958,11 +960,39 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         try {
           await dataService.deleteTask(id, userId, isOnline);
           setTasks(prev => prev.filter(t => t.id !== id));
+          setSelectedTaskIds(prev => prev.filter(taskId => taskId !== id));
           if (selectedTaskId === id) setSelectedTaskId(null);
           toast.success("Tarefa excluída");
         } catch (error) {
           console.error("Failed to delete task:", error);
           toast.error("Erro ao excluir tarefa");
+        }
+        setConfirmModal(null);
+      }
+    });
+  };
+
+  const handleBulkDeleteTasks = async () => {
+    if (selectedTaskIds.length === 0) return;
+
+    const idsToDelete = [...selectedTaskIds];
+    setConfirmModal({
+      isOpen: true,
+      title: "Excluir tarefas selecionadas",
+      message: `Tem certeza que deseja excluir ${idsToDelete.length} tarefa(s) permanentemente?`,
+      onConfirm: async () => {
+        try {
+          await Promise.all(idsToDelete.map(id => dataService.deleteTask(id, userId, isOnline)));
+          setTasks(prev => prev.filter(task => !idsToDelete.includes(task.id)));
+          if (selectedTaskId && idsToDelete.includes(selectedTaskId)) {
+            setSelectedTaskId(null);
+          }
+          setSelectedTaskIds([]);
+          setIsBulkSelectMode(false);
+          toast.success(`${idsToDelete.length} tarefa(s) excluída(s)`);
+        } catch (error) {
+          console.error("Failed to bulk delete tasks:", error);
+          toast.error("Erro ao excluir tarefas selecionadas");
         }
         setConfirmModal(null);
       }
@@ -1238,7 +1268,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     );
   };
 
-  const SortableTaskItem = ({ task, selectedTaskId, setSelectedTaskId, handleUpdateTask, boards }: any) => {
+  const SortableTaskItem = ({ task, selectedTaskId, setSelectedTaskId, handleUpdateTask, boards, isBulkSelectMode, selectedTaskIds, setSelectedTaskIds }: any) => {
     const {
       attributes,
       listeners,
@@ -1258,6 +1288,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     const subtaskProgress = task.subtasks && task.subtasks.length > 0
       ? (task.subtasks.filter((s: any) => s.completed).length / task.subtasks.length) * 100
       : 0;
+    const isSelectedForBulkAction = selectedTaskIds.includes(task.id);
 
     return (
       <div
@@ -1265,7 +1296,17 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         style={style}
         {...attributes}
         {...listeners}
-        onClick={() => setSelectedTaskId(task.id)}
+        onClick={() => {
+          if (isBulkSelectMode) {
+            setSelectedTaskIds((prev: string[]) =>
+              prev.includes(task.id)
+                ? prev.filter((id: string) => id !== task.id)
+                : [...prev, task.id]
+            );
+            return;
+          }
+          setSelectedTaskId(task.id);
+        }}
         className={`p-4 rounded-2xl cursor-pointer transition-all border relative overflow-hidden group ${selectedTaskId === task.id ? 'bg-[#800000] text-white border-transparent shadow-lg scale-[1.02]' : 'bg-white text-slate-700 border-slate-100 hover:border-[#800000]/30 hover:shadow-sm'} ${task.completed ? 'opacity-50' : 'opacity-100'} ${task.priority === 'urgente' ? 'border-l-4 border-l-red-500' : task.priority === 'alta' ? 'border-l-4 border-l-amber-500' : ''}`}
       >
         {(task.priority === 'urgente' || task.priority === 'alta') && !task.completed && (
@@ -1333,6 +1374,23 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
               </div>
             </div>
           </div>
+          {isBulkSelectMode && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedTaskIds((prev: string[]) =>
+                  prev.includes(task.id)
+                    ? prev.filter((id: string) => id !== task.id)
+                    : [...prev, task.id]
+                );
+              }}
+              className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${isSelectedForBulkAction ? 'bg-[#800000] border-[#800000] text-white' : 'border-slate-300 bg-white'}`}
+              title={isSelectedForBulkAction ? "Desmarcar" : "Selecionar"}
+            >
+              {isSelectedForBulkAction && <CheckCircle2 size={12} />}
+            </button>
+          )}
         </div>
 
         {/* Smart Progress Bar */}
@@ -1665,7 +1723,40 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                     {f.label}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isBulkSelectMode) {
+                      setIsBulkSelectMode(false);
+                      setSelectedTaskIds([]);
+                      return;
+                    }
+                    setIsBulkSelectMode(true);
+                  }}
+                  className={`ml-auto flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition-all border ${isBulkSelectMode ? 'bg-slate-900 text-white border-transparent shadow-sm' : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-[#800000]/30'}`}
+                >
+                  <CheckSquare size={10} />
+                  {isBulkSelectMode ? 'Cancelar seleção' : 'Selecionar'}
+                </button>
               </div>
+
+              {isBulkSelectMode && (
+                <div className="px-2 py-2 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    {selectedTaskIds.length} selecionada(s)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleBulkDeleteTasks}
+                    disabled={selectedTaskIds.length === 0}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${selectedTaskIds.length === 0 ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-red-500 text-white hover:bg-red-600'}`}
+                    title="Excluir selecionadas"
+                  >
+                    <Trash2 size={12} />
+                    Excluir
+                  </button>
+                </div>
+              )}
 
               <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">
                 <SortableContext 
@@ -1680,6 +1771,9 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                       setSelectedTaskId={setSelectedTaskId}
                       handleUpdateTask={handleUpdateTask}
                       boards={boards}
+                      isBulkSelectMode={isBulkSelectMode}
+                      selectedTaskIds={selectedTaskIds}
+                      setSelectedTaskIds={setSelectedTaskIds}
                     />
                   ))}
                 </SortableContext>
