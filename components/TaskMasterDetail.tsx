@@ -2396,6 +2396,9 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                           whileHover={{ scale: 1.02 }}
                           onClick={() => {
                             setSelectedTaskId(task.id);
+                            // O painel completo de edição existe no layout de lista.
+                            // Ao clicar no card no Kanban, abrimos esse layout automaticamente.
+                            handleToggleViewMode('list');
                           }}
                           className={`p-4 bg-white rounded-2xl shadow-sm border cursor-pointer hover:shadow-md hover:border-[#800000]/20 transition-all group relative overflow-hidden ${task.priority === 'urgente' ? 'border-l-4 border-l-red-500' : task.priority === 'alta' ? 'border-l-4 border-l-amber-500' : 'border-slate-100'}`}
                         >
