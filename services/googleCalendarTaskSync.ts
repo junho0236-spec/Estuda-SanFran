@@ -7,6 +7,23 @@ import {
   formatCloudTaskRow,
 } from '../utils/supabaseCloudRowFormatters';
 
+const SUBJECT_CLOUD_COLUMNS_FALLBACK =
+  'id, user_id, name, color, semester_start_date, semester_end_date, absences, max_absences, semester_year, workload, p1_date, p2_date, content';
+
+async function fetchSubjectsCloudRows(userId: string) {
+  const primary = await supabase
+    .from('subjects')
+    .select(SUBJECT_CLOUD_COLUMNS)
+    .eq('user_id', userId);
+  if (!primary.error) return primary;
+
+  const fallback = await supabase
+    .from('subjects')
+    .select(SUBJECT_CLOUD_COLUMNS_FALLBACK)
+    .eq('user_id', userId);
+  return fallback;
+}
+
 function mapCloudSubjectRow(s: Record<string, unknown>): Subject {
   const colorRaw = s.color;
   const color =
@@ -66,7 +83,7 @@ export async function syncDueTasksToGoogleAndSupabaseFromCloud(
       .eq('user_id', userId)
       .is('archived_at', null)
       .order('created_at', { ascending: false }),
-    supabase.from('subjects').select(SUBJECT_CLOUD_COLUMNS).eq('user_id', userId),
+    fetchSubjectsCloudRows(userId),
   ]);
   const tasks = (taskRows ?? []).map((t) => formatCloudTaskRow(t as Record<string, unknown>));
   const subjects = (subRows ?? []).map((s) => mapCloudSubjectRow(s as Record<string, unknown>));

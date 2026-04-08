@@ -36,6 +36,28 @@ const SYNC_TABLES_REQUIRING_FULL_LOAD = new Set(['notes', 'subject_files', 'lega
 
 /** Limite para `scope: study_sessions` (rotas). `full` mantém histórico completo. */
 const STUDY_SESSIONS_ROUTE_LIMIT = 1500;
+const SUBJECT_CLOUD_COLUMNS_FALLBACK =
+  'id, user_id, name, color, semester_start_date, semester_end_date, absences, max_absences, semester_year, workload, p1_date, p2_date, content';
+
+async function fetchSubjectsCloudRows(userId: string) {
+  const primary = await supabase
+    .from('subjects')
+    .select(SUBJECT_CLOUD_COLUMNS)
+    .eq('user_id', userId);
+  if (!primary.error) return primary;
+
+  const fallback = await supabase
+    .from('subjects')
+    .select(SUBJECT_CLOUD_COLUMNS_FALLBACK)
+    .eq('user_id', userId);
+  if (!fallback.error) return fallback;
+
+  console.warn('[subjects] Failed to fetch with primary and fallback columns', {
+    primaryError: primary.error,
+    fallbackError: fallback.error,
+  });
+  return fallback;
+}
 
 function mapCloudSubjectRows(subsRows: Record<string, unknown>[] | null | undefined): Subject[] {
   return (subsRows ?? []).map((row) => {
@@ -898,10 +920,7 @@ const App: React.FC = () => {
       }
 
       if (scope === 'subjects') {
-        const { data: subsRows, error: subjectsFetchError } = await supabase
-          .from('subjects')
-          .select(SUBJECT_CLOUD_COLUMNS)
-          .eq('user_id', userId);
+        const { data: subsRows, error: subjectsFetchError } = await fetchSubjectsCloudRows(userId);
         if (!subjectsFetchError && subsRows) {
           const subs = mapCloudSubjectRows(subsRows as unknown as Record<string, unknown>[]);
           const syncQueueCount = await db.syncQueue.count();
@@ -990,7 +1009,7 @@ const App: React.FC = () => {
           profile,
           [resFlds, resCards, resTks, resBoards, resSessions, resReadings, resProgress],
         ] = await Promise.all([
-          supabase.from('subjects').select(SUBJECT_CLOUD_COLUMNS).eq('user_id', userId),
+          fetchSubjectsCloudRows(userId),
           dataService.getUserProfile(userId, isOnline),
           Promise.all([
             supabase
