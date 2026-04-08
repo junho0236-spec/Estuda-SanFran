@@ -10,21 +10,32 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     detectSessionInUrl: true,
     storageKey: 'sb-sanfran-auth-token', // Custom storage key to avoid conflicts
-    // Simple in-memory lock implementation to prevent concurrent refreshes
-    // which can lead to "Invalid Refresh Token" errors in multi-component environments
+    // Lock with TTL to avoid stale locks causing 30s waits.
     lock: async (name: string, acquireTimeout: number, fn: () => Promise<any>) => {
       const lockKey = `supabase-lock-${name}`;
+      const lockTtlMs = 5000;
       const start = Date.now();
       
-      while (localStorage.getItem(lockKey)) {
+      while (true) {
+        const current = localStorage.getItem(lockKey);
+        if (!current) break;
+
+        const ts = Number(current);
+        const isStale = Number.isFinite(ts) && Date.now() - ts > lockTtlMs;
+        if (isStale) {
+          localStorage.removeItem(lockKey);
+          break;
+        }
+
         if (Date.now() - start > acquireTimeout) {
           console.warn(`[Supabase] Lock timeout for ${name}`);
+          localStorage.removeItem(lockKey);
           return await fn(); // Fallback to running anyway if timeout
         }
         await new Promise(resolve => setTimeout(resolve, 50));
       }
       
-      localStorage.setItem(lockKey, 'locked');
+      localStorage.setItem(lockKey, String(Date.now()));
       try {
         return await fn();
       } finally {
