@@ -33,6 +33,7 @@ import {
 
 /** Tabelas na fila offline sem scope dedicado em `loadUserData` — usar `scope: full`. */
 const SYNC_TABLES_REQUIRING_FULL_LOAD = new Set(['notes', 'subject_files', 'legal_frontiers']);
+const SYNC_OFFLINE_TIMEOUT_MS = 12000;
 
 /** Limite para `scope: study_sessions` (rotas). `full` mantém histórico completo. */
 const STUDY_SESSIONS_ROUTE_LIMIT = 1500;
@@ -708,13 +709,24 @@ const App: React.FC = () => {
             const pendingTables = [
               ...new Set((await db.syncQueue.orderBy('id').toArray()).map((q) => q.table)),
             ];
-            await dataService.syncOfflineData(session.user.id);
+            const syncResult = await Promise.race([
+              dataService.syncOfflineData(session.user.id).then(() => 'ok' as const),
+              new Promise<'timeout'>((resolve) =>
+                setTimeout(() => resolve('timeout'), SYNC_OFFLINE_TIMEOUT_MS)
+              ),
+            ]);
+            if (syncResult === 'timeout') {
+              console.warn('[sync] timeout; continuing with partial refresh to avoid blocking UI');
+            }
             if (!cancelled) {
               const needsFull = pendingTables.some((t) =>
                 SYNC_TABLES_REQUIRING_FULL_LOAD.has(t)
               );
               if (needsFull) {
-                await loadUserData({ scope: 'full' });
+                const routeScopes = getDataScopesForView(currentView);
+                const fallbackScopes: UserDataSyncScope[] = ['subjects', 'tasks', 'flashcards'];
+                const scopesToLoad = [...new Set((routeScopes.length > 0 ? routeScopes : fallbackScopes))];
+                await Promise.all(scopesToLoad.map((s) => loadUserData({ scope: s })));
               } else {
                 const scopesSet = new Set<UserDataSyncScope>();
                 if (pendingTables.includes('user_profile')) scopesSet.add('bootstrap');
@@ -725,9 +737,7 @@ const App: React.FC = () => {
                 if (pendingTables.includes('subjects')) scopesSet.add('subjects');
                 if (pendingTables.includes('boards')) scopesSet.add('boards');
                 const scopes = [...scopesSet];
-                if (scopes.length === 0) {
-                  await loadUserData({ scope: 'full' });
-                } else {
+                if (scopes.length > 0) {
                   await Promise.all(scopes.map((s) => loadUserData({ scope: s })));
                 }
               }
@@ -744,7 +754,7 @@ const App: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, session?.user?.id, isOnline]);
+  }, [isAuthenticated, session?.user?.id, isOnline, currentView]);
 
   const loadUserData = async (opts?: { scope?: UserDataSyncScope }) => {
     const scope: UserDataSyncScope = opts?.scope ?? 'bootstrap';
