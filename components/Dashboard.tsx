@@ -1,5 +1,5 @@
 // Dashboard Component - Refactored to use CompetenceRadar
-import { Brain, CheckCircle2, Clock, Zap, TrendingUp, Medal, Gavel, Award, Scale, Briefcase, GraduationCap, Quote, Sun, Book, Shield, Zap as ZapIcon, Trophy, BookOpen, Layout, MousePointerClick, Calculator, Target, Calendar } from 'lucide-react';
+import { Brain, CheckCircle2, Clock, Zap, TrendingUp, Medal, Gavel, Award, Scale, Briefcase, GraduationCap, Quote, Sun, Book, Shield, Zap as ZapIcon, Trophy, BookOpen, Layout, MousePointerClick, Calculator, Target, Calendar, Loader2 } from 'lucide-react';
 import React, { useMemo, useState, useEffect } from 'react';
 import { View, Subject, Flashcard, Task, StudySession, Reading } from '../types';
 import { getBrasiliaDate } from '../utils';
@@ -14,9 +14,19 @@ interface DashboardProps {
   studySessions: StudySession[];
   readings: Reading[];
   onNavigate: (view: View) => void;
+  /** Primeira carga por rota: dados ainda a chegar do Supabase. */
+  isRouteDataLoading?: boolean;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, studySessions, readings, onNavigate }) => {
+const Dashboard: React.FC<DashboardProps> = ({
+  subjects,
+  flashcards,
+  tasks,
+  studySessions,
+  readings,
+  onNavigate,
+  isRouteDataLoading = false,
+}) => {
   const [oabDate, setOabDate] = useState<string>('2024-12-01');
   const [showAllSubjects, setShowAllSubjects] = useState(false);
 
@@ -189,7 +199,19 @@ const Dashboard: React.FC<DashboardProps> = ({ subjects, flashcards, tasks, stud
 
   return (
     <div className="space-y-8 md:space-y-12 animate-in fade-in duration-500 pb-20">
-      
+      {isRouteDataLoading && (
+        <div
+          className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/90 px-4 py-3 text-slate-700 dark:border-sanfran-rubi/25 dark:bg-sanfran-rubi/10 dark:text-slate-200"
+          role="status"
+          aria-live="polite"
+        >
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-sanfran-rubi" aria-hidden />
+          <span className="text-[10px] font-black uppercase tracking-widest">
+            A carregar dados do painel…
+          </span>
+        </div>
+      )}
+
       {/* Widget OAB Countdown no Topo */}
       <div 
         onClick={() => onNavigate(View.OabCountdown)}

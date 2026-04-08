@@ -5,7 +5,15 @@
 
 export type RealtimeUserDataScope = 'flashcards' | 'tasks' | 'folders' | 'user_progress';
 
-export type UserDataSyncScope = 'full' | RealtimeUserDataScope;
+/** Escopos de carga parcial (Realtime usa só os quatro primeiros via debounce). */
+export type UserDataSyncScope =
+  | 'full'
+  | 'bootstrap'
+  | RealtimeUserDataScope
+  | 'subjects'
+  | 'boards'
+  | 'readings'
+  | 'study_sessions';
 
 /**
  * After `delayMs` of silence, invokes `run` with every scope that fired during the window.

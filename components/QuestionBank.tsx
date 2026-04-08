@@ -1627,8 +1627,8 @@ Forneça a explicação de forma concisa e didática.`;
         } else {
           throw error;
         }
-      } else if (data) {
-        const normalized = (data as Question[]).map(normalizeQuestionFromApi);
+      } else if (data && Array.isArray(data)) {
+        const normalized = (data as unknown as Question[]).map(normalizeQuestionFromApi);
 
         if (
           mode === 'reset' &&

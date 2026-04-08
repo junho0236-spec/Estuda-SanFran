@@ -16,6 +16,7 @@ import {
   createScopedRealtimeDebounce,
   type UserDataSyncScope,
 } from './utils/realtimeThrottle';
+import { getDataScopesForView } from './utils/routeDataScopes';
 import {
   FLASHCARD_CLOUD_COLUMNS,
   TASK_CLOUD_COLUMNS,
@@ -30,16 +31,36 @@ import {
   USER_PROGRESS_CLOUD_COLUMNS,
 } from './utils/supabaseSelectColumns';
 
-/** Tabelas na fila offline que exigem `loadUserData` completo (sem scope dedicado). */
-const SYNC_TABLES_REQUIRING_FULL_LOAD = new Set([
-  'study_sessions',
-  'notes',
-  'subject_files',
-  'subjects',
-  'boards',
-  'user_profile',
-  'legal_frontiers',
-]);
+/** Tabelas na fila offline sem scope dedicado em `loadUserData` — usar `scope: full`. */
+const SYNC_TABLES_REQUIRING_FULL_LOAD = new Set(['notes', 'subject_files', 'legal_frontiers']);
+
+/** Limite para `scope: study_sessions` (rotas). `full` mantém histórico completo. */
+const STUDY_SESSIONS_ROUTE_LIMIT = 1500;
+
+function mapCloudSubjectRows(subsRows: Record<string, unknown>[] | null | undefined): Subject[] {
+  return (subsRows ?? []).map((row) => {
+    const colorRaw = row.color;
+    const color =
+      typeof colorRaw === 'string' && colorRaw.trim() !== ''
+        ? colorRaw.trim()
+        : '#94a3b8';
+    return {
+      id: String(row.id),
+      name: String(row.name ?? ''),
+      color,
+      semester_start_date: (row.semester_start_date as string) ?? undefined,
+      semester_end_date: (row.semester_end_date as string) ?? undefined,
+      absences: typeof row.absences === 'number' ? row.absences : undefined,
+      max_absences: typeof row.max_absences === 'number' ? row.max_absences : undefined,
+      semester_year: (row.semester_year as string) ?? undefined,
+      workload: typeof row.workload === 'number' ? row.workload : undefined,
+      p1_date: (row.p1_date as string) ?? undefined,
+      p2_date: (row.p2_date as string) ?? undefined,
+      content: (row.content as string) ?? undefined,
+      topics: Array.isArray(row.topics) ? (row.topics as Subject['topics']) : undefined,
+    };
+  });
+}
 
 function sortStudySessionsNewestFirst<T extends { id: string; start_time?: string; created_at?: string }>(
   rows: T[]
@@ -245,7 +266,9 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   /** Ignora refetch Realtime logo após sync em lote (rajada de postgres_changes). */
   const realtimeMutedUntilRef = useRef(0);
-  const [isLoadingFlashcards, setIsLoadingFlashcards] = useState(true);
+  const loadedDataScopesRef = useRef(new Set<UserDataSyncScope>());
+  const [isRouteDataLoading, setIsRouteDataLoading] = useState(false);
+  const [isLoadingFlashcards, setIsLoadingFlashcards] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [session, setSession] = useState<any>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -642,15 +665,15 @@ const App: React.FC = () => {
   }, []);
 
   /**
-   * Um único arranque: load completo uma vez; sync da fila Dexie só se houver itens (evita duplicar load+sync).
-   * Após sync em lote, silencia Realtime brevemente para não disparar outro full refetch.
+   * Arranque: `bootstrap` (perfil + leve); sync da fila Dexie só se houver itens.
+   * Após sync em lote, silencia Realtime brevemente para não disparar rajada de refetch.
    */
   useEffect(() => {
     if (!isAuthenticated || !session?.user) return;
     let cancelled = false;
 
     void (async () => {
-      await loadUserData();
+      await loadUserData({ scope: 'bootstrap' });
       if (cancelled) return;
 
       if (isOnline) {
@@ -669,14 +692,19 @@ const App: React.FC = () => {
                 SYNC_TABLES_REQUIRING_FULL_LOAD.has(t)
               );
               if (needsFull) {
-                await loadUserData();
+                await loadUserData({ scope: 'full' });
               } else {
-                const scopes: UserDataSyncScope[] = [];
-                if (pendingTables.includes('flashcards')) scopes.push('flashcards');
-                if (pendingTables.includes('tasks')) scopes.push('tasks');
-                if (pendingTables.includes('folders')) scopes.push('folders');
+                const scopesSet = new Set<UserDataSyncScope>();
+                if (pendingTables.includes('user_profile')) scopesSet.add('bootstrap');
+                if (pendingTables.includes('flashcards')) scopesSet.add('flashcards');
+                if (pendingTables.includes('tasks')) scopesSet.add('tasks');
+                if (pendingTables.includes('folders')) scopesSet.add('folders');
+                if (pendingTables.includes('study_sessions')) scopesSet.add('study_sessions');
+                if (pendingTables.includes('subjects')) scopesSet.add('subjects');
+                if (pendingTables.includes('boards')) scopesSet.add('boards');
+                const scopes = [...scopesSet];
                 if (scopes.length === 0) {
-                  await loadUserData();
+                  await loadUserData({ scope: 'full' });
                 } else {
                   await Promise.all(scopes.map((s) => loadUserData({ scope: s })));
                 }
@@ -697,31 +725,99 @@ const App: React.FC = () => {
   }, [isAuthenticated, session?.user?.id, isOnline]);
 
   const loadUserData = async (opts?: { scope?: UserDataSyncScope }) => {
-    const scope: UserDataSyncScope = opts?.scope ?? 'full';
+    const scope: UserDataSyncScope = opts?.scope ?? 'bootstrap';
     const showFlashLoading = scope === 'full' || scope === 'flashcards';
+    const userId = session?.user?.id;
+
+    const hydrateOfflineBootstrapOrFull = async () => {
+      if (!userId) return;
+      const [localTasks, localBoards, localSessions, localFolders, localSubs, localCards, profileRow] =
+        await Promise.all([
+          db.tasks.toArray(),
+          db.boards.toArray(),
+          db.study_sessions.toArray(),
+          db.folders.toArray(),
+          db.subjects.toArray(),
+          db.flashcards.toArray(),
+          db.user_profile.get(userId),
+        ]);
+      setTasks(localTasks);
+      setBoards(localBoards);
+      setStudySessions(localSessions);
+      setFolders(localFolders);
+      setSubjects(localSubs);
+      setFlashcards(localCards);
+      setReadings([]);
+      if (profileRow) setUserProfile(profileRow as UserProfile);
+    };
 
     try {
-      if (!session?.user) {
+      if (!userId) {
         return;
       }
-      const userId = session.user.id;
 
       if (showFlashLoading) {
         setIsLoadingFlashcards(true);
       }
 
       if (!isOnline) {
-        if (scope !== 'full') return;
-        const [localTasks, localBoards, localSessions, localFolders] = await Promise.all([
-          db.tasks.toArray(),
-          db.boards.toArray(),
-          db.study_sessions.toArray(),
-          db.folders.toArray()
-        ]);
-        setTasks(localTasks);
-        setBoards(localBoards);
-        setStudySessions(localSessions);
-        setFolders(localFolders);
+        if (scope === 'bootstrap' || scope === 'full') {
+          await hydrateOfflineBootstrapOrFull();
+          return;
+        }
+        if (scope === 'tasks') {
+          setTasks(await db.tasks.toArray());
+          return;
+        }
+        if (scope === 'boards') {
+          setBoards(await db.boards.toArray());
+          return;
+        }
+        if (scope === 'study_sessions') {
+          setStudySessions(await db.study_sessions.toArray());
+          return;
+        }
+        if (scope === 'folders') {
+          setFolders(await db.folders.toArray());
+          return;
+        }
+        if (scope === 'flashcards') {
+          setFlashcards(await db.flashcards.toArray());
+          return;
+        }
+        if (scope === 'subjects') {
+          setSubjects(await db.subjects.toArray());
+          return;
+        }
+        if (scope === 'readings') {
+          setReadings([]);
+          return;
+        }
+        if (scope === 'user_progress') {
+          return;
+        }
+        return;
+      }
+
+      if (scope === 'bootstrap') {
+        const profile = await dataService.getUserProfile(userId, isOnline);
+        if (profile) {
+          const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+          if (profile.lastInteractionDate && profile.lastInteractionDate !== today) {
+            const updatedProfile = {
+              ...profile,
+              productivityStats: {
+                ...profile.productivityStats,
+                completedYesterday: profile.productivityStats?.completedToday || 0,
+                completedToday: 0,
+              },
+            };
+            setUserProfile(updatedProfile);
+            await dataService.saveUserProfile(updatedProfile, userId, isOnline);
+          } else {
+            setUserProfile(profile);
+          }
+        }
         return;
       }
 
@@ -801,7 +897,92 @@ const App: React.FC = () => {
         return;
       }
 
-      if (isOnline) {
+      if (scope === 'subjects') {
+        const { data: subsRows, error: subjectsFetchError } = await supabase
+          .from('subjects')
+          .select(SUBJECT_CLOUD_COLUMNS)
+          .eq('user_id', userId);
+        if (!subjectsFetchError && subsRows) {
+          const subs = mapCloudSubjectRows(subsRows as unknown as Record<string, unknown>[]);
+          const syncQueueCount = await db.syncQueue.count();
+          if (syncQueueCount === 0) {
+            const localSubs = await db.subjects.toArray();
+            const remoteIds = new Set(subs.map((s) => s.id));
+            const idsToDelete = localSubs.filter((s) => !remoteIds.has(s.id)).map((s) => s.id);
+            if (idsToDelete.length > 0) await bulkDeleteIdsInChunks(db.subjects, idsToDelete);
+            await bulkPutInChunks(db.subjects, subs);
+          }
+          setSubjects(subs);
+        }
+        return;
+      }
+
+      if (scope === 'boards') {
+        const { data } = await supabase
+          .from('boards')
+          .select('id, name, columns, user_id, created_at')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
+        if (data) {
+          const formattedBoards = data.map((b) => ({
+            id: b.id,
+            name: b.name,
+            columns: b.columns,
+            userId: b.user_id,
+            createdAt: b.created_at,
+          }));
+          const syncQueueCount = await db.syncQueue.count();
+          if (syncQueueCount === 0) {
+            await bulkPutInChunks(db.boards, formattedBoards);
+          }
+          setBoards(formattedBoards);
+        }
+        return;
+      }
+
+      if (scope === 'readings') {
+        const { data } = await supabase
+          .from('readings')
+          .select('id, title, author')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
+        if (data) {
+          setReadings(
+            data.map((r) => ({
+              id: r.id,
+              user_id: userId,
+              title: r.title ?? '',
+              author: r.author ?? '',
+              total_pages: 0,
+              current_page: 0,
+              status: 'lendo' as Reading['status'],
+            }))
+          );
+        }
+        return;
+      }
+
+      if (scope === 'study_sessions') {
+        const { data } = await supabase
+          .from('study_sessions')
+          .select(STUDY_SESSION_CLOUD_COLUMNS)
+          .eq('user_id', userId)
+          .order('start_time', { ascending: false })
+          .limit(STUDY_SESSIONS_ROUTE_LIMIT);
+        if (data) {
+          const sessionsSorted = sortStudySessionsNewestFirst(
+            data as { id: string; start_time?: string; created_at?: string }[]
+          ) as StudySession[];
+          const syncQueueCount = await db.syncQueue.count();
+          if (syncQueueCount === 0) {
+            await bulkPutInChunks(db.study_sessions, sessionsSorted);
+          }
+          setStudySessions(sessionsSorted);
+        }
+        return;
+      }
+
+      if (scope === 'full' && isOnline) {
         const syncQueueCount = await db.syncQueue.count();
 
         const [
@@ -844,30 +1025,7 @@ const App: React.FC = () => {
 
         const { data: subsRows, error: subjectsFetchError } = subsRes;
 
-        // Subjects: incluir `color` e metadados — `select('id, name')` fazia todos os círculos caírem no cinza (#94a3b8).
-        const subs: Subject[] = (subsRows ?? []).map((s) => {
-          const row = s as Record<string, unknown>;
-          const colorRaw = row.color;
-          const color =
-            typeof colorRaw === 'string' && colorRaw.trim() !== ''
-              ? colorRaw.trim()
-              : '#94a3b8';
-          return {
-            id: String(row.id),
-            name: String(row.name ?? ''),
-            color,
-            semester_start_date: (row.semester_start_date as string) ?? undefined,
-            semester_end_date: (row.semester_end_date as string) ?? undefined,
-            absences: typeof row.absences === 'number' ? row.absences : undefined,
-            max_absences: typeof row.max_absences === 'number' ? row.max_absences : undefined,
-            semester_year: (row.semester_year as string) ?? undefined,
-            workload: typeof row.workload === 'number' ? row.workload : undefined,
-            p1_date: (row.p1_date as string) ?? undefined,
-            p2_date: (row.p2_date as string) ?? undefined,
-            content: (row.content as string) ?? undefined,
-            topics: Array.isArray(row.topics) ? (row.topics as Subject['topics']) : undefined,
-          };
-        });
+        const subs = mapCloudSubjectRows((subsRows ?? []) as Record<string, unknown>[]);
 
         if (profile) {
           const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
@@ -981,18 +1139,9 @@ const App: React.FC = () => {
       }
     } catch (err) {
       console.error("Erro no carregamento dos dados:", err);
-      if (scope === 'full') {
+      if (scope === 'full' || scope === 'bootstrap') {
         try {
-          const [localTasks, localBoards, localSessions, localFolders] = await Promise.all([
-            db.tasks.toArray(),
-            db.boards.toArray(),
-            db.study_sessions.toArray(),
-            db.folders.toArray()
-          ]);
-          setTasks(localTasks);
-          setBoards(localBoards);
-          setStudySessions(localSessions);
-          setFolders(localFolders);
+          await hydrateOfflineBootstrapOrFull();
         } catch (fallbackErr) {
           console.error("Erro ao hidratar dados locais após falha na nuvem:", fallbackErr);
         }
@@ -1006,6 +1155,22 @@ const App: React.FC = () => {
 
   const loadUserDataRef = useRef(loadUserData);
   loadUserDataRef.current = loadUserData;
+
+  useEffect(() => {
+    if (!isAuthenticated || !session?.user?.id) return;
+    const scopes = [...new Set(getDataScopesForView(currentView))];
+    const pending = scopes.filter((s) => !loadedDataScopesRef.current.has(s));
+    if (pending.length === 0) return;
+    setIsRouteDataLoading(true);
+    void (async () => {
+      try {
+        await Promise.all(pending.map((s) => loadUserDataRef.current({ scope: s })));
+        pending.forEach((s) => loadedDataScopesRef.current.add(s));
+      } finally {
+        setIsRouteDataLoading(false);
+      }
+    })();
+  }, [currentView, isAuthenticated, session?.user?.id]);
 
   const refreshCalendarTasks = useCallback(() => {
     void loadUserDataRef.current({ scope: 'tasks' });
@@ -1181,11 +1346,14 @@ const App: React.FC = () => {
     if (isLoadingFlashcards) return;
     if (sessionStorage.getItem('sanfran_gcal_post_redirect_sync') !== '1') return;
     sessionStorage.removeItem('sanfran_gcal_post_redirect_sync');
+    const userId = session.user.id;
 
     void (async () => {
       try {
-        const { syncDueTasksToGoogleAndSupabase } = await import('./services/googleCalendarTaskSync');
-        const { successCount, withDueCount } = await syncDueTasksToGoogleAndSupabase(tasks, subjects);
+        const { syncDueTasksToGoogleAndSupabaseFromCloud } = await import(
+          './services/googleCalendarTaskSync'
+        );
+        const { successCount, withDueCount } = await syncDueTasksToGoogleAndSupabaseFromCloud(userId);
         if (withDueCount === 0) {
           toast.info('Nenhuma tarefa com prazo para sincronizar.');
         } else if (successCount > 0) {
@@ -1194,10 +1362,10 @@ const App: React.FC = () => {
           toast.error('Não foi possível sincronizar as tarefas com o Google Agenda.');
         }
       } finally {
-        await loadUserData();
+        await loadUserDataRef.current({ scope: 'tasks' });
       }
     })();
-  }, [isAuthenticated, session?.user?.id, isLoadingFlashcards, tasks, subjects]);
+  }, [isAuthenticated, session?.user?.id, isLoadingFlashcards]);
 
   useEffect(() => {
     if (isDarkMode) document.documentElement.classList.add('dark');
@@ -1495,6 +1663,7 @@ const App: React.FC = () => {
   };
 
   const handleLogout = async () => {
+    loadedDataScopesRef.current.clear();
     try {
       await supabase.auth.signOut();
       // Limpa dados locais para evitar vazamento entre usuários e garantir sincronização limpa no próximo login
@@ -1747,6 +1916,7 @@ const App: React.FC = () => {
                     studySessions={studySessions} 
                     readings={readings} 
                     onNavigate={setCurrentView}
+                    isRouteDataLoading={isRouteDataLoading}
                   />
                 } />
                 
