@@ -49,12 +49,12 @@ const Login: React.FC<AuthProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-6 bg-[#F8F9FA] dark:bg-sanfran-rubiBlack transition-colors duration-500 overflow-y-auto relative">
+    <div className="flex min-h-[100dvh] w-full flex-1 items-center justify-center p-4 sm:p-6 bg-[#F8F9FA] dark:bg-sanfran-rubiBlack transition-colors duration-500 overflow-y-auto relative">
       <div className="absolute top-[-10%] right-[-5%] w-96 h-96 bg-sanfran-rubi opacity-[0.03] rounded-full blur-3xl animate-pulse"></div>
       <div className="absolute bottom-[-10%] left-[-5%] w-80 h-80 bg-usp-blue opacity-[0.03] rounded-full blur-3xl animate-pulse delay-700"></div>
       
       <div className="w-full max-w-lg animate-in fade-in slide-in-from-bottom-8 duration-1000">
-        <div className="bg-white dark:bg-sanfran-rubiDark/20 backdrop-blur-sm border-[6px] border-slate-200 dark:border-sanfran-rubi/30 p-10 md:p-14 rounded-[3.5rem] shadow-2xl relative overflow-hidden">
+        <div className="bg-white dark:bg-sanfran-rubiDark/20 backdrop-blur-sm border-[6px] border-slate-200 dark:border-sanfran-rubi/30 p-6 sm:p-10 md:p-14 rounded-[2rem] sm:rounded-[3.5rem] shadow-2xl relative overflow-hidden w-full min-w-0">
           
           <button 
             onClick={() => { setIsLoginMode(!isLoginMode); setError(null); }}

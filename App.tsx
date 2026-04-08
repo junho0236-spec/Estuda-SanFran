@@ -1519,7 +1519,7 @@ const App: React.FC = () => {
   if (!isAuthenticated) return <Login onLogin={() => setIsAuthenticated(true)} />;
 
   return (
-    <div className={`flex h-screen overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#F8F9FA]'}`}>
+    <div className={`flex h-[100dvh] min-h-0 w-full flex-1 overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#F8F9FA]'}`}>
       <Toaster position="top-right" richColors />
       
       <Atmosphere isExtremeFocus={isExtremeFocus} isSidebarOpen={isSidebarOpen} isSidebarMinimized={isSidebarMinimized} />
@@ -1564,7 +1564,7 @@ const App: React.FC = () => {
         />
       )}
 
-      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${isExtremeFocus ? '-translate-x-full lg:-translate-x-full lg:w-0' : `lg:relative lg:translate-x-0 ${isSidebarMinimized ? 'lg:w-20' : 'lg:w-72'}`} fixed inset-y-0 left-0 z-40 bg-white dark:bg-[#0d0303] border-r border-slate-200 dark:border-sanfran-rubi/30 transition-all duration-500 flex flex-col shadow-2xl lg:shadow-none overflow-hidden`}>
+      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${isExtremeFocus ? '-translate-x-full lg:-translate-x-full lg:w-0' : `lg:relative lg:translate-x-0 ${isSidebarMinimized ? 'lg:w-20' : 'lg:w-72'}`} fixed inset-y-0 left-0 z-40 max-lg:w-[min(20rem,calc(100vw-1.25rem))] max-lg:max-w-[90vw] shrink-0 bg-white dark:bg-[#0d0303] border-r border-slate-200 dark:border-sanfran-rubi/30 transition-all duration-500 flex flex-col shadow-2xl lg:shadow-none overflow-hidden`}>
         <div className={`p-6 border-b border-slate-100 dark:border-sanfran-rubi/20 flex flex-col ${isSidebarMinimized ? 'items-center px-2' : ''}`}>
           <div className="flex items-center justify-between mb-4 w-full">
             <Link
@@ -1689,20 +1689,20 @@ const App: React.FC = () => {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0 relative">
-        <header className={`${isExtremeFocus ? 'hidden' : 'lg:hidden'} bg-white dark:bg-[#0d0303] border-b border-slate-200 dark:border-sanfran-rubi/30 p-4 flex items-center justify-between sticky top-0 z-20`}>
-          <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-slate-100 dark:bg-sanfran-rubi/10 rounded-xl text-slate-600 dark:text-white">
+        <header className={`${isExtremeFocus ? 'hidden' : 'lg:hidden'} bg-white dark:bg-[#0d0303] border-b border-slate-200 dark:border-sanfran-rubi/30 px-3 py-3 sm:p-4 flex items-center justify-between gap-2 sticky top-0 z-20 min-w-0`}>
+          <button type="button" onClick={() => setIsSidebarOpen(true)} className="p-2 bg-slate-100 dark:bg-sanfran-rubi/10 rounded-xl text-slate-600 dark:text-white shrink-0" aria-label="Abrir menu">
             <Menu className="w-6 h-6" />
           </button>
-          <div className="flex items-center gap-2">
-            <div className="bg-sanfran-rubi p-1.5 rounded-lg text-white"><BookOpen className="w-4 h-4" /></div>
-            <span className="text-sm font-black dark:text-white uppercase tracking-tighter">SanFran Academy</span>
+          <div className="flex items-center gap-2 min-w-0 flex-1 justify-center">
+            <div className="bg-sanfran-rubi p-1.5 rounded-lg text-white shrink-0"><BookOpen className="w-4 h-4" /></div>
+            <span className="text-xs sm:text-sm font-black dark:text-white uppercase tracking-tighter truncate text-center">SanFran Academy</span>
           </div>
-          <div className="w-10"></div>
+          <div className="w-10 shrink-0" aria-hidden />
         </header>
 
-        <main className={`flex-1 min-h-0 overflow-y-auto ${isExtremeFocus ? 'p-0' : 'p-4 md:p-10'} relative transition-all duration-700`}>
+        <main className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden ${isExtremeFocus ? 'p-0' : currentView === View.Tasks ? 'p-2 sm:p-3 md:p-5' : 'p-3 sm:p-5 md:p-8 lg:p-10'} relative transition-all duration-700`}>
           {!isExtremeFocus && (
-            <div className="flex justify-end mb-6">
+            <div className="flex justify-end mb-4 md:mb-6 w-full min-w-0 overflow-x-auto">
               <HeaderActions 
                 notifications={notifications} 
                 userId={session?.user?.id || ''}
@@ -1724,18 +1724,18 @@ const App: React.FC = () => {
           )}
           {/* Offline Indicator */}
           {!isOnline && (
-            <div className="fixed top-4 right-4 z-50 bg-amber-500 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2 animate-bounce">
+            <div className="fixed z-50 flex max-w-[calc(100vw-1.5rem)] items-center gap-2 rounded-full bg-amber-500 px-3 py-2 text-white shadow-lg animate-bounce sm:px-4 top-[max(0.75rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))]">
               <Zap size={16} fill="currentColor" />
               <span className="text-[10px] font-black uppercase tracking-widest">Modo Offline Ativo</span>
             </div>
           )}
           {isSyncing && (
-            <div className="fixed top-4 right-4 z-50 bg-blue-500 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
+            <div className="fixed z-50 flex max-w-[calc(100vw-1.5rem)] items-center gap-2 rounded-full bg-blue-500 px-3 py-2 text-white shadow-lg sm:px-4 top-[max(0.75rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))]">
               <div className="animate-spin w-3 h-3 border-2 border-white/30 border-t-white rounded-full"></div>
               <span className="text-[10px] font-black uppercase tracking-widest">Sincronizando...</span>
             </div>
           )}
-          <div className={`${isExtremeFocus ? 'max-w-none h-full flex items-center justify-center' : 'max-w-6xl mx-auto w-full h-full'}`}>
+          <div className={`${isExtremeFocus ? 'max-w-none h-full min-h-0 flex items-center justify-center' : currentView === View.Tasks ? 'max-w-none w-full min-w-0 h-full min-h-0 flex flex-col' : 'max-w-6xl xl:max-w-7xl 2xl:max-w-[min(96rem,calc(100vw-2rem))] mx-auto w-full min-w-0 h-full min-h-0 flex flex-col'}`}>
              <Suspense fallback={<PageLoader />}>
 <ErrorBoundary>
 <Routes>

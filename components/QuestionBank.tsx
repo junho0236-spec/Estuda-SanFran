@@ -82,6 +82,10 @@ interface QuestionBankProps {
 
 const QUESTION_FETCH_PAGE_SIZE = 200;
 const QUESTION_FACET_BOOTSTRAP_LIMIT = 5000;
+const QUESTION_BANK_LIST_COLUMNS_LEGACY_FALLBACK =
+  'id, user_id, subject, topic, statement, options, correct_answer, explanation, difficulty, exam_board, institution, exam_name, modality, legal_diploma, year, created_at, audio_hint, listen_count, status, is_reinforcement, legislation_tags, jurisprudence_tags, ai_summary';
+const QUESTION_BANK_FACET_COLUMNS_LEGACY_FALLBACK =
+  'topic, subject, exam_board, year, legislation_tags, jurisprudence_tags, institution, exam_name, legal_diploma';
 
 const QuestionBank: React.FC<QuestionBankProps> = ({ 
   userId, 
@@ -93,6 +97,8 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
   const qbDeepLinkApplied = useRef(false);
   const nextQuestionRangeStartRef = useRef(0);
   const facetBootstrapRef = useRef<Question[]>([]);
+  /** Evita que um SELECT vazio sobrescreva a lista logo após insert local (RLS / latência). */
+  const skipEmptyFetchOverwriteRef = useRef(false);
 
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
@@ -401,6 +407,27 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const mockAnswersRef = useRef<Record<string, number>>({});
+
+  const clearAllQuestionFilters = useCallback(() => {
+    setSearchTerm('');
+    setSelectedSubjects([]);
+    setSelectedTopic('');
+    setDifficultyFilter('');
+    setQuestionStatus('all');
+    setSelectedNotebookId('');
+    setSelectedInstitution('');
+    setSelectedExamName('');
+    setSelectedModality('');
+    setSelectedLegalDiploma('');
+    setSelectedExamBoard('');
+    setSelectedYear('');
+    setSelectedLegislation('');
+    setSelectedJurisprudence('');
+    setSelectedCareer('');
+    setSelectedFormationArea('');
+    setSelectedEducationLevel('');
+    setSelectedJobPosition('');
+  }, []);
 
   const startMock = (questionsToUse: Question[], durationMinutes: number) => {
     setMockQuestions(questionsToUse);
@@ -919,7 +946,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
         .on('postgres_changes', {
           event: '*',
           schema: 'public',
-          table: 'question_notebooks',
+          table: 'notebooks',
           filter: `user_id=eq.${userId}`
         }, () => debouncedNotebooks.schedule())
         .subscribe();
@@ -1501,7 +1528,7 @@ Forneça a explicação de forma concisa e didática.`;
 
   const fetchQuestions = async (
     mode: 'reset' | 'append' = 'reset',
-    opts?: { quiet?: boolean }
+    opts?: { quiet?: boolean; preserveOnError?: boolean }
   ) => {
     if (!userId) {
       setLoading(false);
@@ -1515,29 +1542,77 @@ Forneça a explicação de forma concisa e didática.`;
       setLoadingMoreQuestions(true);
     }
     try {
+      const isMissingSchemaColumnError = (err: unknown): boolean => {
+        if (!err || typeof err !== 'object') return false;
+        const e = err as { code?: string; message?: string };
+        const code = typeof e.code === 'string' ? e.code : '';
+        const message = typeof e.message === 'string' ? e.message.toLowerCase() : '';
+        return (
+          code === 'PGRST204' ||
+          code === '42703' ||
+          message.includes('column') ||
+          message.includes('schema cache') ||
+          message.includes('does not exist')
+        );
+      };
+
       if (mode === 'reset') {
         nextQuestionRangeStartRef.current = 0;
       }
       const from = nextQuestionRangeStartRef.current;
       const to = from + QUESTION_FETCH_PAGE_SIZE - 1;
 
-      const listQuery = supabase
-        .from('questions')
-        .select(QUESTION_BANK_LIST_COLUMNS)
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .range(from, to);
+      const runFetchWithColumns = async (
+        listColumns: string,
+        facetColumns: string
+      ) => {
+        const listQuery = supabase
+          .from('questions')
+          .select(listColumns)
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .range(from, to);
 
-      const facetPromise =
-        mode === 'reset'
-          ? supabase
-              .from('questions')
-              .select(QUESTION_BANK_FACET_COLUMNS)
-              .eq('user_id', userId)
-              .limit(QUESTION_FACET_BOOTSTRAP_LIMIT)
-          : Promise.resolve({ data: [] as unknown[] | null, error: null });
+        const facetPromise =
+          mode === 'reset'
+            ? supabase
+                .from('questions')
+                .select(facetColumns)
+                .eq('user_id', userId)
+                .limit(QUESTION_FACET_BOOTSTRAP_LIMIT)
+            : Promise.resolve({ data: [] as unknown[] | null, error: null });
 
-      const [listRes, facetRes] = await Promise.all([listQuery, facetPromise]);
+        return Promise.all([listQuery, facetPromise]);
+      };
+
+      let [listRes, facetRes] = await runFetchWithColumns(
+        QUESTION_BANK_LIST_COLUMNS,
+        QUESTION_BANK_FACET_COLUMNS
+      );
+
+      if (listRes.error && isMissingSchemaColumnError(listRes.error)) {
+        console.warn(
+          '[QuestionBank] Schema desatualizado detectado; usando seleção legada para compatibilidade.'
+        );
+        [listRes, facetRes] = await runFetchWithColumns(
+          QUESTION_BANK_LIST_COLUMNS_LEGACY_FALLBACK,
+          QUESTION_BANK_FACET_COLUMNS_LEGACY_FALLBACK
+        );
+      }
+
+      if (
+        mode === 'reset' &&
+        !listRes.error &&
+        facetRes.error &&
+        isMissingSchemaColumnError(facetRes.error)
+      ) {
+        const f = await supabase
+          .from('questions')
+          .select(QUESTION_BANK_FACET_COLUMNS_LEGACY_FALLBACK)
+          .eq('user_id', userId)
+          .limit(QUESTION_FACET_BOOTSTRAP_LIMIT);
+        facetRes = f;
+      }
 
       const error = listRes.error;
       const data = listRes.data;
@@ -1554,32 +1629,50 @@ Forneça a explicação de forma concisa e didática.`;
         }
       } else if (data) {
         const normalized = (data as Question[]).map(normalizeQuestionFromApi);
-        nextQuestionRangeStartRef.current = from + data.length;
-        setQuestionsHasMore(data.length === QUESTION_FETCH_PAGE_SIZE);
 
-        if (mode === 'reset') {
-          if (facetRes.data && Array.isArray(facetRes.data)) {
-            facetBootstrapRef.current = facetRes.data as Question[];
-          } else {
-            facetBootstrapRef.current = [];
-          }
-          setQuestions(normalized);
-          updateFilters([...facetBootstrapRef.current, ...normalized] as Question[]);
-          setAiCommentary({});
+        if (
+          mode === 'reset' &&
+          normalized.length === 0 &&
+          skipEmptyFetchOverwriteRef.current
+        ) {
+          console.warn(
+            '[QuestionBank] SELECT devolveu 0 linhas após insert local; mantendo lista em memória.'
+          );
+          skipEmptyFetchOverwriteRef.current = false;
         } else {
-          setQuestions((prev) => {
-            const merged = [...prev, ...normalized];
-            updateFilters([...facetBootstrapRef.current, ...merged] as Question[]);
-            return merged;
-          });
+          if (mode === 'reset' && normalized.length > 0) {
+            skipEmptyFetchOverwriteRef.current = false;
+          }
+          nextQuestionRangeStartRef.current = from + data.length;
+          setQuestionsHasMore(data.length === QUESTION_FETCH_PAGE_SIZE);
+
+          if (mode === 'reset') {
+            if (facetRes.data && Array.isArray(facetRes.data)) {
+              facetBootstrapRef.current = facetRes.data as Question[];
+            } else {
+              facetBootstrapRef.current = [];
+            }
+            setQuestions(normalized);
+            updateFilters([...facetBootstrapRef.current, ...normalized] as Question[]);
+            setAiCommentary({});
+          } else {
+            setQuestions((prev) => {
+              const merged = [...prev, ...normalized];
+              updateFilters([...facetBootstrapRef.current, ...merged] as Question[]);
+              return merged;
+            });
+          }
         }
       }
     } catch (error) {
       console.error('Error fetching questions:', error);
-      if (mode === 'reset') {
+      if (mode === 'reset' && !opts?.preserveOnError) {
         setQuestions([]);
         updateFilters([]);
         facetBootstrapRef.current = [];
+      }
+      if (mode === 'reset' && opts?.preserveOnError) {
+        console.warn('[QuestionBank] fetchQuestions falhou após criar questões (lista local mantida):', error);
       }
     } finally {
       if (mode === 'reset' && !quiet) {
@@ -1784,8 +1877,24 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
         video_url: row.video_url || '',
       }));
 
-      const { error: insertError } = await supabase.from('questions').insert(questionsToSave);
+      const { data: insertedReview, error: insertError } = await supabase
+        .from('questions')
+        .insert(questionsToSave)
+        .select();
       if (insertError) throw insertError;
+
+      if (insertedReview && insertedReview.length > 0) {
+        const insertedNorm = (insertedReview as Question[]).map(normalizeQuestionFromApi);
+        skipEmptyFetchOverwriteRef.current = true;
+        setQuestions((prev) => {
+          const ids = new Set(insertedNorm.map((q) => q.id));
+          const next = [...insertedNorm, ...prev.filter((q) => !ids.has(q.id))];
+          updateFilters([...facetBootstrapRef.current, ...next] as Question[]);
+          return next;
+        });
+        clearAllQuestionFilters();
+        setListPage(1);
+      }
 
       showNotification(
         droppedSimilar.length > 0
@@ -1793,7 +1902,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
           : 'Reforço gerado com sucesso!',
         'success'
       );
-      await fetchQuestions('reset'); // Refresh list
+      await fetchQuestions('reset', { preserveOnError: true });
 
     } catch (error) {
       console.error('Error generating smart review:', error);
@@ -2063,7 +2172,18 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
 
         if (error) throw error;
 
-        if (data) {
+        if (data && data.length > 0) {
+          const insertedNorm = (data as Question[]).map(normalizeQuestionFromApi);
+          skipEmptyFetchOverwriteRef.current = true;
+          setQuestions((prev) => {
+            const ids = new Set(insertedNorm.map((q) => q.id));
+            const next = [...insertedNorm, ...prev.filter((q) => !ids.has(q.id))];
+            updateFilters([...facetBootstrapRef.current, ...next] as Question[]);
+            return next;
+          });
+          clearAllQuestionFilters();
+          setIsErrorNotebookMode(false);
+          setListPage(1);
           setShowAIGenerator(false);
           showNotification(
             droppedSimilar.length > 0
@@ -2071,7 +2191,19 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
               : `${data.length} questões geradas com sucesso!`,
             'success'
           );
-          await fetchQuestions('reset', { quiet: true });
+          await fetchQuestions('reset', { quiet: true, preserveOnError: true });
+          setViewMode('list');
+        } else {
+          clearAllQuestionFilters();
+          setIsErrorNotebookMode(false);
+          setListPage(1);
+          setShowAIGenerator(false);
+          skipEmptyFetchOverwriteRef.current = true;
+          showNotification(
+            `${sanitizedInitialQuestions.length} questão(ões) guardada(s). A sincronizar a lista…`,
+            'success'
+          );
+          await fetchQuestions('reset', { quiet: true, preserveOnError: true });
           setViewMode('list');
         }
       } else {
@@ -3106,26 +3238,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
               setQuestionStatus={setQuestionStatus}
               filteredQuestionCount={filteredQuestions.length}
               activeFilterChips={activeFilterChips}
-              onClearFilters={() => {
-                setSearchTerm('');
-                setSelectedSubjects([]);
-                setSelectedTopic('');
-                setDifficultyFilter('');
-                setQuestionStatus('all');
-                setSelectedNotebookId('');
-                setSelectedInstitution('');
-                setSelectedExamName('');
-                setSelectedModality('');
-                setSelectedLegalDiploma('');
-                setSelectedExamBoard('');
-                setSelectedYear('');
-                setSelectedLegislation('');
-                setSelectedJurisprudence('');
-                setSelectedCareer('');
-                setSelectedFormationArea('');
-                setSelectedEducationLevel('');
-                setSelectedJobPosition('');
-              }}
+              onClearFilters={clearAllQuestionFilters}
               onApplyFilters={() => {
                 setCurrentIndex(0);
                 setViewMode('list');

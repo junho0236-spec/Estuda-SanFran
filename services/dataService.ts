@@ -953,7 +953,23 @@ export const dataService = {
     if (isOnline) {
       const { error } = await supabase.from('tasks').delete().eq('id', id).eq('user_id', userId);
       if (error) {
-        await addToSyncQueue({ table: 'tasks', action: 'delete', data: { id } });
+        const code = String((error as { code?: string }).code || '');
+        const msg = String((error as { message?: string }).message || '').toLowerCase();
+        const isLikelyNetworkIssue =
+          code === '' ||
+          msg.includes('failed to fetch') ||
+          msg.includes('network') ||
+          msg.includes('timeout') ||
+          msg.includes('temporar');
+
+        if (isLikelyNetworkIssue) {
+          await addToSyncQueue({ table: 'tasks', action: 'delete', data: { id } });
+        } else {
+          // Reverte localmente quando o erro é estrutural/permissão (ex.: RLS),
+          // para evitar "sumir e voltar" após recarregar.
+          if (existing) await db.tasks.put(existing);
+          throw error;
+        }
       }
     } else {
       await addToSyncQueue({ table: 'tasks', action: 'delete', data: { id } });

@@ -1,0 +1,54 @@
+Inventário de tabelas public.* referenciadas no código (Estuda-SanFran) + scripts SQL locais.
+Útil para alinhar o Supabase em fases. "Script" = ficheiro em supabase/sql/ ou scripts/ quando existir.
+
+--- Já com script dedicado no repositório (prioridade ao aplicar) ---
+- user_persona          → auth_user_persona_signup_fix.sql + user_persona_complete_setup.sql
+- notes                 → notes_complete_setup.sql, notes_add_missing_columns.sql
+- spaced_topics / FSRS  → spaced_topics_fsrs.sql, spaced_topics_linked_*.sql
+- user_progress (metas) → user_progress_question_answer_goals.sql
+- banco de questões (tabelas + RLS) → question_bank_complete_setup.sql
+- questions (índice)    → questions_user_created_at_index.sql
+- question_bank stats   → question_bank_discipline_pick_stats.sql, question_bank_gran_model_reset.sql
+- views segurança       → advisor_fix_security_definer_views.sql, PASSO1_gerar_codigos_das_vistas.sql
+- chat (várias)         → scripts/supabase-chat-*.sql, supabase-group-*.sql, supabase-post_chat_message.sql
+
+--- Core sync / estudo (App.tsx, dataService) ---
+profiles, subjects, folders, flashcards, tasks, tasks_history, boards, study_sessions,
+readings, user_progress, disciplinas, subject_files, friendships, notifications
+
+--- Banco de questões ---
+questions, user_question_stats, user_weak_topics, notebooks, question_comments,
+question_bank_discipline_pick_stats (agregado)
+
+--- Gamificação / escritório ---
+daily_quests, office_state, office_trades, user_wallet, duels
+
+--- Connect (chat) ---
+chat_scheduled_items, chat_calls, chat_room_settings, chat_messages, chat_participants,
+chat_rooms, chat_favorites, chat_polls, chat_poll_votes, chat_stories, chat_reactions,
+chat_attachments (+ bucket storage chat_attachments)
+
+--- Comunidade / SF social ---
+sf_events, sf_event_rsvps, sf_polls, sf_poll_votes, sf_poll_comments, sf_quotes,
+sf_vault_items, sf_vault_upvotes, mural_messages, societies, society_members,
+society_messages, society_deadlines
+
+--- Outros módulos (componentes) ---
+visual_flashcards_progress, typing_scores, trunfo_scores, exchange_rpg_saves,
+syllabus_trackers, syllabus_topics, sumula_scores, study_pacts, user_slang_stash,
+pronunciation_scores, petitum_templates, petition_wiki_posts, petition_wiki_validations,
+user_configs, mock_jury_sessions, mock_jury_votes, mnemonics, mentor_profiles, mentorships,
+lyrical_progress, user_law_progress, user_annotations, user_article_heatmap,
+legal_translations, latin_terms, auctions, auction_bids, idiomas_progress, study_plans,
+prescription_logs, general_lang_progress (se usado), deck_requests (supabaseSelectColumns),
+sf_book_cycles, sf_book_chat, sf_places, sf_place_reviews, juris_cases, juris_votes,
+sf_internships, sf_mobility_posts, patio_classifieds, summaries, error_logs, editais,
+dosimetria_logs, debate_history, deadline_planner_items, code_reading_plans,
+attendance_records, user_trails, investigation_boards, irac_entries, honorarios_logs,
+juris_tinder_cards, class_war (view/agregado — ver código)
+
+--- Como usar este ficheiro ---
+1) Correr user_persona_complete_setup.sql para resolver colunas em falta no perfil.
+2) Para cada área da app que der PGRST204 ou "relation does not exist", procurar script em supabase/sql/
+   ou gerar migração nova a partir das colunas em utils/supabaseSelectColumns.ts e dos .insert/.upsert no código.
+3) Evitar DROP CASCADE em produção; preferir ADD COLUMN IF NOT EXISTS e CREATE TABLE IF NOT EXISTS como nos scripts notes_*.

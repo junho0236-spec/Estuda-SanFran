@@ -100,7 +100,7 @@ const HeaderActions: React.FC<HeaderActionsProps> = ({
   };
 
   return (
-    <div className="relative z-10 flex items-center gap-4 rounded-full border border-slate-200 bg-white/80 p-2.5 shadow-[0_4px_15px_rgba(0,0,0,0.05)] backdrop-blur-xl">
+    <div className="relative z-10 flex max-w-full min-w-0 flex-wrap items-center justify-end gap-2 sm:flex-nowrap sm:gap-3 md:gap-4 rounded-2xl sm:rounded-full border border-slate-200 bg-white/80 p-2 sm:p-2.5 shadow-[0_4px_15px_rgba(0,0,0,0.05)] backdrop-blur-xl">
       {/* Mini Timer Integrado */}
       <AnimatePresence>
         {timerIsActive && (
@@ -164,7 +164,7 @@ const HeaderActions: React.FC<HeaderActionsProps> = ({
 
         {/* Notifications Dropdown */}
         {isNotificationsOpen && (
-          <div className="absolute right-0 z-50 mt-4 w-80 origin-top-right transform rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-2xl transition-all animate-in fade-in zoom-in-95 duration-200">
+          <div className="absolute right-0 z-50 mt-4 w-[min(20rem,calc(100vw-1.5rem))] max-w-[calc(100vw-1.5rem)] origin-top-right transform rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-2xl transition-all animate-in fade-in zoom-in-95 duration-200">
             <div className="px-4 py-3 border-b border-slate-200/50 flex justify-between items-center">
               <h3 className="font-serif font-bold text-slate-900">Notificações</h3>
               {unreadCount > 0 && (
@@ -252,13 +252,13 @@ const HeaderActions: React.FC<HeaderActionsProps> = ({
             />
             <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full"></div>
           </div>
-          <span className="text-sm font-bold text-slate-800 font-serif max-w-[120px] truncate">{userDisplayName}</span>
+          <span className="hidden sm:inline text-sm font-bold text-slate-800 font-serif max-w-[120px] truncate">{userDisplayName}</span>
           <ChevronDown size={16} className={`text-slate-400 transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''}`} />
         </button>
 
         {/* Profile Dropdown */}
         {isDropdownOpen && (
-          <div className="absolute right-0 z-50 mt-4 w-64 origin-top-right transform rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-2xl transition-all animate-in fade-in zoom-in-95 duration-200">
+          <div className="absolute right-0 z-50 mt-4 w-[min(16rem,calc(100vw-1.5rem))] max-w-[calc(100vw-1.5rem)] origin-top-right transform rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-2xl transition-all animate-in fade-in zoom-in-95 duration-200">
             <div className="px-4 py-3 border-b border-slate-200/50 mb-2">
               <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Gabinete</p>
               <p className="text-sm font-serif font-bold text-slate-900 truncate">{userDisplayName}</p>

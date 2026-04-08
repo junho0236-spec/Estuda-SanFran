@@ -172,7 +172,13 @@ export interface Subject {
 }
 
 export type TaskPriority = 'urgente' | 'alta' | 'media' | 'normal' | 'baixa';
-export type TaskCategory = 'peticao' | 'estudo' | 'audiencia' | 'admin' | 'geral';
+export type TaskCategory =
+  | 'peticao'
+  | 'estudo'
+  | 'audiencia'
+  | 'admin'
+  | 'geral'
+  | (string & {});
 
 export interface SubTask {
   id: string;
@@ -672,6 +678,7 @@ export interface UserProfile {
   last_updated?: string;
   lastInteractionDate?: string;
   viewPreferences?: Record<string, 'list' | 'kanban'>;
+  hiddenTaskTabs?: string[];
   productivityStats?: {
     completedToday: number;
     completedYesterday: number;

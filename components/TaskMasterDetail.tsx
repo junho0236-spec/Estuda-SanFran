@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Task, Subject, Board, BoardColumn, SubTask, StudySession, UserProfile, TaskPriority, TaskCategory, Notification, Friendship, SubjectFile } from '../types';
 import { 
@@ -40,6 +40,7 @@ import { SUBJECT_FILES_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { suggestSubtasks } from '../services/geminiService';
 
 const STORY_POINTS = [1, 2, 3, 5, 8];
+const DEFAULT_TASK_CATEGORIES: TaskCategory[] = ['estudo', 'peticao', 'audiencia', 'admin', 'geral'];
 
 const TASK_TEMPLATES = [
   {
@@ -111,6 +112,10 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [mentionSuggestions, setMentionSuggestions] = useState<Friendship[]>([]);
+  const [isBulkSelectMode, setIsBulkSelectMode] = useState(false);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [newCategoryInput, setNewCategoryInput] = useState('');
+  const [hiddenTaskTabs, setHiddenTaskTabs] = useState<string[]>(userProfile?.hiddenTaskTabs || []);
   const [searchParams, setSearchParams] = useSearchParams();
   /** Prazo vindo da Agenda (`/tasks?due=YYYY-MM-DD`) para o próximo Quick Entry. Deep link: `task` ou `taskId` com UUID. */
   const [pendingCalendarDue, setPendingCalendarDue] = useState<string | null>(null);
@@ -266,10 +271,30 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     );
   }, [searchParams, tasks, setSearchParams]);
 
+  useEffect(() => {
+    setHiddenTaskTabs(userProfile?.hiddenTaskTabs || []);
+  }, [userProfile?.hiddenTaskTabs]);
+
+  const persistHiddenTaskTabs = (nextHiddenTabs: string[]) => {
+    setHiddenTaskTabs(nextHiddenTabs);
+    if (!userProfile) return;
+    const updatedProfile = { ...userProfile, hiddenTaskTabs: nextHiddenTabs };
+    setUserProfile(updatedProfile);
+    dataService.saveUserProfile(updatedProfile, userId, isOnline);
+  };
+
   const TABS = [
-    { id: 'Geral', name: 'Geral' },
-    ...boards.map(b => ({ id: b.id, name: b.name }))
-  ];
+    { id: 'Geral', name: 'Geral', deletable: false },
+    ...boards.map(b => ({ id: b.id, name: b.name, deletable: true }))
+  ].filter(tab => !hiddenTaskTabs.includes(tab.id));
+
+  const handleDeleteTab = (tabId: string) => {
+    if (tabId === 'Geral') return;
+    const board = boards.find((b) => b.id === tabId);
+    if (board) {
+      void handleDeleteBoard(tabId);
+    }
+  };
 
   const handleNLPAddTask = async (text: string) => {
     if (!text.trim()) return;
@@ -952,11 +977,39 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         try {
           await dataService.deleteTask(id, userId, isOnline);
           setTasks(prev => prev.filter(t => t.id !== id));
+          setSelectedTaskIds(prev => prev.filter(taskId => taskId !== id));
           if (selectedTaskId === id) setSelectedTaskId(null);
           toast.success("Tarefa excluída");
         } catch (error) {
           console.error("Failed to delete task:", error);
           toast.error("Erro ao excluir tarefa");
+        }
+        setConfirmModal(null);
+      }
+    });
+  };
+
+  const handleBulkDeleteTasks = async () => {
+    if (selectedTaskIds.length === 0) return;
+
+    const idsToDelete = [...selectedTaskIds];
+    setConfirmModal({
+      isOpen: true,
+      title: "Excluir tarefas selecionadas",
+      message: `Tem certeza que deseja excluir ${idsToDelete.length} tarefa(s) permanentemente?`,
+      onConfirm: async () => {
+        try {
+          await Promise.all(idsToDelete.map(id => dataService.deleteTask(id, userId, isOnline)));
+          setTasks(prev => prev.filter(task => !idsToDelete.includes(task.id)));
+          if (selectedTaskId && idsToDelete.includes(selectedTaskId)) {
+            setSelectedTaskId(null);
+          }
+          setSelectedTaskIds([]);
+          setIsBulkSelectMode(false);
+          toast.success(`${idsToDelete.length} tarefa(s) excluída(s)`);
+        } catch (error) {
+          console.error("Failed to bulk delete tasks:", error);
+          toast.error("Erro ao excluir tarefas selecionadas");
         }
         setConfirmModal(null);
       }
@@ -1031,7 +1084,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         setTasks(updatedTasks);
         
         if (activeTab === boardId) {
-          setActiveTab('inbox');
+          setActiveTab('Geral');
         }
         setConfirmModal(null);
         toast.success("Quadro excluído com sucesso");
@@ -1114,7 +1167,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     return (
       <div 
         ref={setNodeRef}
-        className={`w-80 shrink-0 flex flex-col gap-4 rounded-3xl transition-colors ${isOver ? 'bg-[#800000]/5 ring-2 ring-[#800000]/20 ring-inset' : ''}`}
+        className={`flex w-[min(20rem,calc(100vw-2rem))] shrink-0 flex-col gap-4 rounded-3xl transition-colors sm:w-80 ${isOver ? 'bg-[#800000]/5 ring-2 ring-[#800000]/20 ring-inset' : ''}`}
       >
         {children}
       </div>
@@ -1143,7 +1196,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     );
   };
 
-  const DroppableTab = ({ tab, activeTab, onClick, onDelete }: { tab: { id: string, name: string }, activeTab: string, onClick: () => void, onDelete?: (id: string) => void }) => {
+  const DroppableTab = ({ tab, activeTab, onClick, onDelete }: { tab: { id: string, name: string, deletable?: boolean }, activeTab: string, onClick: () => void, onDelete?: (id: string) => void }) => {
     const { isOver, setNodeRef } = useDroppable({
       id: tab.id,
     });
@@ -1162,7 +1215,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
           }`}
         >
           {tab.name}
-          {onDelete && activeTab === tab.id && (
+          {onDelete && tab.deletable && activeTab === tab.id && (
             <span 
               onClick={(e) => {
                 e.stopPropagation();
@@ -1232,7 +1285,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     );
   };
 
-  const SortableTaskItem = ({ task, selectedTaskId, setSelectedTaskId, handleUpdateTask, boards }: any) => {
+  const SortableTaskItem = ({ task, selectedTaskId, setSelectedTaskId, handleUpdateTask, boards, isBulkSelectMode, selectedTaskIds, setSelectedTaskIds }: any) => {
     const {
       attributes,
       listeners,
@@ -1252,6 +1305,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     const subtaskProgress = task.subtasks && task.subtasks.length > 0
       ? (task.subtasks.filter((s: any) => s.completed).length / task.subtasks.length) * 100
       : 0;
+    const isSelectedForBulkAction = selectedTaskIds.includes(task.id);
 
     return (
       <div
@@ -1259,8 +1313,18 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         style={style}
         {...attributes}
         {...listeners}
-        onClick={() => setSelectedTaskId(task.id)}
-        className={`p-4 rounded-2xl cursor-pointer transition-all border relative overflow-hidden group ${selectedTaskId === task.id ? 'bg-[#800000] text-white border-transparent shadow-lg scale-[1.02]' : 'bg-white text-slate-700 border-slate-100 hover:border-[#800000]/30 hover:shadow-sm'} ${task.completed ? 'opacity-50' : 'opacity-100'} ${task.priority === 'urgente' ? 'border-l-4 border-l-red-500' : task.priority === 'alta' ? 'border-l-4 border-l-amber-500' : ''}`}
+        onClick={() => {
+          if (isBulkSelectMode) {
+            setSelectedTaskIds((prev: string[]) =>
+              prev.includes(task.id)
+                ? prev.filter((id: string) => id !== task.id)
+                : [...prev, task.id]
+            );
+            return;
+          }
+          setSelectedTaskId(task.id);
+        }}
+        className={`p-4 md:p-5 rounded-2xl cursor-pointer transition-all border relative overflow-hidden group ${selectedTaskId === task.id ? 'bg-[#800000] text-white border-transparent shadow-lg scale-[1.02]' : 'bg-white text-slate-700 border-slate-100 hover:border-[#800000]/30 hover:shadow-sm'} ${task.completed ? 'opacity-50' : 'opacity-100'} ${task.priority === 'urgente' ? 'border-l-4 border-l-red-500' : task.priority === 'alta' ? 'border-l-4 border-l-amber-500' : ''}`}
       >
         {(task.priority === 'urgente' || task.priority === 'alta') && !task.completed && (
           <div className={`absolute inset-0 pointer-events-none animate-pulse ${task.priority === 'urgente' ? 'bg-red-500/5' : 'bg-amber-500/5'}`} />
@@ -1278,7 +1342,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <div className={`font-medium text-sm truncate transition-all ${task.completed ? 'line-through' : ''}`}>{task.title}</div>
+              <div className={`font-medium text-base truncate transition-all ${task.completed ? 'line-through' : ''}`}>{task.title}</div>
               {task.priority === 'urgente' && <AlertCircle size={12} className="text-red-500 shrink-0" />}
               {task.waitingOn && <Clock size={12} className="text-amber-500 shrink-0 animate-pulse" />}
             </div>
@@ -1297,17 +1361,17 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
             <div className="flex items-center justify-between mt-1">
               <div className="flex flex-col gap-1">
                 {task.boardId && (
-                  <div className={`text-[9px] font-bold uppercase tracking-tighter ${selectedTaskId === task.id ? 'text-white/60' : 'text-[#800000]/60'}`}>
+                  <div className={`text-[11px] font-bold uppercase tracking-tight ${selectedTaskId === task.id ? 'text-white/60' : 'text-[#800000]/60'}`}>
                     {boards.find((b: any) => b.id === task.boardId)?.name}
                   </div>
                 )}
                 {task.delegatedBy && task.delegatedBy !== userId && (
-                  <div className={`text-[9px] font-bold italic ${selectedTaskId === task.id ? 'text-white/70' : 'text-blue-600'}`}>
+                  <div className={`text-[11px] font-bold italic ${selectedTaskId === task.id ? 'text-white/70' : 'text-blue-600'}`}>
                     De: {task.delegatedByName || 'Amigo'}
                   </div>
                 )}
                 {task.delegatedTo && task.delegatedTo !== userId && (
-                  <div className={`text-[9px] font-bold italic ${selectedTaskId === task.id ? 'text-white/70' : 'text-amber-600'}`}>
+                  <div className={`text-[11px] font-bold italic ${selectedTaskId === task.id ? 'text-white/70' : 'text-amber-600'}`}>
                     Para: {task.delegatedToName || 'Amigo'}
                   </div>
                 )}
@@ -1315,18 +1379,35 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
               
               <div className="flex items-center gap-2">
                 {task.waitingOn && (
-                  <span className={`text-[9px] font-bold italic ${selectedTaskId === task.id ? 'text-white/60' : 'text-amber-600'}`}>
+                  <span className={`text-[11px] font-bold italic ${selectedTaskId === task.id ? 'text-white/60' : 'text-amber-600'}`}>
                     Aguardando: {task.waitingOn}
                   </span>
                 )}
                 {task.subtasks && task.subtasks.length > 0 && (
-                  <span className={`text-[9px] font-bold ${selectedTaskId === task.id ? 'text-white/60' : 'text-slate-400'}`}>
+                  <span className={`text-[11px] font-bold ${selectedTaskId === task.id ? 'text-white/60' : 'text-slate-400'}`}>
                     {task.subtasks.filter((s: any) => s.completed).length}/{task.subtasks.length}
                   </span>
                 )}
               </div>
             </div>
           </div>
+          {isBulkSelectMode && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedTaskIds((prev: string[]) =>
+                  prev.includes(task.id)
+                    ? prev.filter((id: string) => id !== task.id)
+                    : [...prev, task.id]
+                );
+              }}
+              className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${isSelectedForBulkAction ? 'bg-[#800000] border-[#800000] text-white' : 'border-slate-300 bg-white'}`}
+              title={isSelectedForBulkAction ? "Desmarcar" : "Selecionar"}
+            >
+              {isSelectedForBulkAction && <CheckCircle2 size={12} />}
+            </button>
+          )}
         </div>
 
         {/* Smart Progress Bar */}
@@ -1370,26 +1451,54 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     return true;
   });
 
+  const availableTaskCategories = useMemo(() => {
+    const fromTasks = tasks
+      .map((task) => task.category)
+      .filter((category): category is string => typeof category === 'string' && category.trim().length > 0);
+    const unique = Array.from(new Set([...DEFAULT_TASK_CATEGORIES, ...fromTasks]));
+    return unique;
+  }, [tasks]);
+
+  const formatCategoryLabel = (category: string) => {
+    const trimmed = category.trim();
+    if (!trimmed) return '';
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  };
+
   return (
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col">
     <DndContext 
       sensors={sensors}
       collisionDetection={closestCenter}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="h-[calc(100vh-120px)] flex flex-col bg-slate-50 rounded-[32px] overflow-hidden border border-slate-200 shadow-2xl">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 text-[13px] shadow-2xl sm:rounded-[28px] md:rounded-[32px]">
         {/* Header Tabs */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white sticky top-0 z-20">
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar max-w-full md:max-w-[calc(100%-350px)]">
+        <div className="flex flex-col gap-3 border-b border-slate-100 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3 md:px-6 md:py-4 sticky top-0 z-20 min-w-0">
+          <div className="flex min-w-0 items-center gap-2 overflow-x-auto no-scrollbar max-w-full md:max-w-[calc(100%-350px)]">
             {TABS.map(tab => (
               <DroppableTab 
                 key={tab.id} 
                 tab={tab} 
                 activeTab={activeTab} 
                 onClick={() => setActiveTab(tab.id)} 
-                onDelete={tab.id !== 'inbox' ? handleDeleteBoard : undefined}
+                onDelete={handleDeleteTab}
               />
             ))}
+            {hiddenTaskTabs.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  persistHiddenTaskTabs([]);
+                  toast.success("Abas ocultas restauradas");
+                }}
+                className="px-3 py-2 rounded-full text-xs font-bold text-slate-500 hover:text-[#800000] hover:bg-slate-50 border border-slate-100 whitespace-nowrap"
+                title="Restaurar abas ocultas"
+              >
+                Restaurar abas
+              </button>
+            )}
             <button 
               onClick={() => setIsAddingBoard(true)}
               className="p-2 rounded-full text-slate-400 hover:text-[#800000] hover:bg-slate-50 transition-all shrink-0"
@@ -1398,8 +1507,8 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
             </button>
           </div>
 
-        <div className="flex items-center gap-2">
-          <div className="relative">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
+          <div className="relative shrink-0">
             <button 
               onClick={() => setShowExportMenu(!showExportMenu)}
               className="p-2 rounded-full text-slate-400 hover:text-[#800000] hover:bg-slate-50 transition-all"
@@ -1467,7 +1576,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
-                  className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden z-50"
+                  className="absolute right-0 z-50 mt-2 w-[min(20rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl"
                 >
                   <div className="p-4 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
                     <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Notificações</h4>
@@ -1511,13 +1620,13 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
 
           <button 
             onClick={handleArchiveCompleted}
-            className="flex items-center gap-2 px-4 py-1.5 bg-slate-800 text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-md hover:bg-black transition-all"
+            className="flex shrink-0 items-center gap-2 px-3 py-1.5 sm:px-4 bg-slate-800 text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-md hover:bg-black transition-all"
           >
             <RotateCcw size={12} />
-            <span>Ritual 23:59</span>
+            <span className="hidden sm:inline">Ritual 23:59</span>
           </button>
-          <div className="h-4 w-px bg-slate-200" />
-          <div className="flex items-center gap-2">
+          <div className="hidden h-4 w-px bg-slate-200 sm:block" />
+          <div className="hidden items-center gap-2 md:flex">
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Live Sync</span>
           </div>
@@ -1525,12 +1634,12 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         {(currentViewMode === 'list') ? (
           // --- MASTER-DETAIL VIEW (30/70) ---
-          <div className="flex-1 flex overflow-hidden">
+          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
             {/* Master: List (30%) */}
-            <div className={`transition-all duration-500 border-r border-slate-100 bg-white flex flex-col ${selectedTaskId ? 'w-[30%]' : 'w-full'}`}>
+            <div className={`flex min-h-0 flex-col overflow-hidden border-slate-100 bg-white transition-all duration-500 lg:border-r ${selectedTaskId ? 'hidden w-full lg:flex lg:w-[30%]' : 'flex w-full lg:w-[30%]'}`}>
               <div className="p-4 border-b border-slate-50 flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -1653,13 +1762,46 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                   <button
                     key={f.id}
                     onClick={() => setFilter(f.id as any)}
-                    className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition-all border ${filter === f.id ? 'bg-[#800000] text-white border-transparent shadow-sm' : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-[#800000]/30'}`}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border ${filter === f.id ? 'bg-[#800000] text-white border-transparent shadow-sm' : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-[#800000]/30'}`}
                   >
                     <f.icon size={10} />
                     {f.label}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isBulkSelectMode) {
+                      setIsBulkSelectMode(false);
+                      setSelectedTaskIds([]);
+                      return;
+                    }
+                    setIsBulkSelectMode(true);
+                  }}
+                  className={`ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border ${isBulkSelectMode ? 'bg-slate-900 text-white border-transparent shadow-sm' : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-[#800000]/30'}`}
+                >
+                  <CheckSquare size={10} />
+                  {isBulkSelectMode ? 'Cancelar seleção' : 'Selecionar'}
+                </button>
               </div>
+
+              {isBulkSelectMode && (
+                <div className="px-2 py-2 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    {selectedTaskIds.length} selecionada(s)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleBulkDeleteTasks}
+                    disabled={selectedTaskIds.length === 0}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${selectedTaskIds.length === 0 ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-red-500 text-white hover:bg-red-600'}`}
+                    title="Excluir selecionadas"
+                  >
+                    <Trash2 size={12} />
+                    Excluir
+                  </button>
+                </div>
+              )}
 
               <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">
                 <SortableContext 
@@ -1674,6 +1816,9 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                       setSelectedTaskId={setSelectedTaskId}
                       handleUpdateTask={handleUpdateTask}
                       boards={boards}
+                      isBulkSelectMode={isBulkSelectMode}
+                      selectedTaskIds={selectedTaskIds}
+                      setSelectedTaskIds={setSelectedTaskIds}
                     />
                   ))}
                 </SortableContext>
@@ -1687,16 +1832,16 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                   initial={{ x: 100, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
                   exit={{ x: 100, opacity: 0 }}
-                  className="w-[70%] bg-white flex flex-col shadow-2xl z-10"
+                  className="absolute inset-0 z-30 flex min-h-0 w-full flex-col bg-white shadow-2xl lg:relative lg:inset-auto lg:z-10 lg:w-[70%]"
                 >
                   {selectedTask ? (
                     <>
-                      <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-20">
-                        <div className="flex items-center gap-4">
-                          <button onClick={() => setSelectedTaskId(null)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full"><X size={20} /></button>
-                          <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <h2 className="text-xl font-serif font-bold text-slate-900">{selectedTask.title}</h2>
+                      <div className="flex flex-col gap-3 border-b border-slate-100 bg-white p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6 sticky top-0 z-20 min-w-0">
+                        <div className="flex min-w-0 items-start gap-2 sm:gap-4">
+                          <button type="button" onClick={() => setSelectedTaskId(null)} className="shrink-0 p-2 text-slate-400 hover:bg-slate-100 rounded-full" aria-label="Fechar tarefa"><X size={20} /></button>
+                          <div className="min-w-0 flex-1">
+                            <div className="mb-1 flex flex-wrap items-center gap-2">
+                              <h2 className="break-words text-lg font-serif font-bold text-slate-900 sm:text-xl">{selectedTask.title}</h2>
                               {selectedTask.priority === 'urgente' && (
                                 <span className="px-2 py-0.5 bg-red-500 text-white text-[8px] font-black uppercase tracking-widest rounded-full shadow-[0_0_10px_rgba(239,68,68,0.5)] animate-pulse">
                                   Urgente
@@ -1713,20 +1858,20 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">
                           <button 
                             onClick={handleBreakDownTask} 
                             disabled={isBreakingDown}
-                            className={`p-2 transition-all ${isBreakingDown ? 'animate-pulse text-[#800000]' : 'text-slate-400 hover:text-[#800000]'}`}
+                            className={`shrink-0 p-2 transition-all ${isBreakingDown ? 'animate-pulse text-[#800000]' : 'text-slate-400 hover:text-[#800000]'}`}
                             title="Quebrar em Subtarefas (IA)"
                           >
                             <Zap size={20} />
                           </button>
-                          <button onClick={() => handleExportToICal()} className="p-2 text-slate-400 hover:text-[#800000]" title="Exportar iCal"><Calendar size={20} /></button>
+                          <button onClick={() => handleExportToICal()} className="shrink-0 p-2 text-slate-400 hover:text-[#800000]" title="Exportar iCal"><Calendar size={20} /></button>
                           {isTaskBlocked(selectedTask) && (
-                            <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 text-amber-600 rounded-lg text-[10px] font-bold border border-amber-100">
-                              <AlertCircle size={12} />
-                              Bloqueada por dependências
+                            <div className="flex min-w-0 items-center gap-2 rounded-lg border border-amber-100 bg-amber-50 px-2 py-1.5 text-[10px] font-bold text-amber-600 sm:px-3">
+                              <AlertCircle size={12} className="shrink-0" />
+                              <span className="leading-tight">Bloqueada por dependências</span>
                             </div>
                           )}
                           <button 
@@ -1740,17 +1885,18 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                               if (updatedTask.completed) await awardPrestigePoints(updatedTask);
                             }}
                             disabled={isTaskBlocked(selectedTask)}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${selectedTask.completed ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-emerald-50'} ${isTaskBlocked(selectedTask) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            className={`flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition-all sm:px-4 ${selectedTask.completed ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-emerald-50'} ${isTaskBlocked(selectedTask) ? 'opacity-50 cursor-not-allowed' : ''}`}
                           >
                             <CheckCircle2 size={16} />
-                            {selectedTask.completed ? 'Concluída' : 'Marcar Concluída'}
+                            <span className="hidden sm:inline">{selectedTask.completed ? 'Concluída' : 'Marcar Concluída'}</span>
+                            <span className="sm:hidden">{selectedTask.completed ? 'OK' : 'Feito'}</span>
                           </button>
-                          <button onClick={() => handleDeleteTask(selectedTask.id)} className="p-2 text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={20} /></button>
+                          <button type="button" onClick={() => handleDeleteTask(selectedTask.id)} className="shrink-0 p-2 text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={20} /></button>
                         </div>
                       </div>
-                      <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
+                      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-6 custom-scrollbar sm:p-6 md:space-y-8 md:p-8">
                         {/* Board & Category & Priority Selection */}
-                        <section className="grid grid-cols-3 gap-6">
+                        <section className="grid grid-cols-1 gap-6 md:grid-cols-3">
                           <div>
                             <div className="flex items-center gap-2 mb-3 text-slate-400 font-bold text-[10px] uppercase tracking-widest">
                               <Layout size={14} /> Esteira (Kanban)
@@ -1779,15 +1925,43 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                               <Layout size={14} /> Categoria
                             </div>
                             <div className="flex flex-wrap gap-2">
-                              {(['estudo', 'peticao', 'audiencia', 'admin', 'geral'] as const).map(cat => (
+                              {availableTaskCategories.map(cat => (
                                 <button 
                                   key={cat}
-                                  onClick={() => handleUpdateTask({ category: cat })}
+                                  onClick={() => handleUpdateTask({ category: cat as TaskCategory })}
                                   className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border capitalize ${selectedTask.category === cat ? 'bg-amber-500 text-white border-transparent shadow-md' : 'bg-white border-slate-200 text-slate-400 hover:border-amber-500/30'}`}
                                 >
-                                  {cat}
+                                  {formatCategoryLabel(cat)}
                                 </button>
                               ))}
+                            </div>
+                            <div className="flex items-center gap-2 mt-3">
+                              <input
+                                type="text"
+                                value={newCategoryInput}
+                                onChange={(e) => setNewCategoryInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key !== 'Enter') return;
+                                  const normalized = newCategoryInput.trim().toLowerCase();
+                                  if (!normalized) return;
+                                  handleUpdateTask({ category: normalized as TaskCategory });
+                                  setNewCategoryInput('');
+                                }}
+                                placeholder="Nova categoria..."
+                                className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-medium focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const normalized = newCategoryInput.trim().toLowerCase();
+                                  if (!normalized) return;
+                                  handleUpdateTask({ category: normalized as TaskCategory });
+                                  setNewCategoryInput('');
+                                }}
+                                className="px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+                              >
+                                Criar
+                              </button>
                             </div>
                           </div>
 
@@ -1878,7 +2052,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                             />
                           </section>
 
-                          <section className="grid grid-cols-3 gap-6">
+                          <section className="grid grid-cols-1 gap-6 md:grid-cols-3">
                             <div>
                               <div className="flex items-center gap-2 mb-3 text-slate-400 font-bold text-[10px] uppercase tracking-widest">
                                 <Zap size={14} /> Story Points (Esforço)
@@ -1896,7 +2070,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                               </div>
                             </div>
 
-                            <div className="col-span-2">
+                            <div className="md:col-span-2">
                               <div className="flex items-center gap-2 mb-3 text-slate-400 font-bold text-[10px] uppercase tracking-widest">
                                 <LinkIcon size={14} /> Dependências (Bloqueia esta tarefa)
                               </div>
@@ -2061,16 +2235,16 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                         </section>
 
                         {/* Referências Section */}
-                        <section className="bg-slate-50/50 p-6 rounded-3xl border border-slate-100">
-                          <div className="flex items-center justify-between mb-4">
+                        <section className="rounded-3xl border border-slate-100 bg-slate-50/50 p-4 sm:p-6">
+                          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex items-center gap-2 text-slate-400 font-bold text-[10px] uppercase tracking-widest">
                               <Paperclip size={14} /> Centro de Referências
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex min-w-0 w-full items-center gap-2 sm:w-auto sm:max-w-md">
                               <input 
                                 type="text"
                                 placeholder="Cole um link (Drive, PDF, Site)..."
-                                className="px-4 py-2 bg-white border border-slate-200 rounded-full text-[10px] focus:outline-none focus:ring-2 focus:ring-[#800000]/10 w-48"
+                                className="min-w-0 w-full rounded-full border border-slate-200 bg-white px-4 py-2 text-[10px] focus:outline-none focus:ring-2 focus:ring-[#800000]/10"
                                 onKeyDown={(e) => {
                                   if (e.key === 'Enter') {
                                     handleAddLink((e.target as HTMLInputElement).value);
@@ -2240,7 +2414,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
           </div>
         ) : (
           // --- KANBAN VIEW ---
-          <div className="flex-1 overflow-x-auto p-6 bg-slate-50 flex gap-6">
+          <div className="flex min-h-0 flex-1 gap-4 overflow-x-auto bg-slate-50 p-3 sm:gap-6 sm:p-6">
             {(boards.find(b => b.id === activeTab)?.columns || DEFAULT_KANBAN_COLUMNS).map(column => (
               <DroppableColumn key={column.id} column={column}>
                 <div className="flex items-center justify-between px-2">
@@ -2296,6 +2470,9 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                           whileHover={{ scale: 1.02 }}
                           onClick={() => {
                             setSelectedTaskId(task.id);
+                            // O painel completo de edição existe no layout de lista.
+                            // Ao clicar no card no Kanban, abrimos esse layout automaticamente.
+                            handleToggleViewMode('list');
                           }}
                           className={`p-4 bg-white rounded-2xl shadow-sm border cursor-pointer hover:shadow-md hover:border-[#800000]/20 transition-all group relative overflow-hidden ${task.priority === 'urgente' ? 'border-l-4 border-l-red-500' : task.priority === 'alta' ? 'border-l-4 border-l-amber-500' : 'border-slate-100'}`}
                         >
@@ -2574,6 +2751,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         )}
       </AnimatePresence>
     </DndContext>
+    </div>
   );
 };
 

@@ -1,6 +1,9 @@
 -- =============================================================================
 -- Corrigir "Database error creating new user" (sign-up Supabase)
 -- =============================================================================
+-- Depois disto, rode user_persona_complete_setup.sql para todas as colunas que a
+-- app usa (integralizacao_curriculo, bio, turma, etc.) — evita PGRST204 no cliente.
+-- =============================================================================
 -- Causa habitual: trigger AFTER INSERT em auth.users que insere em public.user_persona
 -- falha (RLS, colunas NOT NULL sem default, ou função sem SECURITY DEFINER).
 --
