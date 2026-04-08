@@ -92,6 +92,16 @@ const QUESTION_BANK_LIST_COLUMNS_LEGACY_FALLBACK =
 const QUESTION_BANK_FACET_COLUMNS_LEGACY_FALLBACK =
   'topic, subject, exam_board, year, legislation_tags, jurisprudence_tags, institution, exam_name, legal_diploma';
 
+/** Alinhado ao select do gerador de IA — guia a profundidade pedida ao modelo. */
+const AI_DIFFICULTY_PROMPT_LABEL: Record<QuestionBankAiConfig['difficulty'], string> = {
+  muito_facil: 'muito fácil (conceitos elementares, memorização direta)',
+  facil: 'fácil',
+  media: 'média',
+  dificil: 'difícil (análise e armadilhas habituais de banca)',
+  muito_dificil:
+    'muito difícil (nível máximo: sutilezas doutrinárias ou jurisprudenciais, distratores sofisticados, casos limite)',
+};
+
 const QuestionBank: React.FC<QuestionBankProps> = ({ 
   userId, 
   folders = [], 
@@ -2004,7 +2014,9 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
           `Gerando lote ${batchIdx + 1} de ${batches.length}${mixHint}... (${Math.min(progressDone, totalQuestions)}/${totalQuestions})`
         );
 
-        const prompt = `Crie ${currentBatchSize} questões de nível ${aiConfig.difficulty}.
+        const prompt = `Crie ${currentBatchSize} questões com a DIFICULDADE PEDIDA pelo utilizador: ${AI_DIFFICULTY_PROMPT_LABEL[aiConfig.difficulty]}.
+
+        O campo JSON "difficulty" de TODAS as questões deste lote DEVE ser EXATAMENTE a string: "${aiConfig.difficulty}" (código do sistema: snake_case, sem acentos). Proibido devolver apenas "facil", "media" ou "dificil" se o pedido for outro nível (ex.: muito_facil ou muito_dificil).
         ${subjectLineForPrompt}
         ${topicSuggestionLine}
 
@@ -2057,7 +2069,10 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
                   },
                   correct_answer: { type: Type.INTEGER, description: correctAnswerSchemaDesc },
                   explanation: { type: Type.STRING, description: explanationSchemaDesc },
-                  difficulty: { type: Type.STRING, description: "A dificuldade: 'facil', 'media' ou 'dificil'" },
+                  difficulty: {
+                    type: Type.STRING,
+                    description: `Obrigatório neste pedido: exatamente "${aiConfig.difficulty}". Códigos válidos no sistema: muito_facil, facil, media, dificil, muito_dificil (sempre estes cinco, em snake_case).`,
+                  },
                   exam_board: { type: Type.STRING, description: "A banca examinadora (Estilo)" },
                   institution: { type: Type.STRING, description: "A instituição (ex: USP, OAB, TJ-SP)" },
                   exam_name: { type: Type.STRING, description: "O nome do exame/concurso" },
@@ -2135,8 +2150,12 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
           return;
         }
 
+        const rowsWithUserDifficulty = validated.rows.map((row) => ({
+          ...row,
+          difficulty: aiConfig.difficulty,
+        }));
         const rowsCanonicalTopics = applyCanonicalTopicsToRows(
-          validated.rows,
+          rowsWithUserDifficulty,
           topicCatalog.canonicalByTopicKey
         );
         const { kept: keptAfterSimilarity, dropped: droppedSimilar } = dedupeSimilarAiStatements(
