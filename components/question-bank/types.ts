@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { Question, QuestionModality } from '../../types';
 import type { QuestionAnswerGoalsPersisted } from './answerGoals';
+import type { QuestionBankStatementTypeChoice } from './mixedStatementBatches';
 
 /** Campos omitidos usam o estado React atual (não o banco). Use arrays/objetos vazios para limpar. */
 export type SyncUserProgressUpdates = {
@@ -46,7 +47,7 @@ export type QuestionBankAiConfig = {
   difficulty: 'muito_facil' | 'facil' | 'media' | 'dificil' | 'muito_dificil';
   examStyle: string;
   legalFocus: string[];
-  statementType: 'Caso Prático (Situação Hipotética)' | 'Enunciado Direto';
+  statementType: QuestionBankStatementTypeChoice;
   baseOnFlashcards: boolean;
   selectedFolderId: string;
   tribunal: 'Jurisprudência STF' | 'Jurisprudência STJ' | 'Ambos';

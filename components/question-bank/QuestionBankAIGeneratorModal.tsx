@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Sparkles, X, Loader2, Timer, Gavel } from 'lucide-react';
 import { QUESTION_MODALITY_LABELS, type Folder, type QuestionModality } from '../../types';
 import type { QuestionBankAiConfig, QuestionBankAiConfigSetter } from './types';
+import { QB_STATEMENT_MIX, splitMixedStatementCounts } from './mixedStatementBatches';
 import { SearchableFilterDropdown, toOptions } from './SearchableFilterDropdown';
 import { DisciplineFilterDropdown } from './DisciplineFilterDropdown';
 
@@ -238,7 +239,24 @@ export const QuestionBankAIGeneratorModal: React.FC<QuestionBankAIGeneratorModal
               >
                 <option value="Caso Prático (Situação Hipotética)">Caso Prático</option>
                 <option value="Enunciado Direto">Enunciado Direto</option>
+                <option value={QB_STATEMENT_MIX}>Mistura (direto + caso prático)</option>
               </select>
+              {aiConfig.statementType === QB_STATEMENT_MIX && (
+                <p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                  Com a quantidade acima:{' '}
+                  {(() => {
+                    const { direto, casoPratico } = splitMixedStatementCounts(aiConfig.count);
+                    return (
+                      <>
+                        <strong className="text-slate-700 dark:text-slate-300">
+                          {direto} enunciado(s) direto · {casoPratico} caso(s) prático
+                        </strong>
+                        . Total par → metade de cada; total ímpar → a questão extra é enunciado direto.
+                      </>
+                    );
+                  })()}
+                </p>
+              )}
             </div>
           </div>
 

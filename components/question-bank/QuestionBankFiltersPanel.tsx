@@ -42,7 +42,7 @@ function PillRow({
 }) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-4">
-      <span className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider shrink-0 pt-2 min-w-[140px]">
+      <span className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider shrink-0 pt-2 min-w-0 sm:min-w-[140px]">
         {label}
       </span>
       <div className="flex flex-wrap gap-2 flex-1">{children}</div>
@@ -228,6 +228,8 @@ export const QuestionBankFiltersPanel: React.FC<QuestionBankFiltersPanelProps> =
 }) => {
   const [saveName, setSaveName] = useState('');
   const [showSavedMenu, setShowSavedMenu] = useState(false);
+  /** Em viewports abaixo de `md`, o painel começa fechado para poupar scroll. */
+  const [mobileFiltersExpanded, setMobileFiltersExpanded] = useState(false);
 
   const modalityOptions = useMemo(
     () => MOD_KEYS.map((key) => ({ value: key, label: QUESTION_MODALITY_LABELS[key] })),
@@ -251,6 +253,31 @@ export const QuestionBankFiltersPanel: React.FC<QuestionBankFiltersPanelProps> =
 
   return (
     <>
+      <div className="mb-3 flex items-center gap-3 md:hidden">
+        <button
+          type="button"
+          onClick={() => setMobileFiltersExpanded((v) => !v)}
+          className="flex min-h-[44px] flex-1 items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-left font-black text-sm text-slate-800 shadow-sm touch-manipulation dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          aria-expanded={mobileFiltersExpanded}
+        >
+          <span className="inline-flex items-center gap-2">
+            <SlidersHorizontal size={18} className="text-blue-600 dark:text-blue-400" aria-hidden />
+            Filtros e opções
+          </span>
+          <ChevronDown
+            size={18}
+            className={`shrink-0 text-slate-400 transition-transform ${mobileFiltersExpanded ? 'rotate-180' : ''}`}
+            aria-hidden
+          />
+        </button>
+        <span className="shrink-0 text-[10px] font-black uppercase tracking-widest text-slate-400">
+          {filteredQuestionCount.toLocaleString('pt-BR')} res.
+        </span>
+      </div>
+
+      <div
+        className={`space-y-3 ${mobileFiltersExpanded ? 'block' : 'hidden'} md:block`}
+      >
       <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/40 shadow-sm overflow-visible">
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60">
           <span
@@ -667,6 +694,7 @@ export const QuestionBankFiltersPanel: React.FC<QuestionBankFiltersPanelProps> =
             <option value="difficulty_desc">Dificuldade ↓</option>
           </select>
         </div>
+      </div>
       </div>
     </>
   );

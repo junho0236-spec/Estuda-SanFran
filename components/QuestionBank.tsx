@@ -63,6 +63,11 @@ import {
   QB_USER_PROGRESS_COLUMNS,
 } from './question-bank/questionBankHelpers';
 import { filterAndSortBankQuestions } from './question-bank/filterBankQuestions';
+import {
+  buildAiStatementBatches,
+  QB_STATEMENT_DIRETO,
+  QB_STATEMENT_MIX,
+} from './question-bank/mixedStatementBatches';
 import { QuestionBankConfidenceModal } from './question-bank/QuestionBankConfidenceModal';
 import { QuestionBankMockHud } from './question-bank/QuestionBankMockHud';
 import { QuestionBankMainHeader } from './question-bank/QuestionBankMainHeader';
@@ -1956,6 +1961,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
       
       const totalQuestions = aiConfig.count;
       const chunkSize = 5;
+      const batches = buildAiStatementBatches(totalQuestions, chunkSize, aiConfig.statementType);
       const allGeneratedQuestions = [];
       const isMultipla = aiConfig.modality === 'multipla_escolha';
       const optionsSchemaDesc = isMultipla
@@ -1986,9 +1992,17 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
           ? `Tópico: preferir 1 único valor repetido em todas as questões quando possível; no máximo ${MAX_DISTINCT_TOPICS_PER_AI_BATCH} distintos no array; rótulos amplos; copiar EXATAMENTE um rótulo das instruções TÓPICOS JÁ USADOS quando encaixar.`
           : `Tópico: preferir 1 único valor repetido em todas as questões; no máximo ${MAX_DISTINCT_TOPICS_PER_AI_BATCH} distintos; nomes amplos (capítulo/disciplina), não micro-assuntos por questão.`;
 
-      for (let i = 0; i < totalQuestions; i += chunkSize) {
-        const currentBatchSize = Math.min(chunkSize, totalQuestions - i);
-        setGeneratingStatus(`Gerando lote ${Math.floor(i / chunkSize) + 1} de ${Math.ceil(totalQuestions / chunkSize)}... (${i + currentBatchSize}/${totalQuestions} concluídas)`);
+      let progressDone = 0;
+      for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
+        const { size: currentBatchSize, statementType: statementForThisBatch } = batches[batchIdx];
+        progressDone += currentBatchSize;
+        const mixHint =
+          aiConfig.statementType === QB_STATEMENT_MIX
+            ? ` (mistura: neste lote só ${statementForThisBatch === QB_STATEMENT_DIRETO ? 'enunciados diretos' : 'casos práticos'})`
+            : '';
+        setGeneratingStatus(
+          `Gerando lote ${batchIdx + 1} de ${batches.length}${mixHint}... (${Math.min(progressDone, totalQuestions)}/${totalQuestions})`
+        );
 
         const prompt = `Crie ${currentBatchSize} questões de nível ${aiConfig.difficulty}.
         ${subjectLineForPrompt}
@@ -2000,7 +2014,8 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
         Nome do Exame/Concurso: ${aiConfig.examName || 'Geral'}.
         Diploma Legal de Referência: ${aiConfig.legalDiploma || 'Geral'}.
         Foco Jurídico: ${aiConfig.legalFocus.join(', ') || 'Geral'}.
-        Tipo de Enunciado: ${aiConfig.statementType}.
+        Tipo de Enunciado: ${statementForThisBatch}.
+        ${aiConfig.statementType === QB_STATEMENT_MIX ? `Regra do pedido (mistura): o aluno pediu ${totalQuestions} questão(ões) no total, repartidas entre enunciado direto e caso prático segundo: total par → metade de cada; total ímpar → a questão extra é sempre enunciado direto. Este lote deve seguir APENAS o tipo indicado acima.` : ''}
         Ano da Questão: OBRIGATORIAMENTE ${new Date().getFullYear()}.
         Carreira / trilho: ${aiConfig.career || 'Geral'}.
         Área de formação: ${aiConfig.formationArea || 'Geral'}.
@@ -2079,14 +2094,14 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
             chunkParsed = JSON.parse(response.text);
           } catch {
             showNotification(
-              `Lote ${Math.floor(i / chunkSize) + 1}: resposta da IA não é JSON válido. Gere menos questões por vez ou tente de novo.`,
+              `Lote ${batchIdx + 1}: resposta da IA não é JSON válido. Gere menos questões por vez ou tente de novo.`,
               'error'
             );
             throw new SyntaxError('Invalid AI JSON chunk');
           }
           if (!Array.isArray(chunkParsed)) {
             showNotification(
-              `Lote ${Math.floor(i / chunkSize) + 1}: a IA devolveu um objeto em vez de uma lista de questões.`,
+              `Lote ${batchIdx + 1}: a IA devolveu um objeto em vez de uma lista de questões.`,
               'error'
             );
             throw new Error('AI response is not an array');
@@ -3036,7 +3051,13 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
   }
 
   return (
-    <div className={`${isMockMode ? 'fixed inset-0 z-[100] bg-slate-50 dark:bg-slate-950 overflow-y-auto' : 'max-w-4xl mx-auto p-4 md:p-8 animate-in fade-in duration-500 pb-24'}`}>
+    <div
+      className={`${
+        isMockMode
+          ? 'fixed inset-0 z-[100] bg-slate-50 dark:bg-slate-950 overflow-y-auto'
+          : 'w-full min-w-0 max-w-4xl mx-auto px-3 py-4 sm:px-4 md:p-8 animate-in fade-in duration-500 pb-24'
+      }`}
+    >
       <QuestionBankConfidenceModal
         open={showConfidenceSelection}
         onClose={() => setShowConfidenceSelection(false)}

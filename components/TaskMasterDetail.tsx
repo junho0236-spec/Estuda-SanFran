@@ -1529,7 +1529,8 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
             )}
             <button 
               onClick={() => setIsAddingBoard(true)}
-              className="p-2 rounded-full text-slate-400 hover:text-[#800000] hover:bg-slate-50 transition-all shrink-0"
+              className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-full text-slate-400 touch-manipulation hover:bg-slate-50 hover:text-[#800000] transition-all"
+              aria-label="Nova lista ou quadro"
             >
               <Plus size={18} />
             </button>
@@ -1539,8 +1540,9 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
           <div className="relative shrink-0">
             <button 
               onClick={() => setShowExportMenu(!showExportMenu)}
-              className="p-2 rounded-full text-slate-400 hover:text-[#800000] hover:bg-slate-50 transition-all"
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-slate-400 touch-manipulation hover:bg-slate-50 hover:text-[#800000] transition-all"
               title="Sincronização Externa"
+              aria-label="Sincronização e exportação de calendário"
             >
               <Calendar size={20} />
             </button>
@@ -1569,18 +1571,20 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
             </AnimatePresence>
           </div>
 
-          <div className="flex items-center bg-slate-100 p-1 rounded-lg">
+          <div className="flex items-center rounded-lg bg-slate-100 p-1 touch-manipulation">
             <button 
               onClick={() => handleToggleViewMode('list')}
-              className={`p-1 rounded-md transition-all ${currentViewMode === 'list' ? 'bg-white text-[#800000] shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-md transition-all ${currentViewMode === 'list' ? 'bg-white text-[#800000] shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
               title="Modo Lista"
+              aria-label="Modo lista"
             >
               <List size={14} />
             </button>
             <button 
               onClick={() => handleToggleViewMode('kanban')}
-              className={`p-1 rounded-md transition-all ${currentViewMode === 'kanban' ? 'bg-white text-[#800000] shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-md transition-all ${currentViewMode === 'kanban' ? 'bg-white text-[#800000] shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
               title="Modo Kanban"
+              aria-label="Modo Kanban"
             >
               <Trello size={14} />
             </button>
@@ -1588,7 +1592,8 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
           <div className="relative">
             <button 
               onClick={() => setShowNotifications(!showNotifications)}
-              className="p-2 rounded-full text-slate-400 hover:text-[#800000] hover:bg-slate-50 transition-all relative"
+              className="relative inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-slate-400 touch-manipulation transition-all hover:bg-slate-50 hover:text-[#800000]"
+              aria-label="Notificações"
             >
               <Bell size={20} />
               {notifications.filter(n => !n.is_read).length > 0 && (
@@ -2468,7 +2473,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
           </div>
         ) : (
           // --- KANBAN VIEW ---
-          <div className="flex min-h-0 flex-1 gap-4 overflow-x-auto bg-slate-50 p-3 sm:gap-6 sm:p-6">
+          <div className="flex min-h-0 flex-1 gap-4 overflow-x-auto overscroll-x-contain touch-pan-x bg-slate-50 p-3 sm:gap-6 sm:p-6 [-webkit-overflow-scrolling:touch]">
             {(boards.find(b => b.id === activeTab)?.columns || DEFAULT_KANBAN_COLUMNS).map(column => (
               <DroppableColumn key={column.id} column={column}>
                 <div className="flex items-center justify-between px-2">

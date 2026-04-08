@@ -1792,7 +1792,13 @@ const App: React.FC = () => {
         />
       )}
 
-      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${isExtremeFocus ? '-translate-x-full lg:-translate-x-full lg:w-0' : `lg:relative lg:translate-x-0 ${isSidebarMinimized ? 'lg:w-20' : 'lg:w-72'}`} fixed inset-y-0 left-0 z-40 max-lg:w-[min(20rem,calc(100vw-1.25rem))] max-lg:max-w-[90vw] shrink-0 bg-white dark:bg-[#0d0303] border-r border-slate-200 dark:border-sanfran-rubi/30 transition-all duration-500 flex flex-col shadow-2xl lg:shadow-none overflow-hidden`}>
+      <aside
+        className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${
+          isExtremeFocus
+            ? '-translate-x-full lg:-translate-x-full lg:w-0 lg:pointer-events-none'
+            : `lg:translate-x-0 ${isSidebarMinimized ? 'lg:w-20' : 'lg:w-72'}`
+        } fixed inset-y-0 left-0 z-40 h-[100dvh] max-h-[100dvh] max-lg:w-[min(20rem,calc(100vw-1.25rem))] max-lg:max-w-[90vw] shrink-0 bg-white dark:bg-[#0d0303] border-r border-slate-200 dark:border-sanfran-rubi/30 transition-all duration-500 flex flex-col shadow-2xl lg:shadow-none overflow-hidden`}
+      >
         <div className={`p-6 border-b border-slate-100 dark:border-sanfran-rubi/20 flex flex-col ${isSidebarMinimized ? 'items-center px-2' : ''}`}>
           <div className="flex items-center justify-between mb-4 w-full">
             <Link
@@ -1848,7 +1854,7 @@ const App: React.FC = () => {
           </button>
         </div>
         
-        <nav className={`p-4 space-y-1 flex-1 overflow-y-auto custom-scrollbar ${isSidebarMinimized ? 'px-2' : ''}`}>
+        <nav className={`p-4 space-y-1 flex-1 min-h-0 overflow-y-auto custom-scrollbar ${isSidebarMinimized ? 'px-2' : ''}`}>
           {navItems.map((item) => {
             const isActive = currentView === item.id || 
                              (item.id === View.SanFranEssential && isEssentialChild) ||
@@ -1916,9 +1922,18 @@ const App: React.FC = () => {
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0 relative">
+      <div
+        className={`flex min-h-0 min-w-0 flex-1 flex-col relative transition-[padding] duration-500 ease-out ${
+          isExtremeFocus ? '' : isSidebarMinimized ? 'lg:pl-20' : 'lg:pl-72'
+        }`}
+      >
         <header className={`${isExtremeFocus ? 'hidden' : 'lg:hidden'} bg-white dark:bg-[#0d0303] border-b border-slate-200 dark:border-sanfran-rubi/30 px-3 py-3 sm:p-4 flex items-center justify-between gap-2 sticky top-0 z-20 min-w-0`}>
-          <button type="button" onClick={() => setIsSidebarOpen(true)} className="p-2 bg-slate-100 dark:bg-sanfran-rubi/10 rounded-xl text-slate-600 dark:text-white shrink-0" aria-label="Abrir menu">
+          <button
+            type="button"
+            onClick={() => setIsSidebarOpen(true)}
+            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center bg-slate-100 dark:bg-sanfran-rubi/10 rounded-xl text-slate-600 dark:text-white shrink-0 touch-manipulation"
+            aria-label="Abrir menu"
+          >
             <Menu className="w-6 h-6" />
           </button>
           <div className="flex items-center gap-2 min-w-0 flex-1 justify-center">
@@ -1963,7 +1978,15 @@ const App: React.FC = () => {
               <span className="text-[10px] font-black uppercase tracking-widest">Sincronizando...</span>
             </div>
           )}
-          <div className={`${isExtremeFocus ? 'max-w-none h-full min-h-0 flex items-center justify-center' : currentView === View.Tasks ? 'max-w-none w-full min-w-0 h-full min-h-0 flex flex-col' : 'max-w-6xl xl:max-w-7xl 2xl:max-w-[min(96rem,calc(100vw-2rem))] mx-auto w-full min-w-0 h-full min-h-0 flex flex-col'}`}>
+          <div
+            className={`${
+              isExtremeFocus
+                ? 'max-w-none h-full min-h-0 flex items-center justify-center'
+                : currentView === View.Tasks
+                  ? 'max-w-none w-full min-w-0 h-full min-h-0 flex flex-col'
+                  : 'max-w-6xl xl:max-w-7xl 2xl:max-w-[min(96rem,calc(100vw-2rem))] mx-auto w-full min-w-0 max-w-[100%] h-full min-h-0 flex flex-col'
+            }`}
+          >
              <Suspense fallback={<PageLoader />}>
 <ErrorBoundary>
 <Routes>

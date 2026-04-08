@@ -2789,7 +2789,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
                    <div className="space-y-2">
                       <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nível de Dificuldade</label>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                          {['Iniciante', 'Graduação', 'Concurso/OAB'].map(level => (
                            <button
                              key={level}
@@ -2831,7 +2831,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
                    <div className="space-y-2">
                     <div className="space-y-2">
                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Comprimento da Pergunta</label>
-                       <div className="grid grid-cols-3 gap-2">
+                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                           {[
                             { id: 'curta', label: 'Curta' },
                             { id: 'normal', label: 'Normal' },
@@ -2854,7 +2854,7 @@ const Anki: React.FC<AnkiProps> = ({ subjects, flashcards, setFlashcards, folder
 
                     <div className="space-y-2">
                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Comprimento da Resposta</label>
-                       <div className="grid grid-cols-3 gap-2">
+                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                           {[
                             { id: 'curta', label: 'Curta' },
                             { id: 'normal', label: 'Normal' },

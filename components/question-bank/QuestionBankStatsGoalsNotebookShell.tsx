@@ -44,7 +44,7 @@ export function QuestionBankStatsGoalsNotebookShell({
 }: QuestionBankStatsGoalsNotebookShellProps) {
   return (
     <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 mb-6 overflow-hidden">
-      <div className="p-4 grid grid-cols-3 gap-6 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+      <div className="p-3 sm:p-4 grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-6 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
         <div className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white dark:bg-slate-900 shadow-[5px_5px_10px_#d1d9e6,-5px_-5px_10px_#ffffff] dark:shadow-[5px_5px_10px_#000000,-5px_-5px_10px_#2a2a2a]">
           <span className="text-3xl font-black text-slate-900 dark:text-white">{correctCount + wrongCount}</span>
           <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-1">Questões</span>

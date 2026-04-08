@@ -28,3 +28,10 @@ All commands are defined in `package.json`:
 - The app is a SPA with client-side routing via `react-router-dom`. The Vite dev server serves it on port 3000.
 - All routes are authentication-gated. You must log in (via Supabase email/password auth) to access any feature beyond the login/sign-up page. Use the `TEST_LOGIN_USERNAME` and `TEST_LOGIN_PASSWORD` environment secrets for test access.
 - Sign-up for new accounts may fail with "DATABASE ERROR SAVING NEW USER" due to Supabase RLS policies or project state; use existing test credentials instead.
+
+### Mobile / responsive (Tailwind)
+
+- Prefer **breakpoints** (`sm:`, `md:`, `lg:`) over fixed pixel widths for main layouts; use **`min-w-0`** on flex/grid children that truncate or scroll to avoid horizontal overflow.
+- Avoid large **`min-w-[...]`** on small screens; scope them with **`sm:min-w-[...]`** when needed.
+- Critical tap targets (menus, primary actions): aim for **~44×44px** minimum touch area.
+- Manual test matrix and release checklist: see [docs/mobile-responsive-baseline.md](docs/mobile-responsive-baseline.md).

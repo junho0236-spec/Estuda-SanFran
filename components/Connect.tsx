@@ -424,6 +424,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   const [editingGroupAvatar, setEditingGroupAvatar] = useState('');
   const [internalSearchQuery, setInternalSearchQuery] = useState('');
   const [showInternalSearch, setShowInternalSearch] = useState(false);
+  const [chatHeaderMobileMenuOpen, setChatHeaderMobileMenuOpen] = useState(false);
   const [internalSearchSenderId, setInternalSearchSenderId] = useState('');
   const [internalSearchDateFrom, setInternalSearchDateFrom] = useState('');
   const [internalSearchDateTo, setInternalSearchDateTo] = useState('');
@@ -727,6 +728,10 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     showGifPicker,
     activeRoomId,
   ]);
+
+  useEffect(() => {
+    setChatHeaderMobileMenuOpen(false);
+  }, [activeRoomId]);
 
   const pendingFileByClientIdRef = useRef<Map<string, File>>(new Map());
 
@@ -2977,7 +2982,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
 
 
   return (
-    <div className="flex h-[calc(100vh-120px)] bg-white dark:bg-[#0a0a0a] md:rounded-[2rem] border-0 md:border border-slate-200 dark:border-white/5 overflow-hidden shadow-2xl relative">
+    <div className="flex min-h-0 w-full max-w-[100%] bg-white dark:bg-[#0a0a0a] md:rounded-[2rem] border-0 md:border border-slate-200 dark:border-white/5 overflow-hidden shadow-2xl relative h-[calc(100dvh-6rem)] max-md:h-[calc(100dvh-4.5rem)]">
       
       {/* SIDEBAR */}
       <ChatSidebar
@@ -3100,13 +3105,13 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
                   </div>
                 </button>
               </div>
-              <div className="flex items-center gap-1 shrink-0">
+              <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
                 {!activeRoom.is_group && (
                   <>
                     <button
                       type="button"
                       onClick={() => startCall('audio')}
-                      className={`p-2 text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-all ${FOCUS_RING_ROUND}`}
+                      className={`inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-full text-slate-400 transition-all hover:bg-slate-100 hover:text-blue-500 dark:hover:bg-white/5 ${FOCUS_RING_ROUND}`}
                       title="Chamada de áudio"
                       aria-label="Iniciar chamada de áudio"
                     >
@@ -3115,7 +3120,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
                     <button
                       type="button"
                       onClick={() => startCall('video')}
-                      className={`p-2 text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-all ${FOCUS_RING_ROUND}`}
+                      className={`inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-full text-slate-400 transition-all hover:bg-slate-100 hover:text-blue-500 dark:hover:bg-white/5 ${FOCUS_RING_ROUND}`}
                       title="Chamada de vídeo"
                       aria-label="Iniciar chamada de vídeo"
                     >
@@ -3126,123 +3131,241 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
                 <button
                   type="button"
                   onClick={() => setShowInternalSearch(!showInternalSearch)}
-                  className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors ${FOCUS_RING_ROUND} ${showInternalSearch ? 'text-blue-500 bg-blue-50 dark:bg-blue-500/10' : 'text-slate-400'}`}
+                  className={`inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-full transition-colors touch-manipulation ${FOCUS_RING_ROUND} ${showInternalSearch ? 'bg-blue-50 text-blue-500 dark:bg-blue-500/10' : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'}`}
                   title="Buscar na conversa (Ctrl+K ou Cmd+K)"
                   aria-label="Buscar na conversa. Atalho: Control K ou Command K"
                 >
                   <Search size={20} aria-hidden />
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => setShowStarredOnly(!showStarredOnly)}
-                  className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors ${FOCUS_RING_ROUND} ${showStarredOnly ? 'text-yellow-500 bg-yellow-50 dark:bg-yellow-500/10' : 'text-slate-400'}`}
-                  title="Só mensagens favoritas"
-                  aria-label={showStarredOnly ? 'Mostrar todas as mensagens' : 'Mostrar só mensagens favoritas'}
-                >
-                  <Star size={20} fill={showStarredOnly ? 'currentColor' : 'none'} aria-hidden />
-                </button>
-
-                {activeRoom.is_group && canCreateGroupPoll(activeRoom, userId, participants) && (
+                <div className="hidden items-center gap-1 md:flex">
                   <button
                     type="button"
-                    onClick={() => setShowPollModal(true)}
+                    onClick={() => setShowStarredOnly(!showStarredOnly)}
+                    className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors ${FOCUS_RING_ROUND} ${showStarredOnly ? 'text-yellow-500 bg-yellow-50 dark:bg-yellow-500/10' : 'text-slate-400'}`}
+                    title="Só mensagens favoritas"
+                    aria-label={showStarredOnly ? 'Mostrar todas as mensagens' : 'Mostrar só mensagens favoritas'}
+                  >
+                    <Star size={20} fill={showStarredOnly ? 'currentColor' : 'none'} aria-hidden />
+                  </button>
+
+                  {activeRoom.is_group && canCreateGroupPoll(activeRoom, userId, participants) && (
+                    <button
+                      type="button"
+                      onClick={() => setShowPollModal(true)}
+                      className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-slate-400 ${FOCUS_RING_ROUND}`}
+                      title="Criar enquete"
+                      aria-label="Criar enquete"
+                    >
+                      <BarChart2 size={20} aria-hidden />
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setShowMediaGallery(true)}
                     className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-slate-400 ${FOCUS_RING_ROUND}`}
-                    title="Criar enquete"
-                    aria-label="Criar enquete"
+                    title="Galeria de mídia"
+                    aria-label="Abrir galeria de mídia"
                   >
-                    <BarChart2 size={20} aria-hidden />
+                    <LayoutGrid size={20} aria-hidden />
                   </button>
-                )}
 
-                <button
-                  type="button"
-                  onClick={() => setShowMediaGallery(true)}
-                  className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-slate-400 ${FOCUS_RING_ROUND}`}
-                  title="Galeria de mídia"
-                  aria-label="Abrir galeria de mídia"
-                >
-                  <LayoutGrid size={20} aria-hidden />
-                </button>
-
-                <div className="relative group/mute">
-                  <button
-                    type="button"
-                    className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors ${FOCUS_RING_ROUND} ${participants[activeRoom.id]?.find(p => p.user_id === userId)?.muted_until ? 'text-red-500 bg-red-50 dark:bg-red-500/10' : 'text-slate-400'}`}
-                    title="Silenciar notificações"
-                    aria-label={
-                      participants[activeRoom.id]?.find(p => p.user_id === userId)?.muted_until
-                        ? 'Conversa silenciada. Abrir opções de duração do silêncio'
-                        : 'Silenciar notificações desta conversa'
-                    }
-                    aria-haspopup="menu"
-                  >
-                    {participants[activeRoom.id]?.find(p => p.user_id === userId)?.muted_until ? (
-                      <VolumeX size={20} aria-hidden />
-                    ) : (
-                      <Volume2 size={20} aria-hidden />
-                    )}
-                  </button>
-                  <div
-                    role="menu"
-                    aria-label="Duração do silêncio"
-                    className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/5 rounded-2xl shadow-2xl opacity-0 invisible pointer-events-none group-hover/mute:opacity-100 group-hover/mute:visible group-hover/mute:pointer-events-auto group-focus-within/mute:opacity-100 group-focus-within/mute:visible group-focus-within/mute:pointer-events-auto transition-all z-50 overflow-hidden"
-                  >
-                    <div className="p-2">
-                      <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest p-2">Silenciar por...</p>
-                      {[
-                        { label: '8 Horas', value: '8h' },
-                        { label: '1 Semana', value: '1w' },
-                        { label: 'Sempre', value: 'forever' },
-                        { label: 'Desativar', value: null },
-                      ].map((opt) => (
-                        <button
-                          key={opt.label}
-                          type="button"
-                          role="menuitem"
-                          onClick={() => muteChat(activeRoom.id, opt.value as any)}
-                          className={`w-full text-left p-2 text-sm hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-colors ${FOCUS_RING}`}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
+                  <div className="relative group/mute">
+                    <button
+                      type="button"
+                      className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors ${FOCUS_RING_ROUND} ${participants[activeRoom.id]?.find(p => p.user_id === userId)?.muted_until ? 'text-red-500 bg-red-50 dark:bg-red-500/10' : 'text-slate-400'}`}
+                      title="Silenciar notificações"
+                      aria-label={
+                        participants[activeRoom.id]?.find(p => p.user_id === userId)?.muted_until
+                          ? 'Conversa silenciada. Abrir opções de duração do silêncio'
+                          : 'Silenciar notificações desta conversa'
+                      }
+                      aria-haspopup="menu"
+                    >
+                      {participants[activeRoom.id]?.find(p => p.user_id === userId)?.muted_until ? (
+                        <VolumeX size={20} aria-hidden />
+                      ) : (
+                        <Volume2 size={20} aria-hidden />
+                      )}
+                    </button>
+                    <div
+                      role="menu"
+                      aria-label="Duração do silêncio"
+                      className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/5 rounded-2xl shadow-2xl opacity-0 invisible pointer-events-none group-hover/mute:opacity-100 group-hover/mute:visible group-hover/mute:pointer-events-auto group-focus-within/mute:opacity-100 group-focus-within/mute:visible group-focus-within/mute:pointer-events-auto transition-all z-50 overflow-hidden"
+                    >
+                      <div className="p-2">
+                        <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest p-2">Silenciar por...</p>
+                        {[
+                          { label: '8 Horas', value: '8h' },
+                          { label: '1 Semana', value: '1w' },
+                          { label: 'Sempre', value: 'forever' },
+                          { label: 'Desativar', value: null },
+                        ].map((opt) => (
+                          <button
+                            key={opt.label}
+                            type="button"
+                            role="menuitem"
+                            onClick={() => muteChat(activeRoom.id, opt.value as any)}
+                            className={`w-full text-left p-2 text-sm hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-colors ${FOCUS_RING}`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowMediaGallery(true)}
+                    className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-slate-400 ${FOCUS_RING_ROUND}`}
+                    title="Fotos e imagens"
+                    aria-label="Abrir fotos e imagens da conversa"
+                  >
+                    <ImageIcon size={20} aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowWallpaperModal(true)}
+                    className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-slate-400 ${FOCUS_RING_ROUND}`}
+                    title="Papel de parede"
+                    aria-label="Alterar papel de parede do chat"
+                  >
+                    <Palette size={20} aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (activeRoom.is_group) {
+                        setEditingGroupName(activeRoom.name || '');
+                        setEditingGroupAvatar(activeRoom.avatar_url || '');
+                        setShowGroupInfoModal(true);
+                      }
+                    }}
+                    className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-slate-400 ${FOCUS_RING_ROUND}`}
+                    title="Mais opções"
+                    aria-label={activeRoom.is_group ? 'Mais opções do grupo' : 'Mais opções'}
+                  >
+                    <MoreVertical size={20} aria-hidden />
+                  </button>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setShowMediaGallery(true)}
-                  className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-slate-400 ${FOCUS_RING_ROUND}`}
-                  title="Fotos e imagens"
-                  aria-label="Abrir fotos e imagens da conversa"
-                >
-                  <ImageIcon size={20} aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowWallpaperModal(true)}
-                  className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-slate-400 ${FOCUS_RING_ROUND}`}
-                  title="Papel de parede"
-                  aria-label="Alterar papel de parede do chat"
-                >
-                  <Palette size={20} aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (activeRoom.is_group) {
-                      setEditingGroupName(activeRoom.name || '');
-                      setEditingGroupAvatar(activeRoom.avatar_url || '');
-                      setShowGroupInfoModal(true);
-                    }
-                  }}
-                  className={`p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-slate-400 ${FOCUS_RING_ROUND}`}
-                  title="Mais opções"
-                  aria-label={activeRoom.is_group ? 'Mais opções do grupo' : 'Mais opções'}
-                >
-                  <MoreVertical size={20} aria-hidden />
-                </button>
+                <div className="relative md:hidden">
+                  <button
+                    type="button"
+                    onClick={() => setChatHeaderMobileMenuOpen((o) => !o)}
+                    className={`inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-full transition-colors touch-manipulation ${FOCUS_RING_ROUND} ${chatHeaderMobileMenuOpen ? 'bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-white' : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'}`}
+                    aria-expanded={chatHeaderMobileMenuOpen}
+                    aria-haspopup="menu"
+                    aria-label="Mais ações da conversa"
+                  >
+                    <MoreVertical size={22} aria-hidden />
+                  </button>
+                  {chatHeaderMobileMenuOpen && (
+                    <>
+                      <button
+                        type="button"
+                        className="fixed inset-0 z-40 cursor-default bg-transparent"
+                        aria-label="Fechar menu"
+                        onClick={() => setChatHeaderMobileMenuOpen(false)}
+                      />
+                      <div
+                        role="menu"
+                        className="absolute right-0 top-full z-50 mt-1 max-h-[min(70vh,22rem)] w-[min(18rem,calc(100vw-2rem))] overflow-y-auto rounded-2xl border border-slate-200 bg-white py-2 shadow-2xl dark:border-white/10 dark:bg-[#1a1a1a]"
+                      >
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold text-slate-800 hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-white/5"
+                          onClick={() => {
+                            setShowStarredOnly(!showStarredOnly);
+                            setChatHeaderMobileMenuOpen(false);
+                          }}
+                        >
+                          <Star size={18} className={showStarredOnly ? 'text-yellow-500' : 'text-slate-400'} fill={showStarredOnly ? 'currentColor' : 'none'} aria-hidden />
+                          {showStarredOnly ? 'Mostrar todas as mensagens' : 'Só favoritas'}
+                        </button>
+                        {activeRoom.is_group && canCreateGroupPoll(activeRoom, userId, participants) && (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold text-slate-800 hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-white/5"
+                            onClick={() => {
+                              setShowPollModal(true);
+                              setChatHeaderMobileMenuOpen(false);
+                            }}
+                          >
+                            <BarChart2 size={18} className="text-slate-400" aria-hidden />
+                            Criar enquete
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold text-slate-800 hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-white/5"
+                          onClick={() => {
+                            setShowMediaGallery(true);
+                            setChatHeaderMobileMenuOpen(false);
+                          }}
+                        >
+                          <LayoutGrid size={18} className="text-slate-400" aria-hidden />
+                          Galeria de mídia
+                        </button>
+                        <div className="border-t border-slate-100 px-2 py-2 dark:border-white/10">
+                          <p className="px-2 pb-1 text-[10px] font-black uppercase tracking-widest text-slate-500">Silenciar</p>
+                          {[
+                            { label: '8 horas', value: '8h' as const },
+                            { label: '1 semana', value: '1w' as const },
+                            { label: 'Sempre', value: 'forever' as const },
+                            { label: 'Desativar', value: null },
+                          ].map((opt) => (
+                            <button
+                              key={opt.label}
+                              type="button"
+                              role="menuitem"
+                              className="w-full rounded-xl px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5"
+                              onClick={() => {
+                                muteChat(activeRoom.id, opt.value as any);
+                                setChatHeaderMobileMenuOpen(false);
+                              }}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold text-slate-800 hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-white/5"
+                          onClick={() => {
+                            setShowWallpaperModal(true);
+                            setChatHeaderMobileMenuOpen(false);
+                          }}
+                        >
+                          <Palette size={18} className="text-slate-400" aria-hidden />
+                          Papel de parede
+                        </button>
+                        {activeRoom.is_group && (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold text-slate-800 hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-white/5"
+                            onClick={() => {
+                              setEditingGroupName(activeRoom.name || '');
+                              setEditingGroupAvatar(activeRoom.avatar_url || '');
+                              setShowGroupInfoModal(true);
+                              setChatHeaderMobileMenuOpen(false);
+                            }}
+                          >
+                            <MoreVertical size={18} className="text-slate-400" aria-hidden />
+                            Informações do grupo
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
 
