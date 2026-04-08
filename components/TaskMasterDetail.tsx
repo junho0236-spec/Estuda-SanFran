@@ -268,8 +268,6 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
 
   const TABS = [
     { id: 'Geral', name: 'Geral' },
-    { id: 'Leituras', name: 'Leituras' },
-    { id: 'Entidades', name: 'Entidades' },
     ...boards.map(b => ({ id: b.id, name: b.name }))
   ];
 
@@ -526,9 +524,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
 
     // Then check tab visibility
     if (activeTab === 'Geral') return true;
-    if (activeTab === 'Leituras') return task.category === 'estudo';
-    if (activeTab === 'Entidades') return task.category === 'admin';
-    
+
     const board = boards.find(b => b.id === activeTab);
     if (board) return task.boardId === board.id;
     
@@ -781,9 +777,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
             return;
           }
           
-          let category: TaskCategory = 'geral';
-          if (activeTab === 'Leituras') category = 'estudo';
-          else if (activeTab === 'Entidades') category = 'admin';
+          const category: TaskCategory = 'geral';
 
           const board = boards.find(b => b.id === activeTab);
           const boardIdToSet = board ? board.id : undefined;
@@ -812,8 +806,8 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     }
 
     let category: TaskCategory = 'geral';
-    if (activeTab === 'Leituras') category = 'estudo';
-    else if (activeTab === 'Entidades') category = 'admin';
+    if (template === 'fichamento') category = 'estudo';
+    else if (template === 'gestao') category = 'admin';
 
     const board = boards.find(b => b.id === activeTab);
     const boardIdToSet = board ? board.id : undefined;
