@@ -36,7 +36,8 @@ const SYNC_TABLES_REQUIRING_FULL_LOAD = new Set(['notes', 'subject_files', 'lega
 const SYNC_OFFLINE_TIMEOUT_MS = 12000;
 
 /** Limite para `scope: study_sessions` (rotas). `full` mantém histórico completo. */
-const STUDY_SESSIONS_ROUTE_LIMIT = 1500;
+const STUDY_SESSIONS_ROUTE_LIMIT = 300;
+const ROUTE_SCOPE_TIMEOUT_MS = 8000;
 const SUBJECT_CLOUD_COLUMNS_FALLBACK =
   'id, user_id, name, color, semester_start_date, semester_end_date, absences, max_absences, semester_year, workload, p1_date, p2_date, content';
 
@@ -58,6 +59,25 @@ async function fetchSubjectsCloudRows(userId: string) {
     fallbackError: fallback.error,
   });
   return fallback;
+}
+
+async function loadScopeWithTimeout(
+  loader: (scope: UserDataSyncScope) => Promise<void>,
+  scope: UserDataSyncScope,
+  timeoutMs: number
+): Promise<boolean> {
+  const timeout = new Promise<'timeout'>((resolve) =>
+    setTimeout(() => resolve('timeout'), timeoutMs)
+  );
+  const result = await Promise.race([
+    loader(scope).then(() => 'ok' as const),
+    timeout,
+  ]);
+  if (result === 'timeout') {
+    console.warn(`[route-data] scope "${scope}" timed out after ${timeoutMs}ms`);
+    return false;
+  }
+  return true;
 }
 
 function mapCloudSubjectRows(subsRows: Record<string, unknown>[] | null | undefined): Subject[] {
@@ -1193,8 +1213,18 @@ const App: React.FC = () => {
     setIsRouteDataLoading(true);
     void (async () => {
       try {
-        await Promise.all(pending.map((s) => loadUserDataRef.current({ scope: s })));
-        pending.forEach((s) => loadedDataScopesRef.current.add(s));
+        const results = await Promise.all(
+          pending.map((s) =>
+            loadScopeWithTimeout(
+              async (scope) => loadUserDataRef.current({ scope }),
+              s,
+              ROUTE_SCOPE_TIMEOUT_MS
+            )
+          )
+        );
+        pending.forEach((s, idx) => {
+          if (results[idx]) loadedDataScopesRef.current.add(s);
+        });
       } finally {
         setIsRouteDataLoading(false);
       }

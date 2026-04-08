@@ -5,21 +5,21 @@ import type { UserDataSyncScope } from './realtimeThrottle';
 export function getDataScopesForView(view: View): UserDataSyncScope[] {
   switch (view) {
     case View.Dashboard:
-      return ['subjects', 'tasks', 'flashcards', 'study_sessions', 'readings'];
+      return ['subjects', 'tasks', 'flashcards'];
     case View.Tasks:
-      return ['tasks', 'boards', 'study_sessions', 'subjects'];
+      return ['tasks', 'boards', 'subjects'];
     case View.Anki:
       return ['flashcards', 'folders', 'subjects'];
     case View.QuestionBank:
       return ['folders', 'flashcards'];
     case View.Timer:
-      return ['subjects', 'readings', 'tasks', 'study_sessions'];
+      return ['subjects', 'tasks', 'study_sessions'];
     case View.Calendar:
-      return ['tasks', 'subjects', 'study_sessions'];
+      return ['tasks', 'subjects'];
     case View.Statistics:
       return ['study_sessions', 'flashcards', 'tasks', 'subjects', 'user_progress'];
     case View.Library:
-      return ['readings', 'subjects'];
+      return ['readings'];
     case View.Subjects:
     case View.NoteView:
     case View.Repository:
@@ -31,9 +31,9 @@ export function getDataScopesForView(view: View): UserDataSyncScope[] {
       return ['flashcards'];
     case View.DominioJuridico:
     case View.Specialization:
-      return ['subjects', 'study_sessions'];
+      return ['subjects'];
     case View.DigitalID:
-      return ['study_sessions', 'tasks'];
+      return ['tasks'];
     case View.Office:
     case View.ClassificadosPatio:
       return ['study_sessions'];
