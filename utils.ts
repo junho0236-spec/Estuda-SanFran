@@ -1,5 +1,47 @@
 import { View } from './types';
 
+/** Parte AAAA-MM-DD de um prazo armazenado (sem interpretar como UTC meia-noite). */
+export function dueDateToYmd(due: string): string {
+  return due.trim().split('T')[0];
+}
+
+/** Exibe prazo só-data como DD/MM/AAAA. */
+export function formatDueDateBr(due: string | undefined | null): string {
+  if (!due) return '';
+  const ymd = dueDateToYmd(due);
+  const p = ymd.split('-');
+  if (p.length !== 3 || p[0].length !== 4) return ymd;
+  const [y, m, d] = p;
+  if (m.length !== 2 || d.length !== 2) return ymd;
+  return `${d}/${m}/${y}`;
+}
+
+/** Converte dd/mm/aaaa (ou d/m/aaaa) para AAAA-MM-DD, ou null se inválido. */
+export function parseDueDateBrToIso(text: string): string | null {
+  const t = text.trim();
+  if (!t) return null;
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(t);
+  if (!m) return null;
+  const dd = parseInt(m[1], 10);
+  const mo = parseInt(m[2], 10);
+  const yy = parseInt(m[3], 10);
+  if (mo < 1 || mo > 12 || dd < 1 || dd > 31) return null;
+  const dt = new Date(yy, mo - 1, dd);
+  if (dt.getFullYear() !== yy || dt.getMonth() !== mo - 1 || dt.getDate() !== dd) return null;
+  return `${yy}-${String(mo).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+}
+
+/** Meio-dia no calendário local para AAAA-MM-DD (evita deslocar o dia por UTC em iCal). */
+export function dateAtNoonForYmd(ymd: string): Date {
+  const parts = dueDateToYmd(ymd).split('-');
+  if (parts.length !== 3) return new Date(NaN);
+  const y = Number(parts[0]);
+  const mo = Number(parts[1]);
+  const d = Number(parts[2]);
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return new Date(NaN);
+  return new Date(y, mo - 1, d, 12, 0, 0, 0);
+}
+
 export const getBrasiliaDate = () => {
   return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
 };

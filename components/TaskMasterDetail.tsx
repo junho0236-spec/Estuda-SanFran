@@ -38,6 +38,13 @@ import { dataService } from '../services/dataService';
 import { supabase } from '../services/supabaseClient';
 import { SUBJECT_FILES_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { suggestSubtasks } from '../services/geminiService';
+import {
+  getBrasiliaDate,
+  formatDueDateBr,
+  parseDueDateBrToIso,
+  dateAtNoonForYmd,
+  dueDateToYmd,
+} from '../utils';
 
 const STORY_POINTS = [1, 2, 3, 5, 8];
 const DEFAULT_TASK_CATEGORIES: TaskCategory[] = ['estudo', 'peticao', 'audiencia', 'admin', 'geral'];
@@ -502,6 +509,8 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   const [availableFiles, setAvailableFiles] = useState<SubjectFile[]>([]);
   const [isBreakingDown, setIsBreakingDown] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  /** Campo de prazo no painel (dd/mm/aaaa); sincronizado com a tarefa selecionada. */
+  const [dueDateInputDraft, setDueDateInputDraft] = useState('');
 
   const [revisionStatus, setRevisionStatus] = useState({
     firstReading: false,
@@ -523,6 +532,9 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         summary: false,
         preExamReview: false
       });
+      setDueDateInputDraft(formatDueDateBr(selectedTask.dueDate));
+    } else {
+      setDueDateInputDraft('');
     }
   }, [selectedTaskId, selectedTask]);
 
@@ -677,9 +689,10 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     }
     
     const cal = ical({ name: 'SanFran Tasks' });
+    const dueStart = dateAtNoonForYmd(dueDateToYmd(taskToExport.dueDate));
     cal.createEvent({
-      start: new Date(taskToExport.dueDate),
-      end: new Date(taskToExport.dueDate),
+      start: dueStart,
+      end: dueStart,
       summary: `[SanFran] ${taskToExport.title}`,
       description: taskToExport.notes || 'Sem notas adicionais.',
       location: 'SanFran App'
@@ -699,9 +712,10 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
 
     const cal = ical({ name: 'SanFran Deadlines' });
     tasksWithDates.forEach(t => {
+      const evStart = dateAtNoonForYmd(dueDateToYmd(t.dueDate!));
       cal.createEvent({
-        start: new Date(t.dueDate!),
-        end: new Date(t.dueDate!),
+        start: evStart,
+        end: evStart,
         summary: `[SanFran] ${t.title}`,
         description: t.notes || '',
       });
@@ -714,12 +728,14 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
 
   const awardPrestigePoints = async (task: Task) => {
     if (!task.completed || !task.dueDate || !userProfile) return;
-    
-    const dueDate = new Date(task.dueDate);
-    const now = new Date();
-    
-    // Award points for completing before deadline
-    if (now < dueDate) {
+
+    const dueYmd = dueDateToYmd(task.dueDate);
+    const doneYmd = task.completedAt
+      ? new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date(task.completedAt)).slice(0, 10)
+      : getBrasiliaDate();
+
+    // Award points for completing on or before the deadline (dia civil, Brasília)
+    if (doneYmd <= dueYmd) {
       let pointsToAdd = 0;
       let badgeEarned = '';
 
@@ -870,8 +886,13 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       // Recurrence Logic
       if (taskToUpdate.recurrence) {
         const { frequency, interval = 1, businessDaysOnly } = taskToUpdate.recurrence;
-        let baseDate = new Date(taskToUpdate.dueDate || new Date());
-        
+        let baseDate: Date;
+        if (taskToUpdate.dueDate) {
+          baseDate = dateAtNoonForYmd(dueDateToYmd(taskToUpdate.dueDate));
+        } else {
+          baseDate = new Date();
+        }
+
         const getNextOccurrence = (date: Date) => {
           let next = new Date(date);
           if (frequency === 'daily') {
@@ -892,16 +913,17 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         };
 
         const nextOccurrenceDate = getNextOccurrence(baseDate);
-        
+        const nextYmd = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(nextOccurrenceDate).slice(0, 10);
+
         const nextTask: Task = {
           ...taskToUpdate,
           id: crypto.randomUUID(),
           completed: false,
           completedAt: undefined,
-          dueDate: nextOccurrenceDate.toISOString(),
+          dueDate: nextYmd,
           recurrence: {
             ...taskToUpdate.recurrence,
-            nextOccurrence: nextOccurrenceDate.toISOString()
+            nextOccurrence: nextYmd
           },
           parentTaskId: taskToUpdate.parentTaskId || taskToUpdate.id,
           created_at: new Date().toISOString()
@@ -909,7 +931,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         
         await dataService.saveTask(nextTask, userId, isOnline);
         setTasks(prev => [nextTask, ...prev]);
-        toast.success(`Tarefa recorrente criada para ${nextOccurrenceDate.toLocaleDateString()}`);
+        toast.success(`Tarefa recorrente criada para ${formatDueDateBr(nextYmd)}`);
       }
 
       // Notify delegator if this was a delegated task
@@ -1359,7 +1381,13 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
             )}
 
             <div className="flex items-center justify-between mt-1">
-              <div className="flex flex-col gap-1">
+                            <div className="flex flex-col gap-1">
+                {task.dueDate && (
+                  <div className={`flex items-center gap-1 text-[11px] font-bold ${selectedTaskId === task.id ? 'text-white/80' : 'text-amber-600'}`}>
+                    <Calendar size={12} className="shrink-0" />
+                    {formatDueDateBr(task.dueDate)}
+                  </div>
+                )}
                 {task.boardId && (
                   <div className={`text-[11px] font-bold uppercase tracking-tight ${selectedTaskId === task.id ? 'text-white/60' : 'text-[#800000]/60'}`}>
                     {boards.find((b: any) => b.id === task.boardId)?.name}
@@ -2037,12 +2065,32 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                             <div className="flex items-center gap-2 mb-3 text-slate-400 font-bold text-[10px] uppercase tracking-widest">
                               <Calendar size={14} /> Prazo de Entrega
                             </div>
-                            <input 
-                              type="date"
-                              value={selectedTask.dueDate ? selectedTask.dueDate.split('T')[0] : ''}
-                              onChange={e => handleUpdateTask({ dueDate: e.target.value })}
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              autoComplete="off"
+                              placeholder="dd/mm/aaaa"
+                              value={dueDateInputDraft}
+                              onChange={(e) => setDueDateInputDraft(e.target.value)}
+                              onBlur={() => {
+                                const trimmed = dueDateInputDraft.trim();
+                                if (!trimmed) {
+                                  handleUpdateTask({ dueDate: undefined });
+                                  setDueDateInputDraft('');
+                                  return;
+                                }
+                                const iso = parseDueDateBrToIso(trimmed);
+                                if (iso) {
+                                  handleUpdateTask({ dueDate: iso });
+                                  setDueDateInputDraft(formatDueDateBr(iso));
+                                } else {
+                                  toast.error('Data inválida. Use dd/mm/aaaa.');
+                                  setDueDateInputDraft(formatDueDateBr(selectedTask.dueDate));
+                                }
+                              }}
                               className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#800000]/10"
                             />
+                            <p className="mt-1.5 text-[10px] text-slate-400">Formato: dia / mês / ano (ex.: 08/04/2026)</p>
                           </section>
 
                           <section>
@@ -2521,7 +2569,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                             </div>
                             {task.dueDate && (
                               <div className={`flex items-center gap-1 text-[10px] font-bold ${task.completed ? 'text-slate-300' : 'text-amber-600'}`}>
-                                <Calendar size={10} /> {new Date(task.dueDate).toLocaleDateString()}
+                                <Calendar size={10} /> {formatDueDateBr(task.dueDate)}
                               </div>
                             )}
                           </div>
