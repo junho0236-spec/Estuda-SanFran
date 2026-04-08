@@ -1639,7 +1639,13 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
           // --- MASTER-DETAIL VIEW (30/70) ---
           <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
             {/* Master: List (30%) */}
-            <div className={`flex min-h-0 flex-col overflow-hidden border-slate-100 bg-white transition-all duration-500 lg:border-r ${selectedTaskId ? 'hidden w-full lg:flex lg:w-[30%]' : 'flex w-full lg:w-[30%]'}`}>
+            <div
+              className={`flex min-h-0 flex-col overflow-hidden bg-white transition-all duration-500 ${
+                selectedTaskId
+                  ? 'hidden w-full border-slate-100 lg:flex lg:w-[30%] lg:max-w-[30%] lg:shrink-0 lg:border-r'
+                  : 'w-full min-w-0 flex-1 border-slate-100'
+              }`}
+            >
               <div className="p-4 border-b border-slate-50 flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -1832,7 +1838,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                   initial={{ x: 100, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
                   exit={{ x: 100, opacity: 0 }}
-                  className="absolute inset-0 z-30 flex min-h-0 w-full flex-col bg-white shadow-2xl lg:relative lg:inset-auto lg:z-10 lg:w-[70%]"
+                  className="absolute inset-0 z-30 flex min-h-0 w-full flex-col bg-white shadow-2xl lg:relative lg:inset-auto lg:z-10 lg:min-w-0 lg:w-[70%]"
                 >
                   {selectedTask ? (
                     <>
