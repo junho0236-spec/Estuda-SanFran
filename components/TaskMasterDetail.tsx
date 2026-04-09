@@ -96,6 +96,84 @@ function compareTasksForListView(a: Task, b: Task): number {
   return taskCreatedTimeMs(a) - taskCreatedTimeMs(b);
 }
 
+/** Próxima instância de uma tarefa recorrente (data + horário preservados). `null` se não houver recorrência. */
+function buildNextRecurrenceTask(completedTask: Task): Task | null {
+  const rec = completedTask.recurrence;
+  if (!rec) return null;
+
+  const rawFreq = rec.frequency;
+  const frequency = typeof rawFreq === 'string' ? rawFreq.trim().toLowerCase() : '';
+  const interval = rec.interval != null && Number.isFinite(rec.interval) ? Math.max(1, rec.interval) : 1;
+  const { businessDaysOnly } = rec;
+
+  let baseDate: Date;
+  if (completedTask.dueDate) {
+    if (dueDateHasTime(completedTask.dueDate)) {
+      const inst = new Date(completedTask.dueDate);
+      baseDate = Number.isNaN(inst.getTime())
+        ? dateAtNoonForYmd(dueDateToYmd(completedTask.dueDate))
+        : inst;
+    } else {
+      baseDate = dateAtNoonForYmd(dueDateToYmd(completedTask.dueDate));
+    }
+  } else {
+    baseDate = new Date();
+  }
+
+  const getNextOccurrence = (date: Date) => {
+    const next = new Date(date);
+    if (frequency === 'daily') {
+      next.setDate(next.getDate() + interval);
+    } else if (frequency === 'weekly') {
+      next.setDate(next.getDate() + 7 * interval);
+    } else if (frequency === 'monthly') {
+      next.setMonth(next.getMonth() + interval);
+    } else {
+      next.setDate(next.getDate() + interval);
+    }
+
+    if (businessDaysOnly) {
+      while (next.getDay() === 0 || next.getDay() === 6) {
+        next.setDate(next.getDate() + 1);
+      }
+    }
+    return next;
+  };
+
+  const nextOccurrenceDate = getNextOccurrence(baseDate);
+  const nextYmd = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' })
+    .format(nextOccurrenceDate)
+    .slice(0, 10);
+
+  let nextDueStr = nextYmd;
+  if (completedTask.dueDate && dueDateHasTime(completedTask.dueDate)) {
+    const hm = formatDueTimeHmForInput(completedTask.dueDate);
+    if (hm) {
+      const withTime = combineYmdAndTimeBrToIso(nextYmd, hm);
+      if (withTime) nextDueStr = withTime;
+    }
+  }
+
+  const freshSubtasks = (completedTask.subtasks || []).map((s) => ({ ...s, completed: false }));
+
+  return {
+    ...completedTask,
+    id: crypto.randomUUID(),
+    completed: false,
+    completedAt: undefined,
+    dueDate: nextDueStr,
+    status: 'Pendente',
+    recurrence: {
+      ...rec,
+      nextOccurrence: dueDateToYmd(nextDueStr),
+    },
+    parentTaskId: completedTask.parentTaskId || completedTask.id,
+    created_at: new Date().toISOString(),
+    subtasks: freshSubtasks,
+    dependencies: [],
+  } as Task;
+}
+
 const STORY_POINTS = [1, 2, 3, 5, 8];
 const DEFAULT_TASK_CATEGORIES: TaskCategory[] = ['estudo', 'peticao', 'audiencia', 'admin', 'geral'];
 
@@ -380,6 +458,9 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
             completed: isDone,
             completedAt: isDone ? task.completedAt || new Date().toISOString() : undefined,
           };
+          if (isDone && !task.completed && task.recurrence) {
+            await spawnNextRecurrenceIfNeeded(task);
+          }
           setTasks((prev) => prev.map((t) => (t.id === taskId ? updatedTask : t)));
           await dataService.saveTask(updatedTask, userId, isOnline);
           return;
@@ -1007,6 +1088,35 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     setShowTemplatesMenu(false);
   };
 
+  const spawnNextRecurrenceIfNeeded = async (completedTask: Task) => {
+    const built = buildNextRecurrenceTask(completedTask);
+    if (!built) return;
+    let nextTask = built;
+    const b = nextTask.boardId ? boards.find((x) => x.id === nextTask.boardId) : undefined;
+    if (b?.columns?.length) {
+      const lower = (name: string) => name.toLowerCase();
+      const targetCol = b.columns.find((c) => c.id === nextTask.columnId);
+      const targetLooksDone =
+        targetCol &&
+        (lower(targetCol.name).includes('conclu') || lower(targetCol.name).includes('done'));
+      if (targetLooksDone) {
+        const fallback =
+          b.columns.find((c) => {
+            const n = lower(c.name);
+            return !n.includes('conclu') && !n.includes('done');
+          }) || b.columns[0];
+        nextTask = {
+          ...nextTask,
+          columnId: fallback.id,
+          status: statusFromBoardColumn(b, fallback.id),
+        };
+      }
+    }
+    await dataService.saveTask(nextTask, userId, isOnline);
+    setTasks((prev) => [nextTask, ...prev]);
+    toast.success(`Tarefa recorrente criada para ${formatDueDateTimeBr(nextTask.dueDate)}`);
+  };
+
   const handleUpdateTask = async (updates: Partial<Task>, taskIdOverride?: string) => {
     const taskId = taskIdOverride || selectedTaskId;
     if (!taskId) return;
@@ -1014,76 +1124,13 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     const taskToUpdate = tasks.find(t => t.id === taskId);
     if (!taskToUpdate) return;
 
-    // If marking as completed, set the timestamp and alinhar status (evita estado local incoerente)
-    if (updates.completed === true && !taskToUpdate.completedAt) {
-      updates.completedAt = new Date().toISOString();
+    // Transição para concluída: dispara recorrência (evita depender só de completedAt — ex.: Kanban antigo)
+    if (updates.completed === true && !taskToUpdate.completed) {
+      if (!updates.completedAt) updates.completedAt = new Date().toISOString();
       updates.status = 'Concluido' as Task['status'];
-      
-      // Recurrence Logic
+
       if (taskToUpdate.recurrence) {
-        const { frequency, interval = 1, businessDaysOnly } = taskToUpdate.recurrence;
-        let baseDate: Date;
-        if (taskToUpdate.dueDate) {
-          if (dueDateHasTime(taskToUpdate.dueDate)) {
-            const inst = new Date(taskToUpdate.dueDate);
-            baseDate = Number.isNaN(inst.getTime())
-              ? dateAtNoonForYmd(dueDateToYmd(taskToUpdate.dueDate))
-              : inst;
-          } else {
-            baseDate = dateAtNoonForYmd(dueDateToYmd(taskToUpdate.dueDate));
-          }
-        } else {
-          baseDate = new Date();
-        }
-
-        const getNextOccurrence = (date: Date) => {
-          let next = new Date(date);
-          if (frequency === 'daily') {
-            next.setDate(next.getDate() + interval);
-          } else if (frequency === 'weekly') {
-            next.setDate(next.getDate() + (7 * interval));
-          } else if (frequency === 'monthly') {
-            next.setMonth(next.getMonth() + interval);
-          }
-          
-          if (businessDaysOnly) {
-            // Skip weekends (0 = Sunday, 6 = Saturday)
-            while (next.getDay() === 0 || next.getDay() === 6) {
-              next.setDate(next.getDate() + 1);
-            }
-          }
-          return next;
-        };
-
-        const nextOccurrenceDate = getNextOccurrence(baseDate);
-        const nextYmd = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(nextOccurrenceDate).slice(0, 10);
-
-        let nextDueStr = nextYmd;
-        if (taskToUpdate.dueDate && dueDateHasTime(taskToUpdate.dueDate)) {
-          const hm = formatDueTimeHmForInput(taskToUpdate.dueDate);
-          if (hm) {
-            const withTime = combineYmdAndTimeBrToIso(nextYmd, hm);
-            if (withTime) nextDueStr = withTime;
-          }
-        }
-
-        const nextTask: Task = {
-          ...taskToUpdate,
-          id: crypto.randomUUID(),
-          completed: false,
-          completedAt: undefined,
-          dueDate: nextDueStr,
-          recurrence: {
-            ...taskToUpdate.recurrence,
-            nextOccurrence: dueDateToYmd(nextDueStr),
-          },
-          parentTaskId: taskToUpdate.parentTaskId || taskToUpdate.id,
-          created_at: new Date().toISOString()
-        } as any;
-        
-        await dataService.saveTask(nextTask, userId, isOnline);
-        setTasks(prev => [nextTask, ...prev]);
-        toast.success(`Tarefa recorrente criada para ${formatDueDateTimeBr(nextDueStr)}`);
+        await spawnNextRecurrenceIfNeeded(taskToUpdate);
       }
 
       // Notify delegator if this was a delegated task
