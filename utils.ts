@@ -16,6 +16,73 @@ export function formatDueDateBr(due: string | undefined | null): string {
   return `${d}/${m}/${y}`;
 }
 
+/** `true` se o prazo inclui horário (não é só AAAA-MM-DD). */
+export function dueDateHasTime(due: string | undefined | null): boolean {
+  if (!due?.trim()) return false;
+  const t = due.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return false;
+  return t.includes('T');
+}
+
+/** Data + hora em Brasília (ex.: 08/04/2026 14:30). Sem hora, equivale a `formatDueDateBr`. */
+export function formatDueDateTimeBr(due: string | undefined | null): string {
+  if (!due) return '';
+  const datePart = formatDueDateBr(due);
+  if (!dueDateHasTime(due)) return datePart;
+  const d = new Date(due);
+  if (Number.isNaN(d.getTime())) return datePart;
+  const timePart = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(d);
+  return `${datePart} ${timePart}`;
+}
+
+/** Valor para `<input type="time" />` (HH:mm) a partir do ISO, fuso Brasília. */
+export function formatDueTimeHmForInput(due: string | undefined | null): string {
+  if (!due || !dueDateHasTime(due)) return '';
+  const d = new Date(due);
+  if (Number.isNaN(d.getTime())) return '';
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'America/Sao_Paulo',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(d);
+  const h = parts.find((p) => p.type === 'hour')?.value;
+  const m = parts.find((p) => p.type === 'minute')?.value;
+  if (h == null || m == null) return '';
+  return `${h.padStart(2, '0')}:${m.padStart(2, '0')}`;
+}
+
+/**
+ * Combina data civil AAAA-MM-DD com HH:mm no horário oficial de Brasília (UTC−3, sem DST).
+ * Retorna ISO com offset -03:00.
+ */
+export function combineYmdAndTimeBrToIso(ymd: string, hhmm: string): string | null {
+  const y = ymd.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(y)) return null;
+  const m = /^(\d{1,2}):(\d{2})/.exec(hhmm.trim());
+  if (!m) return null;
+  const h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  if (h < 0 || h > 23 || min < 0 || min > 59) return null;
+  return `${y}T${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}:00-03:00`;
+}
+
+/** Instantâneo em ms para ordenar prazos: só-data usa meio-dia local na data civil; ISO com hora usa o instante. */
+export function dueDateToSortInstantMs(due: string | undefined | null): number {
+  const d = due?.trim();
+  if (!d) return Number.POSITIVE_INFINITY;
+  if (!d.includes('T')) {
+    return dateAtNoonForYmd(dueDateToYmd(d)).getTime();
+  }
+  const ms = new Date(d).getTime();
+  return Number.isNaN(ms) ? Number.POSITIVE_INFINITY : ms;
+}
+
 /** Converte dd/mm/aaaa (ou d/m/aaaa) para AAAA-MM-DD, ou null se inválido. */
 export function parseDueDateBrToIso(text: string): string | null {
   const t = text.trim();

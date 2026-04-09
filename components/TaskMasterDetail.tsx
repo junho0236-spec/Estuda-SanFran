@@ -43,9 +43,14 @@ import { suggestSubtasks } from '../services/geminiService';
 import {
   getBrasiliaDate,
   formatDueDateBr,
+  formatDueDateTimeBr,
+  formatDueTimeHmForInput,
   parseDueDateBrToIso,
   dateAtNoonForYmd,
   dueDateToYmd,
+  dueDateHasTime,
+  dueDateToSortInstantMs,
+  combineYmdAndTimeBrToIso,
   addDaysYmd,
   ymdWeekdayUtc,
   isoTimestampToYmdBr,
@@ -81,14 +86,9 @@ function compareTasksForListView(a: Task, b: Task): number {
     return cb - ca;
   }
 
-  const dueA = a.dueDate ? dueDateToYmd(a.dueDate) : '';
-  const dueB = b.dueDate ? dueDateToYmd(b.dueDate) : '';
-  if (dueA !== dueB) {
-    if (!dueA) return 1;
-    if (!dueB) return -1;
-    const c = dueA.localeCompare(dueB);
-    if (c !== 0) return c;
-  }
+  const dueA = dueDateToSortInstantMs(a.dueDate);
+  const dueB = dueDateToSortInstantMs(b.dueDate);
+  if (dueA !== dueB) return dueA - dueB;
 
   const pr = taskListPriorityRank(a.priority) - taskListPriorityRank(b.priority);
   if (pr !== 0) return pr;
@@ -631,6 +631,8 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   const [showExportMenu, setShowExportMenu] = useState(false);
   /** Campo de prazo no painel (dd/mm/aaaa); sincronizado com a tarefa selecionada. */
   const [dueDateInputDraft, setDueDateInputDraft] = useState('');
+  /** Horário opcional (HH:mm) para o mesmo prazo, fuso Brasília. */
+  const [dueTimeInputDraft, setDueTimeInputDraft] = useState('');
   /** Título editável no cabeçalho do detalhe (evita renomear só na criação). */
   const [taskTitleDraft, setTaskTitleDraft] = useState('');
 
@@ -655,9 +657,11 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         preExamReview: false
       });
       setDueDateInputDraft(formatDueDateBr(selectedTask.dueDate));
+      setDueTimeInputDraft(formatDueTimeHmForInput(selectedTask.dueDate));
       setTaskTitleDraft(selectedTask.title);
     } else {
       setDueDateInputDraft('');
+      setDueTimeInputDraft('');
       setTaskTitleDraft('');
     }
   }, [selectedTaskId, selectedTask]);
@@ -1018,7 +1022,14 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         const { frequency, interval = 1, businessDaysOnly } = taskToUpdate.recurrence;
         let baseDate: Date;
         if (taskToUpdate.dueDate) {
-          baseDate = dateAtNoonForYmd(dueDateToYmd(taskToUpdate.dueDate));
+          if (dueDateHasTime(taskToUpdate.dueDate)) {
+            const inst = new Date(taskToUpdate.dueDate);
+            baseDate = Number.isNaN(inst.getTime())
+              ? dateAtNoonForYmd(dueDateToYmd(taskToUpdate.dueDate))
+              : inst;
+          } else {
+            baseDate = dateAtNoonForYmd(dueDateToYmd(taskToUpdate.dueDate));
+          }
         } else {
           baseDate = new Date();
         }
@@ -1045,15 +1056,24 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         const nextOccurrenceDate = getNextOccurrence(baseDate);
         const nextYmd = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(nextOccurrenceDate).slice(0, 10);
 
+        let nextDueStr = nextYmd;
+        if (taskToUpdate.dueDate && dueDateHasTime(taskToUpdate.dueDate)) {
+          const hm = formatDueTimeHmForInput(taskToUpdate.dueDate);
+          if (hm) {
+            const withTime = combineYmdAndTimeBrToIso(nextYmd, hm);
+            if (withTime) nextDueStr = withTime;
+          }
+        }
+
         const nextTask: Task = {
           ...taskToUpdate,
           id: crypto.randomUUID(),
           completed: false,
           completedAt: undefined,
-          dueDate: nextYmd,
+          dueDate: nextDueStr,
           recurrence: {
             ...taskToUpdate.recurrence,
-            nextOccurrence: nextYmd
+            nextOccurrence: dueDateToYmd(nextDueStr),
           },
           parentTaskId: taskToUpdate.parentTaskId || taskToUpdate.id,
           created_at: new Date().toISOString()
@@ -1061,7 +1081,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         
         await dataService.saveTask(nextTask, userId, isOnline);
         setTasks(prev => [nextTask, ...prev]);
-        toast.success(`Tarefa recorrente criada para ${formatDueDateBr(nextYmd)}`);
+        toast.success(`Tarefa recorrente criada para ${formatDueDateTimeBr(nextDueStr)}`);
       }
 
       // Notify delegator if this was a delegated task
@@ -1121,6 +1141,40 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     const updatedTask = { ...taskToUpdate, ...updates };
     await dataService.saveTask(updatedTask, userId, isOnline);
     setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t));
+  };
+
+  const commitDueDrafts = () => {
+    if (!selectedTaskId) return;
+    const task = tasks.find((t) => t.id === selectedTaskId);
+    const trimmedDate = dueDateInputDraft.trim();
+    if (!trimmedDate) {
+      void handleUpdateTask({ dueDate: undefined });
+      setDueDateInputDraft('');
+      setDueTimeInputDraft('');
+      return;
+    }
+    const ymd = parseDueDateBrToIso(trimmedDate);
+    if (!ymd) {
+      toast.error('Data inválida. Use dd/mm/aaaa.');
+      if (task) {
+        setDueDateInputDraft(formatDueDateBr(task.dueDate));
+        setDueTimeInputDraft(formatDueTimeHmForInput(task.dueDate));
+      }
+      return;
+    }
+    const tm = dueTimeInputDraft.trim();
+    if (tm) {
+      const iso = combineYmdAndTimeBrToIso(ymd, tm);
+      if (iso) {
+        void handleUpdateTask({ dueDate: iso });
+        setDueDateInputDraft(formatDueDateBr(iso));
+        setDueTimeInputDraft(formatDueTimeHmForInput(iso));
+      }
+    } else {
+      void handleUpdateTask({ dueDate: ymd });
+      setDueDateInputDraft(formatDueDateBr(ymd));
+      setDueTimeInputDraft('');
+    }
   };
 
   const handleDeleteTask = async (id: string) => {
@@ -1597,7 +1651,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                 {task.dueDate && (
                   <div className={`flex items-center gap-1 text-[11px] font-bold ${selectedTaskId === task.id ? 'text-white/80' : 'text-amber-600'}`}>
                     <Calendar size={12} className="shrink-0" />
-                    {formatDueDateBr(task.dueDate)}
+                    {formatDueDateTimeBr(task.dueDate)}
                   </div>
                 )}
                 {task.boardId && (
@@ -2325,32 +2379,34 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                             <div className="flex items-center gap-2 mb-3 text-slate-400 font-bold text-[10px] uppercase tracking-widest">
                               <Calendar size={14} /> Prazo de Entrega
                             </div>
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              autoComplete="off"
-                              placeholder="dd/mm/aaaa"
-                              value={dueDateInputDraft}
-                              onChange={(e) => setDueDateInputDraft(e.target.value)}
-                              onBlur={() => {
-                                const trimmed = dueDateInputDraft.trim();
-                                if (!trimmed) {
-                                  handleUpdateTask({ dueDate: undefined });
-                                  setDueDateInputDraft('');
-                                  return;
-                                }
-                                const iso = parseDueDateBrToIso(trimmed);
-                                if (iso) {
-                                  handleUpdateTask({ dueDate: iso });
-                                  setDueDateInputDraft(formatDueDateBr(iso));
-                                } else {
-                                  toast.error('Data inválida. Use dd/mm/aaaa.');
-                                  setDueDateInputDraft(formatDueDateBr(selectedTask.dueDate));
-                                }
-                              }}
-                              className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#800000]/10"
-                            />
-                            <p className="mt-1.5 text-[10px] text-slate-400">Formato: dia / mês / ano (ex.: 08/04/2026)</p>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                              <div>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  autoComplete="off"
+                                  placeholder="dd/mm/aaaa"
+                                  value={dueDateInputDraft}
+                                  onChange={(e) => setDueDateInputDraft(e.target.value)}
+                                  onBlur={() => commitDueDrafts()}
+                                  className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#800000]/10"
+                                />
+                                <p className="mt-1.5 text-[10px] text-slate-400">Data (obrigatória se definir horário)</p>
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                  Horário (opcional)
+                                </label>
+                                <input
+                                  type="time"
+                                  value={dueTimeInputDraft}
+                                  onChange={(e) => setDueTimeInputDraft(e.target.value)}
+                                  onBlur={() => commitDueDrafts()}
+                                  className="min-h-[44px] w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#800000]/10"
+                                />
+                                <p className="mt-1.5 text-[10px] text-slate-400">Fuso de Brasília (ex.: aula de inglês)</p>
+                              </div>
+                            </div>
                           </section>
 
                           <section>
@@ -2830,7 +2886,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                             </div>
                             {task.dueDate && (
                               <div className={`flex items-center gap-1 text-[10px] font-bold ${task.completed ? 'text-slate-300' : 'text-amber-600'}`}>
-                                <Calendar size={10} /> {formatDueDateBr(task.dueDate)}
+                                <Calendar size={10} /> {formatDueDateTimeBr(task.dueDate)}
                               </div>
                             )}
                           </div>

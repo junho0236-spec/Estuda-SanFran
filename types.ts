@@ -207,6 +207,7 @@ export interface Task {
   title: string;
   completed: boolean;
   subjectId?: string;
+  /** Só data (`AAAA-MM-DD`) ou ISO com hora (ex. aula às 14h em Brasília). */
   dueDate?: string;
   completedAt?: string;
   priority?: TaskPriority;
