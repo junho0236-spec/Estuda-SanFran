@@ -915,7 +915,7 @@ const App: React.FC = () => {
         const { data } = await supabase
           .from('tasks')
           .select(TASK_CLOUD_COLUMNS)
-          .eq('user_id', userId)
+          .or(`user_id.eq.${userId},delegated_to.eq.${userId}`)
           .is('archived_at', null)
           .order('created_at', { ascending: false });
         if (data) {
@@ -1054,7 +1054,7 @@ const App: React.FC = () => {
             supabase
               .from('tasks')
               .select(TASK_CLOUD_COLUMNS)
-              .eq('user_id', userId)
+              .or(`user_id.eq.${userId},delegated_to.eq.${userId}`)
               .is('archived_at', null)
               .order('created_at', { ascending: false }),
             supabase

@@ -44,6 +44,9 @@ import {
   parseDueDateBrToIso,
   dateAtNoonForYmd,
   dueDateToYmd,
+  addDaysYmd,
+  ymdWeekdayUtc,
+  isoTimestampToYmdBr,
 } from '../utils';
 
 const STORY_POINTS = [1, 2, 3, 5, 8];
@@ -349,46 +352,43 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       }
     }
 
-    // Parse Date (improved)
-    const now = new Date();
+    // Parse Date (improved) — calendário alinhado a Brasília (evita UTC à meia-noite)
+    const todayYmd = getBrasiliaDate();
     const daysOfWeek = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
-    
+
     if (title.toLowerCase().includes('amanhã')) {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      dueDate = tomorrow.toISOString().split('T')[0];
+      dueDate = addDaysYmd(todayYmd, 1);
       title = title.replace(/amanhã/gi, '');
     } else if (title.toLowerCase().includes('hoje')) {
-      dueDate = now.toISOString().split('T')[0];
+      dueDate = todayYmd;
       title = title.replace(/hoje/gi, '');
     } else {
-      // Check for days of the week
       for (let i = 0; i < daysOfWeek.length; i++) {
         const day = daysOfWeek[i];
         if (title.toLowerCase().includes(day)) {
           const targetDay = i;
-          const currentDay = now.getDay();
+          const currentDay = ymdWeekdayUtc(todayYmd);
           let daysUntil = targetDay - currentDay;
           if (daysUntil <= 0) daysUntil += 7;
-          
-          const futureDate = new Date();
-          futureDate.setDate(now.getDate() + daysUntil);
-          dueDate = futureDate.toISOString().split('T')[0];
+          dueDate = addDaysYmd(todayYmd, daysUntil);
           title = title.replace(new RegExp(day, 'gi'), '');
           break;
         }
       }
     }
 
-    // Parse Date formats like DD/MM
     const dateMatch = title.match(/(\d{1,2})\/(\d{1,2})/);
     if (dateMatch && !dueDate) {
-      const day = parseInt(dateMatch[1]);
-      const month = parseInt(dateMatch[2]) - 1;
-      const year = now.getFullYear();
-      const d = new Date(year, month, day);
-      if (d < now) d.setFullYear(year + 1); // Assume next year if date passed
-      dueDate = d.toISOString().split('T')[0];
+      const dom = parseInt(dateMatch[1], 10);
+      const mon = parseInt(dateMatch[2], 10);
+      const [y0] = todayYmd.split('-').map((x) => parseInt(x, 10));
+      let y = y0;
+      let candidate = `${y}-${String(mon).padStart(2, '0')}-${String(dom).padStart(2, '0')}`;
+      if (candidate < todayYmd) {
+        y = y0 + 1;
+        candidate = `${y}-${String(mon).padStart(2, '0')}-${String(dom).padStart(2, '0')}`;
+      }
+      dueDate = candidate;
       title = title.replace(dateMatch[0], '');
     }
 
@@ -1150,16 +1150,20 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   };
 
   const hasUrgentTasks = (boardId: string | 'inbox') => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getBrasiliaDate();
     const boardTasks = boardId === 'inbox' 
       ? tasks.filter(t => !t.boardId)
       : tasks.filter(t => t.boardId === boardId);
-    return boardTasks.some(t => t.dueDate && t.dueDate.startsWith(today) && !t.completed);
+    return boardTasks.some(
+      (t) => t.dueDate && dueDateToYmd(t.dueDate) === today && !t.completed
+    );
   };
 
   const handleRescheduleOverdue = async () => {
-    const today = new Date().toISOString().split('T')[0];
-    const overdueTasks = tasks.filter(t => t.dueDate && t.dueDate < today && !t.completed);
+    const today = getBrasiliaDate();
+    const overdueTasks = tasks.filter(
+      (t) => t.dueDate && dueDateToYmd(t.dueDate) < today && !t.completed
+    );
     
     if (overdueTasks.length === 0) return;
 
@@ -1259,19 +1263,17 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
 
   const Heatmap = ({ tasks }: { tasks: Task[] }) => {
     const [view, setView] = useState<'me' | 'team'>('me');
-    const today = new Date();
-    const days = Array.from({ length: 14 }, (_, i) => {
-      const d = new Date();
-      d.setDate(today.getDate() - 7 + i);
-      return d.toISOString().split('T')[0];
-    });
+    const todayYmd = getBrasiliaDate();
+    const days = Array.from({ length: 14 }, (_, i) => addDaysYmd(todayYmd, i - 7));
 
     const filteredTasks = view === 'me' 
       ? tasks.filter(t => !t.delegatedTo || t.delegatedTo === userId)
       : tasks;
 
     const getDensity = (date: string) => {
-      const count = filteredTasks.filter(t => t.completedAt?.startsWith(date)).length;
+      const count = filteredTasks.filter(
+        (t) => t.completedAt && isoTimestampToYmdBr(t.completedAt) === date
+      ).length;
       if (count === 0) return 'bg-slate-100';
       if (count < 2) return 'bg-emerald-500/20';
       if (count < 4) return 'bg-emerald-500/40';
@@ -1302,8 +1304,8 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
           {days.map(date => (
             <div 
               key={date}
-              title={`${date}: ${filteredTasks.filter(t => t.completedAt?.startsWith(date)).length} tarefas concluídas`}
-              className={`w-3 h-3 rounded-sm transition-all hover:scale-125 cursor-help ${getDensity(date)} ${date === today.toISOString().split('T')[0] ? 'ring-2 ring-amber-400 ring-offset-1' : ''}`}
+              title={`${date}: ${filteredTasks.filter(t => t.completedAt && isoTimestampToYmdBr(t.completedAt) === date).length} tarefas concluídas`}
+              className={`w-3 h-3 rounded-sm transition-all hover:scale-125 cursor-help ${getDensity(date)} ${date === todayYmd ? 'ring-2 ring-amber-400 ring-offset-1' : ''}`}
             />
           ))}
         </div>
@@ -1468,18 +1470,16 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   };
 
   // --- Render Helpers ---
-  const filteredTasks = tasks.filter(isTaskVisible).filter(task => {
-    // Context filter
-    const today = new Date().toISOString().split('T')[0];
-    const tomorrowDate = new Date();
-    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-    const tomorrow = tomorrowDate.toISOString().split('T')[0];
+  const todayBr = getBrasiliaDate();
+  const tomorrowBr = addDaysYmd(todayBr, 1);
+  const filteredTasks = tasks.filter(isTaskVisible).filter((task) => {
+    const dueYmd = task.dueDate ? dueDateToYmd(task.dueDate) : '';
 
-    if (filter === 'today') return task.dueDate === today;
-    if (filter === 'tomorrow') return task.dueDate === tomorrow;
-    if (filter === 'overdue') return task.dueDate && task.dueDate < today && !task.completed;
+    if (filter === 'today') return dueYmd === todayBr;
+    if (filter === 'tomorrow') return dueYmd === tomorrowBr;
+    if (filter === 'overdue') return !!dueYmd && dueYmd < todayBr && !task.completed;
     if (filter === 'high') return task.priority === 'urgente' || task.priority === 'alta';
-    
+
     return true;
   });
 

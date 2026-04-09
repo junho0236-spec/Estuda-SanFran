@@ -46,6 +46,32 @@ export const getBrasiliaDate = () => {
   return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
 };
 
+/** Soma dias a uma data civil AAAA-MM-DD (aritmética de calendário, sem fuso). */
+export function addDaysYmd(ymd: string, deltaDays: number): string {
+  const parts = ymd.split('-').map((x) => parseInt(x, 10));
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return ymd;
+  const [y, mo, day] = parts;
+  const u = new Date(Date.UTC(y, mo - 1, day + deltaDays));
+  return `${u.getUTCFullYear()}-${String(u.getUTCMonth() + 1).padStart(2, '0')}-${String(u.getUTCDate()).padStart(2, '0')}`;
+}
+
+/** Dia da semana (0=dom … 6=sáb) para uma data civil AAAA-MM-DD. */
+export function ymdWeekdayUtc(ymd: string): number {
+  const parts = ymd.split('-').map((x) => parseInt(x, 10));
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return 0;
+  const [y, mo, day] = parts;
+  return new Date(Date.UTC(y, mo - 1, day)).getUTCDay();
+}
+
+/** Parte AAAA-MM-DD de um instante ISO no fuso de Brasília (para heatmaps / contagens por dia). */
+export function isoTimestampToYmdBr(iso: string): string {
+  const t = String(iso ?? '').trim();
+  if (!t) return '';
+  const d = new Date(t);
+  if (Number.isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(d);
+}
+
 export const getBrasiliaISOString = () => {
   const now = new Date();
   const formatter = new Intl.DateTimeFormat('sv-SE', { 

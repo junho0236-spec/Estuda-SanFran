@@ -80,7 +80,7 @@ export async function syncDueTasksToGoogleAndSupabaseFromCloud(
     supabase
       .from('tasks')
       .select(TASK_CLOUD_COLUMNS)
-      .eq('user_id', userId)
+      .or(`user_id.eq.${userId},delegated_to.eq.${userId}`)
       .is('archived_at', null)
       .order('created_at', { ascending: false }),
     fetchSubjectsCloudRows(userId),

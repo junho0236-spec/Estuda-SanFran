@@ -31,7 +31,7 @@ const DeadArchive: React.FC<DeadArchiveProps> = ({ userId }) => {
         supabase
           .from('tasks')
           .select(TASK_CLOUD_COLUMNS)
-          .eq('user_id', userId)
+          .or(`user_id.eq.${userId},delegated_to.eq.${userId}`)
           .not('archived_at', 'is', null)
           .order('archived_at', { ascending: false }),
         supabase
@@ -64,7 +64,14 @@ const DeadArchive: React.FC<DeadArchiveProps> = ({ userId }) => {
   const restoreItem = async (id: string, type: 'task' | 'card') => {
     const table = type === 'task' ? 'tasks' : 'flashcards';
     try {
-      const { error } = await supabase.from(table).update({ archived_at: null }).eq('id', id).eq('user_id', userId);
+      const { error } =
+        type === 'task'
+          ? await supabase
+              .from(table)
+              .update({ archived_at: null })
+              .eq('id', id)
+              .or(`user_id.eq.${userId},delegated_to.eq.${userId}`)
+          : await supabase.from(table).update({ archived_at: null }).eq('id', id).eq('user_id', userId);
       if (error) throw error;
       
       if (type === 'task') {
@@ -82,7 +89,14 @@ const DeadArchive: React.FC<DeadArchiveProps> = ({ userId }) => {
     
     const table = type === 'task' ? 'tasks' : 'flashcards';
     try {
-      const { error } = await supabase.from(table).delete().eq('id', id).eq('user_id', userId);
+      const { error } =
+        type === 'task'
+          ? await supabase
+              .from(table)
+              .delete()
+              .eq('id', id)
+              .or(`user_id.eq.${userId},delegated_to.eq.${userId}`)
+          : await supabase.from(table).delete().eq('id', id).eq('user_id', userId);
       if (error) throw error;
 
       if (type === 'task') {

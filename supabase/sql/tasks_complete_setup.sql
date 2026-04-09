@@ -68,6 +68,7 @@ DROP POLICY IF EXISTS tasks_select_own_or_delegated ON public.tasks;
 DROP POLICY IF EXISTS tasks_insert_own ON public.tasks;
 DROP POLICY IF EXISTS tasks_update_own_or_delegated ON public.tasks;
 DROP POLICY IF EXISTS tasks_delete_own ON public.tasks;
+DROP POLICY IF EXISTS tasks_delete_own_or_delegated ON public.tasks;
 
 CREATE POLICY tasks_select_own_or_delegated
   ON public.tasks FOR SELECT TO authenticated
@@ -77,14 +78,43 @@ CREATE POLICY tasks_insert_own
   ON public.tasks FOR INSERT TO authenticated
   WITH CHECK (user_id = auth.uid());
 
+-- UPDATE: dono ou delegado podem editar; WITH CHECK igual evita “sumir” da visão após update.
+-- Quem não é dono não pode mudar user_id (ver trigger abaixo) — senão o delegado assumiria a linha.
 CREATE POLICY tasks_update_own_or_delegated
   ON public.tasks FOR UPDATE TO authenticated
   USING (user_id = auth.uid() OR delegated_to = auth.uid())
   WITH CHECK (user_id = auth.uid() OR delegated_to = auth.uid());
 
-CREATE POLICY tasks_delete_own
+-- DELETE: alinhado à app (DeadArchive / deleteTask com .or user_id, delegated_to).
+-- Apenas dono ou delegado apagam a mesma linha; RLS continua a ser o limite final.
+CREATE POLICY tasks_delete_own_or_delegated
   ON public.tasks FOR DELETE TO authenticated
-  USING (user_id = auth.uid());
+  USING (user_id = auth.uid() OR delegated_to = auth.uid());
+
+-- Impede delegado (ou terceiro) de alterar user_id; dono (OLD.user_id) pode transferir se precisar.
+CREATE OR REPLACE FUNCTION public.tasks_enforce_owner_on_user_id_change()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF TG_OP = 'UPDATE'
+     AND NEW.user_id IS DISTINCT FROM OLD.user_id
+     AND auth.uid() IS NOT NULL
+     AND auth.uid() IS DISTINCT FROM OLD.user_id THEN
+    RAISE EXCEPTION 'Apenas o dono da tarefa pode alterar user_id.'
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS tasks_enforce_owner_on_user_id_change ON public.tasks;
+CREATE TRIGGER tasks_enforce_owner_on_user_id_change
+  BEFORE UPDATE ON public.tasks
+  FOR EACH ROW
+  EXECUTE FUNCTION public.tasks_enforce_owner_on_user_id_change();
 
 DROP POLICY IF EXISTS tasks_history_select_own ON public.tasks_history;
 DROP POLICY IF EXISTS tasks_history_insert_own ON public.tasks_history;

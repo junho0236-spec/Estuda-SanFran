@@ -202,6 +202,8 @@ export interface Board {
 
 export interface Task {
   id: string;
+  /** `user_id` da linha no Supabase (dono). Quem recebe por delegação mantém isto ao gravar. */
+  taskOwnerId?: string;
   title: string;
   completed: boolean;
   subjectId?: string;

@@ -1,7 +1,7 @@
 import { supabase } from './supabaseClient';
 import { db, addToSyncQueue, type OfflineSyncQueue } from './offlineService';
 import { Flashcard, Task, StudySession, Note, SubjectFile, Folder, Board, UserProgress, Friendship, Notification } from '../types';
-import { TASK_CLOUD_COLUMNS } from '../utils/supabaseCloudRowFormatters';
+import { TASK_CLOUD_COLUMNS, formatCloudTaskRow } from '../utils/supabaseCloudRowFormatters';
 import {
   FRIENDSHIPS_LIST_COLUMNS,
   NOTES_LIST_COLUMNS,
@@ -87,7 +87,7 @@ function mapSyncQueueItemToRow(item: OfflineSyncQueue, userId: string): Record<s
 
   if (item.table === 'tasks') {
     const task = item.data as Task;
-    payload.user_id = userId;
+    payload.user_id = task.taskOwnerId ?? userId;
     payload.title = task.title;
     payload.notes = task.notes || null;
     payload.due_date = task.dueDate || null;
@@ -98,6 +98,7 @@ function mapSyncQueueItemToRow(item: OfflineSyncQueue, userId: string): Record<s
     payload.subtasks = task.subtasks || [];
     payload.delegated_to = task.delegatedTo || null;
     payload.delegated_by = task.delegatedBy || null;
+    payload.subject_id = task.subjectId || null;
     payload.created_at =
       (task as { created_at?: string }).created_at ||
       (task as { createdAt?: string }).createdAt ||
@@ -132,6 +133,7 @@ function mapSyncQueueItemToRow(item: OfflineSyncQueue, userId: string): Record<s
     delete payload.completed;
     delete payload.delegatedTo;
     delete payload.delegatedBy;
+    delete payload.taskOwnerId;
   }
 
   if (item.table === 'boards') {
@@ -691,7 +693,7 @@ export const dataService = {
     if (isOnline) {
       const payload: any = {
         id: task.id,
-        user_id: userId,
+        user_id: task.taskOwnerId ?? userId,
         title: task.title,
         notes: task.notes || null,
         due_date: task.dueDate || null,
@@ -702,6 +704,7 @@ export const dataService = {
         subtasks: task.subtasks || [],
         delegated_to: task.delegatedTo || null,
         delegated_by: task.delegatedBy || null,
+        subject_id: task.subjectId || null,
         created_at: (task as any).created_at || (task as any).createdAt || new Date().toISOString(),
         description: JSON.stringify({
           syllabusLink: task.syllabusLink,
@@ -788,39 +791,9 @@ export const dataService = {
         .or(`user_id.eq.${userId},delegated_to.eq.${userId}`);
       
       if (!error && data) {
-        const mappedTasks: Task[] = data.map(t => {
-          const desc = t.description ? JSON.parse(t.description) : {};
-          return {
-            id: t.id,
-            title: t.title,
-            completed: t.status === 'Concluido',
-            status: t.status,
-            notes: t.notes,
-            dueDate: t.due_date,
-            completedAt: t.completed_at,
-            category: t.category,
-            priority: desc.originalPriority || (t.priority === 'Alta' ? 'alta' : 'normal'),
-            subtasks: t.subtasks,
-            delegatedTo: t.delegated_to,
-            delegatedBy: t.delegated_by,
-            delegatedByName: desc.delegatedByName,
-            delegatedToName: desc.delegatedToName,
-            syllabusLink: desc.syllabusLink,
-            importantCitations: desc.importantCitations,
-            revisionStatus: desc.revisionStatus,
-            boardId: desc.boardId,
-            columnId: desc.columnId,
-            subjectId: desc.subjectId,
-            recurrence: desc.recurrence,
-            library_attachments: desc.library_attachments,
-            total_focus_time: desc.total_focus_time,
-            parentTaskId: desc.parentTaskId,
-            dependencies: desc.dependencies,
-            storyPoints: desc.storyPoints,
-            comments: desc.comments || [],
-            google_event_id: (t as { google_event_id?: string }).google_event_id ?? desc.google_event_id,
-          };
-        });
+        const mappedTasks: Task[] = data.map((t) =>
+          formatCloudTaskRow(t as unknown as Record<string, unknown>)
+        );
         await db.tasks.bulkPut(mappedTasks);
         return mappedTasks;
       }
@@ -962,7 +935,11 @@ export const dataService = {
     }
 
     if (isOnline) {
-      const { error } = await supabase.from('tasks').delete().eq('id', id).eq('user_id', userId);
+      const { error } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('id', id)
+        .or(`user_id.eq.${userId},delegated_to.eq.${userId}`);
       if (error) {
         const code = String((error as { code?: string }).code || '');
         const msg = String((error as { message?: string }).message || '').toLowerCase();

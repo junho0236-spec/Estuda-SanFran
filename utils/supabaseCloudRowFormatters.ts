@@ -5,7 +5,7 @@ export const FLASHCARD_CLOUD_COLUMNS =
   'id, front, back, notes, tags, source, subject_id, folder_id, next_review, interval, status, learning_step, ease_factor, total_errors, archived_at, is_suspended';
 
 export const TASK_CLOUD_COLUMNS =
-  'id, title, status, subject_id, due_date, completed_at, category, priority, notes, subtasks, description, archived_at, delegated_to, delegated_by, created_at, google_event_id';
+  'id, user_id, title, status, subject_id, due_date, completed_at, category, priority, notes, subtasks, description, archived_at, delegated_to, delegated_by, created_at, google_event_id';
 
 /** Metadados de disciplina usados no Dashboard / Anki. */
 export const SUBJECT_CLOUD_COLUMNS =
@@ -44,6 +44,16 @@ export function formatCloudFlashcardRow(c: Record<string, unknown>): Flashcard {
   };
 }
 
+/** Status vindo do PostgREST (acentos / caixa variam). */
+export function cloudTaskStatusIsCompleted(status: unknown): boolean {
+  const s = String(status ?? '')
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+  return s === 'concluido';
+}
+
 export function formatCloudTaskRow(t: Record<string, unknown>): Task {
   const descRaw = t.description;
   const desc =
@@ -56,11 +66,13 @@ export function formatCloudTaskRow(t: Record<string, unknown>): Task {
           }
         })()
       : {};
+  const rawStatus = t.status as string | undefined;
   return {
     id: String(t.id ?? ''),
+    taskOwnerId: t.user_id != null && String(t.user_id).trim() !== '' ? String(t.user_id) : undefined,
     title: String(t.title ?? ''),
-    completed: t.status === 'Concluido',
-    status: (t.status as Task['status']) ?? undefined,
+    completed: cloudTaskStatusIsCompleted(rawStatus),
+    status: (rawStatus as Task['status']) ?? undefined,
     subjectId: (desc.subjectId as string) || (t.subject_id as string) || '',
     dueDate: t.due_date as string | undefined,
     completedAt: t.completed_at as string | undefined,
@@ -83,6 +95,15 @@ export function formatCloudTaskRow(t: Record<string, unknown>): Task {
         : undefined,
     revisionStatus: desc.revisionStatus as Task['revisionStatus'],
     created_at: t.created_at as string | undefined,
+    recurrence: desc.recurrence as Task['recurrence'],
+    library_attachments: (desc.library_attachments as string[] | undefined) || undefined,
+    total_focus_time:
+      desc.total_focus_time != null ? Number(desc.total_focus_time) : undefined,
+    parentTaskId: desc.parentTaskId as string | undefined,
+    dependencies: (desc.dependencies as string[] | undefined) || undefined,
+    storyPoints:
+      desc.storyPoints != null ? Number(desc.storyPoints) : undefined,
+    comments: (desc.comments as Task['comments']) || [],
     google_event_id:
       (t.google_event_id as string | undefined) ??
       (desc.google_event_id as string | undefined),
