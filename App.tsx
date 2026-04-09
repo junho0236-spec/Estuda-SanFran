@@ -27,6 +27,10 @@ import {
 } from './utils/supabaseCloudRowFormatters';
 import { bulkPutInChunks, bulkDeleteIdsInChunks } from './utils/dexieBulkYield';
 import {
+  normalizeBoardColumnIds,
+  persistBoardColumnNormalization,
+} from './utils/normalizeBoardColumnIds';
+import {
   STUDY_SESSIONS_LIST_COLUMNS as STUDY_SESSION_CLOUD_COLUMNS,
   USER_PROGRESS_CLOUD_COLUMNS,
 } from './utils/supabaseSelectColumns';
@@ -793,8 +797,23 @@ const App: React.FC = () => {
           db.flashcards.toArray(),
           db.user_profile.get(userId),
         ]);
-      setTasks(localTasks);
-      setBoards(localBoards);
+      let nextBoards = localBoards as Board[];
+      let nextTasks = localTasks as Task[];
+      const columnNorm = normalizeBoardColumnIds(nextBoards, nextTasks);
+      if (columnNorm.changed) {
+        await persistBoardColumnNormalization(
+          nextBoards,
+          columnNorm.boards,
+          nextTasks,
+          columnNorm.tasks,
+          userId,
+          isOnline
+        );
+        nextBoards = columnNorm.boards;
+        nextTasks = columnNorm.tasks;
+      }
+      setTasks(nextTasks);
+      setBoards(nextBoards);
       setStudySessions(localSessions);
       setFolders(localFolders);
       setSubjects(localSubs);
@@ -1133,29 +1152,64 @@ const App: React.FC = () => {
           );
         }
 
+        let mergedTasksFull: Task[] | undefined;
         if (resTks.data) {
           const formattedTasks = resTks.data.map((t) =>
             formatCloudTaskRow(t as unknown as Record<string, unknown>)
-          );
+          ) as Task[];
 
           if (syncQueueCount === 0) {
             const localTasks = await db.tasks.toArray();
             const remoteIds = new Set(formattedTasks.map((t) => t.id));
             const idsToDelete = localTasks.filter((t) => !remoteIds.has(t.id)).map((t) => t.id);
             if (idsToDelete.length > 0) await bulkDeleteIdsInChunks(db.tasks, idsToDelete);
-            await bulkPutInChunks(db.tasks, formattedTasks as Task[]);
           }
-          setTasks(formattedTasks as Task[]);
+          mergedTasksFull = formattedTasks as Task[];
         }
 
+        let mergedBoardsFull: Board[] | undefined;
         if (resBoards.data) {
-          const formattedBoards = resBoards.data.map(b => ({
-            id: b.id, name: b.name, columns: b.columns, userId: b.user_id, createdAt: b.created_at
-          }));
-          if (syncQueueCount === 0) {
-            await bulkPutInChunks(db.boards, formattedBoards);
+          mergedBoardsFull = resBoards.data.map((b) => ({
+            id: b.id,
+            name: b.name,
+            columns: b.columns,
+            userId: b.user_id,
+            createdAt: b.created_at,
+          })) as Board[];
+        }
+
+        if (mergedTasksFull && mergedBoardsFull) {
+          const norm = normalizeBoardColumnIds(mergedBoardsFull, mergedTasksFull);
+          const outBoards = norm.boards;
+          const outTasks = norm.tasks;
+          if (norm.changed) {
+            await persistBoardColumnNormalization(
+              mergedBoardsFull,
+              outBoards,
+              mergedTasksFull,
+              outTasks,
+              userId,
+              isOnline
+            );
+          } else if (syncQueueCount === 0) {
+            await bulkPutInChunks(db.tasks, outTasks);
+            await bulkPutInChunks(db.boards, outBoards);
           }
-          setBoards(formattedBoards);
+          setTasks(outTasks);
+          setBoards(outBoards);
+        } else {
+          if (mergedTasksFull) {
+            if (syncQueueCount === 0) {
+              await bulkPutInChunks(db.tasks, mergedTasksFull);
+            }
+            setTasks(mergedTasksFull);
+          }
+          if (mergedBoardsFull) {
+            if (syncQueueCount === 0) {
+              await bulkPutInChunks(db.boards, mergedBoardsFull);
+            }
+            setBoards(mergedBoardsFull);
+          }
         }
         
         if (resSessions.data) {

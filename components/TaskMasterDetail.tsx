@@ -52,6 +52,16 @@ import {
 const STORY_POINTS = [1, 2, 3, 5, 8];
 const DEFAULT_TASK_CATEGORIES: TaskCategory[] = ['estudo', 'peticao', 'audiencia', 'admin', 'geral'];
 
+function statusFromBoardColumn(board: Board | undefined, columnId: string | undefined): NonNullable<Task['status']> {
+  if (!board || !columnId) return 'Pendente';
+  const col = board.columns.find((c) => c.id === columnId);
+  if (!col) return 'Pendente';
+  const n = col.name.toLowerCase();
+  if (n.includes('conclu') || n.includes('done')) return 'Concluido';
+  if (n.includes('fazendo') || n.includes('andamento') || n.includes('progress')) return 'Fazendo';
+  return 'Pendente';
+}
+
 const TASK_TEMPLATES = [
   {
     id: 'fichamento',
@@ -131,10 +141,26 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   const [pendingCalendarDue, setPendingCalendarDue] = useState<string | null>(null);
   const quickEntryInputRef = useRef<HTMLInputElement>(null);
 
-  const currentViewMode: 'list' | 'kanban' = userProfile?.viewPreferences?.[activeTab] || (boards.find(b => b.id === activeTab) ? 'kanban' : 'list');
+  const storedViewMode: 'list' | 'kanban' =
+    userProfile?.viewPreferences?.[activeTab] ?? (boards.find((b) => b.id === activeTab) ? 'kanban' : 'list');
+
+  const [isMdUp, setIsMdUp] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : true
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)');
+    const onChange = () => setIsMdUp(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  /** Geral = só lista agregada; abaixo de md = sem Kanban (só lista nos quadros). */
+  const effectiveViewMode: 'list' | 'kanban' =
+    activeTab === 'Geral' || !isMdUp ? 'list' : storedViewMode;
 
   const handleToggleViewMode = (mode: 'list' | 'kanban') => {
     if (!userProfile) return;
+    if (mode === 'kanban' && (activeTab === 'Geral' || !isMdUp)) return;
     const newPreferences = {
       ...(userProfile.viewPreferences || {}),
       [activeTab]: mode
@@ -143,12 +169,6 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     setUserProfile(updatedProfile);
     dataService.saveUserProfile(updatedProfile, userId, isOnline);
   };
-
-  const DEFAULT_KANBAN_COLUMNS = [
-    { id: 'Pendente', name: 'Pendente', order: 0 },
-    { id: 'Fazendo', name: 'Fazendo', order: 1 },
-    { id: 'Concluido', name: 'Concluído', order: 2 }
-  ];
 
   // Mark all as read when closing notifications
   useEffect(() => {
@@ -200,36 +220,29 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     const task = tasks.find(t => t.id === taskId);
 
     if (task) {
-      // Check if dropping on a default status column
-      if (['Pendente', 'Fazendo', 'Concluido'].includes(overId)) {
-        const updatedTask = { 
-          ...task, 
-          status: overId as any,
-          completed: overId === 'Concluido'
-        };
-        setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t));
-        await dataService.saveTask(updatedTask, userId, isOnline);
-        return;
-      }
-
-      // Check if dropping on a board column
-      for (const board of boards) {
-        const column = board.columns.find(c => c.id === overId);
+      // Kanban de um quadro: só colunas do quadro da aba ativa (vários quadros repetem ids tipo Pendente/Concluido)
+      const activeBoard = boards.find((b) => b.id === activeTab);
+      if (activeBoard) {
+        const column = activeBoard.columns.find((c) => c.id === overId);
         if (column) {
-          const isDone = column.name.toLowerCase().includes('concluído') || column.name.toLowerCase().includes('concluido') || column.name.toLowerCase().includes('done');
-          const updatedTask = { 
-            ...task, 
-            boardId: board.id, 
+          const isDone =
+            column.name.toLowerCase().includes('concluído') ||
+            column.name.toLowerCase().includes('concluido') ||
+            column.name.toLowerCase().includes('done');
+          const updatedTask = {
+            ...task,
+            boardId: activeBoard.id,
             columnId: column.id,
-            status: undefined, // Clear general status if moved to a board
+            status: undefined,
             completed: isDone,
-            completedAt: isDone ? (task.completedAt || new Date().toISOString()) : undefined
+            completedAt: isDone ? task.completedAt || new Date().toISOString() : undefined,
           };
-          setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t));
+          setTasks((prev) => prev.map((t) => (t.id === taskId ? updatedTask : t)));
           await dataService.saveTask(updatedTask, userId, isOnline);
           return;
         }
       }
+
     }
 
     // Handle Reordering
@@ -829,7 +842,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
             title,
             completed: false,
             category,
-            status: (columnIdToSet && ['Pendente', 'Fazendo', 'Concluido'].includes(columnIdToSet)) ? columnIdToSet as any : 'Pendente',
+            status: statusFromBoardColumn(board, columnIdToSet),
             boardId: boardId || boardIdToSet,
             columnId: columnIdToSet,
             subtasks: [],
@@ -859,7 +872,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       title,
       completed: false,
       category,
-      status: (columnIdToSet && ['Pendente', 'Fazendo', 'Concluido'].includes(columnIdToSet)) ? columnIdToSet as any : 'Pendente',
+      status: statusFromBoardColumn(board, columnIdToSet),
       boardId: boardId || boardIdToSet,
       columnId: columnIdToSet,
       subtasks,
@@ -1048,9 +1061,9 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       id: crypto.randomUUID(),
       name: newBoardName,
       columns: [
-        { id: 'col-1', name: 'A fazer', order: 0 },
-        { id: 'col-2', name: 'Em andamento', order: 1 },
-        { id: 'col-3', name: 'Concluído', order: 2 }
+        { id: crypto.randomUUID(), name: 'A fazer', order: 0 },
+        { id: crypto.randomUUID(), name: 'Em andamento', order: 1 },
+        { id: crypto.randomUUID(), name: 'Concluído', order: 2 }
       ],
       userId,
       createdAt: new Date().toISOString()
@@ -1497,6 +1510,8 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
   };
 
+  const kanbanBoardForView = boards.find((b) => b.id === activeTab);
+
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col">
     <DndContext 
@@ -1575,24 +1590,28 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
             </AnimatePresence>
           </div>
 
-          <div className="flex items-center rounded-lg bg-slate-100 p-1 touch-manipulation">
-            <button 
-              onClick={() => handleToggleViewMode('list')}
-              className={`inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-md transition-all ${currentViewMode === 'list' ? 'bg-white text-[#800000] shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-              title="Modo Lista"
-              aria-label="Modo lista"
-            >
-              <List size={14} />
-            </button>
-            <button 
-              onClick={() => handleToggleViewMode('kanban')}
-              className={`inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-md transition-all ${currentViewMode === 'kanban' ? 'bg-white text-[#800000] shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-              title="Modo Kanban"
-              aria-label="Modo Kanban"
-            >
-              <Trello size={14} />
-            </button>
-          </div>
+          {activeTab !== 'Geral' && isMdUp && (
+            <div className="flex items-center rounded-lg bg-slate-100 p-1 touch-manipulation">
+              <button
+                type="button"
+                onClick={() => handleToggleViewMode('list')}
+                className={`inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-md transition-all ${storedViewMode === 'list' ? 'bg-white text-[#800000] shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                title="Modo Lista"
+                aria-label="Modo lista"
+              >
+                <List size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleToggleViewMode('kanban')}
+                className={`inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-md transition-all ${storedViewMode === 'kanban' ? 'bg-white text-[#800000] shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                title="Modo Kanban"
+                aria-label="Modo Kanban"
+              >
+                <Trello size={14} />
+              </button>
+            </div>
+          )}
           <div className="relative">
             <button 
               onClick={() => setShowNotifications(!showNotifications)}
@@ -1672,7 +1691,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
 
       {/* Main Content Area */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
-        {(currentViewMode === 'list') ? (
+        {(effectiveViewMode === 'list') ? (
           // --- MASTER-DETAIL VIEW (lista em largura total + detalhe em painel) ---
           <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
             {/* Master: List */}
@@ -2471,45 +2490,46 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
               )}
             </AnimatePresence>
           </div>
-        ) : (
-          // --- KANBAN VIEW ---
+        ) : kanbanBoardForView ? (
+          // --- KANBAN VIEW (somente quadro específico; Geral e mobile usam lista) ---
           <div className="flex min-h-0 flex-1 flex-row items-stretch gap-4 overflow-x-auto overscroll-x-contain touch-pan-x bg-slate-50 p-3 sm:gap-6 sm:p-6 [-webkit-overflow-scrolling:touch]">
-            {(boards.find(b => b.id === activeTab)?.columns || DEFAULT_KANBAN_COLUMNS).map(column => (
+            {kanbanBoardForView.columns.map((column) => (
               <DroppableColumn key={column.id} column={column}>
                 <div className="flex items-center justify-between px-2">
                   <h4 className="font-bold text-slate-900 flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-[#800000]" />
                     {column.name}
                     <span className="text-xs text-slate-400 font-normal ml-1">
-                      {tasks.filter(t => {
+                      {tasks.filter((t) => {
                         const matchesTab = isTaskVisible(t);
-                        const matchesColumn = boards.find(b => b.id === activeTab) 
-                          ? t.columnId === column.id 
-                          : (t.status || (t.completed ? 'Concluido' : 'Pendente')) === column.id;
+                        const matchesColumn = t.columnId === column.id;
                         return matchesTab && matchesColumn;
                       }).length}
                     </span>
                   </h4>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => handleAddTask(activeTab, column.id)} className="p-1 text-slate-400 hover:text-[#800000] transition-colors"><Plus size={18} /></button>
-                    {boards.find(b => b.id === activeTab) && (
-                      <button 
-                        onClick={() => handleDeleteColumn(column.id)} 
-                        className="p-1 text-slate-300 hover:text-red-500 transition-colors"
-                        title="Excluir Coluna"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleAddTask(kanbanBoardForView.id, column.id)}
+                      className="p-1 text-slate-400 hover:text-[#800000] transition-colors"
+                    >
+                      <Plus size={18} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteColumn(column.id)}
+                      className="p-1 text-slate-300 hover:text-red-500 transition-colors"
+                      title="Excluir Coluna"
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 </div>
                 <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1 custom-scrollbar">
                   {tasks
-                    .filter(t => {
+                    .filter((t) => {
                       const matchesTab = isTaskVisible(t);
-                      const matchesColumn = boards.find(b => b.id === activeTab) 
-                        ? t.columnId === column.id 
-                        : (t.status || (t.completed ? 'Concluido' : 'Pendente')) === column.id;
+                      const matchesColumn = t.columnId === column.id;
                       return matchesTab && matchesColumn;
                     })
                     .map(task => {
@@ -2585,13 +2605,18 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                 </div>
               </DroppableColumn>
             ))}
-            <button 
+            <button
+              type="button"
               onClick={handleAddColumn}
               className="w-[min(20rem,calc(100vw-2rem))] shrink-0 self-start sm:w-80 h-20 border-2 border-dashed border-slate-200 rounded-3xl flex items-center justify-center text-slate-400 hover:border-[#800000] hover:text-[#800000] transition-all group"
             >
               <Plus size={24} className="group-hover:scale-110 transition-transform" />
               <span className="ml-2 font-bold text-sm">Nova Coluna</span>
             </button>
+          </div>
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center bg-slate-50 p-8 text-center text-slate-400">
+            <p className="text-sm font-medium">Selecione um quadro para usar o Kanban.</p>
           </div>
         )}
       </div>
