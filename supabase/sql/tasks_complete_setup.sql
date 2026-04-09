@@ -4,6 +4,7 @@
 -- Sintoma: tarefa some na UI, mas após F5 reaparece.
 -- Causa comum: DELETE bloqueado por RLS/policy em public.tasks.
 -- Este script é idempotente e seguro para rodar múltiplas vezes.
+-- Inclui RPC public.archive_completed_tasks() (chamada em dataService.archiveTasks).
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS public.tasks (
@@ -36,6 +37,8 @@ ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS delegated_by uuid REFERENCES a
 ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
 ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS description text;
 ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS google_event_id text;
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS archived_at timestamptz;
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS subject_id uuid;
 
 CREATE INDEX IF NOT EXISTS idx_tasks_user_created_at ON public.tasks (user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_tasks_delegated_to ON public.tasks (delegated_to);
@@ -115,6 +118,34 @@ CREATE TRIGGER tasks_enforce_owner_on_user_id_change
   BEFORE UPDATE ON public.tasks
   FOR EACH ROW
   EXECUTE FUNCTION public.tasks_enforce_owner_on_user_id_change();
+-- Se o Postgres reclamar, use: EXECUTE PROCEDURE public.tasks_enforce_owner_on_user_id_change();
+
+-- -----------------------------------------------------------------------------
+-- RPC usada pela app: supabase.rpc('archive_completed_tasks')
+-- Arquiva (preenche archived_at) tarefas concluídas em que o utilizador é dono OU
+-- delegado. SECURITY INVOKER → aplica RLS; só altera linhas já visíveis pelas policies.
+-- -----------------------------------------------------------------------------
+DROP FUNCTION IF EXISTS public.archive_completed_tasks();
+
+CREATE OR REPLACE FUNCTION public.archive_completed_tasks()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public
+AS $$
+BEGIN
+  UPDATE public.tasks AS t
+  SET archived_at = now()
+  WHERE t.archived_at IS NULL
+    AND (t.user_id = auth.uid() OR t.delegated_to = auth.uid())
+    -- App grava concluído como status 'Concluido' e/ou completed_at preenchido.
+    AND (t.status = 'Concluido' OR t.completed_at IS NOT NULL);
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.archive_completed_tasks() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.archive_completed_tasks() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.archive_completed_tasks() TO service_role;
 
 DROP POLICY IF EXISTS tasks_history_select_own ON public.tasks_history;
 DROP POLICY IF EXISTS tasks_history_insert_own ON public.tasks_history;

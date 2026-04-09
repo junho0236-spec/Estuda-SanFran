@@ -905,18 +905,16 @@ export const dataService = {
   },
 
   async archiveTasks(userId: string, isOnline: boolean) {
-    if (isOnline) {
-      const { error } = await supabase.rpc('archive_completed_tasks');
-      if (error) {
-        console.error("Error calling archive_completed_tasks RPC:", error);
-        throw error;
-      }
+    if (!isOnline) {
+      console.warn('[dataService] archiveTasks: requer nuvem; não alterar Dexie offline (evita sumir tarefas delegadas).');
+      return;
     }
-    // Locally, we filter them out in the component or delete them if we want to match the RPC behavior
-    const completedTasks = await db.tasks.where('completed').equals(true as any).toArray();
-    for (const task of completedTasks) {
-      await db.tasks.delete(task.id);
+    const { error } = await supabase.rpc('archive_completed_tasks');
+    if (error) {
+      console.error("Error calling archive_completed_tasks RPC:", error);
+      throw error;
     }
+    await dataService.getTasks(userId, true);
   },
 
   async deleteTask(id: string, userId: string, isOnline: boolean) {
