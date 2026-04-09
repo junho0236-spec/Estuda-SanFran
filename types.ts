@@ -680,6 +680,8 @@ export interface UserProfile {
   last_updated?: string;
   lastInteractionDate?: string;
   viewPreferences?: Record<string, 'list' | 'kanban'>;
+  /** IDs dos quadros (tabs) na ordem desejada; "Geral" é sempre primeiro e não entra aqui. */
+  taskBoardTabOrder?: string[];
   hiddenTaskTabs?: string[];
   productivityStats?: {
     completedToday: number;

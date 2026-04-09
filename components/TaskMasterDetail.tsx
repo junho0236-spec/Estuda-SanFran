@@ -5,7 +5,7 @@ import {
   Plus, Layout, List, MoreVertical, Trash2, CheckSquare, 
   Clock, Paperclip, ChevronRight, X, Calendar, AlertCircle,
   Play, Pause, RotateCcw, Save, Quote, ThumbsUp, ExternalLink, Link as LinkIcon, Globe, Bell,
-  CheckCircle2, User, Zap, Trello, BookOpen, Download, Sparkles, Loader2
+  CheckCircle2, User, Zap, Trello, BookOpen, Download, Sparkles, Loader2, GripVertical
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -20,12 +20,14 @@ import {
   DragStartEvent,
   useDroppable,
   useDraggable,
+  useDndContext,
 } from '@dnd-kit/core';
 import {
   arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
+  horizontalListSortingStrategy,
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -235,74 +237,6 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     })
   );
 
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveDragId(event.active.id as string);
-  };
-
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveDragId(null);
-
-    if (!over) return;
-
-    // Handle Tab Switch (Dropping on a tab)
-    if (TABS.some(tab => tab.id === over.id)) {
-      const taskId = active.id as string;
-      const newCategory = over.id as string;
-      
-      const task = tasks.find(t => t.id === taskId);
-      if (task) {
-        const updatedTask = { ...task, category: newCategory as any };
-        setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t));
-        await dataService.saveTask(updatedTask, userId, isOnline);
-      }
-      return;
-    }
-
-    // Handle Kanban Column Drop
-    const taskId = active.id as string;
-    const overId = over.id as string;
-    const task = tasks.find(t => t.id === taskId);
-
-    if (task) {
-      // Kanban de um quadro: só colunas do quadro da aba ativa (vários quadros repetem ids tipo Pendente/Concluido)
-      const activeBoard = boards.find((b) => b.id === activeTab);
-      if (activeBoard) {
-        const column = activeBoard.columns.find((c) => c.id === overId);
-        if (column) {
-          const isDone =
-            column.name.toLowerCase().includes('concluído') ||
-            column.name.toLowerCase().includes('concluido') ||
-            column.name.toLowerCase().includes('done');
-          const updatedTask = {
-            ...task,
-            boardId: activeBoard.id,
-            columnId: column.id,
-            status: undefined,
-            completed: isDone,
-            completedAt: isDone ? task.completedAt || new Date().toISOString() : undefined,
-          };
-          setTasks((prev) => prev.map((t) => (t.id === taskId ? updatedTask : t)));
-          await dataService.saveTask(updatedTask, userId, isOnline);
-          return;
-        }
-      }
-
-    }
-
-    // Handle Reordering
-    if (active.id !== over.id) {
-      const oldIndex = tasks.findIndex(t => t.id === active.id);
-      const newIndex = tasks.findIndex(t => t.id === over.id);
-      
-      if (oldIndex !== -1 && newIndex !== -1) {
-        const newTasks = arrayMove(tasks, oldIndex, newIndex);
-        setTasks(newTasks);
-        // In a real app, we'd save the new order to the DB
-      }
-    }
-  };
-
   useEffect(() => {
     const due = searchParams.get('due');
     if (!due || !/^\d{4}-\d{2}-\d{2}$/.test(due)) return;
@@ -351,10 +285,116 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     dataService.saveUserProfile(updatedProfile, userId, isOnline);
   };
 
-  const TABS = [
-    { id: 'Geral', name: 'Geral', deletable: false },
-    ...boards.map(b => ({ id: b.id, name: b.name, deletable: true }))
-  ].filter(tab => !hiddenTaskTabs.includes(tab.id));
+  const visibleOrderedBoards = useMemo(() => {
+    const visible = boards.filter((b) => !hiddenTaskTabs.includes(b.id));
+    const saved = userProfile?.taskBoardTabOrder;
+    const ordered: Board[] = [];
+    if (saved?.length) {
+      for (const id of saved) {
+        const b = visible.find((x) => x.id === id);
+        if (b) ordered.push(b);
+      }
+    }
+    for (const b of visible) {
+      if (!ordered.some((o) => o.id === b.id)) ordered.push(b);
+    }
+    return ordered;
+  }, [boards, hiddenTaskTabs, userProfile?.taskBoardTabOrder]);
+
+  const TABS = useMemo(
+    () => [
+      { id: 'Geral' as const, name: 'Geral', deletable: false as const },
+      ...visibleOrderedBoards.map((b) => ({ id: b.id, name: b.name, deletable: true as const })),
+    ],
+    [visibleOrderedBoards]
+  );
+
+  const persistTaskBoardTabOrder = useCallback(
+    (order: string[]) => {
+      if (!userProfile) return;
+      const updatedProfile = { ...userProfile, taskBoardTabOrder: order };
+      setUserProfile(updatedProfile);
+      dataService.saveUserProfile(updatedProfile, userId, isOnline);
+    },
+    [userProfile, setUserProfile, userId, isOnline]
+  );
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveDragId(event.active.id as string);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveDragId(null);
+
+    if (!over) return;
+
+    const boardTabIds = TABS.filter((t) => t.deletable).map((t) => t.id);
+    if (
+      boardTabIds.length > 0 &&
+      boardTabIds.includes(active.id as string) &&
+      boardTabIds.includes(over.id as string) &&
+      active.id !== over.id
+    ) {
+      const oldIndex = boardTabIds.indexOf(active.id as string);
+      const newIndex = boardTabIds.indexOf(over.id as string);
+      if (oldIndex !== -1 && newIndex !== -1) {
+        persistTaskBoardTabOrder(arrayMove(boardTabIds, oldIndex, newIndex));
+        toast.success('Ordem das abas guardada');
+      }
+      return;
+    }
+
+    if (TABS.some((tab) => tab.id === over.id)) {
+      const taskId = active.id as string;
+      const task = tasks.find((t) => t.id === taskId);
+      if (task) {
+        const newCategory = over.id as string;
+        const updatedTask = { ...task, category: newCategory as any };
+        setTasks((prev) => prev.map((t) => (t.id === taskId ? updatedTask : t)));
+        await dataService.saveTask(updatedTask, userId, isOnline);
+      }
+      return;
+    }
+
+    const taskId = active.id as string;
+    const overId = over.id as string;
+    const task = tasks.find((t) => t.id === taskId);
+
+    if (task) {
+      const activeBoard = boards.find((b) => b.id === activeTab);
+      if (activeBoard) {
+        const column = activeBoard.columns.find((c) => c.id === overId);
+        if (column) {
+          const isDone =
+            column.name.toLowerCase().includes('concluído') ||
+            column.name.toLowerCase().includes('concluido') ||
+            column.name.toLowerCase().includes('done');
+          const updatedTask = {
+            ...task,
+            boardId: activeBoard.id,
+            columnId: column.id,
+            status: undefined,
+            completed: isDone,
+            completedAt: isDone ? task.completedAt || new Date().toISOString() : undefined,
+          };
+          setTasks((prev) => prev.map((t) => (t.id === taskId ? updatedTask : t)));
+          await dataService.saveTask(updatedTask, userId, isOnline);
+          return;
+        }
+      }
+    }
+
+    if (active.id !== over.id) {
+      const oldIndex = tasks.findIndex((t) => t.id === active.id);
+      const newIndex = tasks.findIndex((t) => t.id === over.id);
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newTasks = arrayMove(tasks, oldIndex, newIndex);
+        setTasks(newTasks);
+      }
+    }
+  };
 
   const handleDeleteTab = (tabId: string) => {
     if (tabId === 'Geral') return;
@@ -1197,6 +1237,15 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         // Unassign tasks from this board
         const updatedTasks = tasks.map(t => t.boardId === boardId ? { ...t, boardId: undefined, columnId: undefined } : t);
         setTasks(updatedTasks);
+
+        setUserProfile((prev) => {
+          if (!prev?.taskBoardTabOrder?.length) return prev;
+          const nextOrder = prev.taskBoardTabOrder.filter((id) => id !== boardId);
+          if (nextOrder.length === prev.taskBoardTabOrder.length) return prev;
+          const next = { ...prev, taskBoardTabOrder: nextOrder };
+          void dataService.saveUserProfile(next, userId, isOnline);
+          return next;
+        });
         
         if (activeTab === boardId) {
           setActiveTab('Geral');
@@ -1346,6 +1395,74 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
             </span>
           )}
         </button>
+      </div>
+    );
+  };
+
+  const SortableBoardTab = ({
+    tab,
+    activeTab,
+    onClick,
+    onDelete,
+  }: {
+    tab: { id: string; name: string; deletable?: boolean };
+    activeTab: string;
+    onClick: () => void;
+    onDelete?: (id: string) => void;
+  }) => {
+    const { active, over } = useDndContext();
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+      id: tab.id,
+    });
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      zIndex: isDragging ? 40 : undefined,
+    };
+    const activeIsTask = active != null && tasks.some((t) => t.id === active.id);
+    const isTaskOverTab =
+      activeIsTask && over?.id === tab.id && active != null && String(active.id) !== String(tab.id);
+
+    return (
+      <div ref={setNodeRef} style={style} className={`relative shrink-0 group ${isDragging ? 'opacity-75' : ''}`}>
+        <div
+          className={`flex min-h-[44px] items-center gap-0.5 rounded-full border-2 pr-1 ${
+            activeTab === tab.id
+              ? 'bg-[#800000] text-white border-[#800000] shadow-md'
+              : isTaskOverTab
+                ? 'bg-[#800000]/10 text-[#800000] border-[#800000] border-dashed scale-[1.02]'
+                : 'text-slate-500 border-transparent hover:text-[#800000] hover:bg-slate-50'
+          }`}
+        >
+          <button
+            type="button"
+            className={`inline-flex min-h-[44px] min-w-[40px] shrink-0 touch-manipulation items-center justify-center rounded-full ${
+              activeTab === tab.id ? 'text-white/70 hover:text-white' : 'text-slate-400 hover:text-[#800000]'
+            }`}
+            {...attributes}
+            {...listeners}
+            aria-label="Arrastar para reordenar abas"
+            title="Reordenar abas"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <GripVertical size={18} />
+          </button>
+          <button type="button" onClick={onClick} className="flex min-h-[44px] flex-1 items-center gap-2 whitespace-nowrap px-2 py-2 text-left text-sm font-bold">
+            {tab.name}
+            {onDelete && tab.deletable && activeTab === tab.id && (
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(tab.id);
+                }}
+                className="inline-flex shrink-0 p-0.5 hover:bg-white/20 rounded-full transition-colors"
+                role="presentation"
+              >
+                <X size={12} />
+              </span>
+            )}
+          </button>
+        </div>
       </div>
     );
   };
@@ -1603,15 +1720,28 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         {/* Header Tabs */}
         <div className="flex flex-col gap-3 border-b border-slate-100 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3 md:px-6 md:py-4 sticky top-0 z-20 min-w-0">
           <div className="flex min-w-0 items-center gap-2 overflow-x-auto no-scrollbar max-w-full md:max-w-[calc(100%-350px)]">
-            {TABS.map(tab => (
-              <DroppableTab 
-                key={tab.id} 
-                tab={tab} 
-                activeTab={activeTab} 
-                onClick={() => setActiveTab(tab.id)} 
-                onDelete={handleDeleteTab}
+            {TABS[0]?.id === 'Geral' && (
+              <DroppableTab
+                key="Geral"
+                tab={TABS[0]}
+                activeTab={activeTab}
+                onClick={() => setActiveTab('Geral')}
               />
-            ))}
+            )}
+            <SortableContext
+              items={visibleOrderedBoards.map((b) => b.id)}
+              strategy={horizontalListSortingStrategy}
+            >
+              {visibleOrderedBoards.map((b) => (
+                <SortableBoardTab
+                  key={b.id}
+                  tab={{ id: b.id, name: b.name, deletable: true }}
+                  activeTab={activeTab}
+                  onClick={() => setActiveTab(b.id)}
+                  onDelete={handleDeleteTab}
+                />
+              ))}
+            </SortableContext>
             {hiddenTaskTabs.length > 0 && (
               <button
                 type="button"
