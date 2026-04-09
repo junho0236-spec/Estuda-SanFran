@@ -475,15 +475,37 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   };
 
   const handleArchiveCompleted = async () => {
-    const completedTasks = tasks.filter(t => t.completed);
-    if (completedTasks.length === 0) return;
+    const completedTasks = tasks.filter((t) => t.completed);
+    if (completedTasks.length === 0) {
+      toast.info('Nenhuma tarefa concluída para arquivar.');
+      return;
+    }
+
+    if (!isOnline) {
+      toast.warning(
+        'O Ritual 23:59 precisa de internet para arquivar na nuvem. As concluídas ficam visíveis até voltares online.'
+      );
+      return;
+    }
 
     try {
-      await dataService.archiveTasks(userId, isOnline);
-      setTasks(prev => prev.filter(t => !t.completed));
-      setSelectedTaskId(null);
+      const ok = await dataService.archiveTasks(userId, isOnline);
+      if (!ok) {
+        toast.warning('Não foi possível arquivar. Verifica a ligação e tenta de novo.');
+        return;
+      }
+      setTasks((prev) => prev.filter((t) => !t.completed));
+      if (selectedTaskId && completedTasks.some((t) => t.id === selectedTaskId)) {
+        setSelectedTaskId(null);
+      }
+      toast.success(
+        `Ritual concluído: ${completedTasks.length} tarefa(s) arquivada(s).`
+      );
     } catch (error) {
-      console.error("Failed to archive tasks:", error);
+      console.error('Failed to archive tasks:', error);
+      toast.error(
+        'Erro ao arquivar. Confirma no Supabase a função archive_completed_tasks e as permissões (ver supabase/sql/tasks_complete_setup.sql).'
+      );
     }
   };
 

@@ -904,10 +904,11 @@ export const dataService = {
     }
   },
 
-  async archiveTasks(userId: string, isOnline: boolean) {
+  /** Arquiva concluídas na nuvem (RPC). Offline: não altera dados; retorna `false`. */
+  async archiveTasks(userId: string, isOnline: boolean): Promise<boolean> {
     if (!isOnline) {
       console.warn('[dataService] archiveTasks: requer nuvem; não alterar Dexie offline (evita sumir tarefas delegadas).');
-      return;
+      return false;
     }
     const { error } = await supabase.rpc('archive_completed_tasks');
     if (error) {
@@ -915,6 +916,7 @@ export const dataService = {
       throw error;
     }
     await dataService.getTasks(userId, true);
+    return true;
   },
 
   async deleteTask(id: string, userId: string, isOnline: boolean) {
