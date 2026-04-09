@@ -1747,7 +1747,9 @@ const App: React.FC = () => {
   if (!isAuthenticated) return <Login onLogin={() => setIsAuthenticated(true)} />;
 
   return (
-    <div className={`flex h-[100dvh] min-h-0 w-full flex-1 overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#F8F9FA]'}`}>
+    <div
+      className={`flex min-h-0 w-full flex-1 flex-col overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark bg-sanfran-rubiBlack' : 'bg-[#F8F9FA]'}`}
+    >
       <Toaster position="top-right" richColors />
       
       <Atmosphere isExtremeFocus={isExtremeFocus} isSidebarOpen={isSidebarOpen} isSidebarMinimized={isSidebarMinimized} />
@@ -1925,7 +1927,7 @@ const App: React.FC = () => {
       <div
         className={`flex min-h-0 min-w-0 flex-1 flex-col relative transition-[padding] duration-500 ease-out ${
           isExtremeFocus ? '' : isSidebarMinimized ? 'lg:pl-20' : 'lg:pl-72'
-        }`}
+        } ${!isExtremeFocus && currentView === View.Tasks ? 'max-h-[100dvh] overflow-hidden' : ''}`}
       >
         <header className={`${isExtremeFocus ? 'hidden' : 'lg:hidden'} bg-white dark:bg-[#0d0303] border-b border-slate-200 dark:border-sanfran-rubi/30 px-3 py-3 sm:p-4 flex items-center justify-between gap-2 sticky top-0 z-20 min-w-0`}>
           <button
@@ -1943,9 +1945,11 @@ const App: React.FC = () => {
           <div className="w-10 shrink-0" aria-hidden />
         </header>
 
-        <main className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden ${isExtremeFocus ? 'p-0' : currentView === View.Tasks ? 'p-2 sm:p-3 md:p-5' : 'p-3 sm:p-5 md:p-8 lg:p-10'} relative transition-all duration-700`}>
+        <main
+          className={`flex-1 min-h-0 overflow-x-hidden ${isExtremeFocus ? 'p-0' : currentView === View.Tasks ? 'grid grid-rows-[auto_minmax(0,1fr)] overflow-hidden p-2 sm:p-3 md:p-5' : 'overflow-y-auto p-3 sm:p-5 md:p-8 lg:p-10'} relative transition-all duration-700`}
+        >
           {!isExtremeFocus && (
-            <div className="flex justify-end mb-4 md:mb-6 w-full min-w-0 overflow-x-auto">
+            <div className={`flex justify-end mb-4 md:mb-6 w-full min-w-0 overflow-x-auto ${currentView === View.Tasks ? 'shrink-0' : ''}`}>
               <HeaderActions 
                 notifications={notifications} 
                 userId={session?.user?.id || ''}
@@ -1983,7 +1987,7 @@ const App: React.FC = () => {
               isExtremeFocus
                 ? 'max-w-none h-full min-h-0 flex items-center justify-center'
                 : currentView === View.Tasks
-                  ? 'max-w-none w-full min-w-0 h-full min-h-0 flex flex-col'
+                  ? 'max-w-none flex h-full min-h-0 min-w-0 w-full flex-col overflow-hidden'
                   : 'max-w-6xl xl:max-w-7xl 2xl:max-w-[min(96rem,calc(100vw-2rem))] mx-auto w-full min-w-0 max-w-[100%] h-full min-h-0 flex flex-col'
             }`}
           >

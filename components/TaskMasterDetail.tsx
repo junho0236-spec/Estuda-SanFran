@@ -1197,7 +1197,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     return (
       <div 
         ref={setNodeRef}
-        className={`flex w-[min(20rem,calc(100vw-2rem))] shrink-0 flex-col gap-4 rounded-3xl transition-colors sm:w-80 ${isOver ? 'bg-[#800000]/5 ring-2 ring-[#800000]/20 ring-inset' : ''}`}
+        className={`flex h-full min-h-0 max-h-full w-[min(20rem,calc(100vw-2rem))] shrink-0 flex-col gap-4 self-stretch rounded-3xl transition-colors sm:w-80 ${isOver ? 'bg-[#800000]/5 ring-2 ring-[#800000]/20 ring-inset' : ''}`}
       >
         {children}
       </div>
@@ -1505,7 +1505,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 text-[13px] shadow-2xl sm:rounded-[28px] md:rounded-[32px]">
+      <div className="flex min-h-[calc(100dvh-9rem)] flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 text-[13px] shadow-2xl sm:min-h-[calc(100dvh-8.5rem)] sm:rounded-[28px] md:min-h-[calc(100dvh-8rem)] md:rounded-[32px] lg:min-h-[calc(100dvh-6.25rem)]">
         {/* Header Tabs */}
         <div className="flex flex-col gap-3 border-b border-slate-100 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3 md:px-6 md:py-4 sticky top-0 z-20 min-w-0">
           <div className="flex min-w-0 items-center gap-2 overflow-x-auto no-scrollbar max-w-full md:max-w-[calc(100%-350px)]">
@@ -1673,15 +1673,11 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       {/* Main Content Area */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         {(currentViewMode === 'list') ? (
-          // --- MASTER-DETAIL VIEW (30/70) ---
+          // --- MASTER-DETAIL VIEW (lista em largura total + detalhe em painel) ---
           <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
-            {/* Master: List (30%) */}
+            {/* Master: List */}
             <div
-              className={`flex min-h-0 flex-col overflow-hidden bg-white transition-all duration-500 ${
-                selectedTaskId
-                  ? 'hidden w-full border-slate-100 lg:flex lg:w-[30%] lg:max-w-[30%] lg:shrink-0 lg:border-r'
-                  : 'w-full min-w-0 flex-1 border-slate-100'
-              }`}
+              className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden border-slate-100 bg-white transition-all duration-500"
             >
               <div className="p-4 border-b border-slate-50 flex flex-col gap-3">
                 <div className="flex items-center justify-between">
@@ -1868,14 +1864,14 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
               </div>
             </div>
 
-            {/* Detail: Panel (70%) */}
+            {/* Detail: Panel */}
             <AnimatePresence>
               {selectedTaskId && (
                 <motion.div 
                   initial={{ x: 100, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
                   exit={{ x: 100, opacity: 0 }}
-                  className="absolute inset-0 z-30 flex min-h-0 w-full flex-col bg-white shadow-2xl lg:relative lg:inset-auto lg:z-10 lg:min-w-0 lg:w-[70%]"
+                  className="absolute inset-0 z-30 flex min-h-0 w-full flex-col bg-white shadow-2xl lg:inset-y-0 lg:right-0 lg:left-auto lg:z-40 lg:w-[min(80rem,68vw)] lg:max-w-full lg:min-w-[44rem] lg:border-l lg:border-slate-100"
                 >
                   {selectedTask ? (
                     <>
@@ -2477,7 +2473,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
           </div>
         ) : (
           // --- KANBAN VIEW ---
-          <div className="flex min-h-0 flex-1 gap-4 overflow-x-auto overscroll-x-contain touch-pan-x bg-slate-50 p-3 sm:gap-6 sm:p-6 [-webkit-overflow-scrolling:touch]">
+          <div className="flex min-h-0 flex-1 flex-row items-stretch gap-4 overflow-x-auto overscroll-x-contain touch-pan-x bg-slate-50 p-3 sm:gap-6 sm:p-6 [-webkit-overflow-scrolling:touch]">
             {(boards.find(b => b.id === activeTab)?.columns || DEFAULT_KANBAN_COLUMNS).map(column => (
               <DroppableColumn key={column.id} column={column}>
                 <div className="flex items-center justify-between px-2">
@@ -2507,7 +2503,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                     )}
                   </div>
                 </div>
-                <div className="flex-1 space-y-3">
+                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1 custom-scrollbar">
                   {tasks
                     .filter(t => {
                       const matchesTab = isTaskVisible(t);
@@ -2591,7 +2587,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
             ))}
             <button 
               onClick={handleAddColumn}
-              className="w-80 shrink-0 h-20 border-2 border-dashed border-slate-200 rounded-3xl flex items-center justify-center text-slate-400 hover:border-[#800000] hover:text-[#800000] transition-all group"
+              className="w-[min(20rem,calc(100vw-2rem))] shrink-0 self-start sm:w-80 h-20 border-2 border-dashed border-slate-200 rounded-3xl flex items-center justify-center text-slate-400 hover:border-[#800000] hover:text-[#800000] transition-all group"
             >
               <Plus size={24} className="group-hover:scale-110 transition-transform" />
               <span className="ml-2 font-bold text-sm">Nova Coluna</span>
