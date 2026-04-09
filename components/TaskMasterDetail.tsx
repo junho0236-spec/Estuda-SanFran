@@ -546,6 +546,8 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   const [showExportMenu, setShowExportMenu] = useState(false);
   /** Campo de prazo no painel (dd/mm/aaaa); sincronizado com a tarefa selecionada. */
   const [dueDateInputDraft, setDueDateInputDraft] = useState('');
+  /** Título editável no cabeçalho do detalhe (evita renomear só na criação). */
+  const [taskTitleDraft, setTaskTitleDraft] = useState('');
 
   const [revisionStatus, setRevisionStatus] = useState({
     firstReading: false,
@@ -568,8 +570,10 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         preExamReview: false
       });
       setDueDateInputDraft(formatDueDateBr(selectedTask.dueDate));
+      setTaskTitleDraft(selectedTask.title);
     } else {
       setDueDateInputDraft('');
+      setTaskTitleDraft('');
     }
   }, [selectedTaskId, selectedTask]);
 
@@ -1921,7 +1925,34 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                           <button type="button" onClick={() => setSelectedTaskId(null)} className="shrink-0 p-2 text-slate-400 hover:bg-slate-100 rounded-full" aria-label="Fechar tarefa"><X size={20} /></button>
                           <div className="min-w-0 flex-1">
                             <div className="mb-1 flex flex-wrap items-center gap-2">
-                              <h2 className="break-words text-lg font-serif font-bold text-slate-900 sm:text-xl">{selectedTask.title}</h2>
+                              <label className="min-w-0 flex-1 basis-full sm:basis-auto sm:min-w-[12rem]">
+                                <span className="sr-only">Título da tarefa</span>
+                                <input
+                                  type="text"
+                                  value={taskTitleDraft}
+                                  onChange={(e) => setTaskTitleDraft(e.target.value)}
+                                  onBlur={() => {
+                                    const next = taskTitleDraft.trim();
+                                    if (!next) {
+                                      setTaskTitleDraft(selectedTask.title);
+                                      toast.error('O título não pode ficar vazio.');
+                                      return;
+                                    }
+                                    if (next !== selectedTask.title) {
+                                      void handleUpdateTask({ title: next });
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      (e.target as HTMLInputElement).blur();
+                                    }
+                                  }}
+                                  className="w-full break-words rounded-lg border border-transparent bg-transparent px-1 py-0.5 text-lg font-serif font-bold text-slate-900 transition-colors hover:border-slate-200 focus:border-[#800000]/35 focus:outline-none focus:ring-2 focus:ring-[#800000]/15 sm:text-xl"
+                                  placeholder="Título da tarefa"
+                                  autoComplete="off"
+                                />
+                              </label>
                               {selectedTask.priority === 'urgente' && (
                                 <span className="px-2 py-0.5 bg-red-500 text-white text-[8px] font-black uppercase tracking-widest rounded-full shadow-[0_0_10px_rgba(239,68,68,0.5)] animate-pulse">
                                   Urgente
