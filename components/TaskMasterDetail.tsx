@@ -458,8 +458,11 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
             completed: isDone,
             completedAt: isDone ? task.completedAt || new Date().toISOString() : undefined,
           };
-          if (isDone && !task.completed && task.recurrence) {
-            await spawnNextRecurrenceIfNeeded(task);
+          if (isDone && !task.completed) {
+            if (task.recurrence) {
+              await spawnNextRecurrenceIfNeeded(task);
+            }
+            await applyCompletionSideEffects(task);
           }
           setTasks((prev) => prev.map((t) => (t.id === taskId ? updatedTask : t)));
           await dataService.saveTask(updatedTask, userId, isOnline);
@@ -1117,6 +1120,55 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     toast.success(`Tarefa recorrente criada para ${formatDueDateTimeBr(nextTask.dueDate)}`);
   };
 
+  /** Notificação ao delegador + XP/streak (lista, detalhe e Kanban por arrasto). */
+  const applyCompletionSideEffects = async (completedTask: Task) => {
+    if (completedTask.delegatedBy && completedTask.delegatedBy !== userId) {
+      await dataService.createNotification(
+        completedTask.delegatedBy,
+        `${userProfile?.full_name || 'Alguém'} concluiu a tarefa: '${completedTask.title}'`,
+        completedTask.id,
+        'completed'
+      );
+    }
+    if (!userProfile) return;
+
+    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+    const lastInteraction = userProfile.lastInteractionDate;
+
+    let newStreak = userProfile.productivityStats?.streak || 0;
+    if (lastInteraction !== today) {
+      if (!lastInteraction) {
+        newStreak = 1;
+      } else {
+        const lastDate = new Date(lastInteraction);
+        const todayDate = new Date(today);
+        const diffTime = Math.abs(todayDate.getTime() - lastDate.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 1) {
+          newStreak += 1;
+        } else {
+          newStreak = 1;
+        }
+      }
+    }
+
+    const updatedProfile: UserProfile = {
+      ...userProfile,
+      arcadia_score: (userProfile.arcadia_score || 0) + 25,
+      lastInteractionDate: today,
+      productivityStats: {
+        ...userProfile.productivityStats,
+        completedToday: (userProfile.productivityStats?.completedToday || 0) + 1,
+        streak: newStreak,
+      },
+    } as UserProfile;
+
+    setUserProfile(updatedProfile);
+    dataService.saveUserProfile(updatedProfile, userId, isOnline);
+    toast.success('+25 XP: Tarefa Concluída!');
+  };
+
   const handleUpdateTask = async (updates: Partial<Task>, taskIdOverride?: string) => {
     const taskId = taskIdOverride || selectedTaskId;
     if (!taskId) return;
@@ -1133,53 +1185,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         await spawnNextRecurrenceIfNeeded(taskToUpdate);
       }
 
-      // Notify delegator if this was a delegated task
-      if (taskToUpdate.delegatedBy && taskToUpdate.delegatedBy !== userId) {
-        await dataService.createNotification(
-          taskToUpdate.delegatedBy,
-          `${userProfile?.full_name || 'Alguém'} concluiu a tarefa: '${taskToUpdate.title}'`,
-          taskToUpdate.id,
-          'completed'
-        );
-      }
-      // Track productivity
-      if (userProfile) {
-        const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
-        const lastInteraction = userProfile.lastInteractionDate;
-        
-        let newStreak = userProfile.productivityStats?.streak || 0;
-        if (lastInteraction !== today) {
-          if (!lastInteraction) {
-            newStreak = 1;
-          } else {
-            const lastDate = new Date(lastInteraction);
-            const todayDate = new Date(today);
-            const diffTime = Math.abs(todayDate.getTime() - lastDate.getTime());
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            
-            if (diffDays === 1) {
-              newStreak += 1;
-            } else {
-              newStreak = 1;
-            }
-          }
-        }
-
-        const updatedProfile: UserProfile = {
-          ...userProfile,
-          arcadia_score: (userProfile.arcadia_score || 0) + 25, // 25 XP per task
-          lastInteractionDate: today,
-          productivityStats: {
-            ...userProfile.productivityStats,
-            completedToday: (userProfile.productivityStats?.completedToday || 0) + 1,
-            streak: newStreak
-          }
-        } as UserProfile;
-
-        setUserProfile(updatedProfile);
-        dataService.saveUserProfile(updatedProfile, userId, isOnline);
-        toast.success("+25 XP: Tarefa Concluída!");
-      }
+      await applyCompletionSideEffects(taskToUpdate);
     } else if (updates.completed === false) {
       updates.completedAt = undefined;
       if (!updates.status && (taskToUpdate.status === 'Concluido' || taskToUpdate.completed)) {
