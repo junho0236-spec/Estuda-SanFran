@@ -187,6 +187,8 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   /** Prazo vindo da Agenda (`/tasks?due=YYYY-MM-DD`) para o próximo Quick Entry. Deep link: `task` ou `taskId` com UUID. */
   const [pendingCalendarDue, setPendingCalendarDue] = useState<string | null>(null);
   const quickEntryInputRef = useRef<HTMLInputElement>(null);
+  const dueDateNativePickerRef = useRef<HTMLInputElement>(null);
+  const taskDueTimePickerRef = useRef<HTMLInputElement>(null);
 
   const storedViewMode: 'list' | 'kanban' =
     userProfile?.viewPreferences?.[activeTab] ?? (boards.find((b) => b.id === activeTab) ? 'kanban' : 'list');
@@ -1174,6 +1176,41 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       void handleUpdateTask({ dueDate: ymd });
       setDueDateInputDraft(formatDueDateBr(ymd));
       setDueTimeInputDraft('');
+    }
+  };
+
+  const applyDueDateFromNativeYmd = (ymd: string) => {
+    if (!ymd) return;
+    setDueDateInputDraft(formatDueDateBr(ymd));
+    const tm = dueTimeInputDraft.trim();
+    if (tm) {
+      const iso = combineYmdAndTimeBrToIso(ymd, tm);
+      if (iso) void handleUpdateTask({ dueDate: iso });
+    } else {
+      void handleUpdateTask({ dueDate: ymd });
+    }
+  };
+
+  const openNativeDatePicker = () => {
+    const el = dueDateNativePickerRef.current;
+    if (!el) return;
+    const fromDraft = parseDueDateBrToIso(dueDateInputDraft.trim());
+    const fromTask = selectedTask?.dueDate ? dueDateToYmd(selectedTask.dueDate) : '';
+    el.value = fromDraft || fromTask || '';
+    try {
+      el.showPicker?.();
+    } catch {
+      el.click();
+    }
+  };
+
+  const openNativeTimePicker = () => {
+    const el = taskDueTimePickerRef.current;
+    if (!el) return;
+    try {
+      el.showPicker?.();
+    } catch {
+      el.focus();
     }
   };
 
@@ -2375,36 +2412,86 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                             </div>
                           </section>
 
-                          <section>
-                            <div className="flex items-center gap-2 mb-3 text-slate-400 font-bold text-[10px] uppercase tracking-widest">
-                              <Calendar size={14} /> Prazo de Entrega
-                            </div>
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                              <div>
+                          <section className="min-w-0">
+                            <div className="flex flex-col gap-4 sm:flex-row sm:items-stretch sm:gap-4">
+                              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
+                                <div className="flex min-h-8 items-center gap-2 text-slate-400 font-bold text-[10px] uppercase tracking-widest">
+                                  <Calendar size={14} className="shrink-0" /> Prazo de entrega
+                                </div>
+                                <div className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    autoComplete="off"
+                                    placeholder="dd/mm/aaaa"
+                                    value={dueDateInputDraft}
+                                    onChange={(e) => setDueDateInputDraft(e.target.value)}
+                                    onBlur={() => commitDueDrafts()}
+                                    className="min-h-[44px] min-w-0 flex-1 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-xs focus:outline-none focus:ring-2 focus:ring-[#800000]/10"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={openNativeDatePicker}
+                                    className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 touch-manipulation transition-colors hover:border-[#800000]/40 hover:text-[#800000]"
+                                    title="Abrir calendário"
+                                    aria-label="Abrir calendário"
+                                  >
+                                    <Calendar size={18} />
+                                  </button>
+                                </div>
                                 <input
-                                  type="text"
-                                  inputMode="numeric"
-                                  autoComplete="off"
-                                  placeholder="dd/mm/aaaa"
-                                  value={dueDateInputDraft}
-                                  onChange={(e) => setDueDateInputDraft(e.target.value)}
-                                  onBlur={() => commitDueDrafts()}
-                                  className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#800000]/10"
+                                  ref={dueDateNativePickerRef}
+                                  type="date"
+                                  tabIndex={-1}
+                                  aria-hidden
+                                  className="fixed left-[-9999px] top-0 h-px w-px opacity-0"
+                                  onChange={(e) => {
+                                    const y = e.target.value;
+                                    if (y) applyDueDateFromNativeYmd(y);
+                                  }}
                                 />
-                                <p className="mt-1.5 text-[10px] text-slate-400">Data (obrigatória se definir horário)</p>
+                                <p className="min-h-[2.5rem] text-[10px] leading-snug text-slate-400">
+                                  Digite ou use o calendário. Obrigatória se definir horário.
+                                </p>
                               </div>
-                              <div>
-                                <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                                  Horário (opcional)
-                                </label>
-                                <input
-                                  type="time"
-                                  value={dueTimeInputDraft}
-                                  onChange={(e) => setDueTimeInputDraft(e.target.value)}
-                                  onBlur={() => commitDueDrafts()}
-                                  className="min-h-[44px] w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#800000]/10"
-                                />
-                                <p className="mt-1.5 text-[10px] text-slate-400">Fuso de Brasília (ex.: aula de inglês)</p>
+
+                              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
+                                <div className="flex min-h-8 items-center gap-2 text-slate-400 font-bold text-[10px] uppercase tracking-widest">
+                                  <Clock size={14} className="shrink-0" /> Horário (opcional)
+                                </div>
+                                <div className="flex gap-2">
+                                  <input
+                                    ref={taskDueTimePickerRef}
+                                    type="time"
+                                    value={dueTimeInputDraft}
+                                    onChange={(e) => {
+                                      const v = e.target.value;
+                                      setDueTimeInputDraft(v);
+                                      const ymd = parseDueDateBrToIso(dueDateInputDraft.trim());
+                                      if (!ymd) return;
+                                      if (!v) {
+                                        void handleUpdateTask({ dueDate: ymd });
+                                        return;
+                                      }
+                                      const iso = combineYmdAndTimeBrToIso(ymd, v);
+                                      if (iso) void handleUpdateTask({ dueDate: iso });
+                                    }}
+                                    onBlur={() => commitDueDrafts()}
+                                    className="min-h-[44px] min-w-0 flex-1 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-xs focus:outline-none focus:ring-2 focus:ring-[#800000]/10"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={openNativeTimePicker}
+                                    className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 touch-manipulation transition-colors hover:border-[#800000]/40 hover:text-[#800000]"
+                                    title="Abrir seletor de horário"
+                                    aria-label="Abrir seletor de horário"
+                                  >
+                                    <Clock size={18} />
+                                  </button>
+                                </div>
+                                <p className="min-h-[2.5rem] text-[10px] leading-snug text-slate-400">
+                                  Toque no relógio do campo ou no botão. Fuso de Brasília.
+                                </p>
                               </div>
                             </div>
                           </section>
