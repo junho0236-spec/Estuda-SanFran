@@ -879,9 +879,10 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     const taskToUpdate = tasks.find(t => t.id === taskId);
     if (!taskToUpdate) return;
 
-    // If marking as completed, set the timestamp
+    // If marking as completed, set the timestamp and alinhar status (evita estado local incoerente)
     if (updates.completed === true && !taskToUpdate.completedAt) {
       updates.completedAt = new Date().toISOString();
+      updates.status = 'Concluido' as Task['status'];
       
       // Recurrence Logic
       if (taskToUpdate.recurrence) {
@@ -983,6 +984,9 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       }
     } else if (updates.completed === false) {
       updates.completedAt = undefined;
+      if (!updates.status && (taskToUpdate.status === 'Concluido' || taskToUpdate.completed)) {
+        updates.status = 'Pendente' as Task['status'];
+      }
     }
 
     const updatedTask = { ...taskToUpdate, ...updates };

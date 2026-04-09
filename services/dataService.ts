@@ -29,6 +29,17 @@ function isValidUuid(id: string): boolean {
 }
 
 /**
+ * Coluna `tasks.status` no Supabase. Ao ler, `completed` na app vem de `status === 'Concluido'`.
+ * Nunca usar `task.status || …`: com `status: 'Pendente'` (truthy) ignorava-se `completed: true` e o upsert gravava sempre pendente.
+ */
+function taskStatusForSupabase(task: Task): string {
+  if (task.completed) return 'Concluido';
+  const s = task.status;
+  if (s && s !== 'Concluido') return s;
+  return 'Pendente';
+}
+
+/**
  * Chave estável para “último evento na fila ganha” (evita upsert+delete contraditórios duplicados).
  */
 function getSyncResolutionKey(item: OfflineSyncQueue, userId: string): string {
@@ -83,7 +94,7 @@ function mapSyncQueueItemToRow(item: OfflineSyncQueue, userId: string): Record<s
     payload.completed_at = task.completedAt || null;
     payload.category = task.category || 'Geral';
     payload.priority = task.priority === 'urgente' || task.priority === 'alta' ? 'Alta' : 'Média';
-    payload.status = task.status || (task.completed ? 'Concluido' : 'Pendente');
+    payload.status = taskStatusForSupabase(task);
     payload.subtasks = task.subtasks || [];
     payload.delegated_to = task.delegatedTo || null;
     payload.delegated_by = task.delegatedBy || null;
@@ -687,7 +698,7 @@ export const dataService = {
         completed_at: task.completedAt || null,
         category: task.category || 'Geral',
         priority: task.priority === 'urgente' || task.priority === 'alta' ? 'Alta' : 'Média',
-        status: task.status || (task.completed ? 'Concluido' : 'Pendente'),
+        status: taskStatusForSupabase(task),
         subtasks: task.subtasks || [],
         delegated_to: task.delegatedTo || null,
         delegated_by: task.delegatedBy || null,
