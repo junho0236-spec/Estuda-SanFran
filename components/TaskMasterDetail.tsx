@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Task, Subject, Board, BoardColumn, SubTask, StudySession, UserProfile, TaskPriority, TaskCategory, Notification, Friendship, SubjectFile } from '../types';
 import { 
@@ -48,6 +48,51 @@ import {
   ymdWeekdayUtc,
   isoTimestampToYmdBr,
 } from '../utils';
+
+const TASK_PRIORITY_SORT_RANK: Record<string, number> = {
+  urgente: 0,
+  alta: 1,
+  media: 2,
+  normal: 3,
+  baixa: 4,
+};
+
+function taskListPriorityRank(p?: Task['priority']): number {
+  if (p == null) return 50;
+  return TASK_PRIORITY_SORT_RANK[p] ?? 50;
+}
+
+function taskCreatedTimeMs(task: Task): number {
+  const raw = task.created_at ?? (task as { createdAt?: string }).createdAt;
+  if (!raw) return 0;
+  const t = new Date(raw).getTime();
+  return Number.isFinite(t) ? t : 0;
+}
+
+/** Vista lista: pendentes primeiro (prazo ↑, prioridade, criação); concluídas ao fim. */
+function compareTasksForListView(a: Task, b: Task): number {
+  if (a.completed !== b.completed) return a.completed ? 1 : -1;
+
+  if (a.completed && b.completed) {
+    const ca = a.completedAt ? new Date(a.completedAt).getTime() : 0;
+    const cb = b.completedAt ? new Date(b.completedAt).getTime() : 0;
+    return cb - ca;
+  }
+
+  const dueA = a.dueDate ? dueDateToYmd(a.dueDate) : '';
+  const dueB = b.dueDate ? dueDateToYmd(b.dueDate) : '';
+  if (dueA !== dueB) {
+    if (!dueA) return 1;
+    if (!dueB) return -1;
+    const c = dueA.localeCompare(dueB);
+    if (c !== 0) return c;
+  }
+
+  const pr = taskListPriorityRank(a.priority) - taskListPriorityRank(b.priority);
+  if (pr !== 0) return pr;
+
+  return taskCreatedTimeMs(a) - taskCreatedTimeMs(b);
+}
 
 const STORY_POINTS = [1, 2, 3, 5, 8];
 const DEFAULT_TASK_CATEGORIES: TaskCategory[] = ['estudo', 'peticao', 'audiencia', 'admin', 'geral'];
@@ -590,22 +635,27 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
 
   // --- Onboarding Logic ---
   // Helper to check if a task should be visible in the main UI
-  const isTaskVisible = (task: Task) => {
-    // First check completion visibility (only show today's completed tasks)
-    if (task.completed && task.completedAt) {
-      const completedDate = new Date(task.completedAt).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
-      const todayDate = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
-      if (completedDate !== todayDate) return false;
-    }
+  const isTaskVisible = useCallback(
+    (task: Task) => {
+      if (task.completed && task.completedAt) {
+        const completedDate = new Date(task.completedAt).toLocaleDateString('sv-SE', {
+          timeZone: 'America/Sao_Paulo',
+        });
+        const todayDate = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(
+          new Date()
+        );
+        if (completedDate !== todayDate) return false;
+      }
 
-    // Then check tab visibility
-    if (activeTab === 'Geral') return true;
+      if (activeTab === 'Geral') return true;
 
-    const board = boards.find(b => b.id === activeTab);
-    if (board) return task.boardId === board.id;
-    
-    return true;
-  };
+      const board = boards.find((b) => b.id === activeTab);
+      if (board) return task.boardId === board.id;
+
+      return true;
+    },
+    [activeTab, boards]
+  );
 
   const handleResetTimer = async () => {
     if (timerSeconds < 25 * 60) { // If some time was spent
@@ -1511,16 +1561,19 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   // --- Render Helpers ---
   const todayBr = getBrasiliaDate();
   const tomorrowBr = addDaysYmd(todayBr, 1);
-  const filteredTasks = tasks.filter(isTaskVisible).filter((task) => {
-    const dueYmd = task.dueDate ? dueDateToYmd(task.dueDate) : '';
+  const filteredTasks = useMemo(() => {
+    const filtered = tasks.filter(isTaskVisible).filter((task) => {
+      const dueYmd = task.dueDate ? dueDateToYmd(task.dueDate) : '';
 
-    if (filter === 'today') return dueYmd === todayBr;
-    if (filter === 'tomorrow') return dueYmd === tomorrowBr;
-    if (filter === 'overdue') return !!dueYmd && dueYmd < todayBr && !task.completed;
-    if (filter === 'high') return task.priority === 'urgente' || task.priority === 'alta';
+      if (filter === 'today') return dueYmd === todayBr;
+      if (filter === 'tomorrow') return dueYmd === tomorrowBr;
+      if (filter === 'overdue') return !!dueYmd && dueYmd < todayBr && !task.completed;
+      if (filter === 'high') return task.priority === 'urgente' || task.priority === 'alta';
 
-    return true;
-  });
+      return true;
+    });
+    return [...filtered].sort(compareTasksForListView);
+  }, [tasks, isTaskVisible, filter, todayBr, tomorrowBr]);
 
   const availableTaskCategories = useMemo(() => {
     const fromTasks = tasks
