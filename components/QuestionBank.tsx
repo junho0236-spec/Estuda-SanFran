@@ -124,6 +124,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
+  const [resolvedPreviewQuestionId, setResolvedPreviewQuestionId] = useState<string | null>(null);
   
   // Filters
   const [topics, setTopics] = useState<string[]>([]);
@@ -2326,7 +2327,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
 
   const currentYear = new Date().getFullYear().toString();
 
-  const filteredQuestions = useMemo(
+  const baseFilteredQuestions = useMemo(
     () =>
       filterAndSortBankQuestions({
         questions,
@@ -2379,6 +2380,85 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
     notebooks,
     isErrorNotebookMode,
     questionStatus,
+    questionStats,
+    sortBy,
+  ]);
+
+  const filteredQuestions = useMemo(() => {
+    if (
+      questionStatus !== 'unresolved' ||
+      !showExplanation ||
+      !resolvedPreviewQuestionId
+    ) {
+      return baseFilteredQuestions;
+    }
+
+    if (baseFilteredQuestions.some((q) => q.id === resolvedPreviewQuestionId)) {
+      return baseFilteredQuestions;
+    }
+
+    const previewQuestion = questions.find((q) => q.id === resolvedPreviewQuestionId);
+    if (!previewQuestion) return baseFilteredQuestions;
+
+    const stillMatchesOtherFilters =
+      filterAndSortBankQuestions({
+        questions: [previewQuestion],
+        searchTerm,
+        selectedSubjects,
+        selectedTopic,
+        difficultyFilter,
+        selectedExamBoard,
+        selectedYear,
+        selectedLegislation,
+        selectedJurisprudence,
+        selectedInstitution,
+        selectedExamName,
+        selectedModality,
+        selectedLegalDiploma,
+        selectedCareer,
+        selectedFormationArea,
+        selectedEducationLevel,
+        selectedJobPosition,
+        wrongQuestions,
+        correctQuestions,
+        selectedNotebookId,
+        notebooks,
+        isErrorNotebookMode,
+        questionStatus: 'all',
+        questionStats,
+        sortBy,
+      }).length > 0;
+
+    if (!stillMatchesOtherFilters) return baseFilteredQuestions;
+
+    return [previewQuestion, ...baseFilteredQuestions];
+  }, [
+    questionStatus,
+    showExplanation,
+    resolvedPreviewQuestionId,
+    baseFilteredQuestions,
+    questions,
+    searchTerm,
+    selectedSubjects,
+    selectedTopic,
+    difficultyFilter,
+    selectedExamBoard,
+    selectedYear,
+    selectedLegislation,
+    selectedJurisprudence,
+    selectedInstitution,
+    selectedExamName,
+    selectedModality,
+    selectedLegalDiploma,
+    selectedCareer,
+    selectedFormationArea,
+    selectedEducationLevel,
+    selectedJobPosition,
+    wrongQuestions,
+    correctQuestions,
+    selectedNotebookId,
+    notebooks,
+    isErrorNotebookMode,
     questionStats,
     sortBy,
   ]);
@@ -2737,6 +2817,10 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
       return;
     }
     
+    if (questionStatus === 'unresolved') {
+      setResolvedPreviewQuestionId(targetQuestion.id);
+    }
+
     setShowExplanation(true);
 
     const nextGoals = bumpAnswerGoals(answerGoals);
@@ -2961,6 +3045,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
     setCurrentIndex(0);
     setSelectedOption(null);
     setShowExplanation(false);
+    setResolvedPreviewQuestionId(null);
     setViewMode('list');
   }, [
     selectedSubjects,
@@ -2983,6 +3068,12 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
     selectedEducationLevel,
     selectedJobPosition,
   ]);
+
+  useEffect(() => {
+    if (!showExplanation) {
+      setResolvedPreviewQuestionId(null);
+    }
+  }, [showExplanation]);
 
   const modalsLayerSections = useQuestionBankModalsLayerSections({
     showAIGenerator,
@@ -3355,6 +3446,8 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
               onFollowUp: handleFollowUp,
               onCreateFlashcardFromError: handleCreateFlashcardFromError,
               showNotification,
+              resolvedPreviewQuestionId,
+              isUnresolvedFilterActive: questionStatus === 'unresolved',
               filteredQuestionCount: filteredQuestions.length,
               onPrevListPage: () => setListPage((p) => Math.max(1, p - 1)),
               onNextListPage: () =>
@@ -3410,6 +3503,8 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
               getNextUnansweredMockIndex,
               mockMarkReviewLater,
               setMockMarkReviewLater,
+              resolvedPreviewQuestionId,
+              isUnresolvedFilterActive: questionStatus === 'unresolved',
             }}
             emptyTotalQuestionsInDb={questions.length}
             onOpenAiGenerator={() => setShowAIGenerator(true)}

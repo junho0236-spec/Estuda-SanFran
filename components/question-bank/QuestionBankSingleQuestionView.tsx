@@ -89,6 +89,8 @@ export type QuestionBankSingleQuestionViewProps = {
   getNextUnansweredMockIndex: (idx: number) => number;
   mockMarkReviewLater: Record<string, boolean>;
   setMockMarkReviewLater: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  resolvedPreviewQuestionId?: string | null;
+  isUnresolvedFilterActive?: boolean;
 };
 
 export function QuestionBankSingleQuestionView({
@@ -138,9 +140,13 @@ export function QuestionBankSingleQuestionView({
   getNextUnansweredMockIndex,
   mockMarkReviewLater,
   setMockMarkReviewLater,
+  resolvedPreviewQuestionId,
+  isUnresolvedFilterActive,
 }: QuestionBankSingleQuestionViewProps) {
   const q = currentQuestion;
   const statsHeader = getXRayStats(q.id);
+  const isRecentlyResolvedPreview =
+    !!isUnresolvedFilterActive && !!showExplanation && resolvedPreviewQuestionId === q.id;
 
   return (
     <div className="flex flex-col gap-4">
@@ -182,6 +188,11 @@ export function QuestionBankSingleQuestionView({
               {q.topic && (
                 <span className="inline-block px-3 py-1 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-full text-xs font-bold uppercase tracking-wider">
                   {q.topic}
+                </span>
+              )}
+              {isRecentlyResolvedPreview && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 rounded-full text-xs font-bold uppercase tracking-wider border border-amber-200 dark:border-amber-900/40">
+                  <CheckCircle2 size={12} /> Recém Respondida
                 </span>
               )}
             </div>

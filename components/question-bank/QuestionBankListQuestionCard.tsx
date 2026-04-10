@@ -76,6 +76,8 @@ export type QuestionBankListQuestionCardProps = {
   onCreateFlashcardFromError: (question: Question) => void;
   showNotification: (message: string, type?: 'success' | 'error') => void;
   onEnterFocusMode: () => void;
+  resolvedPreviewQuestionId?: string | null;
+  isUnresolvedFilterActive?: boolean;
 };
 
 export function QuestionBankListQuestionCard({
@@ -121,7 +123,12 @@ export function QuestionBankListQuestionCard({
   onCreateFlashcardFromError,
   showNotification,
   onEnterFocusMode,
+  resolvedPreviewQuestionId,
+  isUnresolvedFilterActive,
 }: QuestionBankListQuestionCardProps) {
+  const isRecentlyResolvedPreview =
+    !!isUnresolvedFilterActive && !!showExplanation && resolvedPreviewQuestionId === q.id;
+
   return (
     <div
       className={`bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden relative pl-20 p-8 transition-all duration-300 ${activeQuestionId === q.id ? 'ring-2 ring-purple-500 shadow-lg' : ''}`}
@@ -210,6 +217,11 @@ export function QuestionBankListQuestionCard({
           {(correctQuestions.includes(q.id) || wrongQuestions.includes(q.id)) && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-[10px] font-black uppercase tracking-widest border border-blue-100 dark:border-blue-900/30">
               <MessageSquare size={10} /> Discussão Liberada
+            </span>
+          )}
+          {isRecentlyResolvedPreview && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 text-[10px] font-black uppercase tracking-widest border border-amber-200 dark:border-amber-900/30">
+              <CheckCircle2 size={10} /> Recém Respondida
             </span>
           )}
         </div>
