@@ -681,6 +681,8 @@ export interface UserProfile {
   last_updated?: string;
   lastInteractionDate?: string;
   viewPreferences?: Record<string, 'list' | 'kanban'>;
+  /** Se true, tarefas com prazo vencido passam automaticamente para prioridade "alta" (exceto "urgente"). */
+  tasksEscalatePriorityWhenOverdue?: boolean;
   /** IDs dos quadros (tabs) na ordem desejada; "Geral" é sempre primeiro e não entra aqui. */
   taskBoardTabOrder?: string[];
   hiddenTaskTabs?: string[];

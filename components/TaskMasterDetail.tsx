@@ -55,6 +55,11 @@ import {
   ymdWeekdayUtc,
   isoTimestampToYmdBr,
 } from '../utils';
+import { taskIsOverdueBr, taskOverdueDaysBr } from '../utils/taskOverdue';
+
+function hasGoogleCalendarSession(): boolean {
+  return typeof localStorage !== 'undefined' && !!localStorage.getItem('fb_google_token');
+}
 
 const TASK_PRIORITY_SORT_RANK: Record<string, number> = {
   urgente: 0,
@@ -76,24 +81,35 @@ function taskCreatedTimeMs(task: Task): number {
   return Number.isFinite(t) ? t : 0;
 }
 
-/** Vista lista: pendentes primeiro (prazo ↑, prioridade, criação); concluídas ao fim. */
-function compareTasksForListView(a: Task, b: Task): number {
-  if (a.completed !== b.completed) return a.completed ? 1 : -1;
+/** Vista lista: no filtro "Tudo", atrasadas primeiro; depois prazo ↑, prioridade, criação; concluídas ao fim. */
+function makeCompareTasksForListView(
+  filter: 'all' | 'today' | 'tomorrow' | 'overdue' | 'high',
+  todayYmd: string
+) {
+  return (a: Task, b: Task): number => {
+    if (a.completed !== b.completed) return a.completed ? 1 : -1;
 
-  if (a.completed && b.completed) {
-    const ca = a.completedAt ? new Date(a.completedAt).getTime() : 0;
-    const cb = b.completedAt ? new Date(b.completedAt).getTime() : 0;
-    return cb - ca;
-  }
+    if (a.completed && b.completed) {
+      const ca = a.completedAt ? new Date(a.completedAt).getTime() : 0;
+      const cb = b.completedAt ? new Date(b.completedAt).getTime() : 0;
+      return cb - ca;
+    }
 
-  const dueA = dueDateToSortInstantMs(a.dueDate);
-  const dueB = dueDateToSortInstantMs(b.dueDate);
-  if (dueA !== dueB) return dueA - dueB;
+    if (filter === 'all') {
+      const aOver = taskIsOverdueBr(a, todayYmd);
+      const bOver = taskIsOverdueBr(b, todayYmd);
+      if (aOver !== bOver) return aOver ? -1 : 1;
+    }
 
-  const pr = taskListPriorityRank(a.priority) - taskListPriorityRank(b.priority);
-  if (pr !== 0) return pr;
+    const dueA = dueDateToSortInstantMs(a.dueDate);
+    const dueB = dueDateToSortInstantMs(b.dueDate);
+    if (dueA !== dueB) return dueA - dueB;
 
-  return taskCreatedTimeMs(a) - taskCreatedTimeMs(b);
+    const pr = taskListPriorityRank(a.priority) - taskListPriorityRank(b.priority);
+    if (pr !== 0) return pr;
+
+    return taskCreatedTimeMs(a) - taskCreatedTimeMs(b);
+  };
 }
 
 /** Próxima instância de uma tarefa recorrente (data + horário preservados). `null` se não houver recorrência. */
@@ -1446,18 +1462,72 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     const overdueTasks = tasks.filter(
       (t) => t.dueDate && dueDateToYmd(t.dueDate) < today && !t.completed
     );
-    
-    if (overdueTasks.length === 0) return;
+
+    if (overdueTasks.length === 0) return 0;
 
     const updatedTasks = [...tasks];
     for (const task of overdueTasks) {
       const updated = { ...task, dueDate: today };
       await dataService.saveTask(updated, userId, isOnline);
-      const index = updatedTasks.findIndex(t => t.id === task.id);
+      const index = updatedTasks.findIndex((t) => t.id === task.id);
       if (index !== -1) updatedTasks[index] = updated;
     }
     setTasks(updatedTasks);
+    return overdueTasks.length;
   };
+
+  const handleRescheduleOverdueClick = () => {
+    const today = getBrasiliaDate();
+    const n = tasks.filter((t) => t.dueDate && dueDateToYmd(t.dueDate) < today && !t.completed).length;
+    if (n === 0) return;
+    if (
+      !confirm(
+        `Trazer ${n} tarefa(s) com prazo vencido para hoje (${today.slice(8, 10)}/${today.slice(5, 7)})?`
+      )
+    )
+      return;
+    void (async () => {
+      const done = await handleRescheduleOverdue();
+      if (done && done > 0) {
+        toast.success(`${done} tarefa(s) reagendadas para hoje.`);
+        if (hasGoogleCalendarSession()) {
+          toast.info('Lembretes no Google Agenda serão atualizados em segundo plano quando houver conexão.');
+        }
+      }
+    })();
+  };
+
+  const handleSyncOverdueWithGoogle = useCallback(async () => {
+    const today = getBrasiliaDate();
+    const subset = tasks.filter(
+      (t) =>
+        isTaskVisible(t) &&
+        taskIsOverdueBr(t, today) &&
+        !!t.google_event_id &&
+        !!t.dueDate
+    );
+    if (subset.length === 0) {
+      toast.info('Nenhuma tarefa atrasada com evento no Google Agenda.');
+      return;
+    }
+    if (!hasGoogleCalendarSession()) {
+      toast.error('Conecte o Google Agenda (login Google) para sincronizar.');
+      return;
+    }
+    try {
+      const { syncDueTasksToGoogleAndSupabase } = await import('../services/googleCalendarTaskSync');
+      const { successCount, withDueCount } = await syncDueTasksToGoogleAndSupabase(subset, subjects);
+      if (successCount > 0) {
+        toast.success(`Google Agenda: ${successCount}/${withDueCount} evento(s) enviados ou atualizados.`);
+      } else {
+        toast.error('Não foi possível sincronizar com o Google Agenda.');
+      }
+      const fresh = await dataService.getTasks(userId, isOnline);
+      setTasks(fresh);
+    } catch {
+      toast.error('Erro ao sincronizar com o Google Agenda.');
+    }
+  }, [tasks, subjects, userId, isOnline, isTaskVisible, setTasks]);
 
   const handleAddLink = (url: string) => {
     if (!selectedTask || !url.trim()) return;
@@ -1663,7 +1733,17 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     );
   };
 
-  const SortableTaskItem = ({ task, selectedTaskId, setSelectedTaskId, handleUpdateTask, boards, isBulkSelectMode, selectedTaskIds, setSelectedTaskIds }: any) => {
+  const SortableTaskItem = ({
+    task,
+    selectedTaskId,
+    setSelectedTaskId,
+    handleUpdateTask,
+    boards,
+    isBulkSelectMode,
+    selectedTaskIds,
+    setSelectedTaskIds,
+    todayBr,
+  }: any) => {
     const {
       attributes,
       listeners,
@@ -1685,6 +1765,29 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       : 0;
     const isSelectedForBulkAction = selectedTaskIds.includes(task.id);
 
+    const isOverdue = taskIsOverdueBr(task, todayBr);
+    const daysLate = taskOverdueDaysBr(task, todayBr);
+    const isUrgent = task.priority === 'urgente';
+    const isAlta = task.priority === 'alta';
+
+    let borderLeft = '';
+    if (!task.completed) {
+      if (isUrgent) borderLeft = 'border-l-4 border-l-red-500';
+      else if (isOverdue) borderLeft = 'border-l-4 border-dashed border-violet-600';
+      else if (isAlta) borderLeft = 'border-l-4 border-l-amber-500';
+    }
+
+    const overlayClass = !task.completed
+      ? isUrgent
+        ? 'bg-red-500/5'
+        : isOverdue
+          ? 'bg-violet-500/5'
+          : isAlta
+            ? 'bg-amber-500/5'
+            : ''
+      : '';
+    const showOverlay = !task.completed && (isUrgent || isOverdue || isAlta);
+
     return (
       <div
         ref={setNodeRef}
@@ -1702,10 +1805,10 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
           }
           setSelectedTaskId(task.id);
         }}
-        className={`p-4 md:p-5 rounded-2xl cursor-pointer transition-all border relative overflow-hidden group ${selectedTaskId === task.id ? 'bg-[#800000] text-white border-transparent shadow-lg scale-[1.02]' : 'bg-white text-slate-700 border-slate-100 hover:border-[#800000]/30 hover:shadow-sm'} ${task.completed ? 'opacity-50' : 'opacity-100'} ${task.priority === 'urgente' ? 'border-l-4 border-l-red-500' : task.priority === 'alta' ? 'border-l-4 border-l-amber-500' : ''}`}
+        className={`p-4 md:p-5 rounded-2xl cursor-pointer transition-all border relative overflow-hidden group ${selectedTaskId === task.id ? 'bg-[#800000] text-white border-transparent shadow-lg scale-[1.02]' : 'bg-white text-slate-700 border-slate-100 hover:border-[#800000]/30 hover:shadow-sm'} ${task.completed ? 'opacity-50' : 'opacity-100'} ${borderLeft}`}
       >
-        {(task.priority === 'urgente' || task.priority === 'alta') && !task.completed && (
-          <div className={`absolute inset-0 pointer-events-none animate-pulse ${task.priority === 'urgente' ? 'bg-red-500/5' : 'bg-amber-500/5'}`} />
+        {showOverlay && (
+          <div className={`absolute inset-0 pointer-events-none animate-pulse ${overlayClass}`} />
         )}
         
         <div className="flex items-center gap-3 relative z-10">
@@ -1719,10 +1822,23 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
             {task.completed && <CheckCircle2 size={12} />}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <div className={`font-medium text-base truncate transition-all ${task.completed ? 'line-through' : ''}`}>{task.title}</div>
               {task.priority === 'urgente' && <AlertCircle size={12} className="text-red-500 shrink-0" />}
               {task.waitingOn && <Clock size={12} className="text-amber-500 shrink-0 animate-pulse" />}
+              {isOverdue && daysLate > 0 && (
+                <span
+                  className={`text-[9px] font-black uppercase tracking-tight px-1.5 py-0.5 rounded-md shrink-0 ${
+                    selectedTaskId === task.id
+                      ? 'bg-white/20 text-white'
+                      : isUrgent
+                        ? 'bg-red-100 text-red-600'
+                        : 'bg-violet-100 text-violet-700'
+                  }`}
+                >
+                  Atrasada há {daysLate} {daysLate === 1 ? 'dia' : 'dias'}
+                </span>
+              )}
             </div>
 
             {/* Smart Progress Bar */}
@@ -1739,8 +1855,24 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
             <div className="flex items-center justify-between mt-1">
                             <div className="flex flex-col gap-1">
                 {task.dueDate && (
-                  <div className={`flex items-center gap-1 text-[11px] font-bold ${selectedTaskId === task.id ? 'text-white/80' : 'text-amber-600'}`}>
-                    <Calendar size={12} className="shrink-0" />
+                  <div
+                    className={`flex items-center gap-1 text-[11px] font-bold ${
+                      selectedTaskId === task.id
+                        ? isOverdue
+                          ? 'text-white/90'
+                          : 'text-white/80'
+                        : isOverdue
+                          ? isUrgent
+                            ? 'text-red-600'
+                            : 'text-violet-700'
+                          : 'text-amber-600'
+                    }`}
+                  >
+                    {isOverdue ? (
+                      <AlertCircle size={12} className="shrink-0" />
+                    ) : (
+                      <Calendar size={12} className="shrink-0" />
+                    )}
                     {formatDueDateTimeBr(task.dueDate)}
                   </div>
                 )}
@@ -1822,19 +1954,97 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   // --- Render Helpers ---
   const todayBr = getBrasiliaDate();
   const tomorrowBr = addDaysYmd(todayBr, 1);
+  const overdueCount = useMemo(() => {
+    const today = getBrasiliaDate();
+    return tasks.filter((t) => isTaskVisible(t) && taskIsOverdueBr(t, today)).length;
+  }, [tasks, isTaskVisible]);
+
   const filteredTasks = useMemo(() => {
+    const today = getBrasiliaDate();
+    const tomorrow = addDaysYmd(today, 1);
     const filtered = tasks.filter(isTaskVisible).filter((task) => {
       const dueYmd = task.dueDate ? dueDateToYmd(task.dueDate) : '';
 
-      if (filter === 'today') return dueYmd === todayBr;
-      if (filter === 'tomorrow') return dueYmd === tomorrowBr;
-      if (filter === 'overdue') return !!dueYmd && dueYmd < todayBr && !task.completed;
+      if (filter === 'today') return dueYmd === today;
+      if (filter === 'tomorrow') return dueYmd === tomorrow;
+      if (filter === 'overdue') return !!dueYmd && dueYmd < today && !task.completed;
       if (filter === 'high') return task.priority === 'urgente' || task.priority === 'alta';
 
       return true;
     });
-    return [...filtered].sort(compareTasksForListView);
-  }, [tasks, isTaskVisible, filter, todayBr, tomorrowBr]);
+    return [...filtered].sort(makeCompareTasksForListView(filter, today));
+  }, [tasks, isTaskVisible, filter]);
+
+  useEffect(() => {
+    if (!userProfile?.tasksEscalatePriorityWhenOverdue) return;
+    const today = getBrasiliaDate();
+    const list = tasks.filter(
+      (t) =>
+        isTaskVisible(t) &&
+        taskIsOverdueBr(t, today) &&
+        !t.completed &&
+        (t.priority === undefined ||
+          t.priority === 'normal' ||
+          t.priority === 'media' ||
+          t.priority === 'baixa')
+    );
+    if (list.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      for (const t of list) {
+        if (cancelled) break;
+        const updated = { ...t, priority: 'alta' as const };
+        try {
+          await dataService.saveTask(updated, userId, isOnline);
+          if (!cancelled) {
+            setTasks((prev) => prev.map((x) => (x.id === t.id ? updated : x)));
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tasks, userProfile?.tasksEscalatePriorityWhenOverdue, userId, isOnline, isTaskVisible, setTasks]);
+
+  useEffect(() => {
+    if (!userId) return;
+    const today = getBrasiliaDate();
+    const count = tasks.filter((t) => isTaskVisible(t) && taskIsOverdueBr(t, today)).length;
+    if (count === 0) return;
+
+    const toastKey = `sanfran_tasks_overdue_toast_${userId}_${today}`;
+    if (!localStorage.getItem(toastKey)) {
+      localStorage.setItem(toastKey, '1');
+      toast(`Você tem ${count} tarefa(s) com prazo vencido`, {
+        action: {
+          label: 'Ver atrasadas',
+          onClick: () => setFilter('overdue'),
+        },
+      });
+    }
+
+    const notifKey = `sanfran_tasks_overdue_notif_${userId}_${today}`;
+    if (isOnline && !localStorage.getItem(notifKey)) {
+      localStorage.setItem(notifKey, '1');
+      void (async () => {
+        try {
+          await dataService.createNotification(
+            userId,
+            `Você tem ${count} tarefa(s) com prazo vencido nas Tarefas.`,
+            undefined,
+            'overdue_digest'
+          );
+          const notificationsData = await dataService.getNotifications(userId);
+          setNotifications(notificationsData);
+        } catch {
+          /* RLS ou rede */
+        }
+      })();
+    }
+  }, [userId, tasks, isOnline, isTaskVisible]);
 
   const availableTaskCategories = useMemo(() => {
     const fromTasks = tasks
@@ -2177,6 +2387,15 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                   >
                     <f.icon size={10} />
                     {f.label}
+                    {f.id === 'overdue' && overdueCount > 0 && (
+                      <span
+                        className={`ml-0.5 min-w-[1.25rem] rounded-full px-1.5 py-0.5 text-[8px] font-black tabular-nums animate-pulse ${
+                          filter === f.id ? 'bg-white/25 text-white' : 'bg-violet-500 text-white'
+                        }`}
+                      >
+                        {overdueCount}
+                      </span>
+                    )}
                   </button>
                 ))}
                 <button
@@ -2195,6 +2414,28 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                   {isBulkSelectMode ? 'Cancelar seleção' : 'Selecionar'}
                 </button>
               </div>
+
+              {overdueCount > 0 && (
+                <div className="flex flex-wrap items-center gap-2 border-b border-slate-50 px-2 py-2">
+                  <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                    {overdueCount} atrasada{overdueCount === 1 ? '' : 's'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleRescheduleOverdueClick}
+                    className="rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[9px] font-black uppercase tracking-wider text-violet-800 transition-colors hover:bg-violet-100"
+                  >
+                    Trazer atrasadas para hoje
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleSyncOverdueWithGoogle()}
+                    className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[9px] font-black uppercase tracking-wider text-slate-600 transition-colors hover:border-[#800000]/30"
+                  >
+                    Sincronizar atrasadas com Google
+                  </button>
+                </div>
+              )}
 
               {isBulkSelectMode && (
                 <div className="px-2 py-2 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
@@ -2223,6 +2464,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                     <SortableTaskItem 
                       key={task.id}
                       task={task}
+                      todayBr={todayBr}
                       selectedTaskId={selectedTaskId}
                       setSelectedTaskId={setSelectedTaskId}
                       handleUpdateTask={handleUpdateTask}
@@ -2969,6 +3211,27 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                       ? (task.subtasks.filter(s => s.completed).length / task.subtasks.length) * 100
                       : 0;
 
+                    const kbOverdue = taskIsOverdueBr(task, todayBr);
+                    const kbDaysLate = taskOverdueDaysBr(task, todayBr);
+                    const kbUrgent = task.priority === 'urgente';
+                    const kbAlta = task.priority === 'alta';
+                    let kbBorder = 'border-slate-100';
+                    if (!task.completed) {
+                      if (kbUrgent) kbBorder = 'border-l-4 border-l-red-500';
+                      else if (kbOverdue) kbBorder = 'border-l-4 border-dashed border-violet-600';
+                      else if (kbAlta) kbBorder = 'border-l-4 border-l-amber-500';
+                    }
+                    const kbOverlay = !task.completed
+                      ? kbUrgent
+                        ? 'bg-red-500/5'
+                        : kbOverdue
+                          ? 'bg-violet-500/5'
+                          : kbAlta
+                            ? 'bg-amber-500/5'
+                            : ''
+                      : '';
+                    const kbShowOverlay = !task.completed && (kbUrgent || kbOverdue || kbAlta);
+
                     return (
                       <DraggableKanbanCard key={task.id} task={task}>
                         <motion.div 
@@ -2985,10 +3248,10 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                             // Ao clicar no card no Kanban, abrimos esse layout automaticamente.
                             handleToggleViewMode('list');
                           }}
-                          className={`p-4 bg-white rounded-2xl shadow-sm border cursor-pointer hover:shadow-md hover:border-[#800000]/20 transition-all group relative overflow-hidden ${task.priority === 'urgente' ? 'border-l-4 border-l-red-500' : task.priority === 'alta' ? 'border-l-4 border-l-amber-500' : 'border-slate-100'}`}
+                          className={`p-4 bg-white rounded-2xl shadow-sm border cursor-pointer hover:shadow-md hover:border-[#800000]/20 transition-all group relative overflow-hidden ${kbBorder}`}
                         >
-                          {(task.priority === 'urgente' || task.priority === 'alta') && !task.completed && (
-                            <div className={`absolute inset-0 pointer-events-none animate-pulse ${task.priority === 'urgente' ? 'bg-red-500/5' : 'bg-amber-500/5'}`} />
+                          {kbShowOverlay && (
+                            <div className={`absolute inset-0 pointer-events-none animate-pulse ${kbOverlay}`} />
                           )}
                           {task.completed && (
                             <motion.div 
@@ -2998,9 +3261,18 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                             />
                           )}
                           <div className="flex items-start justify-between mb-2 relative z-10">
-                            <div className="flex flex-col gap-1">
+                            <div className="flex flex-col gap-1 min-w-0">
                               <h5 className={`text-sm font-bold text-slate-800 leading-tight transition-all ${task.completed ? 'line-through text-slate-400' : ''}`}>{task.title}</h5>
                               {task.priority === 'urgente' && <span className="text-[8px] font-black text-red-500 uppercase tracking-widest">Urgente</span>}
+                              {kbOverdue && kbDaysLate > 0 && (
+                                <span
+                                  className={`text-[8px] font-black uppercase tracking-tight w-fit rounded px-1 py-0.5 ${
+                                    kbUrgent ? 'bg-red-100 text-red-600' : 'bg-violet-100 text-violet-700'
+                                  }`}
+                                >
+                                  Atrasada há {kbDaysLate} {kbDaysLate === 1 ? 'dia' : 'dias'}
+                                </span>
+                              )}
                             </div>
                             <button 
                               onClick={(e) => {
@@ -3025,8 +3297,19 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                               )}
                             </div>
                             {task.dueDate && (
-                              <div className={`flex items-center gap-1 text-[10px] font-bold ${task.completed ? 'text-slate-300' : 'text-amber-600'}`}>
-                                <Calendar size={10} /> {formatDueDateTimeBr(task.dueDate)}
+                              <div
+                                className={`flex items-center gap-1 text-[10px] font-bold shrink-0 ${
+                                  task.completed
+                                    ? 'text-slate-300'
+                                    : kbOverdue
+                                      ? kbUrgent
+                                        ? 'text-red-600'
+                                        : 'text-violet-700'
+                                      : 'text-amber-600'
+                                }`}
+                              >
+                                {kbOverdue ? <AlertCircle size={10} /> : <Calendar size={10} />}{' '}
+                                {formatDueDateTimeBr(task.dueDate)}
                               </div>
                             )}
                           </div>

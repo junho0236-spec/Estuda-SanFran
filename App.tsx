@@ -2069,7 +2069,17 @@ const App: React.FC = () => {
                 <Route path={getPathFromView(View.SanFranGames)} element={<SanFranGames onNavigate={setCurrentView} />} />
                 <Route path={getPathFromView(View.SanFranHelp)} element={<SanFranHelp onNavigate={setCurrentView} />} />
                 <Route path={getPathFromView(View.FAQ)} element={<FAQ onNavigate={setCurrentView} />} />
-                <Route path={getPathFromView(View.Settings)} element={<Settings />} />
+                <Route
+                  path={getPathFromView(View.Settings)}
+                  element={
+                    <Settings
+                      userId={session?.user?.id}
+                      userProfile={userProfile}
+                      setUserProfile={setUserProfile}
+                      isOnline={isOnline}
+                    />
+                  }
+                />
                 <Route path={getPathFromView(View.SanFranOAB)} element={<SanFranOAB onNavigate={setCurrentView} />} />
                 <Route path={getPathFromView(View.SanFranConcursos)} element={<SanFranConcursos onNavigate={setCurrentView} />} />
 

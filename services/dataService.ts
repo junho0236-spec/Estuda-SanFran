@@ -374,7 +374,8 @@ export const dataService = {
         visible_modules: sanitized.visible_modules || ['jornada', 'grade', 'evolucao', 'mural', 'lideranca', 'conexoes'],
         prestigePoints: sanitized.prestigePoints || 0,
         productivityStats: sanitized.productivityStats || { completedToday: 0, completedYesterday: 0, streak: 0 },
-        lastInteractionDate: sanitized.lastInteractionDate || null
+        lastInteractionDate: sanitized.lastInteractionDate || null,
+        tasksEscalatePriorityWhenOverdue: !!sanitized.tasksEscalatePriorityWhenOverdue,
       },
       profile_completion: sanitized.arcadia_score || 0,
       full_name: sanitized.full_name || null,
@@ -500,6 +501,7 @@ export const dataService = {
           prestigePoints: data.persona_data?.prestigePoints || 0,
           productivityStats: data.persona_data?.productivityStats || { completedToday: 0, completedYesterday: 0, streak: 0 },
           lastInteractionDate: data.persona_data?.lastInteractionDate || null,
+          tasksEscalatePriorityWhenOverdue: !!data.persona_data?.tasksEscalatePriorityWhenOverdue,
           creditos_aula: data.creditos_aula,
           creditos_trabalho: data.creditos_trabalho,
           media: data.media,

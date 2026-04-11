@@ -1,4 +1,5 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Settings as SettingsIcon, 
@@ -16,16 +17,55 @@ import {
   Palette,
   Volume2,
   Database,
-  Cloud
+  Cloud,
+  CheckSquare,
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { dataService } from '../services/dataService';
+import type { UserProfile } from '../types';
 
 const SPACED_REMINDER_STORAGE_KEY = 'sanfran-spaced-reminders';
 const SPACED_REMINDER_OPEN_EVENT = 'sanfran-spaced-reminders-open';
 
-const Settings: React.FC = () => {
+type SettingsProps = {
+  userId?: string;
+  userProfile?: UserProfile | null;
+  setUserProfile?: Dispatch<SetStateAction<UserProfile | null>>;
+  isOnline?: boolean;
+};
+
+const Settings: React.FC<SettingsProps> = ({
+  userId,
+  userProfile,
+  setUserProfile,
+  isOnline = true,
+}) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('geral');
+  const [escalateOverdue, setEscalateOverdue] = useState(
+    !!userProfile?.tasksEscalatePriorityWhenOverdue
+  );
+
+  useEffect(() => {
+    setEscalateOverdue(!!userProfile?.tasksEscalatePriorityWhenOverdue);
+  }, [userProfile?.tasksEscalatePriorityWhenOverdue]);
+
+  const persistEscalateOverdue = useCallback(
+    async (next: boolean) => {
+      if (!userId || !userProfile || !setUserProfile) {
+        setEscalateOverdue(next);
+        return;
+      }
+      setEscalateOverdue(next);
+      const updated: UserProfile = {
+        ...userProfile,
+        tasksEscalatePriorityWhenOverdue: next,
+      };
+      setUserProfile(updated);
+      await dataService.saveUserProfile(updated, userId, isOnline);
+    },
+    [userId, userProfile, setUserProfile, isOnline]
+  );
 
   const openSpacedReminderPanel = useCallback(() => {
     try {
@@ -125,6 +165,36 @@ const Settings: React.FC = () => {
                         <option value="utc">UTC</option>
                       </select>
                     </div>
+                  </div>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-widest mb-6 flex items-center gap-2">
+                    <CheckSquare size={20} className="text-sanfran-rubi" /> Tarefas e prazos
+                  </h3>
+                  <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-black/20 rounded-2xl border border-slate-100 dark:border-white/5">
+                    <div className="pr-4">
+                      <p className="font-bold text-slate-900 dark:text-white">Prioridade alta em atraso</p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Quando uma tarefa estiver com prazo vencido (Brasília), marcar automaticamente como
+                        prioridade &quot;alta&quot; (não altera tarefas já &quot;urgentes&quot;).
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={escalateOverdue}
+                      onClick={() => void persistEscalateOverdue(!escalateOverdue)}
+                      className={`relative h-8 w-14 shrink-0 rounded-full transition-colors ${
+                        escalateOverdue ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-white/15'
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                          escalateOverdue ? 'left-7' : 'left-1'
+                        }`}
+                      />
+                    </button>
                   </div>
                 </section>
 
