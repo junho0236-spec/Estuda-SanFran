@@ -986,17 +986,25 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
     const sub = searchParams.get('qbSubject');
     const top = searchParams.get('qbTopic');
     const qsearch = searchParams.get('qbSearch');
-    if (!rs && !sub && !top && !qsearch) return;
+    const qbAiCount = searchParams.get('qbAiCount');
+    if (!rs && !sub && !top && !qsearch && (qbAiCount == null || qbAiCount === '')) return;
     qbDeepLinkApplied.current = true;
     if (sub) setSelectedSubjects([sub]);
     if (top) setSelectedTopic(top);
     if (qsearch) setSearchTerm(qsearch);
     if (rs === '1' || rs === 'true') setQuestionStatus('review_today');
+    if (qbAiCount != null && qbAiCount !== '') {
+      const n = parseInt(qbAiCount, 10);
+      if (Number.isFinite(n) && n >= 1 && n <= 20) {
+        setAiConfig(prev => ({ ...prev, count: n }));
+      }
+    }
     const next = new URLSearchParams(searchParams);
     next.delete('reviewToday');
     next.delete('qbSubject');
     next.delete('qbTopic');
     next.delete('qbSearch');
+    next.delete('qbAiCount');
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 

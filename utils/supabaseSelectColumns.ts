@@ -42,7 +42,7 @@ export const QUESTION_COMMENTS_LIST_COLUMNS =
 export const DECK_REQUESTS_LIST_COLUMNS = 'id, user_id, topic, votes, created_at';
 
 export const SPACED_TOPICS_LIST_COLUMNS =
-  'id, user_id, subject, topic, study_date, reviews_completed, review_completion_dates, cycles, created_at, content, srs_algorithm, srs_ease_factor, srs_repetitions, srs_interval_days, srs_next_review_at, srs_fsrs_card, review_snoozes, srs_cumulative_offset_days, linked_material_kind, linked_material_query';
+  'id, user_id, subject, topic, study_date, reviews_completed, review_completion_dates, cycles, created_at, content, srs_algorithm, srs_ease_factor, srs_repetitions, srs_interval_days, srs_next_review_at, srs_fsrs_card, review_snoozes, srs_cumulative_offset_days, linked_material_kind, linked_material_query, linked_question_bank_ai_count';
 
 // --- Clube do livro / SF ---
 export const SF_BOOK_CYCLES_ROW_COLUMNS =

@@ -1,5 +1,5 @@
-
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, type NavigateFunction } from 'react-router-dom';
 import { 
   Repeat, Calendar, CheckCircle2, Circle, Plus, Trash2, 
@@ -150,6 +150,7 @@ const normalizeSpacedTopic = (t: SpacedTopic): SpacedTopic => {
     linked_material_kind: normalizeMaterialKind(t.linked_material_kind),
     linked_material_query:
       typeof t.linked_material_query === 'string' ? t.linked_material_query : null,
+    linked_question_bank_ai_count: normalizeQbAiCount(t.linked_question_bank_ai_count),
   };
 };
 
@@ -316,6 +317,25 @@ function normalizeMaterialKind(v: unknown): SpacedMaterialKind {
   return 'none';
 }
 
+/** 1–20 para o Gerador com IA do banco; fora disso → null (não persiste preferência inválida). */
+function normalizeQbAiCount(v: unknown): number | null {
+  let n0: number;
+  if (typeof v === 'number' && Number.isFinite(v)) n0 = v;
+  else if (typeof v === 'string' && v.trim() !== '') {
+    const p = parseInt(v, 10);
+    if (!Number.isFinite(p)) return null;
+    n0 = p;
+  } else return null;
+  const n = Math.round(n0);
+  if (n < 1 || n > 20) return null;
+  return n;
+}
+
+function clampQbAiCountInput(raw: number): number {
+  if (!Number.isFinite(raw)) return 3;
+  return Math.min(20, Math.max(1, Math.round(raw)));
+}
+
 function navigateToQuestionBankForTopic(navigate: NavigateFunction, t: SpacedTopic) {
   const p = new URLSearchParams();
   p.set('qbSubject', t.subject.trim());
@@ -323,6 +343,8 @@ function navigateToQuestionBankForTopic(navigate: NavigateFunction, t: SpacedTop
   p.set('reviewToday', '1');
   const qtxt = t.linked_material_query?.trim();
   if (qtxt) p.set('qbSearch', qtxt);
+  const qbN = normalizeQbAiCount(t.linked_question_bank_ai_count);
+  if (qbN != null) p.set('qbAiCount', String(qbN));
   navigate(`/questoes?${p.toString()}`);
 }
 
@@ -503,6 +525,7 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
   );
   const [contentMaterialKind, setContentMaterialKind] = useState<SpacedMaterialKind>('both');
   const [contentMaterialQuery, setContentMaterialQuery] = useState('');
+  const [contentQbAiCount, setContentQbAiCount] = useState(3);
   const [savingMaterialLink, setSavingMaterialLink] = useState(false);
   const [editPlanStudyDate, setEditPlanStudyDate] = useState('');
   const [editPlanCycles, setEditPlanCycles] = useState(4);
@@ -779,6 +802,9 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
     if (!selectedTopicForContent) return;
     setContentMaterialKind(normalizeMaterialKind(selectedTopicForContent.linked_material_kind));
     setContentMaterialQuery(selectedTopicForContent.linked_material_query || '');
+    setContentQbAiCount(
+      normalizeQbAiCount(selectedTopicForContent.linked_question_bank_ai_count) ?? 3
+    );
     setEditPlanStudyDate(selectedTopicForContent.study_date);
     setEditPlanCycles(selectedTopicForContent.cycles || 4);
     const a = selectedTopicForContent.srs_algorithm;
@@ -827,12 +853,14 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
   const saveMaterialLinkForTopic = async (topicId: string) => {
     setSavingMaterialLink(true);
     const q = contentMaterialQuery.trim() || null;
+    const qbCount = clampQbAiCountInput(contentQbAiCount);
     try {
       const { error } = await supabase
         .from('spaced_topics')
         .update({
           linked_material_kind: contentMaterialKind,
           linked_material_query: q,
+          linked_question_bank_ai_count: qbCount,
         })
         .eq('id', topicId);
       if (error) throw error;
@@ -843,6 +871,7 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                 ...t,
                 linked_material_kind: contentMaterialKind,
                 linked_material_query: q,
+                linked_question_bank_ai_count: qbCount,
               })
             : t
         )
@@ -853,10 +882,11 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
               ...cur,
               linked_material_kind: contentMaterialKind,
               linked_material_query: q,
+              linked_question_bank_ai_count: qbCount,
             })
           : cur
       );
-      toast.success('Vínculo com flashcards / resumidor salvo.');
+      toast.success('Preferências de material e banco de questões salvas.');
     } catch (e) {
       console.error(e);
       toast.error('Não foi possível salvar o vínculo.', {
@@ -1685,14 +1715,16 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
         </div>
       </header>
 
-      {/* CREATE MODAL */}
-      <AnimatePresence>
-        {isAdding && (
+      {/* CREATE MODAL — portal evita ficar atrás da sidebar (stacking context do layout) */}
+      {typeof document !== 'undefined'
+        ? createPortal(
+            <AnimatePresence>
+              {isAdding && (
            <motion.div 
              initial={{ opacity: 0 }}
              animate={{ opacity: 1 }}
              exit={{ opacity: 0 }}
-             className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+             className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
              role="presentation"
              onClick={() => setIsAdding(false)}
            >
@@ -1886,17 +1918,22 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                  </div>
               </motion.div>
            </motion.div>
-        )}
-      </AnimatePresence>
+              )}
+            </AnimatePresence>,
+            document.body
+          )
+        : null}
 
       {/* Confirmação de exclusão (substitui window.confirm) */}
-      <AnimatePresence>
-        {deleteConfirmId && (
+      {typeof document !== 'undefined'
+        ? createPortal(
+            <AnimatePresence>
+              {deleteConfirmId && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+            className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
             role="presentation"
             onClick={() => setDeleteConfirmId(null)}
           >
@@ -1939,16 +1976,21 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
               </div>
             </motion.div>
           </motion.div>
-        )}
-      </AnimatePresence>
+              )}
+            </AnimatePresence>,
+            document.body
+          )
+        : null}
 
-      <AnimatePresence>
-        {qualityPickTask && (
+      {typeof document !== 'undefined'
+        ? createPortal(
+            <AnimatePresence>
+              {qualityPickTask && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[55] flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+            className="fixed inset-0 z-[105] flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
             role="presentation"
             onClick={() => setQualityPickTask(null)}
           >
@@ -2013,8 +2055,11 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
               </button>
             </motion.div>
           </motion.div>
-        )}
-      </AnimatePresence>
+              )}
+            </AnimatePresence>,
+            document.body
+          )
+        : null}
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 xl:gap-8 xl:h-full min-h-0">
          
@@ -2651,13 +2696,15 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
       </div>
 
       {/* CONTENT MODAL (DOCS) */}
-      <AnimatePresence>
-        {selectedTopicForContent && (
+      {typeof document !== 'undefined'
+        ? createPortal(
+            <AnimatePresence>
+              {selectedTopicForContent && (
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
             role="presentation"
             onClick={() => setSelectedTopicForContent(null)}
           >
@@ -2822,7 +2869,10 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                         onClick={() => {
                           const t = selectedTopicForContent;
                           if (!t) return;
-                          navigateToQuestionBankForTopic(navigate, t);
+                          navigateToQuestionBankForTopic(navigate, {
+                            ...t,
+                            linked_question_bank_ai_count: clampQbAiCountInput(contentQbAiCount),
+                          });
                           setSelectedTopicForContent(null);
                         }}
                         className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-[9px] font-black uppercase tracking-tight text-emerald-900 transition-colors hover:bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100"
@@ -2862,13 +2912,35 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                         />
                       </div>
                     </div>
+                    <div>
+                      <label htmlFor="spaced-content-qb-ai-count" className="text-[9px] font-black uppercase text-slate-400">
+                        Quantidade no Gerador com IA (banco)
+                      </label>
+                      <input
+                        id="spaced-content-qb-ai-count"
+                        type="number"
+                        min={1}
+                        max={20}
+                        inputMode="numeric"
+                        value={contentQbAiCount}
+                        onChange={e => {
+                          const v = parseInt(e.target.value, 10);
+                          setContentQbAiCount(Number.isFinite(v) ? clampQbAiCountInput(v) : 1);
+                        }}
+                        className="mt-1 w-full max-w-[8rem] rounded-xl border border-slate-200 bg-white px-2 py-2 text-sm font-bold text-slate-800 outline-none dark:border-white/10 dark:bg-black/40 dark:text-slate-100"
+                      />
+                      <p className="mt-1 text-[9px] leading-snug text-slate-500 dark:text-slate-400">
+                        Número de questões (1–20) que você costuma pedir na IA ao estudar este assunto. Ao abrir o banco por
+                        este tópico, o Gerador com IA já vem com essa quantidade; use o botão abaixo para gravar no servidor.
+                      </p>
+                    </div>
                     <button
                       type="button"
                       disabled={savingMaterialLink || !selectedTopicForContent}
                       onClick={() => selectedTopicForContent && void saveMaterialLinkForTopic(selectedTopicForContent.id)}
                       className="w-full rounded-xl border border-slate-200 bg-white py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-600 transition-colors hover:border-sky-200 hover:bg-sky-50 hover:text-sky-800 disabled:opacity-50 dark:border-white/10 dark:bg-black/40 dark:text-slate-300 dark:hover:border-sky-800"
                     >
-                      {savingMaterialLink ? 'Salvando vínculo…' : 'Salvar preferências de material'}
+                      {savingMaterialLink ? 'Salvando…' : 'Salvar preferências (material + IA do banco)'}
                     </button>
                   </div>
                 </div>
@@ -2894,8 +2966,11 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
               </div>
             </motion.div>
           </motion.div>
-        )}
-      </AnimatePresence>
+              )}
+            </AnimatePresence>,
+            document.body
+          )
+        : null}
     </div>
   );
 };

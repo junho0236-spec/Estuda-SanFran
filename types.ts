@@ -945,6 +945,8 @@ export interface SpacedTopic {
   linked_material_kind?: SpacedMaterialKind | null;
   /** Texto usado na busca dos flashcards e no pré-preenchimento do resumidor (vazio = matéria + tópico). */
   linked_material_query?: string | null;
+  /** Quantidade (1–20) preferida no Gerador com IA do banco de questões ao abrir pelo atalho deste tópico; null = não definido. */
+  linked_question_bank_ai_count?: number | null;
 }
 
 // Attendance Types
