@@ -2283,6 +2283,7 @@ const App: React.FC = () => {
                     isOnline={isOnline} 
                     userProfile={userProfile}
                     setUserProfile={setUserProfile}
+                    onNavigateToCalendar={() => setCurrentView(View.Calendar)}
                   />
                 } />
 

@@ -5,7 +5,7 @@ import {
   Plus, Layout, List, MoreVertical, Trash2, CheckSquare, 
   Clock, Paperclip, ChevronRight, X, Calendar, AlertCircle,
   Play, Pause, RotateCcw, Save, Quote, ThumbsUp, ExternalLink, Link as LinkIcon, Globe, Bell,
-  CheckCircle2, User, Zap, Trello, BookOpen, Download, Sparkles, Loader2, GripVertical
+  CheckCircle2, User, Zap, Trello, BookOpen, Download, Sparkles, Loader2, GripVertical, RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -37,6 +37,7 @@ import { CommentsSection } from './CommentsSection';
 import ical from 'ical-generator';
 import { saveAs } from 'file-saver';
 import { dataService } from '../services/dataService';
+import { connectGoogleCalendarAndSyncTasks } from '../services/googleCalendarConnectFlow';
 import { supabase } from '../services/supabaseClient';
 import { SUBJECT_FILES_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { suggestSubtasks } from '../services/geminiService';
@@ -250,12 +251,14 @@ interface TaskMasterDetailProps {
   isOnline: boolean;
   userProfile: UserProfile | null;
   setUserProfile: React.Dispatch<React.SetStateAction<UserProfile | null>>;
+  /** Abre a rota da Agenda (calendário), onde também está o botão Google Sync na toolbar. */
+  onNavigateToCalendar?: () => void;
 }
 
 const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({ 
   tasks, subjects, setTasks, boards, setBoards, 
   studySessions, setStudySessions, userId, isOnline,
-  userProfile, setUserProfile
+  userProfile, setUserProfile, onNavigateToCalendar
 }) => {
   // --- View State ---
   const [activeTab, setActiveTab] = useState<string>('Geral');
@@ -731,6 +734,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   const [availableFiles, setAvailableFiles] = useState<SubjectFile[]>([]);
   const [isBreakingDown, setIsBreakingDown] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [isGoogleCalendarSyncing, setIsGoogleCalendarSyncing] = useState(false);
   /** Campo de prazo no painel (dd/mm/aaaa); sincronizado com a tarefa selecionada. */
   const [dueDateInputDraft, setDueDateInputDraft] = useState('');
   /** Horário opcional (HH:mm) para o mesmo prazo, fuso Brasília. */
@@ -1529,6 +1533,26 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     }
   }, [tasks, subjects, userId, isOnline, isTaskVisible, setTasks]);
 
+  const handleGoogleCalendarConnectFromMenu = useCallback(async () => {
+    if (!isOnline) {
+      toast.error('Ligue-se à internet para conectar o Google Agenda.');
+      return;
+    }
+    setIsGoogleCalendarSyncing(true);
+    try {
+      await connectGoogleCalendarAndSyncTasks({
+        tasks,
+        subjects,
+        onAfterSync: async () => {
+          const fresh = await dataService.getTasks(userId, isOnline);
+          setTasks(fresh);
+        },
+      });
+    } finally {
+      setIsGoogleCalendarSyncing(false);
+    }
+  }, [tasks, subjects, userId, isOnline, setTasks]);
+
   const handleAddLink = (url: string) => {
     if (!selectedTask || !url.trim()) return;
     try {
@@ -2123,7 +2147,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
             <button 
               onClick={() => setShowExportMenu(!showExportMenu)}
               className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-slate-400 touch-manipulation hover:bg-slate-50 hover:text-[#800000] transition-all"
-              title="Sincronização Externa"
+              title="Google Agenda, exportação .ics e mais"
               aria-label="Sincronização e exportação de calendário"
             >
               <Calendar size={20} />
@@ -2134,19 +2158,50 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
-                  className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 z-50"
+                  className="absolute right-0 z-50 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-2xl border border-slate-100 bg-white p-2 shadow-2xl"
                 >
+                  <button
+                    type="button"
+                    disabled={isGoogleCalendarSyncing || !isOnline}
+                    onClick={() => {
+                      void (async () => {
+                        await handleGoogleCalendarConnectFromMenu();
+                        setShowExportMenu(false);
+                      })();
+                    }}
+                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {isGoogleCalendarSyncing ? (
+                      <Loader2 size={14} className="shrink-0 animate-spin text-[#800000]" />
+                    ) : (
+                      <RefreshCw size={14} className="shrink-0 text-[#800000]" />
+                    )}
+                    Conectar Google Agenda
+                  </button>
+                  {onNavigateToCalendar && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onNavigateToCalendar();
+                        setShowExportMenu(false);
+                      }}
+                      className="mt-0.5 flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
+                    >
+                      <Calendar size={14} className="shrink-0 text-[#800000]" />
+                      Abrir vista Agenda
+                    </button>
+                  )}
+                  <div className="my-1 h-px bg-slate-50" />
                   <button 
                     onClick={() => { handleExportAllDeadlines(); setShowExportMenu(false); }}
-                    className="w-full text-left px-4 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 rounded-xl flex items-center gap-3"
+                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
                   >
-                    <Download size={14} className="text-[#800000]" />
-                    Exportar Todos os Prazos
+                    <Download size={14} className="shrink-0 text-[#800000]" />
+                    Exportar todos os prazos (.ics)
                   </button>
-                  <div className="h-px bg-slate-50 my-1" />
-                  <p className="px-4 py-2 text-[9px] text-slate-400 font-bold uppercase tracking-widest">Dica</p>
-                  <p className="px-4 pb-2 text-[10px] text-slate-500 leading-relaxed">
-                    Importe o arquivo .ics no Google Calendar ou Apple Calendar.
+                  <p className="px-4 pb-1 pt-2 text-[9px] font-bold uppercase tracking-widest text-slate-400">Dica</p>
+                  <p className="px-4 pb-2 text-[10px] leading-relaxed text-slate-500">
+                    Tarefas com prazo viram eventos no calendário principal do Google (título com [SanFran]). O ficheiro .ics serve para importação manual. O rótulo &ldquo;Live Sync&rdquo; ao lado indica nuvem Supabase, não o Google.
                   </p>
                 </motion.div>
               )}
@@ -2245,9 +2300,12 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
             <span className="hidden sm:inline">Ritual 23:59</span>
           </button>
           <div className="hidden h-4 w-px bg-slate-200 sm:block" />
-          <div className="hidden items-center gap-2 md:flex">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Live Sync</span>
+          <div
+            className="hidden items-center gap-2 md:flex"
+            title="Sincronização com a nuvem (Supabase). Para o Google Agenda use o menu do ícone de calendário → Conectar Google Agenda."
+          >
+            <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Live Sync</span>
           </div>
         </div>
       </div>
