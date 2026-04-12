@@ -1,6 +1,13 @@
 import { toast } from 'sonner';
 import type { Subject, Task } from '../types';
 import { googleCalendarService } from './googleCalendarService';
+import firebaseWebConfig from '../firebase-applet-config.json';
+
+function isAiStudioOrGenLangFirebaseProject(): boolean {
+  const id = String(firebaseWebConfig.projectId ?? '');
+  const domain = String(firebaseWebConfig.authDomain ?? '');
+  return /gen-lang-client/i.test(id) || /gen-lang-client/i.test(domain);
+}
 
 /**
  * Login Google (Firebase) com escopo Calendar, grava token e envia tarefas com prazo ao Google Agenda.
@@ -14,6 +21,14 @@ export async function connectGoogleCalendarAndSyncTasks(options: {
   onReloadGoogleExternalEvents?: () => void | Promise<void>;
 }): Promise<void> {
   const { tasks, subjects, onAfterSync, onReloadGoogleExternalEvents } = options;
+
+  if (isAiStudioOrGenLangFirebaseProject()) {
+    toast.error(
+      'O Firebase configurado é um projeto de demonstração (AI Studio / gen-lang-client) que não suporta login Google no site. Cria um projeto Firebase para o SanFran, regista uma Web app, substitui firebase-applet-config.json, ativa Google em Authentication, adiciona o domínio (ex.: www.sanfranacademy.com.br) em Authorized domains e ativa a Google Calendar API no mesmo projeto Google Cloud.',
+      { duration: 16_000 }
+    );
+    return;
+  }
 
   try {
     const { auth, googleProvider, signInWithPopup, signInWithRedirect } = await import('../firebase');
@@ -34,13 +49,22 @@ export async function connectGoogleCalendarAndSyncTasks(options: {
       }
 
       const msg = String(pe?.message || '');
+      const invalidOAuthAction = /requested action is invalid|the requested action is invalid/i.test(msg);
       const useSameTabRedirect =
         pe?.code === 'auth/popup-blocked' ||
         pe?.code === 'auth/operation-not-supported-in-this-environment' ||
-        /requested action is invalid|the requested action is invalid|invalid.*action/i.test(msg);
+        invalidOAuthAction ||
+        /invalid.*action/i.test(msg);
 
       if (useSameTabRedirect) {
-        toast.info('Abrindo login do Google nesta mesma aba (evita bloqueio de pop-up)…');
+        if (invalidOAuthAction) {
+          toast.warning(
+            'O Firebase devolveu “ação inválida”. Confirma: projeto Firebase certo no código, Authentication → Google ativo, Settings → Authorized domains com este site (com e sem www), e no Google Cloud o ecrã OAuth + Calendar API no projeto ligado ao Firebase.',
+            { duration: 12_000 }
+          );
+        } else {
+          toast.info('Abrindo login do Google nesta mesma aba (evita bloqueio de pop-up)…');
+        }
         await signInWithRedirect(auth, googleProvider);
         return;
       }
