@@ -1,10 +1,10 @@
 {
-  "projectId": "gen-lang-client-0941007137",
-  "appId": "1:621523170074:web:e4d2417929e2e37518f2a3",
-  "apiKey": "AIzaSyCEIDPIJf9giFBfELDSVd7e7aREGA2nFk0",
-  "authDomain": "gen-lang-client-0941007137.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-9536e7d1-95d3-4c56-95e8-38759ac106f2",
-  "storageBucket": "gen-lang-client-0941007137.firebasestorage.app",
-  "messagingSenderId": "621523170074",
-  "measurementId": ""
+  "apiKey": "AIzaSyCX-TlUaDXRVUBOg5f7YUuo5YKqBX6GXvo",
+  "authDomain": "sanfran-academy.firebaseapp.com",
+  "projectId": "sanfran-academy",
+  "storageBucket": "sanfran-academy.firebasestorage.app",
+  "messagingSenderId": "395269808585",
+  "appId": "1:395269808585:web:eaf5dcdcee6a51f9a88818",
+  "measurementId": "G-J0PWM9XNB3",
+  "firestoreDatabaseId": "(default)"
 }
