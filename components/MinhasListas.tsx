@@ -45,9 +45,27 @@ function groupUncheckedFirst(items: PersonalChecklistItem[]): PersonalChecklistI
   return reorderItems(sorted);
 }
 
+function sortActiveLists(input: PersonalChecklist[]): PersonalChecklist[] {
+  return [...input].sort((a, b) => {
+    const pinDiff = Number(!!b.is_pinned) - Number(!!a.is_pinned);
+    if (pinDiff !== 0) return pinDiff;
+    return String(b.updated_at).localeCompare(String(a.updated_at));
+  });
+}
+
+function sortArchivedLists(input: PersonalChecklist[]): PersonalChecklist[] {
+  return [...input].sort((a, b) => {
+    const archivedDiff = String(b.archived_at || '').localeCompare(String(a.archived_at || ''));
+    if (archivedDiff !== 0) return archivedDiff;
+    return String(b.updated_at).localeCompare(String(a.updated_at));
+  });
+}
+
 const MinhasListas: React.FC<MinhasListasProps> = ({ userId, isOnline }) => {
   const [lists, setLists] = useState<PersonalChecklist[]>([]);
+  const [archivedLists, setArchivedLists] = useState<PersonalChecklist[]>([]);
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
+  const [listPendingDeleteId, setListPendingDeleteId] = useState<string | null>(null);
   const [newListTitle, setNewListTitle] = useState('');
   const [newItemText, setNewItemText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -58,9 +76,13 @@ const MinhasListas: React.FC<MinhasListasProps> = ({ userId, isOnline }) => {
     const load = async () => {
       setIsLoading(true);
       try {
-        const rows = await dataService.getPersonalChecklists(userId, isOnline);
+        const [rows, archivedRows] = await Promise.all([
+          dataService.getPersonalChecklists(userId, isOnline),
+          dataService.getArchivedPersonalChecklists(userId, isOnline),
+        ]);
         if (!alive) return;
-        setLists(rows);
+        setLists(sortActiveLists(rows));
+        setArchivedLists(sortArchivedLists(archivedRows));
         setSelectedListId((prev) => {
           if (prev && rows.some((list) => list.id === prev)) return prev;
           return rows[0]?.id ?? null;
@@ -74,6 +96,10 @@ const MinhasListas: React.FC<MinhasListasProps> = ({ userId, isOnline }) => {
       alive = false;
     };
   }, [userId, isOnline]);
+
+  useEffect(() => {
+    setListPendingDeleteId(null);
+  }, [selectedListId]);
 
   const selectedList = useMemo(
     () => lists.find((list) => list.id === selectedListId) ?? null,
@@ -96,15 +122,7 @@ const MinhasListas: React.FC<MinhasListasProps> = ({ userId, isOnline }) => {
     const current = lists.find((list) => list.id === listId);
     if (!current) return;
     const updated = updater(current);
-    setLists((prev) =>
-      prev
-        .map((list) => (list.id === listId ? updated : list))
-        .sort((a, b) => {
-          const pinDiff = Number(!!b.is_pinned) - Number(!!a.is_pinned);
-          if (pinDiff !== 0) return pinDiff;
-          return String(b.updated_at).localeCompare(String(a.updated_at));
-        })
-    );
+    setLists((prev) => sortActiveLists(prev.map((list) => (list.id === listId ? updated : list))));
     await saveList(updated);
   };
 
@@ -119,12 +137,44 @@ const MinhasListas: React.FC<MinhasListasProps> = ({ userId, isOnline }) => {
   };
 
   const handleDeleteList = async (listId: string) => {
+    if (listPendingDeleteId !== listId) {
+      setListPendingDeleteId(listId);
+      return;
+    }
+
+    const listToArchive = lists.find((list) => list.id === listId);
+    if (!listToArchive) return;
+    const now = new Date().toISOString();
+    const archivedVersion: PersonalChecklist = {
+      ...listToArchive,
+      archived_at: now,
+      updated_at: now,
+    };
+
     setLists((prev) => prev.filter((list) => list.id !== listId));
+    setArchivedLists((prev) => sortArchivedLists([archivedVersion, ...prev.filter((list) => list.id !== listId)]));
     if (selectedListId === listId) {
       const fallback = lists.find((list) => list.id !== listId);
       setSelectedListId(fallback?.id ?? null);
     }
+    setListPendingDeleteId(null);
     await dataService.deletePersonalChecklist(listId, userId, isOnline);
+  };
+
+  const handleRestoreList = async (listId: string) => {
+    const archived = archivedLists.find((list) => list.id === listId);
+    if (!archived) return;
+    const now = new Date().toISOString();
+    const restored: PersonalChecklist = {
+      ...archived,
+      archived_at: null,
+      updated_at: now,
+    };
+
+    setArchivedLists((prev) => prev.filter((list) => list.id !== listId));
+    setLists((prev) => sortActiveLists([restored, ...prev.filter((list) => list.id !== listId)]));
+    setSelectedListId(restored.id);
+    await dataService.restorePersonalChecklist(listId, userId, isOnline);
   };
 
   const handleAddItem = async () => {
@@ -285,6 +335,38 @@ const MinhasListas: React.FC<MinhasListasProps> = ({ userId, isOnline }) => {
               );
             })}
           </div>
+
+          {archivedLists.length > 0 ? (
+            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/60 p-3">
+              <p className="mb-2 text-[11px] font-black uppercase tracking-wide text-amber-700">
+                Lixeira ({archivedLists.length})
+              </p>
+              <div className="space-y-2">
+                {archivedLists.slice(0, 5).map((list) => (
+                  <div
+                    key={list.id}
+                    className="flex items-center justify-between gap-2 rounded-xl border border-amber-200 bg-white px-3 py-2"
+                  >
+                    <p className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-700">
+                      {list.title}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void handleRestoreList(list.id)}
+                      className="inline-flex min-h-[32px] items-center rounded-lg border border-emerald-200 px-2 text-[11px] font-bold text-emerald-700 transition-colors hover:bg-emerald-50"
+                    >
+                      Restaurar
+                    </button>
+                  </div>
+                ))}
+                {archivedLists.length > 5 ? (
+                  <p className="text-[11px] font-semibold text-amber-700">
+                    Mostrando 5 itens mais recentes da lixeira.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </section>
 
         <section className="lg:col-span-8 min-h-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
@@ -323,13 +405,31 @@ const MinhasListas: React.FC<MinhasListasProps> = ({ userId, isOnline }) => {
                   <button
                     type="button"
                     onClick={() => void handleDeleteList(selectedList.id)}
-                    className="inline-flex min-h-[40px] items-center gap-2 rounded-xl border border-red-200 px-3 text-xs font-bold text-red-600 transition-colors hover:bg-red-50"
+                    className={`inline-flex min-h-[40px] items-center gap-2 rounded-xl border px-3 text-xs font-bold transition-colors ${
+                      listPendingDeleteId === selectedList.id
+                        ? 'border-red-400 bg-red-50 text-red-700'
+                        : 'border-red-200 text-red-600 hover:bg-red-50'
+                    }`}
                   >
                     <Trash2 size={14} />
-                    Excluir
+                    {listPendingDeleteId === selectedList.id ? 'Confirmar envio' : 'Enviar p/ lixeira'}
                   </button>
+                  {listPendingDeleteId === selectedList.id ? (
+                    <button
+                      type="button"
+                      onClick={() => setListPendingDeleteId(null)}
+                      className="inline-flex min-h-[40px] items-center rounded-xl border border-slate-200 px-3 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
+                    >
+                      Cancelar
+                    </button>
+                  ) : null}
                 </div>
               </div>
+              {listPendingDeleteId === selectedList.id ? (
+                <p className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+                  Toque em &quot;Confirmar envio&quot; para mover esta lista para a lixeira.
+                </p>
+              ) : null}
 
               <div className="flex gap-2">
                 <input

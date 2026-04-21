@@ -1341,20 +1341,83 @@ export const dataService = {
       });
   },
 
-  async deletePersonalChecklist(id: string, userId: string, isOnline: boolean) {
-    await db.personal_checklists.delete(id);
+  async getArchivedPersonalChecklists(userId: string, isOnline: boolean): Promise<PersonalChecklist[]> {
+    const localRows = await db.personal_checklists.where('user_id').equals(userId).toArray();
+
+    if (isOnline) {
+      const { data, error } = await supabase
+        .from('personal_checklists')
+        .select('id, user_id, title, description, items, is_pinned, archived_at, created_at, updated_at')
+        .eq('user_id', userId)
+        .not('archived_at', 'is', null)
+        .order('archived_at', { ascending: false })
+        .order('updated_at', { ascending: false });
+
+      if (!error && data) {
+        const mapped = (data as Record<string, unknown>[]).map((row) =>
+          normalizePersonalChecklist(row, userId)
+        );
+        await db.personal_checklists.bulkPut(mapped);
+        return mapped;
+      }
+    }
+
+    return localRows
+      .filter((row) => !!row.archived_at)
+      .sort((a, b) => {
+        const archivedDiff = String(b.archived_at || '').localeCompare(String(a.archived_at || ''));
+        if (archivedDiff !== 0) return archivedDiff;
+        return String(b.updated_at).localeCompare(String(a.updated_at));
+      });
+  },
+
+  async restorePersonalChecklist(id: string, userId: string, isOnline: boolean) {
+    const current = await db.personal_checklists.get(id);
+    if (!current) return;
+    const now = new Date().toISOString();
+    const restored: PersonalChecklist = {
+      ...current,
+      archived_at: null,
+      updated_at: now,
+    };
+    await db.personal_checklists.put(restored);
 
     if (isOnline) {
       const { error } = await supabase
         .from('personal_checklists')
-        .delete()
+        .update({ archived_at: null, updated_at: now })
         .eq('id', id)
         .eq('user_id', userId);
       if (error) {
-        await addToSyncQueue({ table: 'personal_checklists', action: 'delete', data: { id } });
+        await addToSyncQueue({ table: 'personal_checklists', action: 'update', data: restored });
       }
     } else {
-      await addToSyncQueue({ table: 'personal_checklists', action: 'delete', data: { id } });
+      await addToSyncQueue({ table: 'personal_checklists', action: 'update', data: restored });
+    }
+  },
+
+  async deletePersonalChecklist(id: string, userId: string, isOnline: boolean) {
+    const current = await db.personal_checklists.get(id);
+    if (!current) return;
+    const now = new Date().toISOString();
+    const archived: PersonalChecklist = {
+      ...current,
+      archived_at: now,
+      updated_at: now,
+    };
+    await db.personal_checklists.put(archived);
+
+    if (isOnline) {
+      const { error } = await supabase
+        .from('personal_checklists')
+        .update({ archived_at: now, updated_at: now })
+        .eq('id', id)
+        .eq('user_id', userId);
+      if (error) {
+        await addToSyncQueue({ table: 'personal_checklists', action: 'update', data: archived });
+      }
+    } else {
+      await addToSyncQueue({ table: 'personal_checklists', action: 'update', data: archived });
     }
   },
 
