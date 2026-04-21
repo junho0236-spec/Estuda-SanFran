@@ -156,6 +156,7 @@ export const getViewLabel = (view: string) => {
     case View.Timer: return 'Em Sessão de Foco';
     case View.Subjects: return 'Organizando Cadeiras';
     case View.Tasks: return 'Consultando a Pauta';
+    case View.MinhasListas: return 'Organizando Minhas Listas';
     case View.Calendar: return 'Revisando a Agenda';
     case View.Ranking: return 'No Hall da Fama';
     case View.Library: return 'Consultando a Doutrina';

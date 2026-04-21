@@ -223,6 +223,7 @@ const StudyBuddy = React.lazy(() => import('./components/StudyBuddy'));
 const CaseAnalyzer = React.lazy(() => import('./components/CaseAnalyzer'));
 const Certificates = React.lazy(() => import('./components/Certificates'));
 const NoteView = React.lazy(() => import('./components/NoteView'));
+const MinhasListas = React.lazy(() => import('./components/MinhasListas'));
 
 // Loading Fallback Component com Estilo
 const PageLoader = () => (
@@ -1540,6 +1541,7 @@ const App: React.FC = () => {
     // RAMOS PRINCIPAIS AGORA NO NÍVEL SUPERIOR
     { id: View.Subjects, icon: BookOpen, label: 'Disciplinas', color: 'text-pink-600', bg: 'bg-pink-100' },
     { id: View.Tasks, icon: CheckSquare, label: 'Tarefas', color: 'text-emerald-600', bg: 'bg-emerald-100' },
+    { id: View.MinhasListas, icon: ListTodo, label: 'Minhas Listas', color: 'text-violet-600', bg: 'bg-violet-100' },
     { id: View.Anki, icon: BrainCircuit, label: 'FLASHCARDS', color: 'text-slate-900', bg: 'bg-slate-200' },
     { id: View.Connect, icon: MessageSquare, label: 'CONNECT', color: 'text-blue-600', bg: 'bg-blue-100' },
     { id: View.Friends, icon: Users, label: 'FRIENDS', color: 'text-emerald-600', bg: 'bg-emerald-100' },
@@ -2286,6 +2288,7 @@ const App: React.FC = () => {
                     onNavigateToCalendar={() => setCurrentView(View.Calendar)}
                   />
                 } />
+                <Route path={getPathFromView(View.MinhasListas)} element={<MinhasListas userId={session.user.id} isOnline={isOnline} />} />
 
                 <Route path="/simulados" element={<QuestionBank userId={session.user.id} folders={folders} flashcards={flashcards} isOnline={isOnline} />} />
 

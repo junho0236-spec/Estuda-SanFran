@@ -19,6 +19,7 @@ export enum View {
   Timer = 'timer',
   Subjects = 'subjects',
   Tasks = 'tasks',
+  MinhasListas = 'minhas_listas',
   Calendar = 'calendar',
   Ranking = 'ranking',
   Library = 'library',
@@ -302,6 +303,26 @@ export interface Note {
   updated_at: string;
   tags?: string[];
   is_starred?: boolean;
+}
+
+export interface PersonalChecklistItem {
+  id: string;
+  text: string;
+  checked: boolean;
+  order: number;
+  checked_at?: string | null;
+}
+
+export interface PersonalChecklist {
+  id: string;
+  user_id: string;
+  title: string;
+  description?: string | null;
+  items: PersonalChecklistItem[];
+  is_pinned?: boolean;
+  archived_at?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface SubjectFile {

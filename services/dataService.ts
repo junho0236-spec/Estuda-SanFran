@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 import { db, addToSyncQueue, type OfflineSyncQueue } from './offlineService';
-import { Flashcard, Task, StudySession, Note, SubjectFile, Folder, Board, UserProgress, Friendship, Notification } from '../types';
+import { Flashcard, Task, StudySession, Note, SubjectFile, Folder, Board, UserProgress, Friendship, Notification, PersonalChecklist } from '../types';
 import { TASK_CLOUD_COLUMNS, formatCloudTaskRow } from '../utils/supabaseCloudRowFormatters';
 import {
   FRIENDSHIPS_LIST_COLUMNS,
@@ -37,6 +37,56 @@ function taskStatusForSupabase(task: Task): string {
   const s = task.status;
   if (s && s !== 'Concluido') return s;
   return 'Pendente';
+}
+
+function normalizePersonalChecklist(row: Record<string, unknown>, userId: string): PersonalChecklist {
+  const rawItems = Array.isArray(row.items) ? row.items : [];
+  const items = rawItems
+    .map((item, index) => {
+      if (!item || typeof item !== 'object') return null;
+      const current = item as Record<string, unknown>;
+      const text = typeof current.text === 'string' ? current.text : '';
+      if (!text.trim()) return null;
+      return {
+        id:
+          typeof current.id === 'string' && current.id.trim()
+            ? current.id
+            : crypto.randomUUID(),
+        text: text.trim(),
+        checked: !!current.checked,
+        order: typeof current.order === 'number' ? current.order : index,
+        checked_at:
+          typeof current.checked_at === 'string'
+            ? current.checked_at
+            : current.checked_at === null
+              ? null
+              : null,
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null)
+    .sort((a, b) => a.order - b.order)
+    .map((item, index) => ({ ...item, order: index }));
+
+  const createdAt =
+    typeof row.created_at === 'string' && row.created_at
+      ? row.created_at
+      : new Date().toISOString();
+  const updatedAt =
+    typeof row.updated_at === 'string' && row.updated_at
+      ? row.updated_at
+      : createdAt;
+
+  return {
+    id: String(row.id ?? crypto.randomUUID()),
+    user_id: typeof row.user_id === 'string' && row.user_id ? row.user_id : userId,
+    title: String(row.title ?? 'Minha Lista'),
+    description: typeof row.description === 'string' ? row.description : null,
+    items,
+    is_pinned: !!row.is_pinned,
+    archived_at: typeof row.archived_at === 'string' ? row.archived_at : null,
+    created_at: createdAt,
+    updated_at: updatedAt,
+  };
 }
 
 /**
@@ -159,6 +209,15 @@ function mapSyncQueueItemToRow(item: OfflineSyncQueue, userId: string): Record<s
     delete payload.subjectId;
   }
 
+  if (item.table === 'personal_checklists') {
+    payload.user_id = payload.user_id || userId;
+    payload.items = Array.isArray(payload.items) ? payload.items : [];
+    payload.updated_at =
+      typeof payload.updated_at === 'string' ? payload.updated_at : new Date().toISOString();
+    payload.created_at =
+      typeof payload.created_at === 'string' ? payload.created_at : payload.updated_at;
+  }
+
   if (item.table === 'subject_files') {
     payload.subject_id = payload.subject_id || payload.subjectId;
     delete payload.subjectId;
@@ -257,6 +316,7 @@ const SYNC_UPSERT_TABLE_ORDER = [
   'folders',
   'boards',
   'tasks',
+  'personal_checklists',
   'flashcards',
   'notes',
   'study_sessions',
@@ -1212,6 +1272,89 @@ export const dataService = {
       }
     } else {
       await addToSyncQueue({ table: 'notes', action: 'delete', data: { id } });
+    }
+  },
+
+  // MINHAS LISTAS
+  async savePersonalChecklist(list: PersonalChecklist, userId: string, isOnline: boolean) {
+    const now = new Date().toISOString();
+    const normalized = normalizePersonalChecklist(
+      {
+        ...list,
+        user_id: list.user_id || userId,
+        updated_at: list.updated_at || now,
+        created_at: list.created_at || now,
+      } as Record<string, unknown>,
+      userId
+    );
+    await db.personal_checklists.put(normalized);
+
+    const payload = {
+      id: normalized.id,
+      user_id: normalized.user_id,
+      title: normalized.title,
+      description: normalized.description || null,
+      items: normalized.items,
+      is_pinned: !!normalized.is_pinned,
+      archived_at: normalized.archived_at || null,
+      created_at: normalized.created_at,
+      updated_at: normalized.updated_at,
+    };
+
+    if (isOnline) {
+      const { error } = await supabase.from('personal_checklists').upsert(payload, { onConflict: 'id' });
+      if (error) {
+        await addToSyncQueue({ table: 'personal_checklists', action: 'update', data: payload });
+      }
+    } else {
+      await addToSyncQueue({ table: 'personal_checklists', action: 'update', data: payload });
+    }
+  },
+
+  async getPersonalChecklists(userId: string, isOnline: boolean): Promise<PersonalChecklist[]> {
+    const localRows = await db.personal_checklists.where('user_id').equals(userId).toArray();
+
+    if (isOnline) {
+      const { data, error } = await supabase
+        .from('personal_checklists')
+        .select('id, user_id, title, description, items, is_pinned, archived_at, created_at, updated_at')
+        .eq('user_id', userId)
+        .is('archived_at', null)
+        .order('is_pinned', { ascending: false })
+        .order('updated_at', { ascending: false });
+
+      if (!error && data) {
+        const mapped = (data as Record<string, unknown>[]).map((row) =>
+          normalizePersonalChecklist(row, userId)
+        );
+        await db.personal_checklists.bulkPut(mapped);
+        return mapped;
+      }
+    }
+
+    return localRows
+      .filter((row) => !row.archived_at)
+      .sort((a, b) => {
+        const pinDiff = Number(!!b.is_pinned) - Number(!!a.is_pinned);
+        if (pinDiff !== 0) return pinDiff;
+        return String(b.updated_at).localeCompare(String(a.updated_at));
+      });
+  },
+
+  async deletePersonalChecklist(id: string, userId: string, isOnline: boolean) {
+    await db.personal_checklists.delete(id);
+
+    if (isOnline) {
+      const { error } = await supabase
+        .from('personal_checklists')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', userId);
+      if (error) {
+        await addToSyncQueue({ table: 'personal_checklists', action: 'delete', data: { id } });
+      }
+    } else {
+      await addToSyncQueue({ table: 'personal_checklists', action: 'delete', data: { id } });
     }
   },
 

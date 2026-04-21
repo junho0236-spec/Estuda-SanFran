@@ -1,9 +1,20 @@
 import Dexie, { Table } from 'dexie';
-import { Flashcard, Task, StudySession, Note, SubjectFile, Folder, Subject, Board, UserProfile, LegalFrontier } from '../types';
+import { Flashcard, Task, StudySession, Note, SubjectFile, Folder, Subject, Board, UserProfile, LegalFrontier, PersonalChecklist } from '../types';
 
 export interface OfflineSyncQueue {
   id?: number;
-  table: 'flashcards' | 'tasks' | 'study_sessions' | 'notes' | 'subject_files' | 'folders' | 'subjects' | 'boards' | 'user_profile' | 'legal_frontiers';
+  table:
+    | 'flashcards'
+    | 'tasks'
+    | 'study_sessions'
+    | 'notes'
+    | 'subject_files'
+    | 'folders'
+    | 'subjects'
+    | 'boards'
+    | 'user_profile'
+    | 'legal_frontiers'
+    | 'personal_checklists';
   action: 'insert' | 'update' | 'delete';
   data: any;
   timestamp: string;
@@ -20,11 +31,12 @@ export class SanFranOfflineDB extends Dexie {
   boards!: Table<Board>;
   user_profile!: Table<UserProfile & { id: string }>;
   legal_frontiers!: Table<LegalFrontier>;
+  personal_checklists!: Table<PersonalChecklist>;
   syncQueue!: Table<OfflineSyncQueue>;
 
   constructor() {
     super('SanFranOfflineDB');
-    this.version(7).stores({
+    this.version(8).stores({
       flashcards: 'id, subjectId, folderId',
       folders: 'id, parentId',
       subjects: 'id',
@@ -35,6 +47,7 @@ export class SanFranOfflineDB extends Dexie {
       boards: 'id, userId',
       user_profile: 'id',
       legal_frontiers: 'id, user_id',
+      personal_checklists: 'id, user_id, updated_at, is_pinned, archived_at',
       syncQueue: '++id, table, action, timestamp'
     });
   }

@@ -4,6 +4,7 @@ Inventário de tabelas public.* referenciadas no código (Estuda-SanFran) + scri
 --- Já com script dedicado no repositório (prioridade ao aplicar) ---
 - user_persona          → auth_user_persona_signup_fix.sql + user_persona_complete_setup.sql
 - notes                 → notes_complete_setup.sql, notes_add_missing_columns.sql
+- personal_checklists   → personal_checklists_complete_setup.sql
 - spaced_topics / FSRS  → spaced_topics_fsrs.sql, spaced_topics_linked_*.sql
 - user_progress (metas) → user_progress_question_answer_goals.sql
 - banco de questões (tabelas + RLS) → question_bank_complete_setup.sql
@@ -14,7 +15,7 @@ Inventário de tabelas public.* referenciadas no código (Estuda-SanFran) + scri
 
 --- Core sync / estudo (App.tsx, dataService) ---
 profiles, subjects, folders, flashcards, tasks, tasks_history, boards, study_sessions,
-readings, user_progress, disciplinas, subject_files, friendships, notifications
+readings, user_progress, disciplinas, subject_files, friendships, notifications, personal_checklists
 
 --- Banco de questões ---
 questions, user_question_stats, user_weak_topics, notebooks, question_comments,

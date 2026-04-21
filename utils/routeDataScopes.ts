@@ -8,6 +8,8 @@ export function getDataScopesForView(view: View): UserDataSyncScope[] {
       return ['subjects', 'tasks', 'flashcards'];
     case View.Tasks:
       return ['tasks', 'boards', 'subjects'];
+    case View.MinhasListas:
+      return [];
     case View.Anki:
       return ['flashcards', 'folders', 'subjects'];
     case View.QuestionBank:
