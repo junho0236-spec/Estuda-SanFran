@@ -229,6 +229,8 @@ export interface Task {
     businessDaysOnly?: boolean;
     nextOccurrence?: string;
   };
+  /** Duração planejada (em minutos), opcional. */
+  estimated_duration_minutes?: number;
   total_focus_time?: number; // in seconds
   parentTaskId?: string;
   dependencies?: string[]; // IDs of tasks that must be completed first

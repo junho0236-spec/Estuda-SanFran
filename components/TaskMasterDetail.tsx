@@ -82,6 +82,16 @@ function taskCreatedTimeMs(task: Task): number {
   return Number.isFinite(t) ? t : 0;
 }
 
+function formatDurationMinutesLabel(minutes?: number): string {
+  if (minutes == null || !Number.isFinite(minutes) || minutes <= 0) return '';
+  const rounded = Math.max(1, Math.round(minutes));
+  if (rounded < 60) return `${rounded} min`;
+  const hours = Math.floor(rounded / 60);
+  const mins = rounded % 60;
+  if (mins === 0) return `${hours}h`;
+  return `${hours}h ${mins}min`;
+}
+
 /** Vista lista: no filtro "Tudo", atrasadas primeiro; depois prazo ↑, prioridade, criação; concluídas ao fim. */
 function makeCompareTasksForListView(
   filter: 'all' | 'today' | 'tomorrow' | 'overdue' | 'high',
@@ -743,6 +753,8 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   const [dueDateInputDraft, setDueDateInputDraft] = useState('');
   /** Horário opcional (HH:mm) para o mesmo prazo, fuso Brasília. */
   const [dueTimeInputDraft, setDueTimeInputDraft] = useState('');
+  /** Duração opcional da tarefa (em minutos). */
+  const [durationMinutesDraft, setDurationMinutesDraft] = useState('');
   /** Fallback visual para navegadores que nao conseguem abrir picker em input oculto. */
   const [showDueDatePickerFallback, setShowDueDatePickerFallback] = useState(false);
   /** Mesmo fallback visual aplicado ao seletor de horario. */
@@ -772,10 +784,16 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       });
       setDueDateInputDraft(formatDueDateBr(selectedTask.dueDate));
       setDueTimeInputDraft(formatDueTimeHmForInput(selectedTask.dueDate));
+      setDurationMinutesDraft(
+        selectedTask.estimated_duration_minutes != null
+          ? String(Math.max(1, Math.round(selectedTask.estimated_duration_minutes)))
+          : ''
+      );
       setTaskTitleDraft(selectedTask.title);
     } else {
       setDueDateInputDraft('');
       setDueTimeInputDraft('');
+      setDurationMinutesDraft('');
       setTaskTitleDraft('');
     }
   }, [selectedTaskId, selectedTask]);
@@ -1324,6 +1342,31 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       void handleUpdateTask({ dueDate: ymd });
       setDueDateInputDraft(formatDueDateBr(ymd));
       setDueTimeInputDraft('');
+    }
+  };
+
+  const commitDurationDraft = () => {
+    if (!selectedTaskId) return;
+    const raw = durationMinutesDraft.trim();
+    if (!raw) {
+      void handleUpdateTask({ estimated_duration_minutes: undefined });
+      setDurationMinutesDraft('');
+      return;
+    }
+    const parsed = Number.parseInt(raw, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      toast.error('Duracao invalida. Use minutos inteiros maiores que zero.');
+      setDurationMinutesDraft(
+        selectedTask?.estimated_duration_minutes != null
+          ? String(Math.max(1, Math.round(selectedTask.estimated_duration_minutes)))
+          : ''
+      );
+      return;
+    }
+    const normalized = Math.min(parsed, 24 * 60 * 7);
+    setDurationMinutesDraft(String(normalized));
+    if (selectedTask?.estimated_duration_minutes !== normalized) {
+      void handleUpdateTask({ estimated_duration_minutes: normalized });
     }
   };
 
@@ -2020,6 +2063,16 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                       <Calendar size={12} className="shrink-0" />
                     )}
                     {formatDueDateTimeBr(task.dueDate)}
+                  </div>
+                )}
+                {task.estimated_duration_minutes != null && task.estimated_duration_minutes > 0 && (
+                  <div
+                    className={`flex items-center gap-1 text-[11px] font-bold ${
+                      selectedTaskId === task.id ? 'text-white/80' : 'text-slate-500'
+                    }`}
+                  >
+                    <Clock size={12} className="shrink-0" />
+                    {formatDurationMinutesLabel(task.estimated_duration_minutes)}
                   </div>
                 )}
                 {task.boardId && (
@@ -3023,6 +3076,37 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                                   Toque no relógio do campo ou no botão. Fuso de Brasília.
                                 </p>
                               </div>
+                              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
+                                <div className="flex min-h-8 items-center gap-2 text-slate-400 font-bold text-[10px] uppercase tracking-widest">
+                                  <Clock size={14} className="shrink-0" /> Duração prevista (opcional)
+                                </div>
+                                <div className="relative flex gap-2">
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    autoComplete="off"
+                                    placeholder="Ex.: 30"
+                                    value={durationMinutesDraft}
+                                    onChange={(e) =>
+                                      setDurationMinutesDraft(e.target.value.replace(/[^0-9]/g, ''))
+                                    }
+                                    onBlur={commitDurationDraft}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        (e.target as HTMLInputElement).blur();
+                                      }
+                                    }}
+                                    className="min-h-[44px] min-w-0 flex-1 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 pr-12 text-xs focus:outline-none focus:ring-2 focus:ring-[#800000]/10"
+                                  />
+                                  <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                    min
+                                  </span>
+                                </div>
+                                <p className="min-h-[2.5rem] text-[10px] leading-snug text-slate-400">
+                                  Tempo estimado da tarefa. Campo opcional.
+                                </p>
+                              </div>
                             </div>
                           </section>
 
@@ -3531,22 +3615,34 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                                 </div>
                               )}
                             </div>
-                            {task.dueDate && (
-                              <div
-                                className={`flex items-center gap-1 text-[10px] font-bold shrink-0 ${
-                                  task.completed
-                                    ? 'text-slate-300'
-                                    : kbOverdue
-                                      ? kbUrgent
-                                        ? 'text-red-600'
-                                        : 'text-violet-700'
-                                      : 'text-amber-600'
-                                }`}
-                              >
-                                {kbOverdue ? <AlertCircle size={10} /> : <Calendar size={10} />}{' '}
-                                {formatDueDateTimeBr(task.dueDate)}
-                              </div>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {task.estimated_duration_minutes != null && task.estimated_duration_minutes > 0 && (
+                                <div
+                                  className={`flex items-center gap-1 text-[10px] font-bold shrink-0 ${
+                                    task.completed ? 'text-slate-300' : 'text-slate-500'
+                                  }`}
+                                >
+                                  <Clock size={10} />
+                                  {formatDurationMinutesLabel(task.estimated_duration_minutes)}
+                                </div>
+                              )}
+                              {task.dueDate && (
+                                <div
+                                  className={`flex items-center gap-1 text-[10px] font-bold shrink-0 ${
+                                    task.completed
+                                      ? 'text-slate-300'
+                                      : kbOverdue
+                                        ? kbUrgent
+                                          ? 'text-red-600'
+                                          : 'text-violet-700'
+                                        : 'text-amber-600'
+                                  }`}
+                                >
+                                  {kbOverdue ? <AlertCircle size={10} /> : <Calendar size={10} />}{' '}
+                                  {formatDueDateTimeBr(task.dueDate)}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </motion.div>
                       </DraggableKanbanCard>

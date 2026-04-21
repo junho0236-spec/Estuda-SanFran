@@ -97,6 +97,10 @@ export function formatCloudTaskRow(t: Record<string, unknown>): Task {
     created_at: t.created_at as string | undefined,
     recurrence: desc.recurrence as Task['recurrence'],
     library_attachments: (desc.library_attachments as string[] | undefined) || undefined,
+    estimated_duration_minutes:
+      desc.estimated_duration_minutes != null
+        ? Number(desc.estimated_duration_minutes)
+        : undefined,
     total_focus_time:
       desc.total_focus_time != null ? Number(desc.total_focus_time) : undefined,
     parentTaskId: desc.parentTaskId as string | undefined,
