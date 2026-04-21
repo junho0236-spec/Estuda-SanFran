@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Task, Subject, Board, BoardColumn, SubTask, StudySession, UserProfile, TaskPriority, TaskCategory, Notification, Friendship, SubjectFile } from '../types';
 import { 
   Plus, Layout, List, MoreVertical, Trash2, CheckSquare, 
-  Clock, Paperclip, ChevronRight, X, Calendar, AlertCircle,
+  Clock, Paperclip, ChevronRight, ChevronDown, ChevronUp, X, Calendar, AlertCircle,
   Play, Pause, RotateCcw, Save, Quote, ThumbsUp, ExternalLink, Link as LinkIcon, Globe, Bell,
   CheckCircle2, User, Zap, Trello, BookOpen, Download, Sparkles, Loader2, GripVertical, RefreshCw
 } from 'lucide-react';
@@ -293,6 +293,8 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   const [searchParams, setSearchParams] = useSearchParams();
   /** Prazo vindo da Agenda (`/tasks?due=YYYY-MM-DD`) para o próximo Quick Entry. Deep link: `task` ou `taskId` com UUID. */
   const [pendingCalendarDue, setPendingCalendarDue] = useState<string | null>(null);
+  /** Heatmap "Atividade recente": fechado por defeito em mobile para libertar altura para a lista. */
+  const [mobileActivityHeatmapOpen, setMobileActivityHeatmapOpen] = useState(false);
   const quickEntryInputRef = useRef<HTMLInputElement>(null);
   const dueDateNativePickerRef = useRef<HTMLInputElement>(null);
   const dueDateFallbackPickerRef = useRef<HTMLInputElement>(null);
@@ -1891,7 +1893,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     };
 
     return (
-      <div className="flex flex-col gap-2 p-3 bg-white rounded-2xl border border-slate-100 shadow-sm mb-4">
+      <div className="mb-0 flex flex-col gap-2 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm md:mb-4">
         <div className="flex items-center justify-between">
           <div className="text-[8px] font-black uppercase tracking-widest text-slate-400">Atividade Recente</div>
           <div className="flex bg-slate-50 p-0.5 rounded-lg border border-slate-100">
@@ -2261,6 +2263,186 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
 
   const kanbanBoardForView = boards.find((b) => b.id === activeTab);
 
+  /** Calendário / exportação, lista↔kanban (md+), notificações, Ritual 23:59, Live Sync — reutilizado na sticky (≥sm) e ao lado do + no mobile (lista). */
+  const renderBoardToolbarActions = () => (
+    <>
+      <div className="relative shrink-0">
+        <button
+          type="button"
+          onClick={() => setShowExportMenu(!showExportMenu)}
+          className="inline-flex min-h-9 min-w-9 touch-manipulation items-center justify-center rounded-full text-slate-400 transition-all hover:bg-slate-50 hover:text-[#800000] sm:min-h-[44px] sm:min-w-[44px]"
+          title="Google Agenda, exportação .ics e mais"
+          aria-label="Sincronização e exportação de calendário"
+        >
+          <Calendar className="size-[18px] sm:size-5" />
+        </button>
+        <AnimatePresence>
+          {showExportMenu && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="absolute right-0 z-50 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-2xl border border-slate-100 bg-white p-2 shadow-2xl"
+            >
+              <button
+                type="button"
+                disabled={isGoogleCalendarSyncing || !isOnline}
+                onClick={() => {
+                  void (async () => {
+                    await handleGoogleCalendarConnectFromMenu();
+                    setShowExportMenu(false);
+                  })();
+                }}
+                className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
+              >
+                {isGoogleCalendarSyncing ? (
+                  <Loader2 size={14} className="shrink-0 animate-spin text-[#800000]" />
+                ) : (
+                  <RefreshCw size={14} className="shrink-0 text-[#800000]" />
+                )}
+                Conectar Google Agenda
+              </button>
+              {onNavigateToCalendar && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onNavigateToCalendar();
+                    setShowExportMenu(false);
+                  }}
+                  className="mt-0.5 flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
+                >
+                  <Calendar size={14} className="shrink-0 text-[#800000]" />
+                  Abrir vista Agenda
+                </button>
+              )}
+              <div className="my-1 h-px bg-slate-50" />
+              <button
+                type="button"
+                onClick={() => {
+                  handleExportAllDeadlines();
+                  setShowExportMenu(false);
+                }}
+                className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
+              >
+                <Download size={14} className="shrink-0 text-[#800000]" />
+                Exportar todos os prazos (.ics)
+              </button>
+              <p className="px-4 pb-1 pt-2 text-[9px] font-bold uppercase tracking-widest text-slate-400">Dica</p>
+              <p className="px-4 pb-2 text-[10px] leading-relaxed text-slate-500">
+                Tarefas com prazo viram eventos no calendário principal do Google (título com [SanFran]). O ficheiro .ics serve para importação manual. O rótulo
+                &ldquo;Live Sync&rdquo; ao lado indica nuvem Supabase, não o Google.
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {activeTab !== 'Geral' && isMdUp && (
+        <div className="flex touch-manipulation items-center rounded-lg bg-slate-100 p-1">
+          <button
+            type="button"
+            onClick={() => handleToggleViewMode('list')}
+            className={`inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-md transition-all ${storedViewMode === 'list' ? 'bg-white text-[#800000] shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            title="Modo Lista"
+            aria-label="Modo lista"
+          >
+            <List size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => handleToggleViewMode('kanban')}
+            className={`inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-md transition-all ${storedViewMode === 'kanban' ? 'bg-white text-[#800000] shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            title="Modo Kanban"
+            aria-label="Modo Kanban"
+          >
+            <Trello size={14} />
+          </button>
+        </div>
+      )}
+      <div className="relative shrink-0">
+        <button
+          type="button"
+          onClick={() => setShowNotifications(!showNotifications)}
+          className="relative inline-flex min-h-9 min-w-9 touch-manipulation items-center justify-center rounded-full text-slate-400 transition-all hover:bg-slate-50 hover:text-[#800000] sm:min-h-[44px] sm:min-w-[44px]"
+          aria-label="Notificações"
+        >
+          <Bell className="size-[18px] sm:size-5" />
+          {notifications.filter((n) => !n.is_read).length > 0 && (
+            <span className="absolute right-0.5 top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full border border-white bg-red-500 text-[8px] font-black text-white sm:right-1 sm:top-1 sm:h-4 sm:w-4 sm:text-[10px]">
+              {notifications.filter((n) => !n.is_read).length}
+            </span>
+          )}
+        </button>
+
+        <AnimatePresence>
+          {showNotifications && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="absolute right-0 z-50 mt-2 w-[min(20rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl"
+            >
+              <div className="flex items-center justify-between border-b border-slate-50 bg-slate-50/50 p-4">
+                <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Notificações</h4>
+                <button type="button" onClick={() => setShowNotifications(false)} className="text-slate-300 hover:text-slate-500">
+                  <X size={14} />
+                </button>
+              </div>
+              <div className="max-h-96 overflow-y-auto">
+                {notifications.length === 0 ? (
+                  <div className="p-8 text-center text-xs italic text-slate-400">Nenhuma notificação por enquanto.</div>
+                ) : (
+                  notifications.map((n) => (
+                    <div
+                      key={n.id}
+                      onClick={async () => {
+                        await dataService.markNotificationAsRead(n.id);
+                        setNotifications((prev) => prev.map((notif) => (notif.id === n.id ? { ...notif, is_read: true } : notif)));
+                        if (n.link_task) setSelectedTaskId(n.link_task);
+                        setShowNotifications(false);
+                      }}
+                      className={`flex cursor-pointer gap-3 border-b border-slate-50 p-4 transition-all hover:bg-slate-50 ${!n.is_read ? 'bg-slate-50/50' : ''}`}
+                    >
+                      <div
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                          n.type === 'delegated' ? 'bg-red-50 text-red-600' : n.type === 'completed' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'
+                        }`}
+                      >
+                        {n.type === 'delegated' ? <User size={14} /> : n.type === 'completed' ? <CheckCircle2 size={14} /> : <User size={14} />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-xs leading-relaxed ${!n.is_read ? 'font-bold text-slate-900' : 'text-slate-600'}`}>{n.message}</p>
+                        <p className="mt-1 text-[10px] text-slate-400">{new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                      </div>
+                      {!n.is_read && <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-red-500" />}
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      <button
+        type="button"
+        onClick={handleArchiveCompleted}
+        className="flex h-9 shrink-0 items-center gap-1 rounded-full bg-slate-800 px-2 text-[9px] font-black uppercase tracking-widest text-white shadow-md transition-all hover:bg-black sm:h-auto sm:gap-2 sm:px-4 sm:py-1.5 sm:text-[10px]"
+      >
+        <RotateCcw className="size-3 shrink-0 sm:size-3" />
+        <span className="hidden sm:inline">Ritual 23:59</span>
+      </button>
+      <div className="hidden h-4 w-px bg-slate-200 sm:block" />
+      <div
+        className="hidden items-center gap-2 md:flex"
+        title="Sincronização com a nuvem (Supabase). Para o Google Agenda use o menu do ícone de calendário → Conectar Google Agenda."
+      >
+        <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Live Sync</span>
+      </div>
+    </>
+  );
+
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col">
     <DndContext 
@@ -2271,7 +2453,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     >
       <div className="flex min-h-[calc(100dvh-9rem)] flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 text-[13px] shadow-2xl sm:min-h-[calc(100dvh-8.5rem)] sm:rounded-[28px] md:min-h-[calc(100dvh-8rem)] md:rounded-[32px] lg:min-h-[calc(100dvh-6.25rem)]">
         {/* Header Tabs */}
-        <div className="flex flex-col gap-3 border-b border-slate-100 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3 md:px-6 md:py-4 sticky top-0 z-20 min-w-0">
+        <div className="flex flex-col gap-2 border-b border-slate-100 bg-white px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4 sm:py-3 md:px-6 md:py-4 sticky top-0 z-20 min-w-0">
           <div className="flex min-w-0 items-center gap-2 overflow-x-auto no-scrollbar max-w-full md:max-w-[calc(100%-350px)]">
             {TABS[0]?.id === 'Geral' && (
               <DroppableTab
@@ -2317,171 +2499,12 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
             </button>
           </div>
 
-        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
-          <div className="relative shrink-0">
-            <button 
-              onClick={() => setShowExportMenu(!showExportMenu)}
-              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-slate-400 touch-manipulation hover:bg-slate-50 hover:text-[#800000] transition-all"
-              title="Google Agenda, exportação .ics e mais"
-              aria-label="Sincronização e exportação de calendário"
-            >
-              <Calendar size={20} />
-            </button>
-            <AnimatePresence>
-              {showExportMenu && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  className="absolute right-0 z-50 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-2xl border border-slate-100 bg-white p-2 shadow-2xl"
-                >
-                  <button
-                    type="button"
-                    disabled={isGoogleCalendarSyncing || !isOnline}
-                    onClick={() => {
-                      void (async () => {
-                        await handleGoogleCalendarConnectFromMenu();
-                        setShowExportMenu(false);
-                      })();
-                    }}
-                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
-                  >
-                    {isGoogleCalendarSyncing ? (
-                      <Loader2 size={14} className="shrink-0 animate-spin text-[#800000]" />
-                    ) : (
-                      <RefreshCw size={14} className="shrink-0 text-[#800000]" />
-                    )}
-                    Conectar Google Agenda
-                  </button>
-                  {onNavigateToCalendar && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onNavigateToCalendar();
-                        setShowExportMenu(false);
-                      }}
-                      className="mt-0.5 flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
-                    >
-                      <Calendar size={14} className="shrink-0 text-[#800000]" />
-                      Abrir vista Agenda
-                    </button>
-                  )}
-                  <div className="my-1 h-px bg-slate-50" />
-                  <button 
-                    onClick={() => { handleExportAllDeadlines(); setShowExportMenu(false); }}
-                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
-                  >
-                    <Download size={14} className="shrink-0 text-[#800000]" />
-                    Exportar todos os prazos (.ics)
-                  </button>
-                  <p className="px-4 pb-1 pt-2 text-[9px] font-bold uppercase tracking-widest text-slate-400">Dica</p>
-                  <p className="px-4 pb-2 text-[10px] leading-relaxed text-slate-500">
-                    Tarefas com prazo viram eventos no calendário principal do Google (título com [SanFran]). O ficheiro .ics serve para importação manual. O rótulo &ldquo;Live Sync&rdquo; ao lado indica nuvem Supabase, não o Google.
-                  </p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {activeTab !== 'Geral' && isMdUp && (
-            <div className="flex items-center rounded-lg bg-slate-100 p-1 touch-manipulation">
-              <button
-                type="button"
-                onClick={() => handleToggleViewMode('list')}
-                className={`inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-md transition-all ${storedViewMode === 'list' ? 'bg-white text-[#800000] shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                title="Modo Lista"
-                aria-label="Modo lista"
-              >
-                <List size={14} />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleToggleViewMode('kanban')}
-                className={`inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-md transition-all ${storedViewMode === 'kanban' ? 'bg-white text-[#800000] shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                title="Modo Kanban"
-                aria-label="Modo Kanban"
-              >
-                <Trello size={14} />
-              </button>
-            </div>
-          )}
-          <div className="relative">
-            <button 
-              onClick={() => setShowNotifications(!showNotifications)}
-              className="relative inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-slate-400 touch-manipulation transition-all hover:bg-slate-50 hover:text-[#800000]"
-              aria-label="Notificações"
-            >
-              <Bell size={20} />
-              {notifications.filter(n => !n.is_read).length > 0 && (
-                <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] flex items-center justify-center rounded-full border-2 border-white font-black">
-                  {notifications.filter(n => !n.is_read).length}
-                </span>
-              )}
-            </button>
-
-            <AnimatePresence>
-              {showNotifications && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  className="absolute right-0 z-50 mt-2 w-[min(20rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl"
-                >
-                  <div className="p-4 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
-                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Notificações</h4>
-                    <button onClick={() => setShowNotifications(false)} className="text-slate-300 hover:text-slate-500"><X size={14} /></button>
-                  </div>
-                  <div className="max-h-96 overflow-y-auto">
-                    {notifications.length === 0 ? (
-                      <div className="p-8 text-center text-slate-400 text-xs italic">Nenhuma notificação por enquanto.</div>
-                    ) : (
-                      notifications.map(n => (
-                        <div 
-                          key={n.id} 
-                          onClick={async () => {
-                            await dataService.markNotificationAsRead(n.id);
-                            setNotifications(prev => prev.map(notif => notif.id === n.id ? { ...notif, is_read: true } : notif));
-                            if (n.link_task) setSelectedTaskId(n.link_task);
-                            setShowNotifications(false);
-                          }}
-                          className={`p-4 border-b border-slate-50 cursor-pointer transition-all hover:bg-slate-50 flex gap-3 ${!n.is_read ? 'bg-slate-50/50' : ''}`}
-                        >
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                            n.type === 'delegated' ? 'bg-red-50 text-red-600' : 
-                            n.type === 'completed' ? 'bg-emerald-50 text-emerald-600' : 
-                            'bg-blue-50 text-blue-600'
-                          }`}>
-                            {n.type === 'delegated' ? <User size={14} /> : n.type === 'completed' ? <CheckCircle2 size={14} /> : <User size={14} />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className={`text-xs leading-relaxed ${!n.is_read ? 'font-bold text-slate-900' : 'text-slate-600'}`}>{n.message}</p>
-                            <p className="text-[10px] text-slate-400 mt-1">{new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                          </div>
-                          {!n.is_read && <div className="w-2 h-2 rounded-full bg-red-500 shrink-0 mt-1.5" />}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          <button 
-            onClick={handleArchiveCompleted}
-            className="flex shrink-0 items-center gap-2 px-3 py-1.5 sm:px-4 bg-slate-800 text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-md hover:bg-black transition-all"
-          >
-            <RotateCcw size={12} />
-            <span className="hidden sm:inline">Ritual 23:59</span>
-          </button>
-          <div className="hidden h-4 w-px bg-slate-200 sm:block" />
-          <div
-            className="hidden items-center gap-2 md:flex"
-            title="Sincronização com a nuvem (Supabase). Para o Google Agenda use o menu do ícone de calendário → Conectar Google Agenda."
-          >
-            <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Live Sync</span>
-          </div>
+        <div
+          className={`min-w-0 flex-wrap items-center justify-end gap-1.5 sm:flex-nowrap sm:gap-2 ${
+            effectiveViewMode === 'list' ? 'hidden sm:flex' : 'flex'
+          }`}
+        >
+          {renderBoardToolbarActions()}
         </div>
       </div>
 
@@ -2494,22 +2517,25 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
             <div
               className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden border-slate-100 bg-white transition-all duration-500"
             >
-              <div className="p-4 border-b border-slate-50 flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <h3 className="font-serif font-bold text-slate-900">
-                      {boards.find(b => b.id === activeTab)?.name || activeTab}
+              <div className="flex flex-col gap-2 border-b border-slate-50 p-3 sm:gap-3 sm:p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+                    <h3 className="truncate font-serif text-base font-bold text-slate-900 sm:text-lg md:text-xl">
+                      {boards.find((b) => b.id === activeTab)?.name || activeTab}
                     </h3>
                   </div>
-                  <div className="flex items-center gap-2 relative">
-                    <button 
-                      onClick={() => setShowTemplatesMenu(!showTemplatesMenu)} 
-                      className="p-2 bg-[#800000] text-white rounded-lg shadow-md hover:bg-red-900 transition-all"
-                    >
-                      <Plus size={16} />
-                    </button>
-                    
-                    <AnimatePresence>
+                  <div className="flex shrink-0 items-center gap-0.5 sm:gap-2">
+                    <div className="flex items-center gap-0.5 sm:hidden">{renderBoardToolbarActions()}</div>
+                    <div className="relative flex shrink-0 items-center">
+                      <button
+                        type="button"
+                        onClick={() => setShowTemplatesMenu(!showTemplatesMenu)}
+                        className="rounded-md bg-[#800000] p-1.5 text-white shadow-md transition-all hover:bg-red-900 sm:rounded-lg sm:p-2"
+                      >
+                        <Plus className="size-3.5 sm:size-4" />
+                      </button>
+
+                      <AnimatePresence>
                       {showTemplatesMenu && (
                         <motion.div 
                           initial={{ opacity: 0, y: 10 }}
@@ -2528,7 +2554,8 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                           </button>
                         </motion.div>
                       )}
-                    </AnimatePresence>
+                      </AnimatePresence>
+                    </div>
                   </div>
                 </div>
 
@@ -2601,8 +2628,30 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                   </AnimatePresence>
                 </div>
 
-                {/* Heatmap */}
-                <Heatmap tasks={tasks} />
+                {/* Heatmap: colapsado em mobile por defeito */}
+                <div>
+                  <button
+                    type="button"
+                    id="task-activity-heatmap-toggle"
+                    className="mb-0 flex min-h-[44px] w-full touch-manipulation items-center justify-between rounded-xl border border-slate-100 bg-white px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500 shadow-sm md:hidden"
+                    onClick={() => setMobileActivityHeatmapOpen((v) => !v)}
+                    aria-expanded={mobileActivityHeatmapOpen}
+                    aria-controls="task-activity-heatmap"
+                  >
+                    <span>Atividade recente</span>
+                    {mobileActivityHeatmapOpen ? (
+                      <ChevronUp size={18} className="shrink-0 text-slate-400" aria-hidden />
+                    ) : (
+                      <ChevronDown size={18} className="shrink-0 text-slate-400" aria-hidden />
+                    )}
+                  </button>
+                  <div
+                    id="task-activity-heatmap"
+                    className={mobileActivityHeatmapOpen ? 'block md:block' : 'hidden md:block'}
+                  >
+                    <Heatmap tasks={tasks} />
+                  </div>
+                </div>
               </div>
               
               {/* Context Filters */}
