@@ -1985,7 +1985,7 @@ const App: React.FC = () => {
           isExtremeFocus ? '' : isSidebarMinimized ? 'lg:pl-20' : 'lg:pl-72'
         } ${!isExtremeFocus && currentView === View.Tasks ? 'max-h-[100dvh] overflow-hidden' : ''}`}
       >
-        <header className={`${isExtremeFocus ? 'hidden' : 'lg:hidden'} bg-white dark:bg-[#0d0303] border-b border-slate-200 dark:border-sanfran-rubi/30 px-3 py-3 sm:p-4 flex items-center justify-between gap-2 sticky top-0 z-20 min-w-0`}>
+        <header className={`${isExtremeFocus ? 'hidden' : 'lg:hidden'} bg-white dark:bg-[#0d0303] border-b border-slate-200 dark:border-sanfran-rubi/30 px-2 py-2.5 sm:px-3 sm:py-3 flex items-center justify-between gap-2 sticky top-0 z-20 min-w-0`}>
           <button
             type="button"
             onClick={() => setIsSidebarOpen(true)}
@@ -1994,35 +1994,87 @@ const App: React.FC = () => {
           >
             <Menu className="w-6 h-6" />
           </button>
-          <div className="flex items-center gap-2 min-w-0 flex-1 justify-center">
-            <div className="bg-sanfran-rubi p-1.5 rounded-lg text-white shrink-0"><BookOpen className="w-4 h-4" /></div>
-            <span className="text-xs sm:text-sm font-black dark:text-white uppercase tracking-tighter truncate text-center">SanFran Academy</span>
+          <div className="flex min-w-0 flex-1 items-center justify-center gap-2 px-1">
+            <div className="shrink-0 rounded-lg bg-sanfran-rubi p-1.5 text-white"><BookOpen className="w-4 h-4" /></div>
+            <span className="truncate text-center text-xs font-black uppercase tracking-tighter text-slate-900 dark:text-white sm:text-sm">
+              SanFran Academy
+            </span>
           </div>
-          <div className="w-10 shrink-0" aria-hidden />
+          {!isExtremeFocus && (
+            <div className="flex min-w-0 max-w-[min(52%,17.5rem)] shrink justify-end sm:max-w-[min(48%,19rem)]">
+              <Suspense
+                fallback={
+                  <div
+                    className="h-10 min-w-[7rem] shrink-0 animate-pulse rounded-full bg-slate-100 dark:bg-white/10"
+                    aria-hidden
+                  />
+                }
+              >
+                <HeaderActions
+                  compactToolbar
+                  notifications={notifications}
+                  userId={session?.user?.id || ''}
+                  userProfile={userProfile}
+                  isDarkMode={isDarkMode}
+                  onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+                  onNotificationClick={handleNotificationClick}
+                  onAcceptFriendRequest={handleAcceptFriendRequest}
+                  onDeclineFriendRequest={handleDeclineFriendRequest}
+                  onMarkAllRead={() =>
+                    setNotifications((prev) =>
+                      prev.map((n) => (n.type === 'friend_request' ? n : { ...n, is_read: true }))
+                    )
+                  }
+                  onViewChange={setCurrentView}
+                  onLogout={handleLogout}
+                  timerIsActive={
+                    (timerIsActive || timerSecondsLeft < timerTotalInitial) && currentView !== View.Timer
+                  }
+                  timerSecondsLeft={timerSecondsLeft}
+                  timerTotalInitial={timerTotalInitial}
+                  timerMode={timerMode}
+                />
+              </Suspense>
+            </div>
+          )}
         </header>
 
         <main
           className={`flex-1 min-h-0 overflow-x-hidden ${isExtremeFocus ? 'p-0' : currentView === View.Tasks ? 'grid grid-rows-[auto_minmax(0,1fr)] overflow-hidden p-2 sm:p-3 md:p-5' : 'overflow-y-auto p-3 sm:p-5 md:p-8 lg:p-10'} relative transition-all duration-700`}
         >
           {!isExtremeFocus && (
-            <div className={`flex justify-end mb-4 md:mb-6 w-full min-w-0 overflow-x-auto ${currentView === View.Tasks ? 'shrink-0' : ''}`}>
-              <HeaderActions 
-                notifications={notifications} 
-                userId={session?.user?.id || ''}
-                userProfile={userProfile}
-                isDarkMode={isDarkMode}
-                onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
-                onNotificationClick={handleNotificationClick}
-                onAcceptFriendRequest={handleAcceptFriendRequest}
-                onDeclineFriendRequest={handleDeclineFriendRequest}
-                onMarkAllRead={() => setNotifications(prev => prev.map(n => n.type === 'friend_request' ? n : { ...n, is_read: true }))}
-                onViewChange={setCurrentView}
-                onLogout={handleLogout}
-                timerIsActive={(timerIsActive || timerSecondsLeft < timerTotalInitial) && currentView !== View.Timer}
-                timerSecondsLeft={timerSecondsLeft}
-                timerTotalInitial={timerTotalInitial}
-                timerMode={timerMode}
-              />
+            <div
+              className={`mb-4 hidden min-w-0 justify-end overflow-x-auto md:mb-6 lg:flex w-full ${currentView === View.Tasks ? 'shrink-0' : ''}`}
+            >
+              <Suspense
+                fallback={
+                  <div className="h-11 w-40 shrink-0 animate-pulse rounded-full bg-slate-100 dark:bg-white/10" aria-hidden />
+                }
+              >
+                <HeaderActions
+                  notifications={notifications}
+                  userId={session?.user?.id || ''}
+                  userProfile={userProfile}
+                  isDarkMode={isDarkMode}
+                  onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+                  onNotificationClick={handleNotificationClick}
+                  onAcceptFriendRequest={handleAcceptFriendRequest}
+                  onDeclineFriendRequest={handleDeclineFriendRequest}
+                  onMarkAllRead={() =>
+                    setNotifications((prev) =>
+                      prev.map((n) => (n.type === 'friend_request' ? n : { ...n, is_read: true }))
+                    )
+                  }
+                  onViewChange={setCurrentView}
+                  onLogout={handleLogout}
+                  timerIsActive={
+                    (timerIsActive || timerSecondsLeft < timerTotalInitial) && currentView !== View.Timer
+                  }
+                  timerSecondsLeft={timerSecondsLeft}
+                  timerTotalInitial={timerTotalInitial}
+                  timerMode={timerMode}
+                />
+              </Suspense>
             </div>
           )}
           {/* Offline Indicator */}
