@@ -286,7 +286,10 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   const quickEntryInputRef = useRef<HTMLInputElement>(null);
   const dueDateNativePickerRef = useRef<HTMLInputElement>(null);
   const dueDateFallbackPickerRef = useRef<HTMLInputElement>(null);
+  const dueDatePickerWrapRef = useRef<HTMLDivElement>(null);
   const taskDueTimePickerRef = useRef<HTMLInputElement>(null);
+  const dueTimeFallbackPickerRef = useRef<HTMLInputElement>(null);
+  const dueTimePickerWrapRef = useRef<HTMLDivElement>(null);
 
   const storedViewMode: 'list' | 'kanban' =
     userProfile?.viewPreferences?.[activeTab] ?? (boards.find((b) => b.id === activeTab) ? 'kanban' : 'list');
@@ -742,6 +745,8 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   const [dueTimeInputDraft, setDueTimeInputDraft] = useState('');
   /** Fallback visual para navegadores que nao conseguem abrir picker em input oculto. */
   const [showDueDatePickerFallback, setShowDueDatePickerFallback] = useState(false);
+  /** Mesmo fallback visual aplicado ao seletor de horario. */
+  const [showDueTimePickerFallback, setShowDueTimePickerFallback] = useState(false);
   /** Título editável no cabeçalho do detalhe (evita renomear só na criação). */
   const [taskTitleDraft, setTaskTitleDraft] = useState('');
 
@@ -781,7 +786,65 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   }, [showDueDatePickerFallback]);
 
   useEffect(() => {
+    if (!showDueTimePickerFallback) return;
+    dueTimeFallbackPickerRef.current?.focus();
+  }, [showDueTimePickerFallback]);
+
+  useEffect(() => {
+    if (!showDueDatePickerFallback) return;
+
+    const handlePointerDownOutside = (event: PointerEvent) => {
+      const wrap = dueDatePickerWrapRef.current;
+      const target = event.target as Node | null;
+      if (!wrap || !target) return;
+      if (!wrap.contains(target)) {
+        setShowDueDatePickerFallback(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowDueDatePickerFallback(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDownOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDownOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [showDueDatePickerFallback]);
+
+  useEffect(() => {
+    if (!showDueTimePickerFallback) return;
+
+    const handlePointerDownOutside = (event: PointerEvent) => {
+      const wrap = dueTimePickerWrapRef.current;
+      const target = event.target as Node | null;
+      if (!wrap || !target) return;
+      if (!wrap.contains(target)) {
+        setShowDueTimePickerFallback(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowDueTimePickerFallback(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDownOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDownOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [showDueTimePickerFallback]);
+
+  useEffect(() => {
     setShowDueDatePickerFallback(false);
+    setShowDueTimePickerFallback(false);
   }, [selectedTaskId]);
 
   useEffect(() => {
@@ -1282,6 +1345,10 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     return fromDraft || fromTask || '';
   }, [dueDateInputDraft, selectedTask?.dueDate]);
 
+  const currentDueTimeHm = useMemo(() => {
+    return dueTimeInputDraft.trim();
+  }, [dueTimeInputDraft]);
+
   const openNativeDatePicker = () => {
     const el = dueDateNativePickerRef.current;
     if (!el) return;
@@ -1316,16 +1383,30 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   const openNativeTimePicker = () => {
     const el = taskDueTimePickerRef.current;
     if (!el) return;
+    setShowDueTimePickerFallback(true);
     if (typeof el.showPicker === 'function') {
       try {
         el.showPicker();
-        return;
       } catch {
-        // fall through to focus fallback
+        // keep fallback visible when native picker fails
       }
     }
 
     el.focus();
+
+    window.setTimeout(() => {
+      const fallbackEl = dueTimeFallbackPickerRef.current;
+      if (!fallbackEl) return;
+      if (typeof fallbackEl.showPicker === 'function') {
+        try {
+          fallbackEl.showPicker();
+          return;
+        } catch {
+          // fall back to focus
+        }
+      }
+      fallbackEl.focus();
+    }, 0);
   };
 
   const handleDeleteTask = async (id: string) => {
@@ -2812,7 +2893,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                                 <div className="flex min-h-8 items-center gap-2 text-slate-400 font-bold text-[10px] uppercase tracking-widest">
                                   <Calendar size={14} className="shrink-0" /> Prazo de entrega
                                 </div>
-                                <div className="relative flex gap-2">
+                                <div ref={dueDatePickerWrapRef} className="relative flex gap-2">
                                   <input
                                     type="text"
                                     inputMode="numeric"
@@ -2841,13 +2922,13 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                                       <input
                                         ref={dueDateFallbackPickerRef}
                                         type="date"
+                                        lang="pt-BR"
                                         value={currentDueDateYmd}
                                         onChange={(e) => {
                                           const y = e.target.value;
                                           if (y) applyDueDateFromNativeYmd(y);
                                           setShowDueDatePickerFallback(false);
                                         }}
-                                        onBlur={() => setShowDueDatePickerFallback(false)}
                                         className="min-h-[44px] rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#800000]/20"
                                       />
                                     </div>
@@ -2856,6 +2937,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                                 <input
                                   ref={dueDateNativePickerRef}
                                   type="date"
+                                  lang="pt-BR"
                                   tabIndex={-1}
                                   aria-hidden
                                   value={currentDueDateYmd}
@@ -2874,10 +2956,11 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                                 <div className="flex min-h-8 items-center gap-2 text-slate-400 font-bold text-[10px] uppercase tracking-widest">
                                   <Clock size={14} className="shrink-0" /> Horário (opcional)
                                 </div>
-                                <div className="flex gap-2">
+                                <div ref={dueTimePickerWrapRef} className="relative flex gap-2">
                                   <input
                                     ref={taskDueTimePickerRef}
                                     type="time"
+                                    lang="pt-BR"
                                     value={dueTimeInputDraft}
                                     onChange={(e) => {
                                       const v = e.target.value;
@@ -2896,6 +2979,10 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                                   />
                                   <button
                                     type="button"
+                                    onPointerDown={(e) => {
+                                      e.preventDefault();
+                                      openNativeTimePicker();
+                                    }}
                                     onClick={openNativeTimePicker}
                                     className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 touch-manipulation transition-colors hover:border-[#800000]/40 hover:text-[#800000]"
                                     title="Abrir seletor de horário"
@@ -2903,6 +2990,34 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                                   >
                                     <Clock size={18} />
                                   </button>
+                                  {showDueTimePickerFallback && (
+                                    <div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+                                      <input
+                                        ref={dueTimeFallbackPickerRef}
+                                        type="time"
+                                        lang="pt-BR"
+                                        value={currentDueTimeHm}
+                                        onChange={(e) => {
+                                          const v = e.target.value;
+                                          setDueTimeInputDraft(v);
+                                          const ymd = parseDueDateBrToIso(dueDateInputDraft.trim());
+                                          if (!ymd) {
+                                            setShowDueTimePickerFallback(false);
+                                            return;
+                                          }
+                                          if (!v) {
+                                            void handleUpdateTask({ dueDate: ymd });
+                                            setShowDueTimePickerFallback(false);
+                                            return;
+                                          }
+                                          const iso = combineYmdAndTimeBrToIso(ymd, v);
+                                          if (iso) void handleUpdateTask({ dueDate: iso });
+                                          setShowDueTimePickerFallback(false);
+                                        }}
+                                        className="min-h-[44px] rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#800000]/20"
+                                      />
+                                    </div>
+                                  )}
                                 </div>
                                 <p className="min-h-[2.5rem] text-[10px] leading-snug text-slate-400">
                                   Toque no relógio do campo ou no botão. Fuso de Brasília.
