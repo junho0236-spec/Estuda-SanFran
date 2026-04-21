@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { HelpCircle, Bell, ChevronDown, User, Settings, LogOut, ShieldAlert, CheckCircle2, UserPlus, Moon, Sun, Zap, Coffee, Gavel } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -47,9 +47,14 @@ const HeaderActions: React.FC<HeaderActionsProps> = ({
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
-  /** Painéis em portal (compactToolbar): fora do `notifRef` / `dropdownRef` para clique-fora e overflow. */
+  const notifBtnRef = useRef<HTMLButtonElement>(null);
+  const profileBtnRef = useRef<HTMLButtonElement>(null);
+  /** Painéis em portal (body): evitam `overflow-hidden` de ascendentes (main mobile e desktop). */
   const notifPanelRef = useRef<HTMLDivElement>(null);
   const profilePanelRef = useRef<HTMLDivElement>(null);
+  type PanelPos = { top: number; right: number; maxH: number };
+  const [notifPanelPos, setNotifPanelPos] = useState<PanelPos | null>(null);
+  const [profilePanelPos, setProfilePanelPos] = useState<PanelPos | null>(null);
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
@@ -64,7 +69,55 @@ const HeaderActions: React.FC<HeaderActionsProps> = ({
 
   const progress = ((timerTotalInitial - timerSecondsLeft) / timerTotalInitial) * 100;
 
-  // Close dropdowns when clicking outside (inclui painéis em portal quando compactToolbar)
+  useLayoutEffect(() => {
+    if (!isNotificationsOpen) {
+      setNotifPanelPos(null);
+      return;
+    }
+    const measure = () => {
+      const el = notifBtnRef.current;
+      if (!el || typeof window === 'undefined') return;
+      const r = el.getBoundingClientRect();
+      setNotifPanelPos({
+        top: r.bottom + 8,
+        right: Math.max(12, window.innerWidth - r.right),
+        maxH: Math.max(220, window.innerHeight - r.bottom - 20),
+      });
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    window.addEventListener('scroll', measure, true);
+    return () => {
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('scroll', measure, true);
+    };
+  }, [isNotificationsOpen]);
+
+  useLayoutEffect(() => {
+    if (!isDropdownOpen) {
+      setProfilePanelPos(null);
+      return;
+    }
+    const measure = () => {
+      const el = profileBtnRef.current;
+      if (!el || typeof window === 'undefined') return;
+      const r = el.getBoundingClientRect();
+      setProfilePanelPos({
+        top: r.bottom + 8,
+        right: Math.max(12, window.innerWidth - r.right),
+        maxH: Math.max(220, window.innerHeight - r.bottom - 20),
+      });
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    window.addEventListener('scroll', measure, true);
+    return () => {
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('scroll', measure, true);
+    };
+  }, [isDropdownOpen]);
+
+  // Close dropdowns when clicking outside (inclui painéis em portal)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const t = event.target as Node;
@@ -160,7 +213,8 @@ const HeaderActions: React.FC<HeaderActionsProps> = ({
 
       {/* Notifications */}
       <div className="relative shrink-0" ref={notifRef}>
-        <button 
+        <button
+          ref={notifBtnRef}
           onClick={handleToggleNotifications}
           className={`relative rounded-full border flex items-center justify-center transition-all active:scale-95 ${
             compactToolbar ? 'h-10 w-10' : 'w-11 h-11'
@@ -178,167 +232,99 @@ const HeaderActions: React.FC<HeaderActionsProps> = ({
           )}
         </button>
 
-        {/* Notifications Dropdown — portal em compactToolbar para não ser cortado por overflow-hidden dos ascendentes */}
+        {/* Notificações: sempre em portal + fixed, ancorado ao botão (main tem overflow-hidden). */}
         {isNotificationsOpen &&
-          (compactToolbar
-            ? createPortal(
-                <div
-                  ref={notifPanelRef}
-                  className="fixed z-[80] right-2 top-[max(4.75rem,calc(env(safe-area-inset-top,0px)+4.75rem))] w-[min(20rem,calc(100vw-1rem))] max-h-[min(70vh,calc(100dvh-5.5rem))] origin-top-right overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-2xl dark:border-sanfran-rubi/30 dark:bg-[#0d0303]/95"
-                >
-                  <div className="flex justify-between border-b border-slate-200/50 px-4 py-3 dark:border-sanfran-rubi/20">
-                    <h3 className="font-serif font-bold text-slate-900 dark:text-white">Notificações</h3>
-                    {unreadCount > 0 && (
-                      <span className="rounded-full bg-red-50 px-2 py-1 text-xs font-bold text-[#800000] dark:bg-red-900/30 dark:text-red-100">
-                        {unreadCount} Novas
-                      </span>
-                    )}
-                  </div>
-                  <div className="custom-scrollbar max-h-[min(52vh,24rem)] overflow-y-auto py-2">
-                    {notifications.length > 0 ? (
-                      notifications.map((notif) => (
-                        <div
-                          key={notif.id}
-                          onClick={() => {
-                            onNotificationClick(notif);
-                            setIsNotificationsOpen(false);
-                          }}
-                          className="group relative flex cursor-pointer gap-3 overflow-hidden rounded-xl px-4 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
-                        >
-                          {!notif.is_read && (
-                            <div className="absolute bottom-0 left-0 top-0 w-1 rounded-r-full bg-[#800000]" />
-                          )}
-                          <div
-                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${!notif.is_read ? 'bg-red-50 dark:bg-red-900/20' : 'bg-slate-100 dark:bg-white/10'}`}
-                          >
-                            {getIcon(notif.type)}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p
-                              className={`text-sm ${!notif.is_read ? 'font-bold text-slate-900 dark:text-white' : 'font-medium text-slate-600 dark:text-slate-300'}`}
-                            >
-                              {notif.message}
-                            </p>
-                            {notif.type === 'friend_request' && !notif.is_read && (
-                              <div className="mt-2 flex gap-2">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onAcceptFriendRequest(notif);
-                                  }}
-                                  className="rounded-lg bg-emerald-600 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white transition-colors hover:bg-emerald-700"
-                                >
-                                  Aceitar
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onDeclineFriendRequest(notif);
-                                  }}
-                                  className="rounded-lg bg-slate-200 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-600 transition-colors hover:bg-slate-300 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/20"
-                                >
-                                  Recusar
-                                </button>
-                              </div>
-                            )}
-                            <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">
-                              {new Date(notif.created_at).toLocaleString()}
-                            </p>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="px-4 py-8 text-center text-xs font-medium text-slate-400 dark:text-slate-500">
-                        Nenhuma notificação por aqui.
+          notifPanelPos &&
+          createPortal(
+            <div
+              ref={notifPanelRef}
+              style={{
+                position: 'fixed',
+                top: notifPanelPos.top,
+                right: notifPanelPos.right,
+                maxHeight: notifPanelPos.maxH,
+                width: 'min(20rem, calc(100vw - 1.5rem))',
+              }}
+              className="z-[80] origin-top-right overflow-y-auto rounded-2xl border border-slate-200/80 bg-white/95 shadow-[0_20px_40px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-2xl custom-scrollbar dark:border-sanfran-rubi/30 dark:bg-[#0d0303]/95"
+            >
+              <div className="sticky top-0 z-[1] flex justify-between border-b border-slate-200/50 bg-white/95 px-4 py-3 backdrop-blur-sm dark:border-sanfran-rubi/20 dark:bg-[#0d0303]/95">
+                <h3 className="font-serif font-bold text-slate-900 dark:text-white">Notificações</h3>
+                {unreadCount > 0 && (
+                  <span className="rounded-full bg-red-50 px-2 py-1 text-xs font-bold text-[#800000] dark:bg-red-900/30 dark:text-red-100">
+                    {unreadCount} Novas
+                  </span>
+                )}
+              </div>
+              <div className="py-2">
+                {notifications.length > 0 ? (
+                  notifications.map((notif) => (
+                    <div
+                      key={notif.id}
+                      onClick={() => {
+                        onNotificationClick(notif);
+                        setIsNotificationsOpen(false);
+                      }}
+                      className="group relative flex cursor-pointer gap-3 overflow-hidden rounded-xl px-4 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
+                    >
+                      {!notif.is_read && (
+                        <div className="absolute bottom-0 left-0 top-0 w-1 rounded-r-full bg-[#800000]" />
+                      )}
+                      <div
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${!notif.is_read ? 'bg-red-50 dark:bg-red-900/20' : 'bg-slate-100 dark:bg-white/10'}`}
+                      >
+                        {getIcon(notif.type)}
                       </div>
-                    )}
-                  </div>
-                </div>,
-                document.body
-              )
-            : (
-                <div
-                  ref={notifPanelRef}
-                  className="absolute right-0 z-50 mt-4 w-[min(20rem,calc(100vw-1.5rem))] max-w-[calc(100vw-1.5rem)] origin-top-right transform rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-2xl transition-all animate-in fade-in zoom-in-95 duration-200"
-                >
-                  <div className="flex justify-between border-b border-slate-200/50 px-4 py-3">
-                    <h3 className="font-serif font-bold text-slate-900">Notificações</h3>
-                    {unreadCount > 0 && (
-                      <span className="rounded-full bg-red-50 px-2 py-1 text-xs font-bold text-[#800000]">
-                        {unreadCount} Novas
-                      </span>
-                    )}
-                  </div>
-                  <div className="custom-scrollbar max-h-[400px] overflow-y-auto py-2">
-                    {notifications.length > 0 ? (
-                      notifications.map((notif) => (
-                        <div
-                          key={notif.id}
-                          onClick={() => {
-                            onNotificationClick(notif);
-                            setIsNotificationsOpen(false);
-                          }}
-                          className="group relative flex cursor-pointer gap-3 overflow-hidden rounded-xl px-4 py-3 transition-colors hover:bg-slate-50"
+                      <div className="min-w-0 flex-1">
+                        <p
+                          className={`text-sm ${!notif.is_read ? 'font-bold text-slate-900 dark:text-white' : 'font-medium text-slate-600 dark:text-slate-300'}`}
                         >
-                          {!notif.is_read && (
-                            <div className="absolute bottom-0 left-0 top-0 w-1 rounded-r-full bg-[#800000]" />
-                          )}
-                          <div
-                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${!notif.is_read ? 'bg-red-50' : 'bg-slate-100'}`}
-                          >
-                            {getIcon(notif.type)}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p
-                              className={`text-sm ${!notif.is_read ? 'font-bold text-slate-900' : 'font-medium text-slate-600'}`}
+                          {notif.message}
+                        </p>
+                        {notif.type === 'friend_request' && !notif.is_read && (
+                          <div className="mt-2 flex gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onAcceptFriendRequest(notif);
+                              }}
+                              className="rounded-lg bg-emerald-600 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white transition-colors hover:bg-emerald-700"
                             >
-                              {notif.message}
-                            </p>
-                            {notif.type === 'friend_request' && !notif.is_read && (
-                              <div className="mt-2 flex gap-2">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onAcceptFriendRequest(notif);
-                                  }}
-                                  className="rounded-lg bg-emerald-600 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white transition-colors hover:bg-emerald-700"
-                                >
-                                  Aceitar
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onDeclineFriendRequest(notif);
-                                  }}
-                                  className="rounded-lg bg-slate-200 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-600 transition-colors hover:bg-slate-300"
-                                >
-                                  Recusar
-                                </button>
-                              </div>
-                            )}
-                            <p className="mt-0.5 text-[10px] text-slate-400">
-                              {new Date(notif.created_at).toLocaleString()}
-                            </p>
+                              Aceitar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDeclineFriendRequest(notif);
+                              }}
+                              className="rounded-lg bg-slate-200 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-600 transition-colors hover:bg-slate-300 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/20"
+                            >
+                              Recusar
+                            </button>
                           </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="px-4 py-8 text-center text-xs font-medium text-slate-400">
-                        Nenhuma notificação por aqui.
+                        )}
+                        <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">
+                          {new Date(notif.created_at).toLocaleString()}
+                        </p>
                       </div>
-                    )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="px-4 py-8 text-center text-xs font-medium text-slate-400 dark:text-slate-500">
+                    Nenhuma notificação por aqui.
                   </div>
-                </div>
-              ))}
+                )}
+              </div>
+            </div>,
+            document.body
+          )}
       </div>
 
       {/* Profile */}
       <div className="relative shrink-0" ref={dropdownRef}>
-        <button 
+        <button
+          ref={profileBtnRef}
           onClick={() => {
             setIsDropdownOpen(!isDropdownOpen);
             setIsNotificationsOpen(false);
@@ -366,126 +352,74 @@ const HeaderActions: React.FC<HeaderActionsProps> = ({
           <ChevronDown size={compactToolbar ? 14 : 16} className={`shrink-0 text-slate-400 transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''}`} />
         </button>
 
-        {/* Profile Dropdown — portal em compactToolbar (overflow dos ascendentes) */}
+        {/* Perfil: sempre em portal + fixed (mesmo motivo que notificações). */}
         {isDropdownOpen &&
-          (compactToolbar
-            ? createPortal(
-                <div
-                  ref={profilePanelRef}
-                  className="fixed z-[80] right-2 top-[max(4.75rem,calc(env(safe-area-inset-top,0px)+4.75rem))] w-[min(16rem,calc(100vw-1rem))] max-h-[min(75vh,calc(100dvh-5.5rem))] origin-top-right overflow-y-auto rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-2xl dark:border-sanfran-rubi/30 dark:bg-[#0d0303]/95"
-                >
-                  <div className="mb-2 border-b border-slate-200/50 px-4 py-3 dark:border-sanfran-rubi/20">
-                    <p className="mb-1 text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                      Gabinete
-                    </p>
-                    <p className="truncate font-serif text-sm font-bold text-slate-900 dark:text-white">{userDisplayName}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleNavigate(View.Profile)}
-                    className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5"
-                  >
-                    <User size={16} className="text-slate-400" /> Minha Conta
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleNavigate(View.Settings)}
-                    className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5"
-                  >
-                    <Settings size={16} className="text-slate-400" /> Configurações
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onToggleDarkMode}
-                    className="flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5"
-                  >
-                    <div className="flex items-center gap-3">
-                      {isDarkMode ? <Moon size={16} className="text-slate-400" /> : <Sun size={16} className="text-slate-400" />}
-                      <span>{isDarkMode ? 'Modo Escuro' : 'Modo Claro'}</span>
-                    </div>
-                    <div
-                      className={`relative h-4 w-8 rounded-full transition-colors ${isDarkMode ? 'bg-sanfran-rubi' : 'bg-slate-200'}`}
-                    >
-                      <div
-                        className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${isDarkMode ? 'right-0.5' : 'left-0.5'}`}
-                      />
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleNavigate(View.FAQ)}
-                    className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5"
-                  >
-                    <HelpCircle size={16} className="text-slate-400" /> Ajuda
-                  </button>
-                  <div className="my-2 border-t border-slate-200/50 dark:border-sanfran-rubi/20" />
-                  <button
-                    type="button"
-                    onClick={onLogout}
-                    className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-sm font-bold text-[#800000] transition-colors hover:bg-red-50 dark:hover:bg-red-950/40"
-                  >
-                    <LogOut size={16} /> Encerrar Sessão
-                  </button>
-                </div>,
-                document.body
-              )
-            : (
-                <div
-                  ref={profilePanelRef}
-                  className="absolute right-0 z-50 mt-4 w-[min(16rem,calc(100vw-1.5rem))] max-w-[calc(100vw-1.5rem)] origin-top-right transform rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-2xl transition-all animate-in fade-in zoom-in-95 duration-200"
-                >
-                  <div className="mb-2 border-b border-slate-200/50 px-4 py-3">
-                    <p className="mb-1 text-xs font-bold uppercase tracking-widest text-slate-400">Gabinete</p>
-                    <p className="truncate font-serif text-sm font-bold text-slate-900">{userDisplayName}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleNavigate(View.Profile)}
-                    className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-                  >
-                    <User size={16} className="text-slate-400" /> Minha Conta
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleNavigate(View.Settings)}
-                    className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-                  >
-                    <Settings size={16} className="text-slate-400" /> Configurações
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onToggleDarkMode}
-                    className="flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-                  >
-                    <div className="flex items-center gap-3">
-                      {isDarkMode ? <Moon size={16} className="text-slate-400" /> : <Sun size={16} className="text-slate-400" />}
-                      <span>{isDarkMode ? 'Modo Escuro' : 'Modo Claro'}</span>
-                    </div>
-                    <div
-                      className={`relative h-4 w-8 rounded-full transition-colors ${isDarkMode ? 'bg-sanfran-rubi' : 'bg-slate-200'}`}
-                    >
-                      <div
-                        className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${isDarkMode ? 'right-0.5' : 'left-0.5'}`}
-                      />
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleNavigate(View.FAQ)}
-                    className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-                  >
-                    <HelpCircle size={16} className="text-slate-400" /> Ajuda
-                  </button>
-                  <div className="my-2 border-t border-slate-200/50" />
-                  <button
-                    type="button"
-                    onClick={onLogout}
-                    className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-sm font-bold text-[#800000] transition-colors hover:bg-red-50"
-                  >
-                    <LogOut size={16} /> Encerrar Sessão
-                  </button>
+          profilePanelPos &&
+          createPortal(
+            <div
+              ref={profilePanelRef}
+              style={{
+                position: 'fixed',
+                top: profilePanelPos.top,
+                right: profilePanelPos.right,
+                maxHeight: profilePanelPos.maxH,
+                width: 'min(16rem, calc(100vw - 1.5rem))',
+              }}
+              className="z-[80] flex origin-top-right flex-col overflow-y-auto rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-2xl dark:border-sanfran-rubi/30 dark:bg-[#0d0303]/95"
+            >
+              <div className="mb-2 border-b border-slate-200/50 px-4 py-3 dark:border-sanfran-rubi/20">
+                <p className="mb-1 text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Gabinete</p>
+                <p className="truncate font-serif text-sm font-bold text-slate-900 dark:text-white">{userDisplayName}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleNavigate(View.Profile)}
+                className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5"
+              >
+                <User size={16} className="text-slate-400" /> Minha Conta
+              </button>
+              <button
+                type="button"
+                onClick={() => handleNavigate(View.Settings)}
+                className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5"
+              >
+                <Settings size={16} className="text-slate-400" /> Configurações
+              </button>
+              <button
+                type="button"
+                onClick={onToggleDarkMode}
+                className="flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5"
+              >
+                <div className="flex items-center gap-3">
+                  {isDarkMode ? <Moon size={16} className="text-slate-400" /> : <Sun size={16} className="text-slate-400" />}
+                  <span>{isDarkMode ? 'Modo Escuro' : 'Modo Claro'}</span>
                 </div>
-              ))}
+                <div
+                  className={`relative h-4 w-8 rounded-full transition-colors ${isDarkMode ? 'bg-sanfran-rubi' : 'bg-slate-200'}`}
+                >
+                  <div
+                    className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${isDarkMode ? 'right-0.5' : 'left-0.5'}`}
+                  />
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleNavigate(View.FAQ)}
+                className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5"
+              >
+                <HelpCircle size={16} className="text-slate-400" /> Ajuda
+              </button>
+              <div className="my-2 border-t border-slate-200/50 dark:border-sanfran-rubi/20" />
+              <button
+                type="button"
+                onClick={onLogout}
+                className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-sm font-bold text-[#800000] transition-colors hover:bg-red-50 dark:hover:bg-red-950/40"
+              >
+                <LogOut size={16} /> Encerrar Sessão
+              </button>
+            </div>,
+            document.body
+          )}
       </div>
     </div>
   );

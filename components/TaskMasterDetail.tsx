@@ -2264,17 +2264,24 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
   const kanbanBoardForView = boards.find((b) => b.id === activeTab);
 
   /** Calendário / exportação, lista↔kanban (md+), notificações, Ritual 23:59, Live Sync — reutilizado na sticky (≥sm) e ao lado do + no mobile (lista). */
-  const renderBoardToolbarActions = () => (
+  const renderBoardToolbarActions = (opts: { uniformIconRow?: boolean } = {}) => {
+    const { uniformIconRow = false } = opts;
+    const iconBtn =
+      'inline-flex h-9 w-9 shrink-0 touch-manipulation items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-[0_1px_2px_rgba(15,23,42,0.06)] transition-all hover:border-slate-300 hover:bg-slate-50 hover:text-[#800000] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#800000]/20 md:h-11 md:w-11';
+    const ritualPill =
+      'inline-flex h-9 shrink-0 touch-manipulation items-center gap-1.5 rounded-full border border-slate-700 bg-slate-800 px-3 text-[9px] font-black uppercase tracking-widest text-white shadow-[0_1px_2px_rgba(0,0,0,0.12)] transition-all hover:bg-slate-900 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 md:h-11 md:gap-2 md:px-4 md:text-[10px]';
+
+    return (
     <>
       <div className="relative shrink-0">
         <button
           type="button"
           onClick={() => setShowExportMenu(!showExportMenu)}
-          className="inline-flex min-h-9 min-w-9 touch-manipulation items-center justify-center rounded-full text-slate-400 transition-all hover:bg-slate-50 hover:text-[#800000] sm:min-h-[44px] sm:min-w-[44px]"
+          className={iconBtn}
           title="Google Agenda, exportação .ics e mais"
           aria-label="Sincronização e exportação de calendário"
         >
-          <Calendar className="size-[18px] sm:size-5" />
+          <Calendar className="size-[17px] md:size-[18px]" strokeWidth={2} />
         </button>
         <AnimatePresence>
           {showExportMenu && (
@@ -2363,12 +2370,12 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         <button
           type="button"
           onClick={() => setShowNotifications(!showNotifications)}
-          className="relative inline-flex min-h-9 min-w-9 touch-manipulation items-center justify-center rounded-full text-slate-400 transition-all hover:bg-slate-50 hover:text-[#800000] sm:min-h-[44px] sm:min-w-[44px]"
+          className={`relative ${iconBtn}`}
           aria-label="Notificações"
         >
-          <Bell className="size-[18px] sm:size-5" />
+          <Bell className="size-[17px] md:size-[18px]" strokeWidth={2} />
           {notifications.filter((n) => !n.is_read).length > 0 && (
-            <span className="absolute right-0.5 top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full border border-white bg-red-500 text-[8px] font-black text-white sm:right-1 sm:top-1 sm:h-4 sm:w-4 sm:text-[10px]">
+            <span className="absolute right-0.5 top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full border border-white bg-red-500 text-[8px] font-black text-white md:right-1 md:top-1 md:h-4 md:w-4 md:text-[10px]">
               {notifications.filter((n) => !n.is_read).length}
             </span>
           )}
@@ -2427,12 +2434,13 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
       <button
         type="button"
         onClick={handleArchiveCompleted}
-        className="flex h-9 shrink-0 items-center gap-1 rounded-full bg-slate-800 px-2 text-[9px] font-black uppercase tracking-widest text-white shadow-md transition-all hover:bg-black sm:h-auto sm:gap-2 sm:px-4 sm:py-1.5 sm:text-[10px]"
+        className={uniformIconRow ? iconBtn : ritualPill}
+        title="Ritual 23:59 — arquivar tarefas concluídas"
       >
-        <RotateCcw className="size-3 shrink-0 sm:size-3" />
-        <span className="hidden sm:inline">Ritual 23:59</span>
+        <RotateCcw className="size-[17px] shrink-0 md:size-[18px]" strokeWidth={2} />
+        {!uniformIconRow && <span className="hidden md:inline">Ritual 23:59</span>}
       </button>
-      <div className="hidden h-4 w-px bg-slate-200 sm:block" />
+      <div className="hidden h-4 w-px bg-slate-200 md:block" />
       <div
         className="hidden items-center gap-2 md:flex"
         title="Sincronização com a nuvem (Supabase). Para o Google Agenda use o menu do ícone de calendário → Conectar Google Agenda."
@@ -2441,7 +2449,8 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
         <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Live Sync</span>
       </div>
     </>
-  );
+    );
+  };
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col">
@@ -2453,7 +2462,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     >
       <div className="flex min-h-[calc(100dvh-9rem)] flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 text-[13px] shadow-2xl sm:min-h-[calc(100dvh-8.5rem)] sm:rounded-[28px] md:min-h-[calc(100dvh-8rem)] md:rounded-[32px] lg:min-h-[calc(100dvh-6.25rem)]">
         {/* Header Tabs */}
-        <div className="flex flex-col gap-2 border-b border-slate-100 bg-white px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4 sm:py-3 md:px-6 md:py-4 sticky top-0 z-20 min-w-0">
+        <div className="flex flex-col gap-2 border-b border-slate-100 bg-white px-3 py-2.5 md:flex-row md:items-center md:justify-between md:gap-3 md:px-6 md:py-4 sticky top-0 z-20 min-w-0">
           <div className="flex min-w-0 items-center gap-2 overflow-x-auto no-scrollbar max-w-full md:max-w-[calc(100%-350px)]">
             {TABS[0]?.id === 'Geral' && (
               <DroppableTab
@@ -2500,8 +2509,8 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
           </div>
 
         <div
-          className={`min-w-0 flex-wrap items-center justify-end gap-1.5 sm:flex-nowrap sm:gap-2 ${
-            effectiveViewMode === 'list' ? 'hidden sm:flex' : 'flex'
+          className={`min-w-0 flex-wrap items-center justify-end gap-1.5 md:flex-nowrap md:gap-2 ${
+            effectiveViewMode === 'list' ? 'hidden md:flex' : 'flex'
           }`}
         >
           {renderBoardToolbarActions()}
@@ -2517,22 +2526,26 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
             <div
               className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden border-slate-100 bg-white transition-all duration-500"
             >
-              <div className="flex flex-col gap-2 border-b border-slate-50 p-3 sm:gap-3 sm:p-4">
+              <div className="flex flex-col gap-2 border-b border-slate-50 p-3 md:gap-3 md:p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
-                    <h3 className="truncate font-serif text-base font-bold text-slate-900 sm:text-lg md:text-xl">
+                  <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3">
+                    <h3 className="truncate font-serif text-base font-bold text-slate-900 md:text-lg lg:text-xl">
                       {boards.find((b) => b.id === activeTab)?.name || activeTab}
                     </h3>
                   </div>
-                  <div className="flex shrink-0 items-center gap-0.5 sm:gap-2">
-                    <div className="flex items-center gap-0.5 sm:hidden">{renderBoardToolbarActions()}</div>
+                  <div className="flex shrink-0 items-center gap-0.5 md:gap-2">
+                    <div className="flex items-center gap-1 md:hidden">
+                      {renderBoardToolbarActions({ uniformIconRow: true })}
+                    </div>
                     <div className="relative flex shrink-0 items-center">
                       <button
                         type="button"
                         onClick={() => setShowTemplatesMenu(!showTemplatesMenu)}
-                        className="rounded-md bg-[#800000] p-1.5 text-white shadow-md transition-all hover:bg-red-900 sm:rounded-lg sm:p-2"
+                        className="inline-flex h-9 w-9 shrink-0 touch-manipulation items-center justify-center rounded-full border border-[#6d0000] bg-[#800000] text-white shadow-[0_1px_2px_rgba(0,0,0,0.12)] transition-all hover:bg-[#700000] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#800000]/35 md:h-11 md:w-11"
+                        title="Adicionar tarefa (templates)"
+                        aria-label="Adicionar nova tarefa ou escolher modelo"
                       >
-                        <Plus className="size-3.5 sm:size-4" />
+                        <Plus className="size-[17px] md:size-[18px]" strokeWidth={2.5} />
                       </button>
 
                       <AnimatePresence>
