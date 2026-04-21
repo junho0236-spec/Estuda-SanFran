@@ -37,6 +37,14 @@ function reorderItems(items: PersonalChecklistItem[]): PersonalChecklistItem[] {
   return items.map((item, index) => ({ ...item, order: index }));
 }
 
+function groupUncheckedFirst(items: PersonalChecklistItem[]): PersonalChecklistItem[] {
+  const sorted = [...items].sort((a, b) => {
+    if (a.checked === b.checked) return a.order - b.order;
+    return Number(a.checked) - Number(b.checked);
+  });
+  return reorderItems(sorted);
+}
+
 const MinhasListas: React.FC<MinhasListasProps> = ({ userId, isOnline }) => {
   const [lists, setLists] = useState<PersonalChecklist[]>([]);
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
@@ -130,20 +138,32 @@ const MinhasListas: React.FC<MinhasListasProps> = ({ userId, isOnline }) => {
       checked_at: null,
     };
 
-    await updateList(selectedList.id, (current) => ({
-      ...current,
-      items: [...current.items, nextItem],
-      updated_at: new Date().toISOString(),
-    }));
+    await updateList(selectedList.id, (current) => {
+      const ordered = [...current.items].sort((a, b) => a.order - b.order);
+      const firstCheckedIndex = ordered.findIndex((item) => item.checked);
+      if (firstCheckedIndex === -1) {
+        return {
+          ...current,
+          items: reorderItems([...ordered, nextItem]),
+          updated_at: new Date().toISOString(),
+        };
+      }
+      const nextItems = [...ordered];
+      nextItems.splice(firstCheckedIndex, 0, nextItem);
+      return {
+        ...current,
+        items: reorderItems(nextItems),
+        updated_at: new Date().toISOString(),
+      };
+    });
     setNewItemText('');
   };
 
   const handleToggleItem = async (itemId: string) => {
     if (!selectedList) return;
     const now = new Date().toISOString();
-    await updateList(selectedList.id, (current) => ({
-      ...current,
-      items: current.items.map((item) =>
+    await updateList(selectedList.id, (current) => {
+      const updatedItems = current.items.map((item) =>
         item.id === itemId
           ? {
               ...item,
@@ -151,9 +171,13 @@ const MinhasListas: React.FC<MinhasListasProps> = ({ userId, isOnline }) => {
               checked_at: !item.checked ? now : null,
             }
           : item
-      ),
-      updated_at: now,
-    }));
+      );
+      return {
+        ...current,
+        items: groupUncheckedFirst(updatedItems),
+        updated_at: now,
+      };
+    });
   };
 
   const handleRemoveItem = async (itemId: string) => {
@@ -201,8 +225,8 @@ const MinhasListas: React.FC<MinhasListasProps> = ({ userId, isOnline }) => {
         </p>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 lg:grid-cols-12">
-        <section className="lg:col-span-4 min-h-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
+      <div className="grid min-h-0 flex-1 grid-cols-1 items-start gap-6 lg:grid-cols-12">
+        <section className="lg:col-span-4 min-h-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm md:p-6 lg:sticky lg:top-4 lg:h-[calc(100dvh-10rem)] lg:self-start lg:flex lg:flex-col">
           <div className="mb-4 flex gap-2">
             <input
               value={newListTitle}
@@ -224,7 +248,7 @@ const MinhasListas: React.FC<MinhasListasProps> = ({ userId, isOnline }) => {
             </button>
           </div>
 
-          <div className="custom-scrollbar flex max-h-[60vh] flex-col gap-2 overflow-y-auto pr-1">
+          <div className="custom-scrollbar flex flex-col gap-2 overflow-y-auto pr-1 lg:min-h-0 lg:flex-1">
             {isLoading && (
               <p className="rounded-xl bg-slate-50 px-3 py-4 text-xs font-semibold text-slate-500">
                 Carregando listas...
@@ -334,8 +358,7 @@ const MinhasListas: React.FC<MinhasListasProps> = ({ userId, isOnline }) => {
                     Esta lista ainda nao possui itens.
                   </div>
                 ) : (
-                  [...selectedList.items]
-                    .sort((a, b) => a.order - b.order)
+                  groupUncheckedFirst(selectedList.items)
                     .map((item, index) => (
                       <div
                         key={item.id}
