@@ -2043,11 +2043,11 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
               </div>
             )}
 
-            <div className="flex items-center justify-between mt-1">
-                            <div className="flex flex-col gap-1">
+            <div className="mt-1 flex min-h-[1.375rem] items-center justify-between gap-2">
+              <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-x-2 overflow-hidden text-[11px] leading-tight">
                 {task.dueDate && (
-                  <div
-                    className={`flex items-center gap-1 text-[11px] font-bold ${
+                  <span
+                    className={`inline-flex shrink-0 items-center gap-1 font-bold ${
                       selectedTaskId === task.id
                         ? isOverdue
                           ? 'text-white/90'
@@ -2065,36 +2065,93 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                       <Calendar size={12} className="shrink-0" />
                     )}
                     {formatDueDateTimeBr(task.dueDate)}
-                  </div>
+                  </span>
+                )}
+                {task.dueDate &&
+                  ((task.estimated_duration_minutes != null && task.estimated_duration_minutes > 0) ||
+                    task.boardId ||
+                    (task.delegatedBy && task.delegatedBy !== userId) ||
+                    (task.delegatedTo && task.delegatedTo !== userId)) && (
+                  <span
+                    className={`shrink-0 select-none ${selectedTaskId === task.id ? 'text-white/35' : 'text-slate-300'}`}
+                    aria-hidden
+                  >
+                    ·
+                  </span>
                 )}
                 {task.estimated_duration_minutes != null && task.estimated_duration_minutes > 0 && (
-                  <div
-                    className={`flex items-center gap-1 text-[11px] font-bold ${
+                  <span
+                    className={`inline-flex shrink-0 items-center gap-1 font-bold ${
                       selectedTaskId === task.id ? 'text-white/80' : 'text-slate-500'
                     }`}
                   >
                     <Clock size={12} className="shrink-0" />
                     {formatDurationMinutesLabel(task.estimated_duration_minutes)}
-                  </div>
+                  </span>
+                )}
+                {task.estimated_duration_minutes != null &&
+                  task.estimated_duration_minutes > 0 &&
+                  (task.boardId ||
+                    (task.delegatedBy && task.delegatedBy !== userId) ||
+                    (task.delegatedTo && task.delegatedTo !== userId)) && (
+                  <span
+                    className={`shrink-0 select-none ${selectedTaskId === task.id ? 'text-white/35' : 'text-slate-300'}`}
+                    aria-hidden
+                  >
+                    ·
+                  </span>
                 )}
                 {task.boardId && (
-                  <div className={`text-[11px] font-bold uppercase tracking-tight ${selectedTaskId === task.id ? 'text-white/60' : 'text-[#800000]/60'}`}>
+                  <span
+                    className={`min-w-0 truncate font-bold uppercase tracking-tight ${
+                      selectedTaskId === task.id ? 'text-white/60' : 'text-[#800000]/60'
+                    }`}
+                    title={boards.find((b: any) => b.id === task.boardId)?.name}
+                  >
                     {boards.find((b: any) => b.id === task.boardId)?.name}
-                  </div>
+                  </span>
+                )}
+                {task.boardId &&
+                  ((task.delegatedBy && task.delegatedBy !== userId) ||
+                    (task.delegatedTo && task.delegatedTo !== userId)) && (
+                  <span
+                    className={`shrink-0 select-none ${selectedTaskId === task.id ? 'text-white/35' : 'text-slate-300'}`}
+                    aria-hidden
+                  >
+                    ·
+                  </span>
                 )}
                 {task.delegatedBy && task.delegatedBy !== userId && (
-                  <div className={`text-[11px] font-bold italic ${selectedTaskId === task.id ? 'text-white/70' : 'text-blue-600'}`}>
+                  <span
+                    className={`max-w-[min(8rem,28vw)] truncate font-bold italic ${
+                      selectedTaskId === task.id ? 'text-white/70' : 'text-blue-600'
+                    }`}
+                    title={`De: ${task.delegatedByName || 'Amigo'}`}
+                  >
                     De: {task.delegatedByName || 'Amigo'}
-                  </div>
+                  </span>
+                )}
+                {task.delegatedBy && task.delegatedBy !== userId && task.delegatedTo && task.delegatedTo !== userId && (
+                  <span
+                    className={`shrink-0 select-none ${selectedTaskId === task.id ? 'text-white/35' : 'text-slate-300'}`}
+                    aria-hidden
+                  >
+                    ·
+                  </span>
                 )}
                 {task.delegatedTo && task.delegatedTo !== userId && (
-                  <div className={`text-[11px] font-bold italic ${selectedTaskId === task.id ? 'text-white/70' : 'text-amber-600'}`}>
+                  <span
+                    className={`max-w-[min(8rem,28vw)] truncate font-bold italic ${
+                      selectedTaskId === task.id ? 'text-white/70' : 'text-amber-600'
+                    }`}
+                    title={`Para: ${task.delegatedToName || 'Amigo'}`}
+                  >
                     Para: {task.delegatedToName || 'Amigo'}
-                  </div>
+                  </span>
                 )}
               </div>
-              
-              <div className="flex items-center gap-2">
+
+              <div className="flex shrink-0 items-center gap-2">
                 {task.waitingOn && (
                   <span className={`text-[11px] font-bold italic ${selectedTaskId === task.id ? 'text-white/60' : 'text-amber-600'}`}>
                     Aguardando: {task.waitingOn}
@@ -2667,32 +2724,38 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                 </div>
               </div>
               
-              {/* Context Filters */}
-              <div className="p-2 border-b border-slate-50 flex items-center gap-1 overflow-x-auto no-scrollbar">
-                {[
-                  { id: 'all', label: 'Tudo', icon: List },
-                  { id: 'today', label: 'Hoje', icon: Calendar },
-                  { id: 'overdue', label: 'Atraso', icon: AlertCircle },
-                  { id: 'high', label: 'Alta', icon: Zap },
-                ].map(f => (
-                  <button
-                    key={f.id}
-                    onClick={() => setFilter(f.id as any)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border ${filter === f.id ? 'bg-[#800000] text-white border-transparent shadow-sm' : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-[#800000]/30'}`}
-                  >
-                    <f.icon size={10} />
-                    {f.label}
-                    {f.id === 'overdue' && overdueCount > 0 && (
-                      <span
-                        className={`ml-0.5 min-w-[1.25rem] rounded-full px-1.5 py-0.5 text-[8px] font-black tabular-nums animate-pulse ${
-                          filter === f.id ? 'bg-white/25 text-white' : 'bg-violet-500 text-white'
-                        }`}
-                      >
-                        {overdueCount}
-                      </span>
-                    )}
-                  </button>
-                ))}
+              {/* Context Filters — filtros em scroll; Selecionar fixo à direita (sem “vão” entre Alta e Selecionar) */}
+              <div className="flex items-center gap-2 border-b border-slate-50 p-2">
+                <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto no-scrollbar">
+                  {[
+                    { id: 'all', label: 'Tudo', icon: List },
+                    { id: 'today', label: 'Hoje', icon: Calendar },
+                    { id: 'overdue', label: 'Atraso', icon: AlertCircle },
+                    { id: 'high', label: 'Alta', icon: Zap },
+                  ].map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() => setFilter(f.id as any)}
+                      className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all ${
+                        filter === f.id
+                          ? 'border-transparent bg-[#800000] text-white shadow-sm'
+                          : 'border-slate-100 bg-slate-50 text-slate-400 hover:border-[#800000]/30'
+                      }`}
+                    >
+                      <f.icon size={10} />
+                      {f.label}
+                      {f.id === 'overdue' && overdueCount > 0 && (
+                        <span
+                          className={`ml-0.5 min-w-[1.25rem] rounded-full px-1.5 py-0.5 text-[8px] font-black tabular-nums animate-pulse ${
+                            filter === f.id ? 'bg-white/25 text-white' : 'bg-violet-500 text-white'
+                          }`}
+                        >
+                          {overdueCount}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
                 <button
                   type="button"
                   onClick={() => {
@@ -2703,7 +2766,11 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
                     }
                     setIsBulkSelectMode(true);
                   }}
-                  className={`ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border ${isBulkSelectMode ? 'bg-slate-900 text-white border-transparent shadow-sm' : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-[#800000]/30'}`}
+                  className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all ${
+                    isBulkSelectMode
+                      ? 'border-transparent bg-slate-900 text-white shadow-sm'
+                      : 'border-slate-100 bg-slate-50 text-slate-400 hover:border-[#800000]/30'
+                  }`}
                 >
                   <CheckSquare size={10} />
                   {isBulkSelectMode ? 'Cancelar seleção' : 'Selecionar'}
