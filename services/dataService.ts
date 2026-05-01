@@ -1423,6 +1423,33 @@ export const dataService = {
     }
   },
 
+  async clearArchivedPersonalChecklists(userId: string, isOnline: boolean) {
+    const localRows = await db.personal_checklists.where('user_id').equals(userId).toArray();
+    const archivedIds = localRows.filter((row) => !!row.archived_at).map((row) => row.id);
+
+    if (archivedIds.length > 0) {
+      await db.personal_checklists.bulkDelete(archivedIds);
+    }
+
+    if (isOnline) {
+      const { error } = await supabase
+        .from('personal_checklists')
+        .delete()
+        .eq('user_id', userId)
+        .not('archived_at', 'is', null);
+
+      if (error) {
+        for (const id of archivedIds) {
+          await addToSyncQueue({ table: 'personal_checklists', action: 'delete', data: { id } });
+        }
+      }
+    } else {
+      for (const id of archivedIds) {
+        await addToSyncQueue({ table: 'personal_checklists', action: 'delete', data: { id } });
+      }
+    }
+  },
+
   // SYNC ALL — lote (batch) para não disparar centenas de pedidos HTTP ao PostgREST de uma vez.
   async syncOfflineData(userId: string) {
     const queue = await db.syncQueue.orderBy('id').toArray();

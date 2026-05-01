@@ -66,6 +66,7 @@ const MinhasListas: React.FC<MinhasListasProps> = ({ userId, isOnline }) => {
   const [archivedLists, setArchivedLists] = useState<PersonalChecklist[]>([]);
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
   const [listPendingDeleteId, setListPendingDeleteId] = useState<string | null>(null);
+  const [isTrashOpen, setIsTrashOpen] = useState(false);
   const [newListTitle, setNewListTitle] = useState('');
   const [newItemText, setNewItemText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -100,6 +101,12 @@ const MinhasListas: React.FC<MinhasListasProps> = ({ userId, isOnline }) => {
   useEffect(() => {
     setListPendingDeleteId(null);
   }, [selectedListId]);
+
+  useEffect(() => {
+    if (archivedLists.length === 0) {
+      setIsTrashOpen(false);
+    }
+  }, [archivedLists.length]);
 
   const selectedList = useMemo(
     () => lists.find((list) => list.id === selectedListId) ?? null,
@@ -175,6 +182,17 @@ const MinhasListas: React.FC<MinhasListasProps> = ({ userId, isOnline }) => {
     setLists((prev) => sortActiveLists([restored, ...prev.filter((list) => list.id !== listId)]));
     setSelectedListId(restored.id);
     await dataService.restorePersonalChecklist(listId, userId, isOnline);
+  };
+
+  const handleClearTrash = async () => {
+    if (archivedLists.length === 0) return;
+    const shouldClear = window.confirm(
+      `Esvaziar a lixeira e apagar ${archivedLists.length} lista(s) permanentemente?`
+    );
+    if (!shouldClear) return;
+    await dataService.clearArchivedPersonalChecklists(userId, isOnline);
+    setArchivedLists([]);
+    setIsTrashOpen(false);
   };
 
   const handleAddItem = async () => {
@@ -336,35 +354,69 @@ const MinhasListas: React.FC<MinhasListasProps> = ({ userId, isOnline }) => {
             })}
           </div>
 
-          {archivedLists.length > 0 ? (
-            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/60 p-3">
-              <p className="mb-2 text-[11px] font-black uppercase tracking-wide text-amber-700">
-                Lixeira ({archivedLists.length})
-              </p>
-              <div className="space-y-2">
-                {archivedLists.slice(0, 5).map((list) => (
-                  <div
-                    key={list.id}
-                    className="flex items-center justify-between gap-2 rounded-xl border border-amber-200 bg-white px-3 py-2"
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => setIsTrashOpen((prev) => !prev)}
+              className="inline-flex min-h-[40px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600 transition-colors hover:border-amber-300 hover:text-amber-700"
+              aria-label={isTrashOpen ? 'Fechar lixeira' : 'Abrir lixeira'}
+              title={isTrashOpen ? 'Fechar lixeira' : 'Abrir lixeira'}
+            >
+              <Trash2 size={14} />
+              {archivedLists.length > 0 ? (
+                <span className="inline-flex min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[11px] font-black text-amber-700">
+                  {archivedLists.length}
+                </span>
+              ) : null}
+            </button>
+          </div>
+
+          {isTrashOpen ? (
+            <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-[11px] font-black uppercase tracking-wide text-amber-700">
+                  Lixeira ({archivedLists.length})
+                </p>
+                {archivedLists.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleClearTrash()}
+                    className="inline-flex min-h-[32px] items-center rounded-lg border border-red-200 bg-white px-2 text-[11px] font-bold text-red-600 transition-colors hover:bg-red-50"
                   >
-                    <p className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-700">
-                      {list.title}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => void handleRestoreList(list.id)}
-                      className="inline-flex min-h-[32px] items-center rounded-lg border border-emerald-200 px-2 text-[11px] font-bold text-emerald-700 transition-colors hover:bg-emerald-50"
-                    >
-                      Restaurar
-                    </button>
-                  </div>
-                ))}
-                {archivedLists.length > 5 ? (
-                  <p className="text-[11px] font-semibold text-amber-700">
-                    Mostrando 5 itens mais recentes da lixeira.
-                  </p>
+                    Esvaziar lixeira
+                  </button>
                 ) : null}
               </div>
+              {archivedLists.length === 0 ? (
+                <p className="text-[11px] font-semibold text-amber-700">
+                  Nenhuma lista na lixeira.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {archivedLists.slice(0, 5).map((list) => (
+                    <div
+                      key={list.id}
+                      className="flex items-center justify-between gap-2 rounded-xl border border-amber-200 bg-white px-3 py-2"
+                    >
+                      <p className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-700">
+                        {list.title}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void handleRestoreList(list.id)}
+                        className="inline-flex min-h-[32px] items-center rounded-lg border border-emerald-200 px-2 text-[11px] font-bold text-emerald-700 transition-colors hover:bg-emerald-50"
+                      >
+                        Restaurar
+                      </button>
+                    </div>
+                  ))}
+                  {archivedLists.length > 5 ? (
+                    <p className="text-[11px] font-semibold text-amber-700">
+                      Mostrando 5 itens mais recentes da lixeira.
+                    </p>
+                  ) : null}
+                </div>
+              )}
             </div>
           ) : null}
         </section>
