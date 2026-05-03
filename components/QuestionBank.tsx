@@ -42,6 +42,11 @@ import {
 } from './question-bank/aiQuestionTopics';
 import { dedupeSimilarAiStatements } from './question-bank/similarStatementDetection';
 import {
+  buildAiDistractorQualityBlock,
+  refineMultipleChoiceDistractors,
+  shouldRefineMcDistractors,
+} from './question-bank/aiDistractorInstructions';
+import {
   bumpAnswerGoals,
   createDefaultAnswerGoals,
   parseAnswerGoalsFromDb,
@@ -1826,6 +1831,8 @@ Forneça a explicação de forma concisa e didática.`;
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
       const prompt = `Com base nestes temas que o aluno errou muito: ${topics}, gere 5 novas questões inéditas de nível Médio/Difícil para reforçar o aprendizado.
 
+${buildAiDistractorQualityBlock('dificil', 'multipla_escolha')}
+
 ${buildTopicMinimalityInstructions()}
 
 ${smartCatalog.promptBlock}
@@ -2050,6 +2057,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
 
         ${topicCatalog.promptBlock}
         
+        ${buildAiDistractorQualityBlock(aiConfig.difficulty, aiConfig.modality)}
         ${aiConfig.modality === 'multipla_escolha' ? 'Cada questão deve ter 5 alternativas (A, B, C, D, E).' : 'Cada questão deve ser de Certo ou Errado (duas alternativas: Certo e Errado).'}
         A explicação deve ser EXTREMAMENTE detalhada, contendo uma análise individual para cada alternativa (ou para o item Certo/Errado), explicando por que a resposta correta está certa e por que as incorretas estão erradas, fundamentando com base no foco jurídico selecionado e no diploma legal mencionado.
         
@@ -2135,9 +2143,19 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
       }
 
       if (allGeneratedQuestions.length > 0) {
+        let questionsForValidation = allGeneratedQuestions;
+        if (shouldRefineMcDistractors(aiConfig.modality, aiConfig.difficulty)) {
+          setGeneratingStatus('Aperfeiçoando alternativas (distratores)...');
+          questionsForValidation = await refineMultipleChoiceDistractors(
+            ai,
+            allGeneratedQuestions,
+            aiConfig.difficulty
+          );
+        }
+
         const yearStr = new Date().getFullYear().toString();
         const validated = validateAiQuestionsBatch(
-          allGeneratedQuestions,
+          questionsForValidation,
           aiConfig.modality,
           {
             exam_board: aiConfig.examStyle,
