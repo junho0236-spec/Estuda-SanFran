@@ -2,13 +2,21 @@ import { GoogleGenAI, Type } from '@google/genai';
 import type { QuestionModality } from '../../types';
 import type { QuestionBankAiConfig } from './types';
 import { GEMINI_MODEL } from '../../services/geminiService';
+import {
+  QB_STATEMENT_CASO,
+  QB_STATEMENT_DIRETO,
+} from './mixedStatementBatches';
 
 const REFINE_CHUNK_SIZE = 5;
 
-/** Instruções por nível — modalidade múltipla escolha beneficia mais; certo/errado recebe nota curta. */
+type StatementBatchKind = typeof QB_STATEMENT_CASO | typeof QB_STATEMENT_DIRETO;
+
+/** Instruções por nível — modalidade múltipla escolha beneficia mais; certo/errado recebe nota curta.
+ * `statementStyle` alinha o texto ao tipo de enunciado do lote (evita pedir “casuística” quando o pedido é direto, e vice-versa). */
 export function buildAiDistractorQualityBlock(
   difficulty: QuestionBankAiConfig['difficulty'],
-  modality: QuestionModality
+  modality: QuestionModality,
+  statementStyle?: StatementBatchKind
 ): string {
   if (modality === 'certo_errado') {
     return `
@@ -32,21 +40,35 @@ Nível pedido (${difficulty}): distratores podem ser mais claros, mas mantenha a
       return `${baseHomogeneity}
 Nível médio: pelo menos duas incorretas devem ser “armadilhas plausíveis” (teses parcialmente corretas ou norma errada para o caso).`;
 
-    case 'dificil':
+    case 'dificil': {
+      const enunciadoLine =
+        statementStyle === QB_STATEMENT_DIRETO
+          ? `- Enunciados diretos: priorize teses subtis, distinções doutrinárias ou interpretações normativas exigentes, sem narrativa de caso.`
+          : statementStyle === QB_STATEMENT_CASO
+            ? `- Casos práticos: o enunciado deve narrar fatos e exigir aplicação da norma ou distinção entre hipóteses parecidas ao cenário.`
+            : `- Priorize enunciados que exijam aplicação da norma a fatos ou distinção entre hipóteses parecidas.`;
       return `${baseHomogeneity}
 Nível difícil (estilo banca):
-- Priorize enunciados que exijam aplicação da norma a fatos ou distinção entre hipóteses parecidas.
+${enunciadoLine}
 - As quatro incorretas devem competir com a correta: todas defendíveis à primeira vista por quem tem lacuna pontual.
 - Varie o tipo de distratores (ex.: confundir regra com exceção; instituto de diploma diferente mas tema afim; consequência jurídica errada; julgado ou súmula inadequada ao caso).
 - Proiba alternativas que “soem” erradas pelo tom (ex.: extremos ridículos, negações vazias).`;
+    }
 
-    case 'muito_dificil':
+    case 'muito_dificil': {
+      const enunciadoLine =
+        statementStyle === QB_STATEMENT_DIRETO
+          ? `- Enunciados diretos: escolha entre teses finas, interpretações sistemáticas ou pontos jurisprudenciais específicos, em formato compacto (sem caso narrado).`
+          : statementStyle === QB_STATEMENT_CASO
+            ? `- Casos práticos: narrativa + decisão entre teses finas; o gabarito deve depender de um ponto doutrinário, sistemático ou jurisprudencial aplicável aos fatos.`
+            : `- Enunciados casuísticos ou de escolha entre teses finas; a decisão entre alternativas corretas deve depender de um ponto doutrinário, sistemático ou jurisprudencial específico.`;
       return `${baseHomogeneity}
 Nível muito difícil (máxima exigência):
-- Enunciados casuísticos ou de escolha entre teses finas; a decisão entre alternativas corretas deve depender de um ponto doutrinário, sistemático ou jurisprudencial específico.
+${enunciadoLine}
 - Todas as incorretas devem ser distratores sofisticados: quem estuda de forma superficial deve vacilar entre pelo menos três opções.
 - Não use incorretas que apenas neguem grosseiramente o enunciado; use confusões reais de concursos (norma vizinha, súmula ou informativo inadequado, regime jurídico equiparável mas inaplicável, linha jurisprudencial superada vs atual).
 - Mantenha paralelismo gramatical e de densidade informacional entre todas as cinco opções.`;
+    }
 
     default:
       return baseHomogeneity;

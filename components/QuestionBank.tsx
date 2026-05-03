@@ -70,6 +70,8 @@ import {
 import { filterAndSortBankQuestions } from './question-bank/filterBankQuestions';
 import {
   buildAiStatementBatches,
+  buildAiStatementEnforcementBlock,
+  QB_STATEMENT_CASO,
   QB_STATEMENT_DIRETO,
   QB_STATEMENT_MIX,
 } from './question-bank/mixedStatementBatches';
@@ -2021,6 +2023,10 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
       let progressDone = 0;
       for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
         const { size: currentBatchSize, statementType: statementForThisBatch } = batches[batchIdx];
+        const statementSchemaDesc =
+          statementForThisBatch === QB_STATEMENT_CASO
+            ? 'Obrigatório: enunciado em formato de caso prático (narrativa com partes e fatos, depois a pergunta). Não use apenas definição doutrinária ou pergunta abstrata sem cenário.'
+            : 'Obrigatório: enunciado direto, sucinto, sem narrativa de caso; comando ou tese objetiva.';
         progressDone += currentBatchSize;
         const mixHint =
           aiConfig.statementType === QB_STATEMENT_MIX
@@ -2043,6 +2049,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
         Diploma Legal de Referência: ${aiConfig.legalDiploma || 'Geral'}.
         Foco Jurídico: ${aiConfig.legalFocus.join(', ') || 'Geral'}.
         Tipo de Enunciado: ${statementForThisBatch}.
+        ${buildAiStatementEnforcementBlock(statementForThisBatch)}
         ${aiConfig.statementType === QB_STATEMENT_MIX ? `Regra do pedido (mistura): o aluno pediu ${totalQuestions} questão(ões) no total, repartidas entre enunciado direto e caso prático segundo: total par → metade de cada; total ímpar → a questão extra é sempre enunciado direto. Este lote deve seguir APENAS o tipo indicado acima.` : ''}
         Ano da Questão: OBRIGATORIAMENTE ${new Date().getFullYear()}.
         Carreira / trilho: ${aiConfig.career || 'Geral'}.
@@ -2057,7 +2064,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
 
         ${topicCatalog.promptBlock}
         
-        ${buildAiDistractorQualityBlock(aiConfig.difficulty, aiConfig.modality)}
+        ${buildAiDistractorQualityBlock(aiConfig.difficulty, aiConfig.modality, statementForThisBatch)}
         ${aiConfig.modality === 'multipla_escolha' ? 'Cada questão deve ter 5 alternativas (A, B, C, D, E).' : 'Cada questão deve ser de Certo ou Errado (duas alternativas: Certo e Errado).'}
         A explicação deve ser EXTREMAMENTE detalhada, contendo uma análise individual para cada alternativa (ou para o item Certo/Errado), explicando por que a resposta correta está certa e por que as incorretas estão erradas, fundamentando com base no foco jurídico selecionado e no diploma legal mencionado.
         
@@ -2078,7 +2085,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
                 properties: {
                   subject: { type: Type.STRING, description: "A matéria (ex: Direito Civil)" },
                   topic: { type: Type.STRING, description: topicSchemaDesc },
-                  statement: { type: Type.STRING, description: "O enunciado da questão" },
+                  statement: { type: Type.STRING, description: statementSchemaDesc },
                   options: {
                     type: Type.ARRAY,
                     items: { type: Type.STRING },

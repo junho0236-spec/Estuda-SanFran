@@ -71,3 +71,27 @@ export function buildAiStatementBatches(
 
   return batches;
 }
+
+/**
+ * Regras imperativas para o modelo não misturar “caso prático” com “enunciado direto”.
+ * Usar no prompt da geração por lote (`statementForThisBatch` é sempre CASO ou DIRETO).
+ */
+export function buildAiStatementEnforcementBlock(
+  statementType: typeof QB_STATEMENT_CASO | typeof QB_STATEMENT_DIRETO
+): string {
+  if (statementType === QB_STATEMENT_CASO) {
+    return `
+REGRAS OBRIGATÓRIAS DO ENUNCIADO (Caso Prático — TODAS as questões deste lote, sem exceção):
+- Cada campo "statement" DEVE ser uma situação hipotética com narrativa: identificar partes (nomes fictícios ou papéis jurídicos), expor fatos concretos relevantes (contratos, prazos, atos, danos, pedidos, etc.) e só depois formular a pergunta jurídica a partir desses fatos.
+- PROIBIDO: enunciados que apenas definam institutos, perguntem "Assinale a alternativa correta sobre X" sem cenário, ou limitem-se a transcrever/elucidar um artigo isolado sem fato nem personagens.
+- PROIBIDO: formato de "prova de lei seca" sem mini-história; o candidato deve resolver a partir do caso narrado.
+- Se alguma questão violar isto, substitua-a por um novo caso hipotético antes de devolver o JSON.`;
+  }
+
+  return `
+REGRAS OBRIGATÓRIAS DO ENUNCIADO (Enunciado Direto — TODAS as questões deste lote):
+- Cada campo "statement" DEVE ser objetivo: comando breve, proposição normativa ou questão conceitual, sem narrativa de caso.
+- PROIBIDO: histórias com personagens nomeados, sequências fáticas longas, ou cenários do tipo "A contratou B e depois…".
+- Máximo ~3–4 frases por enunciado; foco na distinção jurídica pedida.
+- Se alguma questão violar isto, reescreva-a em formato direto antes de devolver o JSON.`;
+}
