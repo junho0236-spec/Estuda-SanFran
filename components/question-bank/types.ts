@@ -60,6 +60,12 @@ export type QuestionBankAiConfig = {
   formationArea: string;
   educationLevel: string;
   jobPosition: string;
+  /** Repartição planejada do material por questão (Passo 1 + Passo 2); requer texto ou flashcards; incompatível com jurisprudência atualizada. */
+  materialCoverageEnabled: boolean;
+  /** Com Cobertura do material: a IA escolhe quantas questões (mínimo necessário), até `materialCoverageMaxQuestions`. */
+  materialCoverageAutoQuestionCount: boolean;
+  /** Teto ao usar quantidade automática (1–20). */
+  materialCoverageMaxQuestions: number;
 };
 
 /** Snapshot serializável para filtros guardados (localStorage). */

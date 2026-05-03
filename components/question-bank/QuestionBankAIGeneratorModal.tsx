@@ -32,6 +32,13 @@ export const QuestionBankAIGeneratorModal: React.FC<QuestionBankAIGeneratorModal
 }) => {
   if (!open) return null;
 
+  const hasTextMaterial = Boolean(aiConfig.context?.trim());
+  const hasFlashcardBase =
+    aiConfig.baseOnFlashcards && Boolean(aiConfig.selectedFolderId?.trim());
+  const jurisprudenceBlocksCoverage = aiConfig.legalFocus.includes('Jurisprudência Atualizada');
+  const canEnableMaterialCoverage =
+    (hasTextMaterial || hasFlashcardBase) && !jurisprudenceBlocksCoverage;
+
   // Portal + z alto: overlay dentro do QuestionBank ficava por baixo do HeaderActions (main).
   const overlay = (
     <div
@@ -100,6 +107,89 @@ export const QuestionBankAIGeneratorModal: React.FC<QuestionBankAIGeneratorModal
               className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none min-h-[120px] text-sm"
               placeholder="Cole aqui o texto da aula, anotações ou trechos de livros para que a IA crie questões baseadas exatamente neste conteúdo..."
             />
+            <div className="mt-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+              <label
+                className={`flex items-start gap-3 cursor-pointer ${!canEnableMaterialCoverage ? 'opacity-60 cursor-not-allowed' : ''}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={Boolean(aiConfig.materialCoverageEnabled && canEnableMaterialCoverage)}
+                  disabled={!canEnableMaterialCoverage}
+                  onChange={(e) =>
+                    setAiConfig({
+                      ...aiConfig,
+                      materialCoverageEnabled: e.target.checked,
+                      ...(e.target.checked ? {} : { materialCoverageAutoQuestionCount: false }),
+                    })
+                  }
+                  className="w-4 h-4 mt-0.5 rounded border-slate-300 text-purple-600 focus:ring-purple-500 shrink-0"
+                />
+                <span>
+                  <span className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                    Cobertura do material
+                  </span>
+                  <span className="block text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
+                    Primeiro é criado um plano (âncoras do texto ou flashcards), depois as questões — até{' '}
+                    <strong className="font-semibold text-slate-700 dark:text-slate-300">duas ideias por questão</strong>{' '}
+                    para evitar enunciados sobrecarregados. Requer texto acima ou pasta em “Basear em meus Flashcards”.
+                    Incompatível com o foco “Jurisprudência Atualizada”.
+                  </span>
+                </span>
+              </label>
+              {!canEnableMaterialCoverage && (
+                <p className="text-xs text-amber-700 dark:text-amber-400/90 mt-2 pl-7">
+                  {jurisprudenceBlocksCoverage
+                    ? 'Desative “Jurisprudência Atualizada” no Foco Jurídico para usar este modo.'
+                    : 'Adicione texto de base ou selecione uma pasta de flashcards para ativar.'}
+                </p>
+              )}
+              {canEnableMaterialCoverage && aiConfig.materialCoverageEnabled && (
+                <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-600 space-y-3 pl-0">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={aiConfig.materialCoverageAutoQuestionCount}
+                      onChange={(e) =>
+                        setAiConfig({
+                          ...aiConfig,
+                          materialCoverageAutoQuestionCount: e.target.checked,
+                        })
+                      }
+                      className="w-4 h-4 mt-0.5 rounded border-slate-300 text-purple-600 focus:ring-purple-500 shrink-0"
+                    />
+                    <span>
+                      <span className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                        IA define a quantidade (mínimo necessário)
+                      </span>
+                      <span className="block text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
+                        A primeira análise estima quantas questões cobrem o material (agrupando conceitos). Respeita o máximo abaixo; se o conteúdo for maior, usa o máximo e pode ficar conteúdo por cobrir nessa leva.
+                      </span>
+                    </span>
+                  </label>
+                  {aiConfig.materialCoverageAutoQuestionCount && (
+                    <div className="pl-7">
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                        Máximo de questões
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={aiConfig.materialCoverageMaxQuestions}
+                        onChange={(e) => {
+                          const v = parseInt(e.target.value, 10);
+                          const n = Number.isFinite(v)
+                            ? Math.min(20, Math.max(1, v))
+                            : 20;
+                          setAiConfig({ ...aiConfig, materialCoverageMaxQuestions: n });
+                        }}
+                        className="w-full max-w-[140px] p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none text-sm"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -357,15 +447,29 @@ export const QuestionBankAIGeneratorModal: React.FC<QuestionBankAIGeneratorModal
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Quantidade</label>
+              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">
+                Quantidade
+                {canEnableMaterialCoverage &&
+                  aiConfig.materialCoverageEnabled &&
+                  aiConfig.materialCoverageAutoQuestionCount && (
+                  <span className="block text-xs font-normal text-slate-500 dark:text-slate-400 mt-1">
+                    Ignorado — a IA escolhe até o máximo definido em Cobertura do material.
+                  </span>
+                )}
+              </label>
               <input
                 type="number"
                 min={1}
                 max={20}
                 required
+                disabled={
+                  canEnableMaterialCoverage &&
+                  aiConfig.materialCoverageEnabled &&
+                  aiConfig.materialCoverageAutoQuestionCount
+                }
                 value={aiConfig.count}
                 onChange={e => setAiConfig({ ...aiConfig, count: parseInt(e.target.value, 10) || 1 })}
-                className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
+                className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
             <div>

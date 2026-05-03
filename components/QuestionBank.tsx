@@ -76,6 +76,13 @@ import {
   QB_STATEMENT_DIRETO,
   QB_STATEMENT_MIX,
 } from './question-bank/mixedStatementBatches';
+import {
+  buildCoveragePromptBlock,
+  fetchMaterialCoveragePlan,
+  fetchRecommendedQuestionCount,
+  MATERIAL_COVERAGE_AUTO_COUNT_MAX,
+  type MaterialCoveragePlan,
+} from './question-bank/aiMaterialCoverage';
 import { QuestionBankConfidenceModal } from './question-bank/QuestionBankConfidenceModal';
 import { QuestionBankMockHud } from './question-bank/QuestionBankMockHud';
 import { QuestionBankMainHeader } from './question-bank/QuestionBankMainHeader';
@@ -677,6 +684,9 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
     formationArea: '',
     educationLevel: '',
     jobPosition: '',
+    materialCoverageEnabled: false,
+    materialCoverageAutoQuestionCount: false,
+    materialCoverageMaxQuestions: 20,
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [voiceSpeed, setVoiceSpeed] = useState(1);
@@ -1975,7 +1985,12 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
         contextFromText = `Baseie as questões no seguinte material de estudo fornecido:\n${aiConfig.context}`;
       }
 
+      const hasBaseMaterial =
+        Boolean(aiConfig.context?.trim()) || Boolean(contextFromFlashcards.trim());
       const isJurisprudenceMode = aiConfig.legalFocus.includes('Jurisprudência Atualizada');
+      const runMaterialCoveragePlan =
+        aiConfig.materialCoverageEnabled && !isJurisprudenceMode && hasBaseMaterial;
+
       let jurisprudencePrompt = "";
       if (isJurisprudenceMode) {
         jurisprudencePrompt = `
@@ -1987,21 +2002,6 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
         3. Na explicação, inclua OBRIGATORIAMENTE o número do informativo ou o Recurso Extraordinário (RE/ARE) que baseou a resposta.
         `;
       }
-      
-      const totalQuestions = aiConfig.count;
-      const chunkSize = 5;
-      const batches = buildAiStatementBatches(totalQuestions, chunkSize, aiConfig.statementType);
-      const allGeneratedQuestions = [];
-      const isMultipla = aiConfig.modality === 'multipla_escolha';
-      const optionsSchemaDesc = isMultipla
-        ? 'Exatamente 5 strings: alternativas A a E.'
-        : 'Exatamente 2 strings: primeira e segunda alternativa (ex.: Certo e Errado), na mesma ordem usada em correct_answer.';
-      const correctAnswerSchemaDesc = isMultipla
-        ? 'Índice inteiro da alternativa correta: 0 a 4.'
-        : 'Índice inteiro da alternativa correta: 0 ou 1 (alinhar com a ordem do array options).';
-      const explanationSchemaDesc = isMultipla
-        ? 'Explicação detalhada referindo cada alternativa A–E.'
-        : 'Explicação detalhada para Certo e para Errado.';
 
       const subjectTrim = aiConfig.subject.trim();
       const topicCatalog = buildTopicReuseCatalog(
@@ -2021,9 +2021,91 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
           ? `Tópico: preferir 1 único valor repetido em todas as questões quando possível; no máximo ${MAX_DISTINCT_TOPICS_PER_AI_BATCH} distintos no array; rótulos amplos; copiar EXATAMENTE um rótulo das instruções TÓPICOS JÁ USADOS quando encaixar.`
           : `Tópico: preferir 1 único valor repetido em todas as questões; no máximo ${MAX_DISTINCT_TOPICS_PER_AI_BATCH} distintos; nomes amplos (capítulo/disciplina), não micro-assuntos por questão.`;
 
+      const maxCoverageQuestions = Math.min(
+        MATERIAL_COVERAGE_AUTO_COUNT_MAX,
+        Math.max(
+          1,
+          Number.isFinite(aiConfig.materialCoverageMaxQuestions)
+            ? Math.floor(aiConfig.materialCoverageMaxQuestions)
+            : MATERIAL_COVERAGE_AUTO_COUNT_MAX
+        )
+      );
+
+      let totalQuestions = Math.min(
+        MATERIAL_COVERAGE_AUTO_COUNT_MAX,
+        Math.max(1, Math.floor(Number(aiConfig.count)) || 1)
+      );
+
+      if (runMaterialCoveragePlan && aiConfig.materialCoverageAutoQuestionCount) {
+        setGeneratingStatus('A definir quantidade de questões (cobertura do material)…');
+        try {
+          const recommended = await fetchRecommendedQuestionCount(ai, {
+            materialFlashcardsBlock: contextFromFlashcards,
+            materialTextBlock: contextFromText,
+            maxQuestions: maxCoverageQuestions,
+            statementType: aiConfig.statementType,
+            subjectLine: subjectLineForPrompt,
+          });
+          totalQuestions = recommended.question_count;
+        } catch (qcErr) {
+          console.error(qcErr);
+          showNotification(
+            'Não foi possível definir a quantidade automaticamente. Tente de novo ou desmarque “IA define a quantidade”.',
+            'error'
+          );
+          setIsGenerating(false);
+          return;
+        }
+      }
+
+      const chunkSize = 5;
+      const batches = buildAiStatementBatches(totalQuestions, chunkSize, aiConfig.statementType);
+      const allGeneratedQuestions = [];
+      const isMultipla = aiConfig.modality === 'multipla_escolha';
+      const optionsSchemaDesc = isMultipla
+        ? 'Exatamente 5 strings: alternativas A a E.'
+        : 'Exatamente 2 strings: primeira e segunda alternativa (ex.: Certo e Errado), na mesma ordem usada em correct_answer.';
+      const correctAnswerSchemaDesc = isMultipla
+        ? 'Índice inteiro da alternativa correta: 0 a 4.'
+        : 'Índice inteiro da alternativa correta: 0 ou 1 (alinhar com a ordem do array options).';
+      const explanationSchemaDesc = isMultipla
+        ? 'Explicação detalhada referindo cada alternativa A–E.'
+        : 'Explicação detalhada para Certo e para Errado.';
+
+      let materialCoveragePlan: MaterialCoveragePlan | null = null;
+      if (runMaterialCoveragePlan) {
+        setGeneratingStatus('Planejando cobertura do material…');
+        try {
+          materialCoveragePlan = await fetchMaterialCoveragePlan(ai, {
+            materialFlashcardsBlock: contextFromFlashcards,
+            materialTextBlock: contextFromText,
+            totalQuestions,
+            statementType: aiConfig.statementType,
+            subjectLine: subjectLineForPrompt,
+          });
+        } catch (covErr) {
+          console.error(covErr);
+          showNotification(
+            'Não foi possível planear a cobertura do material. Tente de novo ou desative Cobertura do material.',
+            'error'
+          );
+          setIsGenerating(false);
+          return;
+        }
+      }
+
+      let slotOffset = 0;
       let progressDone = 0;
       for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
         const { size: currentBatchSize, statementType: statementForThisBatch } = batches[batchIdx];
+        const slotsThisBatch = Array.from(
+          { length: currentBatchSize },
+          (_, i) => slotOffset + i + 1
+        );
+        slotOffset += currentBatchSize;
+        const coverageBlock = materialCoveragePlan
+          ? buildCoveragePromptBlock(materialCoveragePlan, slotsThisBatch)
+          : '';
         const statementSchemaDesc =
           statementForThisBatch === QB_STATEMENT_CASO
             ? 'Obrigatório: enunciado em formato de caso prático (narrativa com partes e fatos, depois a pergunta). Não use apenas definição doutrinária ou pergunta abstrata sem cenário.'
@@ -2062,6 +2144,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
         ${contextFromFlashcards}
         ${contextFromText}
 
+        ${coverageBlock ? `${coverageBlock}\n\n` : ''}
         ${buildTopicMinimalityInstructions()}
 
         ${topicCatalog.promptBlock}
@@ -2259,10 +2342,16 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
           setIsErrorNotebookMode(false);
           setListPage(1);
           setShowAIGenerator(false);
+          const autoQtyHint =
+            aiConfig.materialCoverageEnabled &&
+            aiConfig.materialCoverageAutoQuestionCount &&
+            runMaterialCoveragePlan
+              ? ' Quantidade escolhida pela IA (dentro do máximo definido).'
+              : '';
           showNotification(
             droppedSimilar.length > 0
               ? `${data.length} questão(ões) guardada(s). ${droppedSimilar.length} omitida(s) por enunciado muito parecido (mesmo lote ou acervo).`
-              : `${data.length} questões geradas com sucesso!`,
+              : `${data.length} questões geradas com sucesso!${autoQtyHint}`,
             'success'
           );
           await fetchQuestions('reset', { quiet: true, preserveOnError: true });
