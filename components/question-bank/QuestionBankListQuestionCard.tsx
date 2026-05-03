@@ -12,20 +12,18 @@ import {
   Eye,
   EyeOff,
   BookOpen,
-  Scale,
-  Zap,
-  Lightbulb,
   Gavel,
   Send,
   PlusSquare,
   MessageSquare,
   Volume2,
+  RefreshCw,
 } from 'lucide-react';
 import type { Question, QuestionAiCommentary, QuestionAiCorrection } from '../../types';
 import { QuestionComments } from '../QuestionComments';
 import { GlossaryText } from '../GlossaryText.tsx';
 import { QB_OPTION_FOCUS } from './questionBankHelpers';
-import { QuestionAlternativeAnalysisBlocks } from './QuestionAlternativeAnalysisBlocks';
+import { QuestionAiCorrectionPanel } from './QuestionAiCorrectionPanel';
 import type { FollowUpMessage } from './QuestionBankSingleQuestionView';
 
 export type QuestionBankListQuestionCardProps = {
@@ -68,6 +66,7 @@ export type QuestionBankListQuestionCardProps = {
   onToggleElimination: (questionId: string, optionIndex: number) => void;
   loadingAiCommentary: Record<string, boolean>;
   aiCommentary: Record<string, QuestionAiCommentary>;
+  onRegenerateAiCommentary: (question: Question) => void;
   followUpChat: Record<string, FollowUpMessage[]>;
   followUpInput: Record<string, string>;
   setFollowUpInput: React.Dispatch<React.SetStateAction<Record<string, string>>>;
@@ -115,6 +114,7 @@ export function QuestionBankListQuestionCard({
   onToggleElimination,
   loadingAiCommentary,
   aiCommentary,
+  onRegenerateAiCommentary,
   followUpChat,
   followUpInput,
   setFollowUpInput,
@@ -447,69 +447,37 @@ export function QuestionBankListQuestionCard({
               ) : aiCommentary[q.id] ? (
                 <>
                   {typeof aiCommentary[q.id] === 'string' ? (
-                    <div
-                      className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700"
-                      role="region"
-                      aria-label="Correção em texto da inteligência artificial"
-                    >
-                      <div className="prose prose-sm dark:prose-invert max-w-none">
-                        <Markdown remarkPlugins={[remarkGfm]}>{aiCommentary[q.id] as string}</Markdown>
+                    <div className="space-y-3" role="region" aria-label="Correção em texto da inteligência artificial">
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => onRegenerateAiCommentary(q)}
+                          disabled={!!loadingAiCommentary[q.id]}
+                          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                        >
+                          <RefreshCw
+                            size={14}
+                            className={loadingAiCommentary[q.id] ? 'animate-spin' : ''}
+                            aria-hidden
+                          />
+                          Regenerar explicação
+                        </button>
+                      </div>
+                      <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
+                        <div className="prose prose-sm dark:prose-invert max-w-none">
+                          <Markdown remarkPlugins={[remarkGfm]}>{aiCommentary[q.id] as string}</Markdown>
+                        </div>
                       </div>
                     </div>
                   ) : (
-                    (() => {
-                      const ac = aiCommentary[q.id] as QuestionAiCorrection;
-                      return (
-                        <div
-                          className="space-y-4"
-                          role="region"
-                          aria-label="Correção comentada pela inteligência artificial"
-                        >
-                          <div className="p-4 bg-indigo-50 dark:bg-indigo-900/10 rounded-xl border border-indigo-100 dark:border-indigo-900/30">
-                            <h4 className="font-black text-indigo-800 dark:text-indigo-400 text-[10px] uppercase tracking-widest mb-2 flex items-center gap-2">
-                              <BookOpen size={14} aria-hidden /> Doutrina e Contexto
-                            </h4>
-                            <p className="text-indigo-900/80 dark:text-indigo-200/80 text-sm leading-relaxed">
-                              {ac.doctrineAndContext}
-                            </p>
-                          </div>
-
-                          <div className="p-5 bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl border border-emerald-100 dark:border-emerald-900/30">
-                            <h4 className="font-black text-emerald-800 dark:text-emerald-400 text-[10px] uppercase tracking-widest mb-2 flex items-center gap-2">
-                              <Scale size={14} aria-hidden /> Fundamentação Legal
-                            </h4>
-                            <p className="text-emerald-900/80 dark:text-emerald-200/80 text-sm font-medium">
-                              {ac.legalBasis}
-                            </p>
-                          </div>
-
-                          <div className="space-y-2">
-                            <h4
-                              id={`qb-alt-h-${q.id}`}
-                              className="font-black text-slate-700 dark:text-slate-300 text-[10px] uppercase tracking-widest mb-2 flex items-center gap-2"
-                            >
-                              <Gavel size={14} aria-hidden /> Análise das Alternativas
-                            </h4>
-                            <QuestionAlternativeAnalysisBlocks
-                              analysis={ac.alternativesAnalysis}
-                              headingId={`qb-alt-h-${q.id}`}
-                            />
-                          </div>
-
-                          <div className="p-4 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-100 dark:border-amber-900/30 relative overflow-hidden">
-                            <div className="absolute top-0 right-0 p-2 opacity-10" aria-hidden>
-                              <Zap size={40} className="text-amber-500" />
-                            </div>
-                            <h4 className="font-black text-amber-800 dark:text-amber-400 text-[10px] uppercase tracking-widest mb-2 flex items-center gap-2">
-                              <Lightbulb size={14} aria-hidden /> Pulo do Gato (Dica de Ouro)
-                            </h4>
-                            <p className="text-amber-900/80 dark:text-amber-200/80 text-sm font-bold italic">
-                              &quot;{ac.mnemonic}&quot;
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })()
+                    <QuestionAiCorrectionPanel
+                      question={q}
+                      correction={aiCommentary[q.id] as QuestionAiCorrection}
+                      loading={!!loadingAiCommentary[q.id]}
+                      onRegenerate={onRegenerateAiCommentary}
+                      density="list"
+                      alternativesHeadingId={`qb-alt-h-${q.id}`}
+                    />
                   )}
                   <div className="mt-6 pt-6 border-t border-slate-100 dark:border-white/5 space-y-4">
                     <div className="flex items-center gap-2 mb-2">

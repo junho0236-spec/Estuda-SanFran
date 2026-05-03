@@ -9,6 +9,9 @@ import {
   Flashcard,
   questionModalityLabel,
   formatAlternativesAnalysisPlain,
+  buildExplicacaoDoutrinariaFromCorrection,
+  formatQuestionAiCorrectionForFlashcard,
+  normalizeQuestionAiCorrection,
   type QuestionAiCommentary,
   type QuestionAiCorrection,
   type GlossaryTerm,
@@ -33,6 +36,7 @@ import type {
   QuestionBankSavedFilterPreset,
 } from './question-bank/types';
 import { validateAiQuestionsBatch } from './question-bank/validateAiGeneratedQuestions';
+import { buildIntelligentCorrectionUserPrompt } from './question-bank/intelligentCorrectionPrompt';
 import {
   applyCanonicalTopicsToRows,
   buildTopicMinimalityInstructions,
@@ -1305,65 +1309,90 @@ Forneça a explicação de forma concisa e didática.`;
     }
   };
 
-  const generateIntelligentCorrection = async (question: Question) => {
-    // 1. Check if already in state
-    if (aiCommentary[question.id]) return;
+  const generateIntelligentCorrection = async (
+    question: Question,
+    options?: { force?: boolean }
+  ) => {
+    const force = options?.force === true;
+    if (!force && aiCommentary[question.id]) return;
 
     try {
-      setLoadingAiCommentary(prev => ({ ...prev, [question.id]: true }));
-
-      // 2. Check-First Pattern: SELECT from database
-      let { data: dbQuestion, error: fetchError } = await supabase
-        .from('questions')
-        .select('texto_gabarito_ia, ai_correction')
-        .eq('id', question.id)
-        .single();
-
-      // Se a coluna texto_gabarito_ia não existir, tenta buscar apenas ai_correction
-      if (fetchError && fetchError.code === '42703') {
-        const result = await supabase
-          .from('questions')
-          .select('ai_correction')
-          .eq('id', question.id)
-          .single();
-        
-        dbQuestion = result.data ? { texto_gabarito_ia: null, ai_correction: result.data.ai_correction } : null;
-        fetchError = result.error;
+      setLoadingAiCommentary((prev) => ({ ...prev, [question.id]: true }));
+      if (force) {
+        setAiCommentary((prev) => {
+          const next = { ...prev };
+          delete next[question.id];
+          return next;
+        });
       }
 
-      // Cenário A (Cache Hit)
-      if (!fetchError) {
-        if (dbQuestion?.texto_gabarito_ia) {
-          try {
-            const parsedData = JSON.parse(dbQuestion.texto_gabarito_ia);
-            setAiCommentary(prev => ({ ...prev, [question.id]: parsedData as QuestionAiCommentary }));
-            return;
-          } catch (e) {
-            // Se não for JSON, exibe como string simples
-            setAiCommentary(prev => ({ ...prev, [question.id]: dbQuestion.texto_gabarito_ia }));
+      if (!force) {
+        let { data: dbQuestion, error: fetchError } = await supabase
+          .from('questions')
+          .select('texto_gabarito_ia, ai_correction')
+          .eq('id', question.id)
+          .single();
+
+        if (fetchError && fetchError.code === '42703') {
+          const result = await supabase
+            .from('questions')
+            .select('ai_correction')
+            .eq('id', question.id)
+            .single();
+
+          dbQuestion = result.data
+            ? { texto_gabarito_ia: null, ai_correction: result.data.ai_correction }
+            : null;
+          fetchError = result.error;
+        }
+
+        if (!fetchError) {
+          if (dbQuestion?.texto_gabarito_ia) {
+            try {
+              const parsedData = JSON.parse(dbQuestion.texto_gabarito_ia) as unknown;
+              const normalized = normalizeQuestionAiCorrection(parsedData);
+              setAiCommentary((prev) => ({
+                ...prev,
+                [question.id]:
+                  (normalized as QuestionAiCommentary) ??
+                  (typeof parsedData === 'string' ? parsedData : (parsedData as QuestionAiCommentary)),
+              }));
+              return;
+            } catch {
+              setAiCommentary((prev) => ({
+                ...prev,
+                [question.id]: dbQuestion.texto_gabarito_ia as QuestionAiCommentary,
+              }));
+              return;
+            }
+          }
+          if (dbQuestion?.ai_correction) {
+            const rawCorrection = dbQuestion.ai_correction;
+            const parsedCorrection =
+              typeof rawCorrection === 'string'
+                ? (() => {
+                    try {
+                      return JSON.parse(rawCorrection) as unknown;
+                    } catch {
+                      return null;
+                    }
+                  })()
+                : rawCorrection;
+            const normalized = normalizeQuestionAiCorrection(parsedCorrection ?? rawCorrection);
+            setAiCommentary((prev) => ({
+              ...prev,
+              [question.id]:
+                (normalized as QuestionAiCommentary) ??
+                (parsedCorrection as QuestionAiCommentary) ??
+                (rawCorrection as QuestionAiCommentary),
+            }));
             return;
           }
-        } else if (dbQuestion?.ai_correction) {
-          // Fallback para o formato antigo
-          setAiCommentary(prev => ({
-            ...prev,
-            [question.id]: dbQuestion.ai_correction as QuestionAiCommentary,
-          }));
-          return;
         }
       }
 
-      // Cenário B (Primeira Geração)
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
-      
-      const prompt = `Como um professor de Direito especialista em concursos, forneça uma correção técnica e didática para esta questão.
-      
-      ENUNCIADO: ${question.statement}
-      ALTERNATIVAS: ${question.options.map((o, i) => `${String.fromCharCode(65 + i)}) ${o}`).join(' | ')}
-      GABARITO: Alternativa ${String.fromCharCode(65 + question.correct_answer)}
-      BANCA: ${question.exam_board || 'Geral'}
-      
-      Preencha todos os campos do JSON solicitado. Em alternativesAnalysis, use status exatamente "Correta" ou "Incorreta" por alternativa.`;
+      const prompt = buildIntelligentCorrectionUserPrompt(question);
 
       const response = await ai.models.generateContent({
         model: GEMINI_MODEL,
@@ -1373,8 +1402,23 @@ Forneça a explicação de forma concisa e didática.`;
           responseSchema: {
             type: Type.OBJECT,
             properties: {
+              plainLanguageSummary: { type: Type.STRING },
+              keyConcepts: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    term: { type: Type.STRING },
+                    explanation: { type: Type.STRING },
+                  },
+                  required: ['term', 'explanation'],
+                },
+              },
+              reasoningSteps: { type: Type.STRING },
               doctrineAndContext: { type: Type.STRING },
               legalBasis: { type: Type.STRING },
+              boardTrap: { type: Type.STRING },
+              nuanceNote: { type: Type.STRING },
               alternativesAnalysis: {
                 type: Type.ARRAY,
                 items: {
@@ -1384,6 +1428,7 @@ Forneça a explicação de forma concisa e didática.`;
                     status: { type: Type.STRING },
                     explanation: { type: Type.STRING },
                   },
+                  required: ['alternative', 'status', 'explanation'],
                 },
               },
               mnemonic: { type: Type.STRING },
@@ -1391,8 +1436,13 @@ Forneça a explicação de forma concisa e didática.`;
               doctrineUrl: { type: Type.STRING },
             },
             required: [
+              'plainLanguageSummary',
+              'keyConcepts',
+              'reasoningSteps',
               'doctrineAndContext',
               'legalBasis',
+              'boardTrap',
+              'nuanceNote',
               'alternativesAnalysis',
               'mnemonic',
               'doctrineLink',
@@ -1405,33 +1455,45 @@ Forneça a explicação de forma concisa e didática.`;
       if (response.text) {
         let data: QuestionAiCorrection;
         try {
-          data = JSON.parse(response.text) as QuestionAiCorrection;
+          const rawParsed = JSON.parse(response.text) as unknown;
+          const normalized = normalizeQuestionAiCorrection(rawParsed);
+          if (!normalized) {
+            console.error('Failed to normalize AI correction JSON:', response.text);
+            setAiCommentary((prev) => ({
+              ...prev,
+              [question.id]: response.text as QuestionAiCommentary,
+            }));
+            return;
+          }
+          data = normalized;
         } catch (e) {
           console.error('Failed to parse AI response as JSON:', e, response.text);
-          setAiCommentary(prev => ({ ...prev, [question.id]: response.text as QuestionAiCommentary }));
+          setAiCommentary((prev) => ({
+            ...prev,
+            [question.id]: response.text as QuestionAiCommentary,
+          }));
           return;
         }
 
-        setAiCommentary(prev => ({ ...prev, [question.id]: data as QuestionAiCommentary }));
-        const serialized = response.text;
+        setAiCommentary((prev) => ({ ...prev, [question.id]: data as QuestionAiCommentary }));
+        const serialized = JSON.stringify(data);
+        const explicacao = buildExplicacaoDoutrinariaFromCorrection(data);
 
-        // Imediatamente faça um UPDATE no banco de dados
         let { error: updateError } = await supabase
           .from('questions')
-          .update({ 
+          .update({
             texto_gabarito_ia: serialized,
             ai_correction: data,
-            explicacao_doutrinaria: data.doctrineAndContext
+            explicacao_doutrinaria: explicacao,
           })
           .eq('id', question.id);
-          
+
         if (updateError && updateError.code === '42703') {
-          // Fallback se a coluna texto_gabarito_ia não existir
           const result = await supabase
             .from('questions')
-            .update({ 
+            .update({
               ai_correction: data,
-              explicacao_doutrinaria: data.doctrineAndContext
+              explicacao_doutrinaria: explicacao,
             })
             .eq('id', question.id);
           updateError = result.error;
@@ -1444,8 +1506,12 @@ Forneça a explicação de forma concisa e didática.`;
     } catch (error) {
       console.error('Error generating intelligent correction:', error);
     } finally {
-      setLoadingAiCommentary(prev => ({ ...prev, [question.id]: false }));
+      setLoadingAiCommentary((prev) => ({ ...prev, [question.id]: false }));
     }
+  };
+
+  const onRegenerateAiCommentary = (q: Question) => {
+    void generateIntelligentCorrection(q, { force: true });
   };
 
   const handleCreateFlashcardFromError = (question: Question, selectedIndex?: number, isCorrect?: boolean) => {
@@ -1466,10 +1532,7 @@ Forneça a explicação de forma concisa e didática.`;
       if (typeof commentary === 'string') {
         back += `⚖️ **Correção IA:**\n\n${commentary}\n\n`;
       } else {
-        back += `⚖️ **Fundamentação Legal:** ${commentary.legalBasis}\n\n`;
-        back += `📖 **Explicação Doutrinária:** ${commentary.doctrineAndContext}\n\n`;
-        back += `📋 **Análise das alternativas:** ${formatAlternativesAnalysisPlain(commentary.alternativesAnalysis)}\n\n`;
-        back += `💡 **Mnemônico/Dica:** ${commentary.mnemonic}`;
+        back += formatQuestionAiCorrectionForFlashcard(commentary);
       }
     } else {
       back += `**Explicação:** ${question.explanation || 'Nenhuma explicação detalhada disponível no momento.'}`;
@@ -3567,6 +3630,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
               onToggleElimination: toggleElimination,
               loadingAiCommentary,
               aiCommentary,
+              onRegenerateAiCommentary,
               followUpChat,
               followUpInput,
               setFollowUpInput,
@@ -3606,6 +3670,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
               onToggleElimination: toggleElimination,
               loadingAiCommentary,
               aiCommentary,
+              onRegenerateAiCommentary,
               followUpChat,
               followUpInput,
               setFollowUpInput,

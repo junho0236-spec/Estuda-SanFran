@@ -15,9 +15,6 @@ import {
   Eye,
   EyeOff,
   BookOpen,
-  Scale,
-  Zap,
-  Lightbulb,
   Gavel,
   Send,
   PlusSquare,
@@ -25,11 +22,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Bookmark,
+  RefreshCw,
 } from 'lucide-react';
 import type { Question, QuestionAiCommentary, QuestionAiCorrection } from '../../types';
 import { QuestionComments } from '../QuestionComments';
 import { QB_OPTION_FOCUS } from './questionBankHelpers';
-import { QuestionAlternativeAnalysisBlocks } from './QuestionAlternativeAnalysisBlocks';
+import { QuestionAiCorrectionPanel } from './QuestionAiCorrectionPanel';
 
 export type FollowUpMessage = { role: 'user' | 'assistant'; text: string };
 
@@ -60,6 +58,7 @@ export type QuestionBankSingleQuestionViewProps = {
   onToggleElimination: (questionId: string, optionIndex: number) => void;
   loadingAiCommentary: Record<string, boolean>;
   aiCommentary: Record<string, QuestionAiCommentary>;
+  onRegenerateAiCommentary: (question: Question) => void;
   followUpChat: Record<string, FollowUpMessage[]>;
   followUpInput: Record<string, string>;
   setFollowUpInput: React.Dispatch<React.SetStateAction<Record<string, string>>>;
@@ -115,6 +114,7 @@ export function QuestionBankSingleQuestionView({
   onToggleElimination,
   loadingAiCommentary,
   aiCommentary,
+  onRegenerateAiCommentary,
   followUpChat,
   followUpInput,
   setFollowUpInput,
@@ -410,6 +410,21 @@ export function QuestionBankSingleQuestionView({
                         </span>
                         <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
                       </div>
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => onRegenerateAiCommentary(q)}
+                          disabled={!!loadingAiCommentary[q.id]}
+                          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                        >
+                          <RefreshCw
+                            size={14}
+                            className={loadingAiCommentary[q.id] ? 'animate-spin' : ''}
+                            aria-hidden
+                          />
+                          Regenerar explicação
+                        </button>
+                      </div>
                       <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-[2rem] border-2 border-slate-200 dark:border-slate-700">
                         <div className="prose prose-sm dark:prose-invert max-w-none">
                           <Markdown remarkPlugins={[remarkGfm]}>{aiCommentary[q.id] as string}</Markdown>
@@ -417,69 +432,14 @@ export function QuestionBankSingleQuestionView({
                       </div>
                     </div>
                   ) : (
-                    (() => {
-                      const ac = aiCommentary[q.id] as QuestionAiCorrection;
-                      return (
-                        <div
-                          className="space-y-6"
-                          role="region"
-                          aria-label="Correção comentada pela inteligência artificial"
-                        >
-                          <div className="flex items-center gap-3 mb-2">
-                            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">
-                              Correção Comentada IA
-                            </span>
-                            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="p-6 bg-indigo-50 dark:bg-indigo-900/10 rounded-[2rem] border-2 border-indigo-100 dark:border-indigo-900/30">
-                              <h4 className="font-black text-indigo-800 dark:text-indigo-400 text-[11px] uppercase tracking-widest mb-3 flex items-center gap-2">
-                                <BookOpen size={16} aria-hidden /> Doutrina e Contexto
-                              </h4>
-                              <p className="text-indigo-900/80 dark:text-indigo-200/80 text-sm leading-relaxed">
-                                {ac.doctrineAndContext}
-                              </p>
-                            </div>
-
-                            <div className="p-6 bg-emerald-50 dark:bg-emerald-900/10 rounded-[2rem] border-2 border-emerald-100 dark:border-emerald-900/30">
-                              <h4 className="font-black text-emerald-800 dark:text-emerald-400 text-[11px] uppercase tracking-widest mb-3 flex items-center gap-2">
-                                <Scale size={16} aria-hidden /> Fundamentação Legal
-                              </h4>
-                              <p className="text-emerald-900/80 dark:text-emerald-200/80 text-sm font-bold leading-relaxed">
-                                {ac.legalBasis}
-                              </p>
-                            </div>
-
-                            <div className="p-6 bg-amber-50 dark:bg-amber-900/10 rounded-[2rem] border-2 border-amber-100 dark:border-amber-900/30 relative overflow-hidden">
-                              <div className="absolute -top-2 -right-2 opacity-10 rotate-12" aria-hidden>
-                                <Zap size={80} className="text-amber-500" />
-                              </div>
-                              <h4 className="font-black text-amber-800 dark:text-amber-400 text-[11px] uppercase tracking-widest mb-3 flex items-center gap-2">
-                                <Lightbulb size={16} aria-hidden /> Pulo do Gato
-                              </h4>
-                              <p className="text-amber-900/80 dark:text-amber-200/80 text-sm font-black italic leading-relaxed">
-                                {'"'}{ac.mnemonic}{'"'}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-[2rem] border-2 border-slate-200 dark:border-slate-700 space-y-3">
-                            <h4
-                              id={`qb-alt-h-single-${q.id}`}
-                              className="font-black text-slate-700 dark:text-slate-300 text-[11px] uppercase tracking-widest mb-3 flex items-center gap-2"
-                            >
-                              <Gavel size={16} aria-hidden /> Análise Técnica das Alternativas
-                            </h4>
-                            <QuestionAlternativeAnalysisBlocks
-                              analysis={ac.alternativesAnalysis}
-                              headingId={`qb-alt-h-single-${q.id}`}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })()
+                    <QuestionAiCorrectionPanel
+                      question={q}
+                      correction={aiCommentary[q.id] as QuestionAiCorrection}
+                      loading={!!loadingAiCommentary[q.id]}
+                      onRegenerate={onRegenerateAiCommentary}
+                      density="single"
+                      alternativesHeadingId={`qb-alt-h-single-${q.id}`}
+                    />
                   )}
                   <div className="mt-6 pt-6 border-t border-slate-100 dark:border-white/5 space-y-4">
                     <div className="flex items-center gap-2 mb-2">

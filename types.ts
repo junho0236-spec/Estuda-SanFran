@@ -570,6 +570,12 @@ export type AiCorrectionAlternativesAnalysis =
   | QuestionAlternativeAnalysisItem[]
   | string;
 
+/** Conceito do glossário na correção IA pedagógica (opcional em JSON legado). */
+export interface QuestionAiKeyConcept {
+  term: string;
+  explanation: string;
+}
+
 export interface QuestionAiCorrection {
   doctrineAndContext: string;
   legalBasis: string;
@@ -577,6 +583,98 @@ export interface QuestionAiCorrection {
   mnemonic: string;
   doctrineLink?: string;
   doctrineUrl?: string;
+  /** Enunciado e comando em linguagem simples (Markdown). */
+  plainLanguageSummary?: string;
+  /** Glossário curto dos termos jurídicos da questão. */
+  keyConcepts?: QuestionAiKeyConcept[];
+  /** Passos de raciocínio em Markdown (ex.: fatos → problema → critério → conclusão). */
+  reasoningSteps?: string;
+  /** Por que a banca confunde ou quais distratores são sedutores. */
+  boardTrap?: string;
+  /** Controvérsia ou ressalva; vazio quando não aplicável. */
+  nuanceNote?: string;
+}
+
+/** Texto agregado para coluna `explicacao_doutrinaria` / busca legada. */
+export function buildExplicacaoDoutrinariaFromCorrection(ac: QuestionAiCorrection): string {
+  const parts: string[] = [];
+  const summary = ac.plainLanguageSummary?.trim();
+  if (summary) parts.push(summary);
+  const doctrine = ac.doctrineAndContext?.trim();
+  if (doctrine) parts.push(doctrine);
+  const concepts = ac.keyConcepts?.filter((k) => k.term?.trim() && k.explanation?.trim());
+  if (concepts?.length) {
+    parts.push(
+      concepts.map((k) => `${k.term.trim()}: ${k.explanation.trim()}`).join('\n')
+    );
+  }
+  return parts.join('\n\n').trim() || doctrine || '';
+}
+
+/** Bloco de texto para verso de flashcard a partir da correção estruturada. */
+export function formatQuestionAiCorrectionForFlashcard(ac: QuestionAiCorrection): string {
+  const lines: string[] = [];
+  const s = ac.plainLanguageSummary?.trim();
+  if (s) lines.push(`**Em linguagem clara:**\n\n${s}`);
+  const concepts = ac.keyConcepts?.filter((k) => k.term?.trim() && k.explanation?.trim());
+  if (concepts?.length) {
+    lines.push(
+      `**Conceitos:**\n\n${concepts.map((k) => `- **${k.term.trim()}:** ${k.explanation.trim()}`).join('\n')}`
+    );
+  }
+  const steps = ac.reasoningSteps?.trim();
+  if (steps) lines.push(`**Raciocínio:**\n\n${steps}`);
+  lines.push(`**Fundamentação legal:** ${ac.legalBasis}`);
+  lines.push(`**Doutrina / contexto:** ${ac.doctrineAndContext}`);
+  const trap = ac.boardTrap?.trim();
+  if (trap) lines.push(`**Pegadinha da banca:** ${trap}`);
+  const nuance = ac.nuanceNote?.trim();
+  if (nuance) lines.push(`**Ressalva:** ${nuance}`);
+  lines.push(`**Análise das alternativas:**\n\n${formatAlternativesAnalysisPlain(ac.alternativesAnalysis)}`);
+  lines.push(`**Mnemônico / dica:** ${ac.mnemonic}`);
+  return lines.filter(Boolean).join('\n\n');
+}
+
+/** Normaliza objeto vindo da API (campos novos ausentes em cache legado). */
+export function normalizeQuestionAiCorrection(raw: unknown): QuestionAiCorrection | null {
+  if (raw == null || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  const doctrineAndContext = typeof o.doctrineAndContext === 'string' ? o.doctrineAndContext : '';
+  const legalBasis = typeof o.legalBasis === 'string' ? o.legalBasis : '';
+  const mnemonic = typeof o.mnemonic === 'string' ? o.mnemonic : '';
+  if (!doctrineAndContext && !legalBasis && !mnemonic) return null;
+  let alternativesAnalysis: AiCorrectionAlternativesAnalysis =
+    Array.isArray(o.alternativesAnalysis) ? (o.alternativesAnalysis as QuestionAlternativeAnalysisItem[]) : typeof o.alternativesAnalysis === 'string'
+      ? o.alternativesAnalysis
+      : [];
+  const keyRaw = o.keyConcepts;
+  let keyConcepts: QuestionAiKeyConcept[] | undefined;
+  if (Array.isArray(keyRaw)) {
+    keyConcepts = keyRaw
+      .map((item) => {
+        if (item == null || typeof item !== 'object') return null;
+        const k = item as Record<string, unknown>;
+        const term = typeof k.term === 'string' ? k.term.trim() : '';
+        const explanation = typeof k.explanation === 'string' ? k.explanation.trim() : '';
+        if (!term || !explanation) return null;
+        return { term, explanation };
+      })
+      .filter((x): x is QuestionAiKeyConcept => x != null);
+    if (keyConcepts.length === 0) keyConcepts = undefined;
+  }
+  return {
+    doctrineAndContext,
+    legalBasis,
+    alternativesAnalysis,
+    mnemonic,
+    doctrineLink: typeof o.doctrineLink === 'string' ? o.doctrineLink : undefined,
+    doctrineUrl: typeof o.doctrineUrl === 'string' ? o.doctrineUrl : undefined,
+    plainLanguageSummary: typeof o.plainLanguageSummary === 'string' ? o.plainLanguageSummary : undefined,
+    keyConcepts,
+    reasoningSteps: typeof o.reasoningSteps === 'string' ? o.reasoningSteps : undefined,
+    boardTrap: typeof o.boardTrap === 'string' ? o.boardTrap : undefined,
+    nuanceNote: typeof o.nuanceNote === 'string' ? o.nuanceNote : undefined,
+  };
 }
 
 export type QuestionAiCommentary = string | QuestionAiCorrection;
