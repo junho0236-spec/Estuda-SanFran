@@ -29,6 +29,8 @@ ALTERNATIVAS (múltipla escolha) — regras gerais:
 - As incorretas não podem ser absurdas, irrelevantes ou contraditórias ao enunciado de forma grosseira.
 - Evite “palpite fácil”: não faça a correta única alternativa longa ou detalhada demais.
 - Cada incorreta deve representar um erro que um candidato descuidado cometeria (confundir instituto, artigo, efeito, prazo, competência, exceção, súmula ou entendimento).
+- ANTI-CARICATURA (anti-manequim): PROIBIDO distratores elimináveis por absurdo factual ou invenção de regra (ex.: normas técnicas como critério de mérito pelo número de páginas; tipos de trabalho ou métodos exclusivos de um nível de curso quando não é assim no sistema brasileiro típico; composição de banca factualmente impossível ou regra inventada sobre externos; volume físico do manuscrito como definidor epistemológico; créditos ou carga horária como diferencial epistemológico da tese frente ao mestrado) salvo se o enunciado exigir explicitamente esse dado.
+- Cada incorreta deve ser defensível numa defesa oral breve até ser refutada pelo critério fino do enunciado; o erro deve ser de recorte, prioridade normativa ou escopo — não “mentira grosseira” nem estereótipo de prova que um monitor descartaria logo.
 - ANTI-ELIMINAÇÃO (sempre): proiba o padrão em que só UMA alternativa soa “certeira” ou só UMA soa “errada pelo tom”. É PROIBIDO quatro elogios ao cenário do enunciado e uma crítica metodológica (ou quatro críticas furadas e uma única técnica). Várias alternativas devem poder parecer defensáveis até confrontadas com o critério canónico preciso; incorretas devem errar por NUANCE (critério adjacente, escopo errado, autoridade inadequada), não por ausência de rigor aparente.
 - Distribua vocabulário técnico da disciplina entre TODAS as opções — não concentre na correta os únicos termos decisivos (ex.: “problema de pesquisa”, “originalidade”, “nexo”): incorretas devem também soar acadêmicas e bem fundamentadas, mas aplicadas ao recorte errado ou ao juízo incorreto.
 - ANTI-“ÚNICA VOZ DO RIGOR”: é PROIBIDO que só a alternativa correta cite exigências cardeais do meio académico (ex.: replicabilidade, transparência metodológica, descrição explícita de procedimentos, conformidade com normas do periódico/ABNT, peer review, objetividade da estrutura do artigo) enquanto as incorretas só “elogiam” o autor ou minimizam deveres formais. Pelo menos DUAS incorretas devem também invocar rigor, normas, ciência ou deveres editoriais — mas sustentar um juízo SUBSTANTIVAMENTE errado (prioridade invertida, norma errada ao contexto, escopo de exigência inadequado, confundir marco teórico com método, etc.).
@@ -57,7 +59,8 @@ ${enunciadoLine}
 - As quatro incorretas devem competir com a correta: todas defendíveis à primeira vista por quem tem lacuna pontual.
 - Varie o tipo de distratores (ex.: confundir regra com exceção; instituto de diploma diferente mas tema afim; consequência jurídica errada; julgado ou súmula inadequada ao caso).
 - Proiba alternativas que “soem” erradas pelo tom (ex.: extremos ridículos, negações vazias).
-- Anti-eliminação: se o enunciado descrever um trabalho/caso, não faça quatro alternativas que “aprovam” a conduta e uma única que “reprova” metodicamente — rebalanceie para várias críticas plausíveis ou várias leituras sedutoras mas imprecisas.`;
+- Anti-eliminação: se o enunciado descrever um trabalho/caso, não faça quatro alternativas que “aprovam” a conduta e uma única que “reprova” metodicamente — rebalanceie para várias críticas plausíveis ou várias leituras sedutoras mas imprecisas.
+- Anti-caricatura: não use incorretas “boneco” que um examinador eliminaria por absurdo; todas devem parecer teses que alguém poderia sustentar por um momento no debate acadêmico.`;
     }
 
     case 'muito_dificil': {
@@ -72,6 +75,7 @@ Nível muito difícil (máxima exigência):
 ${enunciadoLine}
 - TESTE DE ELIMINAÇÃO: imagine um candidato eliminando uma por vez só pelo estilo. Se após duas eliminações só restar uma por contraste de tom (ex.: só uma opção “critica” e as outras “aprovam” o trabalho do enunciado), reescreva TODAS até pelo menos três alternativas continuarem plausíveis para um orientador exigente.
 - TESTE DO “GABARITO ORTODOXO”: se só uma alternativa soar como defesa inequívoca do método científico / normas da revista / replicabilidade e as outras soar como defesa do pesquisador contra essas exigências, o lote está INVÁLIDO — rebalanceie até várias opções citarem deveres formais e rigor; o que separa a correta deve ser o SUBSTANTIVO (qual dever prevalece neste facto), não o facto de citar rigor.
+- PROIBIDO o padrão “quatro manequins caricaturais + uma única frase de manual (CAPES/LDB/regimento)”: as cinco alternativas devem soar como posições que um orientador ou examinador poderia defender temporariamente em mesa; incorretas erram por nuance normativa ou escopo, não por lendas urbanas acadêmicas.
 - Todas as incorretas devem ser distratores sofisticados: vacilar entre pelo menos TRÊS opções deve ser comum; incorretas atrativas — teses parcialmente válidas, recomendações de boas práticas aplicadas no âmbito errado, ou juízo técnico sedutor mas equivocado.
 - Não use incorretas que apenas neguem grosseiramente o enunciado; use confusões reais de concursos (norma vizinha, súmula ou informativo inadequado, regime jurídico equiparável mas inaplicável, linha jurisprudencial superada vs atual).
 - Mantenha paralelismo gramatical e de densidade informacional entre todas as cinco opções — comprimento não substitui dificuldade; evite “enchimento” que mascara gabarito óbvio.`;
@@ -80,6 +84,19 @@ ${enunciadoLine}
     default:
       return baseHomogeneity;
   }
+}
+
+/** Enunciados de “segunda ordem” para discriminar entre teses todas plausíveis (só MC + difícil/muito difícil). */
+export function buildAiHighDifficultyStemBlock(
+  difficulty: QuestionBankAiConfig['difficulty'],
+  modality: QuestionModality
+): string {
+  if (modality !== 'multipla_escolha') return '';
+  if (difficulty !== 'dificil' && difficulty !== 'muito_dificil') return '';
+  return `
+COMANDO DO ENUNCIADO (alta dificuldade — cumpra em pelo menos METADE das questões DESTE lote):
+- Prefira formulações de segunda ordem que obriguem a discriminar entre teses todas plausíveis (ex.: "Qual crítica seria menos adequada...", "Qual distinção é mais pertinente face ao cenário...", "Qual argumento não sustenta...", "Assinale a leitura que melhor reconcilia X com Y"), em vez de apenas "Qual característica diferencia..." ou "Assinale a alternativa correta sobre..." como modelo único de comando.
+- Nas restantes questões do lote pode usar comando clássico, desde que as incorretas não sejam caricaturais (vide ANTI-CARICATURA nas alternativas).`;
 }
 
 export function shouldRefineMcDistractors(
@@ -97,7 +114,8 @@ type RefineItem = {
 };
 
 /**
- * Segunda passagem: reescreve apenas os textos das alternativas para aumentar plausibilidade dos distratores.
+ * Refino em cadeia das alternativas (só múltipla escolha; dificil = 1 passo; muito_dificil = 3 passos).
+ * muito_dificil: 3 chamadas ao modelo por chunk (lotes de 5), o que aumenta latência e custo.
  * Preserva o índice do gabarito; em falha da API devolve o array original.
  */
 export async function refineMultipleChoiceDistractors(
@@ -128,7 +146,7 @@ export async function refineMultipleChoiceDistractors(
 
   const refinePasses =
     difficulty === 'muito_dificil'
-      ? ([1, 2] as const)
+      ? ([1, 2, 3] as const)
       : ([1] as const);
 
   for (const passNum of refinePasses) {
@@ -147,9 +165,11 @@ export async function refineMultipleChoiceDistractors(
 
       try {
         const prompt =
-          passNum === 2
-            ? buildMcRefineCamouflagePrompt(payload)
-            : buildMcRefineStandardPrompt(difficultyLabel, payload);
+          passNum === 3
+            ? buildMcRefineAntiCaricaturePrompt(payload)
+            : passNum === 2
+              ? buildMcRefineCamouflagePrompt(payload)
+              : buildMcRefineStandardPrompt(difficultyLabel, payload);
 
         const response = await ai.models.generateContent({
           model: GEMINI_MODEL,
@@ -235,6 +255,25 @@ Regras:
 1. Mesmo "id", mesmo "correct_answer" (índice); só altere textos em "options".
 2. Todas as cinco linhas: tom acadêmico paralelo, extensão semelhante.
 3. Não deixe quatro opções “adoçando” o comportamento do personagem do enunciado e uma única “severa” — redistribua severidade e louvor com nuance.
+
+Entrada (JSON):
+${JSON.stringify(payload)}
+
+Saída: array JSON com objetos { "id", "options", "correct_answer" } apenas.`;
+}
+
+/** Terceira passagem só muito_dificil: reduz alternativas ainda elimináveis por absurdo. */
+function buildMcRefineAntiCaricaturePrompt(payload: RefineItem[]): string {
+  return `Terceira passagem (anti-caricatura — muito difícil): releia o "statement" e as cinco "options" de cada item.
+
+Objetivo: se alguma alternativa INCORRETA ainda soa estraníssima, lendária ou factualmente insustentável no contexto acadêmico-jurídico brasileiro (fábulas sobre ABNT, regras de banca inexistentes, exclusões impossíveis de métodos por nível de curso, etc.), SUBSTITUA essa(s) incorreta(s) por distratores cíveis que erram por NUANCE (recorte, prioridade normativa, escopo) — defendíveis brevemente até serem refutadas pelo critério fino do enunciado.
+
+A alternativa na posição "correct_answer" mantém a MESMA tese substantiva (só ajuste de redação se necessário para paralelismo com as outras). Mantenha "correct_answer" e "id" inalterados.
+
+Regras:
+1. Devolva EXACTAMENTE uma entrada por item, com o mesmo "id" e o mesmo "correct_answer".
+2. As cinco "options" completas; não prefixe com A) B)…
+3. Não transforme incorretas em absurdo cômico; o alvo é plausibilidade mínima de banca.
 
 Entrada (JSON):
 ${JSON.stringify(payload)}

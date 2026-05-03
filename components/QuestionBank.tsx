@@ -43,6 +43,7 @@ import {
 import { dedupeSimilarAiStatements } from './question-bank/similarStatementDetection';
 import {
   buildAiDistractorQualityBlock,
+  buildAiHighDifficultyStemBlock,
   refineMultipleChoiceDistractors,
   shouldRefineMcDistractors,
 } from './question-bank/aiDistractorInstructions';
@@ -2050,6 +2051,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
         Foco Jurídico: ${aiConfig.legalFocus.join(', ') || 'Geral'}.
         Tipo de Enunciado: ${statementForThisBatch}.
         ${buildAiStatementEnforcementBlock(statementForThisBatch)}
+        ${buildAiHighDifficultyStemBlock(aiConfig.difficulty, aiConfig.modality)}
         ${aiConfig.statementType === QB_STATEMENT_MIX ? `Regra do pedido (mistura): o aluno pediu ${totalQuestions} questão(ões) no total, repartidas entre enunciado direto e caso prático segundo: total par → metade de cada; total ímpar → a questão extra é sempre enunciado direto. Este lote deve seguir APENAS o tipo indicado acima.` : ''}
         Ano da Questão: OBRIGATORIAMENTE ${new Date().getFullYear()}.
         Carreira / trilho: ${aiConfig.career || 'Geral'}.
@@ -2152,7 +2154,11 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
       if (allGeneratedQuestions.length > 0) {
         let questionsForValidation = allGeneratedQuestions;
         if (shouldRefineMcDistractors(aiConfig.modality, aiConfig.difficulty)) {
-          setGeneratingStatus('Aperfeiçoando alternativas (distratores)...');
+          setGeneratingStatus(
+            aiConfig.difficulty === 'muito_dificil'
+              ? 'Aperfeiçoando alternativas (refino avançado: várias passagens)...'
+              : 'Aperfeiçoando alternativas (distratores)...'
+          );
           questionsForValidation = await refineMultipleChoiceDistractors(
             ai,
             allGeneratedQuestions,
