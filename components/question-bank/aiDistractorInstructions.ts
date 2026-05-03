@@ -28,7 +28,10 @@ ALTERNATIVAS (múltipla escolha) — regras gerais:
 - As cinco alternativas devem parecer respostas “de prova”: mesmo registro formal, extensão parecida (nenhuma bem mais curta ou genérica que as outras).
 - As incorretas não podem ser absurdas, irrelevantes ou contraditórias ao enunciado de forma grosseira.
 - Evite “palpite fácil”: não faça a correta única alternativa longa ou detalhada demais.
-- Cada incorreta deve representar um erro que um candidato descuidado cometeria (confundir instituto, artigo, efeito, prazo, competência, exceção, súmula ou entendimento).`;
+- Cada incorreta deve representar um erro que um candidato descuidado cometeria (confundir instituto, artigo, efeito, prazo, competência, exceção, súmula ou entendimento).
+- ANTI-ELIMINAÇÃO (sempre): proiba o padrão em que só UMA alternativa soa “certeira” ou só UMA soa “errada pelo tom”. É PROIBIDO quatro elogios ao cenário do enunciado e uma crítica metodológica (ou quatro críticas furadas e uma única técnica). Varias alternativas devem poder parecer defensáveis até confrontadas com o critério canónico preciso; incorretas devem errar por NUANCE (critério adjacente, escopo errado, autoridade inadequada), não por ausência de rigor aparente.
+- Distribua vocabulário técnico da disciplina entre TODAS as opções — não concentre na correta os únicos termos decisivos (ex.: “problema de pesquisa”, “originalidade”, “nexo”): incorretas devem também soar acadêmicas e bem fundamentadas, mas aplicadas ao recorte errado ou ao juízo incorreto.
+- Igualar cadência: número de períodos/cláusulas e nível de abstração semelhantes nas cinco linhas; evite que uma alternativa seja a única negativa, a única genérica ou a única com modalização forte (“carece”, “falha”), salvo se todas negociarem matizes equivalentes.`;
 
   switch (difficulty) {
     case 'muito_facil':
@@ -52,7 +55,8 @@ Nível difícil (estilo banca):
 ${enunciadoLine}
 - As quatro incorretas devem competir com a correta: todas defendíveis à primeira vista por quem tem lacuna pontual.
 - Varie o tipo de distratores (ex.: confundir regra com exceção; instituto de diploma diferente mas tema afim; consequência jurídica errada; julgado ou súmula inadequada ao caso).
-- Proiba alternativas que “soem” erradas pelo tom (ex.: extremos ridículos, negações vazias).`;
+- Proiba alternativas que “soem” erradas pelo tom (ex.: extremos ridículos, negações vazias).
+- Anti-eliminação: se o enunciado descrever um trabalho/caso, não faça quatro alternativas que “aprovam” a conduta e uma única que “reprova” metodicamente — rebalanceie para várias críticas plausíveis ou várias leituras sedutoras mas imprecisas.`;
     }
 
     case 'muito_dificil': {
@@ -65,9 +69,10 @@ ${enunciadoLine}
       return `${baseHomogeneity}
 Nível muito difícil (máxima exigência):
 ${enunciadoLine}
-- Todas as incorretas devem ser distratores sofisticados: quem estuda de forma superficial deve vacilar entre pelo menos três opções.
+- TESTE DE ELIMINAÇÃO: imagine um candidato eliminando uma por vez só pelo estilo. Se após duas eliminações só restar uma por contraste de tom (ex.: só uma opção “critica” e as outras “aprovam” o trabalho do enunciado), reescreva TODAS até pelo menos três alternativas continuarem plausíveis para um orientador exigente.
+- Todas as incorretas devem ser distratores sofisticados: vacilar entre pelo menos TRÊS opções deve ser comum; incorretas atrativas — teses parcialmente válidas, recomendações de boas práticas aplicadas no âmbito errado, ou juízo técnico sedutor mas equivocado.
 - Não use incorretas que apenas neguem grosseiramente o enunciado; use confusões reais de concursos (norma vizinha, súmula ou informativo inadequado, regime jurídico equiparável mas inaplicável, linha jurisprudencial superada vs atual).
-- Mantenha paralelismo gramatical e de densidade informacional entre todas as cinco opções.`;
+- Mantenha paralelismo gramatical e de densidade informacional entre todas as cinco opções — comprimento não substitui dificuldade; evite “enchimento” que mascara gabarito óbvio.`;
     }
 
     default:
@@ -133,14 +138,18 @@ export async function refineMultipleChoiceDistractors(
     });
 
     try {
-      const prompt = `Tarefa: melhorar APENAS os textos das alternativas de questões de múltipla escolha jurídicas (Brasil), nível ${difficultyLabel}.
+      const prompt = `Tarefa: melhorar APENAS os textos das alternativas de questões de múltipla escolha (academia jurídica / concursos, Brasil), nível ${difficultyLabel}.
+
+Objetivo principal: impedir que o candidato ache o gabarito por ELIMINAÇÃO superficial (tom, polaridade ou “única opção técnica”).
 
 Regras obrigatórias:
 1. Devolva EXACTAMENTE uma entrada por item de entrada, com o mesmo "id" numérico.
 2. O campo "correct_answer" (0 a 4) INDICA qual alternativa é a ÚNICA correta. Mantenha esse índice. O texto na posição correct_answer deve continuar a expressar essa resposta correta (pode refinar redação para ficar paralela às outras).
-3. Reescreva as quatro incorretas para serem distratores plausíveis e homogêneos: mesmo tom, extensão semelhante, sem respostas absurdas ou vagas.
-4. Não altere o enunciado (statement); use-o só como contexto.
-5. As cinco strings em "options" devem ser alternativas completas (não prefixe com "A)", "B)" etc.).
+3. Reescreva as QUATRO incorretas para que NÃO sejam descartáveis por contraste de tom com a correta: é PROIBIDO o esquema “quatro elogiam o cenário / uma critica” ou “quatro genéricas / uma precisa”. Pelo menos três alternativas incorretas devem soar como juízos acadêmicos ou técnicos sérios que um examinador poderia defender até certo ponto.
+4. Distribua vocabulário específico da disciplina por todas as opções; as incorretas devem errar por RECORTE, ESCOPO ou CRITÉRIO adjacentemente equivocado — não por falta de linguagem técnica.
+5. Harmonize extensão e estrutura (frases, vírgulas, peso argumentativo) entre as cinco linhas; não deixe uma alternativa como única negativa forte (“carece”, “falha”) se as outras forem só louváveis — rebalanceie para várias matizes críticas ou várias aparentemente positivas mas imprecisas.
+6. Não altere o enunciado (statement); use-o só como contexto.
+7. As cinco strings em "options" devem ser alternativas completas (não prefixe com "A)", "B)" etc.).
 
 Entrada (JSON):
 ${JSON.stringify(payload)}
