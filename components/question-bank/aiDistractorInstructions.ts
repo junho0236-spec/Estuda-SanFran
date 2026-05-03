@@ -34,6 +34,7 @@ ALTERNATIVAS (múltipla escolha) — regras gerais:
 - ANTI-ELIMINAÇÃO (sempre): proiba o padrão em que só UMA alternativa soa “certeira” ou só UMA soa “errada pelo tom”. É PROIBIDO quatro elogios ao cenário do enunciado e uma crítica metodológica (ou quatro críticas furadas e uma única técnica). Várias alternativas devem poder parecer defensáveis até confrontadas com o critério canónico preciso; incorretas devem errar por NUANCE (critério adjacente, escopo errado, autoridade inadequada), não por ausência de rigor aparente.
 - Distribua vocabulário técnico da disciplina entre TODAS as opções — não concentre na correta os únicos termos decisivos (ex.: “problema de pesquisa”, “originalidade”, “nexo”): incorretas devem também soar acadêmicas e bem fundamentadas, mas aplicadas ao recorte errado ou ao juízo incorreto.
 - ANTI-“ÚNICA VOZ DO RIGOR”: é PROIBIDO que só a alternativa correta cite exigências cardeais do meio académico (ex.: replicabilidade, transparência metodológica, descrição explícita de procedimentos, conformidade com normas do periódico/ABNT, peer review, objetividade da estrutura do artigo) enquanto as incorretas só “elogiam” o autor ou minimizam deveres formais. Pelo menos DUAS incorretas devem também invocar rigor, normas, ciência ou deveres editoriais — mas sustentar um juízo SUBSTANTIVAMENTE errado (prioridade invertida, norma errada ao contexto, escopo de exigência inadequado, confundir marco teórico com método, etc.).
+- ANTI-“FOTOCOPIA DO DISPOSITIVO” (lei seca / aplicação normativa): PROIBIDO que só a correta seja a paráfrase óbvia do núcleo do artigo aplicável enquanto as incorretas são extremos jurídicos fáceis de cortar (resolução automática e única, conversão obrigatória de obrigação, pré-requisitos processuais inventados, “vedação absoluta” ao recebimento da coisa, mora como pressuposto quando o regime não exige, etc.). Pelo menos DUAS incorretas devem usar o mesmo léxico técnico da área (faculdade do credor, perdas e danos, resolução, abatimento, restituição, mora, culpa do devedor, etc.) e soar aplicáveis ao caso até confrontadas com o **regime jurídico exato** da hipótese ou com o **efeito** previsto no dispositivo citado — errando por instituto vizinho, pressuposto inadequado, ou consequência própria de outra hipótese do mesmo capítulo.
 - Igualar cadência: número de períodos/cláusulas e nível de abstração semelhantes nas cinco linhas; evite que uma alternativa seja a única negativa, a única genérica ou a única com modalização forte (“carece”, “falha”), salvo se todas negociarem matizes equivalentes.`;
 
   switch (difficulty) {
@@ -78,6 +79,7 @@ ${enunciadoLine}
 - PROIBIDO o padrão “quatro manequins caricaturais + uma única frase de manual (CAPES/LDB/regimento)”: as cinco alternativas devem soar como posições que um orientador ou examinador poderia defender temporariamente em mesa; incorretas erram por nuance normativa ou escopo, não por lendas urbanas acadêmicas.
 - Todas as incorretas devem ser distratores sofisticados: vacilar entre pelo menos TRÊS opções deve ser comum; incorretas atrativas — teses parcialmente válidas, recomendações de boas práticas aplicadas no âmbito errado, ou juízo técnico sedutor mas equivocado.
 - Não use incorretas que apenas neguem grosseiramente o enunciado; use confusões reais de concursos (norma vizinha, súmula ou informativo inadequado, regime jurídico equiparável mas inaplicável, linha jurisprudencial superada vs atual).
+- Direito das obrigações/contratos: favoreça confundir hipóteses do mesmo universo normativo (ex.: deterioração da coisa certa antes da entrega vs mora absoluta vs resolução por inadimplemento; faculdades do art. 239 vs outros regimes de incumprimento) — não um único artigo “limpo” contra quatro frases disparatadas.
 - Mantenha paralelismo gramatical e de densidade informacional entre todas as cinco opções — comprimento não substitui dificuldade; evite “enchimento” que mascara gabarito óbvio.`;
     }
 
@@ -96,7 +98,8 @@ export function buildAiHighDifficultyStemBlock(
   return `
 COMANDO DO ENUNCIADO (alta dificuldade — cumpra em pelo menos METADE das questões DESTE lote):
 - Prefira formulações de segunda ordem que obriguem a discriminar entre teses todas plausíveis (ex.: "Qual crítica seria menos adequada...", "Qual distinção é mais pertinente face ao cenário...", "Qual argumento não sustenta...", "Assinale a leitura que melhor reconcilia X com Y"), em vez de apenas "Qual característica diferencia..." ou "Assinale a alternativa correta sobre..." como modelo único de comando.
-- Nas restantes questões do lote pode usar comando clássico, desde que as incorretas não sejam caricaturais (vide ANTI-CARICATURA nas alternativas).`;
+- Em direito material (obrigações, contratos, responsabilidade): quando possível, evite só "Assinale a alternativa que melhor descreve as faculdades..." com cinco respostas onde quatro são disparates; prefira também formulações do tipo "Qual consequência seria **incabível**...", "Qual requisito **não** se exige nesta hipótese...", "Qual leitura **não** se sustenta no regime legal aplicável...", mantendo as cinco alternativas em registo técnico semelhante.
+- Nas restantes questões do lote pode usar comando clássico, desde que as incorretas não sejam caricaturais (vide ANTI-CARICATURA e ANTI-FOTOCOPIA DO DISPOSITIVO nas alternativas).`;
 }
 
 export function shouldRefineMcDistractors(
@@ -238,6 +241,7 @@ Regras obrigatórias:
 6. Harmonize extensão e estrutura (frases, vírgulas, peso argumentativo) entre as cinco linhas; não deixe uma alternativa como única negativa forte (“carece”, “falha”) se as outras forem só louváveis — rebalanceie para várias matizes críticas ou várias aparentemente positivas mas imprecisas.
 7. Não altere o enunciado (statement); use-o só como contexto.
 8. As cinco strings em "options" devem ser alternativas completas (não prefixe com "A)", "B)" etc.).
+9. ANTI-FOTOCOPIA LEGISLATIVA: se a correta for a única paráfrase limpa de um artigo e as incorretas forem extremos jurídicos óbvios, reescreva AS CINCO: incorretas devem parecer aplicações plausíveis mas equivocadas de institutos ou arts. vizinhos (mesmo léxico: resolução, abatimento, mora, culpa, faculdade do credor). Mantenha a substantividade da correta.
 
 Entrada (JSON):
 ${JSON.stringify(payload)}
@@ -266,7 +270,8 @@ Saída: array JSON com objetos { "id", "options", "correct_answer" } apenas.`;
 function buildMcRefineAntiCaricaturePrompt(payload: RefineItem[]): string {
   return `Terceira passagem (anti-caricatura — muito difícil): releia o "statement" e as cinco "options" de cada item.
 
-Objetivo: se alguma alternativa INCORRETA ainda soa estraníssima, lendária ou factualmente insustentável no contexto acadêmico-jurídico brasileiro (fábulas sobre ABNT, regras de banca inexistentes, exclusões impossíveis de métodos por nível de curso, etc.), SUBSTITUA essa(s) incorreta(s) por distratores cíveis que erram por NUANCE (recorte, prioridade normativa, escopo) — defendíveis brevemente até serem refutadas pelo critério fino do enunciado.
+Objetivo: se alguma alternativa INCORRETA ainda soa estraníssima, lendária ou factualmente insustentável no contexto acadêmico-jurídico brasileiro (fábulas sobre ABNT, regras de banca inexistentes, exclusões impossíveis de métodos por nível de curso, OU extremos grosseiros em lei civil quando o enunciado pede regime de obrigações/contratos), SUBSTITUA essa(s) incorreta(s) por distratores cíveis que erram por NUANCE (recorte, prioridade normativa, escopo, confusão entre arts. ou institutos vizinhos) — defendíveis brevemente até serem refutadas pelo critério fino do enunciado.
+Adicional: se a correta for nitidamente a única paráfrase do dispositivo aplicável e as incorretas forem disparates, substitua incorretas por teses que cite o mesmo vocabulário jurídico mas apliquem regime ou pressuposto inadequado.
 
 A alternativa na posição "correct_answer" mantém a MESMA tese substantiva (só ajuste de redação se necessário para paralelismo com as outras). Mantenha "correct_answer" e "id" inalterados.
 
