@@ -737,6 +737,10 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   }, [activeRoomId]);
 
   const pendingFileByClientIdRef = useRef<Map<string, File>>(new Map());
+  const messageIncrementalInFlightRef = useRef<Map<string, Promise<void>>>(new Map());
+  const messageIncrementalLastFetchAtRef = useRef<Map<string, number>>(new Map());
+  const pollsInFlightRef = useRef<Map<string, Promise<void>>>(new Map());
+  const pollsLastFetchAtRef = useRef<Map<string, number>>(new Map());
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageRoomMetaRef = useRef<Record<string, RoomMessageCacheMeta>>({});
@@ -1465,6 +1469,42 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
       }
 
       if (!loadMore && cached.length > 0 && lastIso) {
+        const incrementalCooldownMs = 700;
+        const now = Date.now();
+        const lastIncrementalAt = messageIncrementalLastFetchAtRef.current.get(roomId) || 0;
+        if (now - lastIncrementalAt < incrementalCooldownMs) {
+          devPerfCount('Connect:fetchMessages_incremental_skipped_cooldown');
+          const meta = messageRoomMetaRef.current[roomId];
+          if (roomId === activeRoomId) {
+            setHasMoreMessages(meta?.hasMore ?? true);
+          }
+          setIsLoadingMore(false);
+          devPerfEnd('Connect:fetchMessages', perfStart, {
+            roomId,
+            loadMore,
+            mode: 'incremental_skipped_cooldown',
+          });
+          return;
+        }
+
+        const incrementalInFlight = messageIncrementalInFlightRef.current.get(roomId);
+        if (incrementalInFlight) {
+          devPerfCount('Connect:fetchMessages_incremental_skipped_inflight');
+          await incrementalInFlight;
+          const meta = messageRoomMetaRef.current[roomId];
+          if (roomId === activeRoomId) {
+            setHasMoreMessages(meta?.hasMore ?? true);
+          }
+          setIsLoadingMore(false);
+          devPerfEnd('Connect:fetchMessages', perfStart, {
+            roomId,
+            loadMore,
+            mode: 'incremental_skipped_inflight',
+          });
+          return;
+        }
+
+        const syncPromise = (async () => {
         try {
           const { data, error } = await supabase
             .from('chat_messages')
@@ -1478,6 +1518,16 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
           }
         } catch (e) {
           logConnectError('messages', 'sync_new_failed', e, { roomId });
+        }
+        })();
+        messageIncrementalInFlightRef.current.set(roomId, syncPromise);
+        try {
+          await syncPromise;
+          messageIncrementalLastFetchAtRef.current.set(roomId, Date.now());
+        } finally {
+          if (messageIncrementalInFlightRef.current.get(roomId) === syncPromise) {
+            messageIncrementalInFlightRef.current.delete(roomId);
+          }
         }
         const meta = messageRoomMetaRef.current[roomId];
         if (roomId === activeRoomId) {
@@ -1610,6 +1660,24 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   const fetchPolls = async (roomId: string) => {
     const perfStart = devPerfStart('Connect:fetchPolls');
     devPerfCount('Connect:fetchPolls_calls');
+    const now = Date.now();
+    const pollsCooldownMs = 900;
+    const lastPollsAt = pollsLastFetchAtRef.current.get(roomId) || 0;
+    if (now - lastPollsAt < pollsCooldownMs) {
+      devPerfCount('Connect:fetchPolls_skipped_cooldown');
+      devPerfEnd('Connect:fetchPolls', perfStart, { roomId, mode: 'skipped_cooldown' });
+      return;
+    }
+
+    const inFlight = pollsInFlightRef.current.get(roomId);
+    if (inFlight) {
+      devPerfCount('Connect:fetchPolls_skipped_inflight');
+      await inFlight;
+      devPerfEnd('Connect:fetchPolls', perfStart, { roomId, mode: 'skipped_inflight' });
+      return;
+    }
+
+    const run = (async () => {
     try {
       const { data, error } = await supabase
         .from('chat_polls')
@@ -1631,7 +1699,16 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
       setPolls(pollMap);
     } catch (error: any) {
       console.error('Erro ao buscar enquetes:', error);
+    }
+    })();
+    pollsInFlightRef.current.set(roomId, run);
+    try {
+      await run;
+      pollsLastFetchAtRef.current.set(roomId, Date.now());
     } finally {
+      if (pollsInFlightRef.current.get(roomId) === run) {
+        pollsInFlightRef.current.delete(roomId);
+      }
       devPerfEnd('Connect:fetchPolls', perfStart, { roomId });
     }
   };
