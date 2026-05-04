@@ -166,6 +166,8 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     loadComposerDrafts(userId)
   );
   const [loading, setLoading] = useState(true);
+  const roomsFetchInFlightRef = useRef<Promise<void> | null>(null);
+  const roomsLastRealtimeFetchAtRef = useRef(0);
 
   useEffect(() => {
     setMessageDraftsByRoom(loadComposerDrafts(userId));
@@ -971,7 +973,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   const subscribeToAllRooms = () => {
     const debouncedRooms = createTrailingDebounce(() => {
       devPerfCount('Connect:realtime_rooms_debounced_fetch');
-      void fetchRooms();
+      void fetchRooms({ source: 'realtime' });
     }, 550);
 
     const channel = supabase
@@ -1211,68 +1213,98 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     searchGlobalMessages,
   ]);
 
-  const fetchRooms = async (options?: { showLoading?: boolean }) => {
+  const fetchRooms = async (options?: { showLoading?: boolean; source?: 'manual' | 'realtime' }) => {
     const showLoading = options?.showLoading ?? false;
+    const source = options?.source ?? 'manual';
+    const now = Date.now();
+    const realtimeCooldownMs = 1000;
+    if (source === 'realtime' && now - roomsLastRealtimeFetchAtRef.current < realtimeCooldownMs) {
+      devPerfCount('Connect:fetchRooms_skipped_realtime_cooldown');
+      return;
+    }
+
+    const inFlight = roomsFetchInFlightRef.current;
+    if (inFlight) {
+      devPerfCount('Connect:fetchRooms_skipped_inflight');
+      await inFlight;
+      return;
+    }
+
     const perfStart = devPerfStart('Connect:fetchRooms');
-    devPerfCount('Connect:fetchRooms_calls');
-    if (showLoading) setLoading(true);
-    try {
-      // Get rooms where user is a participant
-      const { data: participantData, error: participantError } = await supabase
-        .from('chat_participants')
-        .select('room_id, is_pinned')
-        .eq('user_id', userId);
+    devPerfCount('Connect:fetchRooms_calls', { source });
 
-      if (participantError) throw participantError;
-
-      if (participantData && participantData.length > 0) {
-        const roomIds = participantData.map(p => p.room_id);
-        const pinnedIds = participantData.filter(p => p.is_pinned).map(p => p.room_id);
-        setPinnedRooms(pinnedIds);
-
-        const { data: roomData, error: roomError } = await supabase
-          .from('chat_rooms')
-          .select(CONNECT_CHAT_ROOMS_COLUMNS)
-          .in('id', roomIds);
-
-        if (roomError) throw roomError;
-
-        // Sort rooms: pinned first, then by updated_at
-        const sortedRooms = (roomData || []).sort((a, b) => {
-          const aPinned = pinnedIds.includes(a.id);
-          const bPinned = pinnedIds.includes(b.id);
-          if (aPinned && !bPinned) return -1;
-          if (!aPinned && bPinned) return 1;
-          return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
-        });
-
-        setRooms(sortedRooms);
-
-        // Fetch participants for these rooms
-        const { data: allParticipants, error: pError } = await supabase
+    const run = (async () => {
+      if (showLoading) setLoading(true);
+      try {
+        // Get rooms where user is a participant
+        const { data: participantData, error: participantError } = await supabase
           .from('chat_participants')
-          .select(CONNECT_CHAT_PARTICIPANTS_COLUMNS)
-          .in('room_id', roomIds);
+          .select('room_id, is_pinned')
+          .eq('user_id', userId);
 
-        if (!pError && allParticipants) {
-          const grouped = allParticipants.reduce((acc: any, p) => {
-            if (!acc[p.room_id]) acc[p.room_id] = [];
-            acc[p.room_id].push(p);
-            return acc;
-          }, {});
-          setParticipants(grouped);
+        if (participantError) throw participantError;
+
+        if (participantData && participantData.length > 0) {
+          const roomIds = participantData.map(p => p.room_id);
+          const pinnedIds = participantData.filter(p => p.is_pinned).map(p => p.room_id);
+          setPinnedRooms(pinnedIds);
+
+          const { data: roomData, error: roomError } = await supabase
+            .from('chat_rooms')
+            .select(CONNECT_CHAT_ROOMS_COLUMNS)
+            .in('id', roomIds);
+
+          if (roomError) throw roomError;
+
+          // Sort rooms: pinned first, then by updated_at
+          const sortedRooms = (roomData || []).sort((a, b) => {
+            const aPinned = pinnedIds.includes(a.id);
+            const bPinned = pinnedIds.includes(b.id);
+            if (aPinned && !bPinned) return -1;
+            if (!aPinned && bPinned) return 1;
+            return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+          });
+
+          setRooms(sortedRooms);
+
+          // Fetch participants for these rooms
+          const { data: allParticipants, error: pError } = await supabase
+            .from('chat_participants')
+            .select(CONNECT_CHAT_PARTICIPANTS_COLUMNS)
+            .in('room_id', roomIds);
+
+          if (!pError && allParticipants) {
+            const grouped = allParticipants.reduce((acc: any, p) => {
+              if (!acc[p.room_id]) acc[p.room_id] = [];
+              acc[p.room_id].push(p);
+              return acc;
+            }, {});
+            setParticipants(grouped);
+          }
+        } else {
+          setRooms([]);
+          setPinnedRooms([]);
+          setParticipants({});
         }
-      } else {
-        setRooms([]);
-        setPinnedRooms([]);
-        setParticipants({});
+      } catch (error: any) {
+        console.error('Error fetching rooms:', error);
+        toast.error(`Erro ao carregar conversas: ${error.message || 'Verifique o console'}`);
+      } finally {
+        devPerfEnd('Connect:fetchRooms', perfStart, { source });
+        if (showLoading) setLoading(false);
       }
-    } catch (error: any) {
-      console.error('Error fetching rooms:', error);
-      toast.error(`Erro ao carregar conversas: ${error.message || 'Verifique o console'}`);
+    })();
+
+    roomsFetchInFlightRef.current = run;
+    try {
+      await run;
+      if (source === 'realtime') {
+        roomsLastRealtimeFetchAtRef.current = Date.now();
+      }
     } finally {
-      devPerfEnd('Connect:fetchRooms', perfStart);
-      if (showLoading) setLoading(false);
+      if (roomsFetchInFlightRef.current === run) {
+        roomsFetchInFlightRef.current = null;
+      }
     }
   };
 
