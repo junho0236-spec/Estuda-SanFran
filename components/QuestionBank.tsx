@@ -20,6 +20,7 @@ import { dataService } from '../services/dataService';
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { GEMINI_MODEL, extractPrecedent } from '../services/geminiService';
 import { createTrailingDebounce } from '../utils/realtimeThrottle';
+import { devPerfCount, devPerfEnd, devPerfStart } from '../utils/devPerfLog';
 import { Loader2 } from 'lucide-react';
 import { fetchTermDefinition } from '../services/geminiService';
 import { exportQuestionBankPdf } from './question-bank/exportQuestionBankPdf';
@@ -130,6 +131,12 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
   const [searchParams, setSearchParams] = useSearchParams();
   const qbDeepLinkApplied = useRef(false);
   const nextQuestionRangeStartRef = useRef(0);
+  const userProgressInFlightRef = useRef<Promise<void> | null>(null);
+  const userProgressLastFetchAtRef = useRef(0);
+  const notebooksInFlightRef = useRef<Promise<void> | null>(null);
+  const notebooksLastFetchAtRef = useRef(0);
+  const questionStatsInFlightRef = useRef<Promise<void> | null>(null);
+  const questionStatsLastFetchAtRef = useRef(0);
   const facetBootstrapRef = useRef<Question[]>([]);
   /** Evita que um SELECT vazio sobrescreva a lista logo após insert local (RLS / latência). */
   const skipEmptyFetchOverwriteRef = useRef(false);
@@ -1032,58 +1039,106 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
 
   const fetchQuestionStats = async () => {
     if (!userId) return;
-    try {
-      const { data, error } = await supabase
-        .from('user_question_stats')
-        .select(QB_USER_QUESTION_STATS_COLUMNS)
-        .eq('user_id', userId);
-      
-      if (!error && data) {
-        const statsMap: Record<string, any> = {};
-        data.forEach(row => {
-          statsMap[row.question_id] = {
-            totalAttempts: row.total_attempts,
-            correctAttempts: row.correct_attempts,
-            lastAttemptCorrect: row.last_attempt_correct,
-            updatedAt: row.updated_at != null ? String(row.updated_at) : undefined,
-          };
-        });
-        setQuestionStats(statsMap);
+    const now = Date.now();
+    const cooldownMs = 700;
+    if (now - questionStatsLastFetchAtRef.current < cooldownMs) {
+      devPerfCount('QuestionBank:fetchQuestionStats_skipped_cooldown');
+      return;
+    }
+    if (questionStatsInFlightRef.current) {
+      devPerfCount('QuestionBank:fetchQuestionStats_skipped_inflight');
+      await questionStatsInFlightRef.current;
+      return;
+    }
+
+    devPerfCount('QuestionBank:fetchQuestionStats_calls');
+    const perfStart = devPerfStart('QuestionBank:fetchQuestionStats');
+    const run = (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('user_question_stats')
+          .select(QB_USER_QUESTION_STATS_COLUMNS)
+          .eq('user_id', userId);
+        
+        if (!error && data) {
+          const statsMap: Record<string, any> = {};
+          data.forEach(row => {
+            statsMap[row.question_id] = {
+              totalAttempts: row.total_attempts,
+              correctAttempts: row.correct_attempts,
+              lastAttemptCorrect: row.last_attempt_correct,
+              updatedAt: row.updated_at != null ? String(row.updated_at) : undefined,
+            };
+          });
+          setQuestionStats(statsMap);
+        }
+      } catch (err) {
+        console.error('Error fetching question stats:', err);
       }
-    } catch (err) {
-      console.error('Error fetching question stats:', err);
+    })();
+    questionStatsInFlightRef.current = run;
+    try {
+      await run;
+      questionStatsLastFetchAtRef.current = Date.now();
+    } finally {
+      if (questionStatsInFlightRef.current === run) questionStatsInFlightRef.current = null;
+      devPerfEnd('QuestionBank:fetchQuestionStats', perfStart);
     }
   };
 
   const fetchUserProgress = async () => {
+    const now = Date.now();
+    const cooldownMs = 650;
+    if (now - userProgressLastFetchAtRef.current < cooldownMs) {
+      devPerfCount('QuestionBank:fetchUserProgress_skipped_cooldown');
+      return;
+    }
+    if (userProgressInFlightRef.current) {
+      devPerfCount('QuestionBank:fetchUserProgress_skipped_inflight');
+      await userProgressInFlightRef.current;
+      return;
+    }
+
+    devPerfCount('QuestionBank:fetchUserProgress_calls');
+    const perfStart = devPerfStart('QuestionBank:fetchUserProgress');
+    const run = (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('user_progress')
+          .select(QB_USER_PROGRESS_COLUMNS)
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (error) {
+          handleFirestoreError(error, OperationType.GET, 'user_progress');
+          return;
+        }
+
+        if (data) {
+          setUserProgress(data);
+          setAnswerGoals(parseAnswerGoalsFromDb(data.question_answer_goals));
+          setFavorites(data.favorites || []);
+          // Merge with local state to ensure progress is not lost
+          setWrongQuestions(prev => [...new Set([...prev, ...(data.wrong_questions || data.wrong_question_ids || [])])]);
+          setCorrectQuestions(prev => [...new Set([...prev, ...(data.correct_questions || [])])]);
+          setNotes(data.notes || {});
+          setCorrectCount(data.correct_count || 0);
+          setWrongCount(data.wrong_count || 0);
+          setErrorMastery(data.error_mastery || {});
+        }
+      } catch (err) {
+        console.error('Failed to sync progress:', err);
+      } finally {
+        setIsProgressLoaded(true);
+      }
+    })();
+    userProgressInFlightRef.current = run;
     try {
-      const { data, error } = await supabase
-        .from('user_progress')
-        .select(QB_USER_PROGRESS_COLUMNS)
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (error) {
-        handleFirestoreError(error, OperationType.GET, 'user_progress');
-        return;
-      }
-
-      if (data) {
-        setUserProgress(data);
-        setAnswerGoals(parseAnswerGoalsFromDb(data.question_answer_goals));
-        setFavorites(data.favorites || []);
-        // Merge with local state to ensure progress is not lost
-        setWrongQuestions(prev => [...new Set([...prev, ...(data.wrong_questions || data.wrong_question_ids || [])])]);
-        setCorrectQuestions(prev => [...new Set([...prev, ...(data.correct_questions || [])])]);
-        setNotes(data.notes || {});
-        setCorrectCount(data.correct_count || 0);
-        setWrongCount(data.wrong_count || 0);
-        setErrorMastery(data.error_mastery || {});
-      }
-    } catch (err) {
-      console.error('Failed to sync progress:', err);
+      await run;
+      userProgressLastFetchAtRef.current = Date.now();
     } finally {
-      setIsProgressLoaded(true);
+      if (userProgressInFlightRef.current === run) userProgressInFlightRef.current = null;
+      devPerfEnd('QuestionBank:fetchUserProgress', perfStart);
     }
   };
 
@@ -1146,17 +1201,41 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
   };
 
   const fetchNotebooks = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('notebooks')
-        .select(QB_NOTEBOOK_LIST_COLUMNS)
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
+    const now = Date.now();
+    const cooldownMs = 650;
+    if (now - notebooksLastFetchAtRef.current < cooldownMs) {
+      devPerfCount('QuestionBank:fetchNotebooks_skipped_cooldown');
+      return;
+    }
+    if (notebooksInFlightRef.current) {
+      devPerfCount('QuestionBank:fetchNotebooks_skipped_inflight');
+      await notebooksInFlightRef.current;
+      return;
+    }
 
-      if (error) throw error;
-      setNotebooks(data || []);
-    } catch (error) {
-      console.error('Error fetching notebooks:', error);
+    devPerfCount('QuestionBank:fetchNotebooks_calls');
+    const perfStart = devPerfStart('QuestionBank:fetchNotebooks');
+    const run = (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('notebooks')
+          .select(QB_NOTEBOOK_LIST_COLUMNS)
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        setNotebooks(data || []);
+      } catch (error) {
+        console.error('Error fetching notebooks:', error);
+      }
+    })();
+    notebooksInFlightRef.current = run;
+    try {
+      await run;
+      notebooksLastFetchAtRef.current = Date.now();
+    } finally {
+      if (notebooksInFlightRef.current === run) notebooksInFlightRef.current = null;
+      devPerfEnd('QuestionBank:fetchNotebooks', perfStart);
     }
   };
 

@@ -4,6 +4,7 @@ import { Send, Pin, Trash2, MessageSquare, Quote, AlertCircle, RefreshCw } from 
 import { supabase } from '../services/supabaseClient';
 import { MURAL_MESSAGES_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { MuralMessage } from '../types';
+import { devPerfCount, devPerfEnd, devPerfStart } from '../utils/devPerfLog';
 
 import { toast } from 'sonner';
 
@@ -19,6 +20,8 @@ const Mural: React.FC<MuralProps> = ({ userId, userName }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fetchInFlightRef = useRef<Promise<void> | null>(null);
+  const lastFetchAtRef = useRef(0);
 
   useEffect(() => {
     fetchMessages();
@@ -26,10 +29,15 @@ const Mural: React.FC<MuralProps> = ({ userId, userName }) => {
     const channel = supabase
       .channel('public:mural_messages')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mural_messages' }, (payload) => {
+        devPerfCount('Mural:realtime_insert');
         const newMsg = payload.new as MuralMessage;
-        setMessages((prev) => [newMsg, ...prev]);
+        setMessages((prev) => {
+          if (prev.some((msg) => msg.id === newMsg.id)) return prev;
+          return [newMsg, ...prev];
+        });
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'mural_messages' }, (payload) => {
+        devPerfCount('Mural:realtime_delete');
         setMessages((prev) => prev.filter((msg) => msg.id !== payload.old.id));
       })
       .subscribe();
@@ -40,6 +48,21 @@ const Mural: React.FC<MuralProps> = ({ userId, userName }) => {
   }, []);
 
   const fetchMessages = async () => {
+    const now = Date.now();
+    const cooldownMs = 800;
+    if (now - lastFetchAtRef.current < cooldownMs) {
+      devPerfCount('Mural:fetchMessages_skipped_cooldown');
+      return;
+    }
+    if (fetchInFlightRef.current) {
+      devPerfCount('Mural:fetchMessages_skipped_inflight');
+      await fetchInFlightRef.current;
+      return;
+    }
+
+    devPerfCount('Mural:fetchMessages_calls');
+    const perfStart = devPerfStart('Mural:fetchMessages');
+    const run = (async () => {
     setIsLoading(true);
     setFetchError(null);
     const { data, error } = await supabase
@@ -55,6 +78,15 @@ const Mural: React.FC<MuralProps> = ({ userId, userName }) => {
       setMessages(data || []);
     }
     setIsLoading(false);
+    })();
+    fetchInFlightRef.current = run;
+    try {
+      await run;
+      lastFetchAtRef.current = Date.now();
+    } finally {
+      if (fetchInFlightRef.current === run) fetchInFlightRef.current = null;
+      devPerfEnd('Mural:fetchMessages', perfStart);
+    }
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
