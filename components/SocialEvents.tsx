@@ -17,6 +17,7 @@ import {
 import { supabase } from '../services/supabaseClient';
 import { SF_EVENTS_LIST_COLUMNS, SF_EVENT_RSVPS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { createTrailingDebounce } from '../utils/realtimeThrottle';
+import { devPerfCount, devPerfEnd, devPerfStart } from '../utils/devPerfLog';
 import { SanFranEvent, EventRSVP } from '../types';
 import confetti from 'canvas-confetti';
 
@@ -60,6 +61,7 @@ const SocialEvents: React.FC<SocialEventsProps> = ({ userId, userName }) => {
 
   useEffect(() => {
     const debounced = createTrailingDebounce(() => {
+      devPerfCount('SocialEvents:realtime_debounced_fetch');
       void fetchData();
     }, 1000);
 
@@ -68,12 +70,16 @@ const SocialEvents: React.FC<SocialEventsProps> = ({ userId, userName }) => {
     const eventsChannel = supabase
       .channel('social_events_coalesced')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_events' }, (payload) => {
+        devPerfCount('SocialEvents:realtime_sf_events');
         const row = (payload.new || payload.old) as { event_date?: string } | null;
         // Skip old events to avoid unnecessary refetch pressure.
         if (row?.event_date && new Date(row.event_date).getTime() < Date.now()) return;
         debounced.schedule();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_event_rsvps' }, () => debounced.schedule())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_event_rsvps' }, () => {
+        devPerfCount('SocialEvents:realtime_sf_event_rsvps');
+        debounced.schedule();
+      })
       .subscribe();
 
     return () => {
@@ -84,6 +90,8 @@ const SocialEvents: React.FC<SocialEventsProps> = ({ userId, userName }) => {
 
   const fetchData = async () => {
     setLoading(true);
+    const perfStart = devPerfStart('SocialEvents:fetchData');
+    devPerfCount('SocialEvents:fetchData_calls');
     const [eventsRes, rsvpsRes] = await Promise.all([
       supabase
         .from('sf_events')
@@ -95,6 +103,10 @@ const SocialEvents: React.FC<SocialEventsProps> = ({ userId, userName }) => {
 
     if (eventsRes.data) setEvents(eventsRes.data);
     if (rsvpsRes.data) setRsvps(rsvpsRes.data);
+    devPerfEnd('SocialEvents:fetchData', perfStart, {
+      eventsCount: eventsRes.data?.length || 0,
+      rsvpsCount: rsvpsRes.data?.length || 0,
+    });
     setLoading(false);
   };
 

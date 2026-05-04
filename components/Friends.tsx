@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../services/supabaseClient';
 import { FRIENDSHIPS_LIST_COLUMNS, USER_PERSONA_COMMUNITY_LIST } from '../utils/supabaseSelectColumns';
 import { createTrailingDebounce } from '../utils/realtimeThrottle';
+import { devPerfCount, devPerfEnd, devPerfStart } from '../utils/devPerfLog';
 import { dataService } from '../services/dataService';
 import { Friendship, UserProfile, View } from '../types';
 import { toast } from 'sonner';
@@ -32,6 +33,7 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
 
   useEffect(() => {
     const debounced = createTrailingDebounce(() => {
+      devPerfCount('Friends:realtime_debounced_fetch');
       void fetchData();
     }, 700);
 
@@ -42,12 +44,18 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'friendships', filter: `user_id=eq.${userId}` },
-        () => debounced.schedule()
+        () => {
+          devPerfCount('Friends:realtime_friendships_user');
+          debounced.schedule();
+        }
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'friendships', filter: `friend_id=eq.${userId}` },
-        () => debounced.schedule()
+        () => {
+          devPerfCount('Friends:realtime_friendships_friend');
+          debounced.schedule();
+        }
       )
       .subscribe();
 
@@ -60,6 +68,8 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
   const fetchData = async () => {
     if (!userId) return;
     setLoading(true);
+    const perfStart = devPerfStart('Friends:fetchData');
+    devPerfCount('Friends:fetchData_calls');
     try {
       // Fetch all users from user_persona
       const { data: usersData, error: usersError } = await supabase
@@ -94,6 +104,7 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
     } catch (error) {
       console.error('Error fetching friends data:', error);
     } finally {
+      devPerfEnd('Friends:fetchData', perfStart, { userId });
       setLoading(false);
     }
   };

@@ -30,6 +30,7 @@ import {
   normalizeBoardColumnIds,
   persistBoardColumnNormalization,
 } from './utils/normalizeBoardColumnIds';
+import { devPerfCount, devPerfEnd, devPerfStart } from './utils/devPerfLog';
 import {
   STUDY_SESSIONS_LIST_COLUMNS as STUDY_SESSION_CLOUD_COLUMNS,
   USER_PROGRESS_CLOUD_COLUMNS,
@@ -793,6 +794,8 @@ const App: React.FC = () => {
 
   const loadUserData = async (opts?: { scope?: UserDataSyncScope }) => {
     const scope: UserDataSyncScope = opts?.scope ?? 'bootstrap';
+    const perfStart = devPerfStart(`App:loadUserData:${scope}`);
+    devPerfCount(`App:loadUserData_calls:${scope}`);
     const showFlashLoading = scope === 'full' || scope === 'flashcards';
     const userId = session?.user?.id;
     const scopeMinIntervalMs: Partial<Record<UserDataSyncScope, number>> = {
@@ -811,11 +814,13 @@ const App: React.FC = () => {
     const lastLoadedAt = scopeLastLoadedAtRef.current.get(scope) ?? 0;
     const minInterval = scopeMinIntervalMs[scope] ?? 0;
     if (minInterval > 0 && now - lastLoadedAt < minInterval) {
+      devPerfCount(`App:loadUserData_skipped_cooldown:${scope}`);
       return;
     }
 
     const inFlight = scopeLoadPromisesRef.current.get(scope);
     if (inFlight) {
+      devPerfCount(`App:loadUserData_skipped_inflight:${scope}`);
       await inFlight;
       return;
     }
@@ -1297,6 +1302,7 @@ const App: React.FC = () => {
       await run;
       scopeLastLoadedAtRef.current.set(scope, Date.now());
     } finally {
+      devPerfEnd(`App:loadUserData:${scope}`, perfStart);
       scopeLoadPromisesRef.current.delete(scope);
     }
   };
@@ -1356,6 +1362,7 @@ const App: React.FC = () => {
         table: 'flashcards',
         filter: `user_id=eq.${userId}`
       }, (payload) => {
+        devPerfCount('App:realtime:flashcards');
         if (Date.now() < realtimeMutedUntilRef.current) return;
         const p = payload as {
           eventType: string;
@@ -1393,6 +1400,7 @@ const App: React.FC = () => {
         table: 'tasks',
         filter: `user_id=eq.${userId}`
       }, (payload) => {
+        devPerfCount('App:realtime:tasks');
         if (Date.now() < realtimeMutedUntilRef.current) return;
         const p = payload as {
           eventType: string;
@@ -1430,6 +1438,7 @@ const App: React.FC = () => {
         table: 'folders',
         filter: `user_id=eq.${userId}`
       }, (payload) => {
+        devPerfCount('App:realtime:folders');
         if (Date.now() < realtimeMutedUntilRef.current) return;
         const p = payload as {
           eventType: string;
@@ -1460,7 +1469,10 @@ const App: React.FC = () => {
         schema: 'public',
         table: 'user_progress',
         filter: `user_id=eq.${userId}`
-      }, () => debounced.schedule('user_progress'))
+      }, () => {
+        devPerfCount('App:realtime:user_progress');
+        debounced.schedule('user_progress');
+      })
       .subscribe();
 
     return () => {
