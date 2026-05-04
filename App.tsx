@@ -315,6 +315,10 @@ const App: React.FC = () => {
   /** Ignora refetch Realtime logo após sync em lote (rajada de postgres_changes). */
   const realtimeMutedUntilRef = useRef(0);
   const loadedDataScopesRef = useRef(new Set<UserDataSyncScope>());
+  /** Evita consultas duplicadas por scope quando vários gatilhos disparam juntos. */
+  const scopeLoadPromisesRef = useRef(new Map<UserDataSyncScope, Promise<void>>());
+  /** Cooldown curto por scope para reduzir bursts de refetch no Supabase. */
+  const scopeLastLoadedAtRef = useRef(new Map<UserDataSyncScope, number>());
   const [isRouteDataLoading, setIsRouteDataLoading] = useState(false);
   const [isLoadingFlashcards, setIsLoadingFlashcards] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -712,6 +716,12 @@ const App: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    loadedDataScopesRef.current.clear();
+    scopeLoadPromisesRef.current.clear();
+    scopeLastLoadedAtRef.current.clear();
+  }, [session?.user?.id]);
+
   /**
    * Arranque: `bootstrap` (perfil + leve); sync da fila Dexie só se houver itens.
    * Após sync em lote, silencia Realtime brevemente para não disparar rajada de refetch.
@@ -779,12 +789,36 @@ const App: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, session?.user?.id, isOnline, currentView]);
+  }, [isAuthenticated, session?.user?.id, isOnline]);
 
   const loadUserData = async (opts?: { scope?: UserDataSyncScope }) => {
     const scope: UserDataSyncScope = opts?.scope ?? 'bootstrap';
     const showFlashLoading = scope === 'full' || scope === 'flashcards';
     const userId = session?.user?.id;
+    const scopeMinIntervalMs: Partial<Record<UserDataSyncScope, number>> = {
+      bootstrap: 2000,
+      user_progress: 800,
+      tasks: 800,
+      flashcards: 900,
+      folders: 1200,
+      subjects: 1500,
+      boards: 1500,
+      study_sessions: 1800,
+      readings: 2000,
+      full: 4000,
+    };
+    const now = Date.now();
+    const lastLoadedAt = scopeLastLoadedAtRef.current.get(scope) ?? 0;
+    const minInterval = scopeMinIntervalMs[scope] ?? 0;
+    if (minInterval > 0 && now - lastLoadedAt < minInterval) {
+      return;
+    }
+
+    const inFlight = scopeLoadPromisesRef.current.get(scope);
+    if (inFlight) {
+      await inFlight;
+      return;
+    }
 
     const hydrateOfflineBootstrapOrFull = async () => {
       if (!userId) return;
@@ -823,7 +857,8 @@ const App: React.FC = () => {
       if (profileRow) setUserProfile(profileRow as UserProfile);
     };
 
-    try {
+    const run = (async () => {
+      try {
       if (!userId) {
         return;
       }
@@ -1241,19 +1276,28 @@ const App: React.FC = () => {
           );
         }
       }
-    } catch (err) {
-      console.error("Erro no carregamento dos dados:", err);
-      if (scope === 'full' || scope === 'bootstrap') {
-        try {
-          await hydrateOfflineBootstrapOrFull();
-        } catch (fallbackErr) {
-          console.error("Erro ao hidratar dados locais após falha na nuvem:", fallbackErr);
+      } catch (err) {
+        console.error("Erro no carregamento dos dados:", err);
+        if (scope === 'full' || scope === 'bootstrap') {
+          try {
+            await hydrateOfflineBootstrapOrFull();
+          } catch (fallbackErr) {
+            console.error("Erro ao hidratar dados locais após falha na nuvem:", fallbackErr);
+          }
+        }
+      } finally {
+        if (showFlashLoading) {
+          setIsLoadingFlashcards(false);
         }
       }
+    })();
+
+    scopeLoadPromisesRef.current.set(scope, run);
+    try {
+      await run;
+      scopeLastLoadedAtRef.current.set(scope, Date.now());
     } finally {
-      if (showFlashLoading) {
-        setIsLoadingFlashcards(false);
-      }
+      scopeLoadPromisesRef.current.delete(scope);
     }
   };
 
@@ -1780,6 +1824,8 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     loadedDataScopesRef.current.clear();
+    scopeLoadPromisesRef.current.clear();
+    scopeLastLoadedAtRef.current.clear();
     try {
       await supabase.auth.signOut();
       // Limpa dados locais para evitar vazamento entre usuários e garantir sincronização limpa no próximo login

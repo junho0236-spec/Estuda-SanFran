@@ -38,9 +38,17 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
     fetchData();
 
     const merged = supabase
-      .channel('friends_coalesced')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, () => debounced.schedule())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_persona' }, () => debounced.schedule())
+      .channel(`friends_coalesced:${userId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'friendships', filter: `user_id=eq.${userId}` },
+        () => debounced.schedule()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'friendships', filter: `friend_id=eq.${userId}` },
+        () => debounced.schedule()
+      )
       .subscribe();
 
     return () => {

@@ -798,12 +798,27 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     }, 600);
 
     const channel = supabase
-      .channel('chat_calls_history')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'chat_calls' 
-      }, () => debouncedHistory.schedule())
+      .channel(`chat_calls_history:${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'chat_calls',
+          filter: `caller_id=eq.${userId}`,
+        },
+        () => debouncedHistory.schedule()
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'chat_calls',
+          filter: `receiver_id=eq.${userId}`,
+        },
+        () => debouncedHistory.schedule()
+      )
       .subscribe();
     
     return () => {
@@ -1559,7 +1574,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   const subscribeToPolls = (roomId: string) => {
     const debouncedPolls = createTrailingDebounce(() => {
       void fetchPolls(roomId);
-    }, 450);
+    }, 900);
 
     const channel = supabase
       .channel(`polls:${roomId}`)
@@ -1590,7 +1605,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   const subscribeToStories = () => {
     const debouncedStories = createTrailingDebounce(() => {
       void fetchStories();
-    }, 600);
+    }, 1200);
 
     const channel = supabase
       .channel('chat_stories_channel')
