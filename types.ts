@@ -1060,7 +1060,7 @@ export interface SpacedTopic {
   srs_fsrs_card?: unknown;
   /** Modo fixo: adia a revisão de um degrau (ex.: Again) — chave = intervalo em string, valor = data. */
   review_snoozes?: Record<string, string>;
-  /** Modo fixo: deslocamento em dias aplicado à escada (Hard/Easy). */
+  /** Modo fixo: somado a study_date+degrau; valores negativos antecipam (Hard −2, Easy −1 por clique, mín. −5). */
   srs_cumulative_offset_days?: number | null;
   /** Qual atalho de material enfatizar (ambos continuam disponíveis quando não for `none`). */
   linked_material_kind?: SpacedMaterialKind | null;

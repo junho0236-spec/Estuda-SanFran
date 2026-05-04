@@ -51,6 +51,7 @@ export type SpacedTopicPlanPatch = {
  * - Só mudar data (SM-2/FSRS): reinicia scheduler a partir da nova data (primeira revisão = data + 1 dia).
  * - Só mudar ciclos (fixo): remove conclusões/snoozes cujo degrau deixou de existir no plano.
  * - Só mudar ciclos (SM-2/FSRS): só altera meta de “ciclos”; estado do scheduler inalterado.
+ * - Modo fixo (qualidade ao concluir degrau): Hard antecipa (−2 no offset cumulativo), Easy antecipa levemente (−1), Good neutro; offset mín. −5.
  */
 export function applySpacedTopicPlanEdit(prev: SpacedTopic, patch: SpacedTopicPlanPatch): SpacedTopic {
   const nextStudy = patch.study_date ?? prev.study_date;

@@ -219,7 +219,8 @@ function applyReviewQuality(topic: SpacedTopic, task: ReviewTask, quality: Revie
   const newCompleted = [...topic.reviews_completed, task.interval];
   const newDates = { ...(topic.review_completion_dates || {}), [intKey]: completionDay };
   let offset = topic.srs_cumulative_offset_days ?? 0;
-  if (quality === 'hard') offset += 2;
+  // Negativo = antecipa os degraus (mais cedo), alinhado a SM-2/FSRS: Hard rever antes que Good.
+  if (quality === 'hard') offset = Math.max(-5, offset - 2);
   if (quality === 'easy') offset = Math.max(-5, offset - 1);
 
   return normalizeSpacedTopic({
@@ -1861,7 +1862,7 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                               ? 'FSRS (biblioteca ts-fsrs): scheduler moderno, melhor previsão de esquecimento que SM-2 clássico. Intervalos em dias (sem steps de minutos), alinhado ao calendário do app.'
                               : newTopicAlgorithm === 'sm2'
                                 ? 'SuperMemo 2 simplificado: o próximo prazo depende da qualidade e do fator de facilidade. FSRS costuma ser mais preciso para retenção a longo prazo.'
-                                : 'Escada clássica 1d → 3d → 7d… Hard/Easy deslocam levemente os prazos; Again repete o degrau no dia seguinte.'}
+                                : 'Escada clássica 1d → 3d → 7d… Hard antecipa 2 dias e Easy 1 dia os próximos degraus; Good segue o plano; Again repete o degrau no dia seguinte.'}
                           </p>
                        </div>
                        <div className="flex justify-between items-center mb-4">
