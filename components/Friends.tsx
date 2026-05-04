@@ -162,8 +162,6 @@ const Friends: React.FC<FriendsProps> = ({ userId, userName, onNavigate }) => {
 
   const handleFriendRequest = async (friendshipId: string, status: 'accepted' | 'declined', requesterId: string) => {
     try {
-      console.log(`[Friends] Handling friend request: ${friendshipId}, status: ${status}, requester: ${requesterId}`);
-      
       await dataService.handleFriendRequest(friendshipId, status);
 
       if (status === 'accepted') {

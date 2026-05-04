@@ -466,8 +466,6 @@ export const dataService = {
       entidades: sanitized.entidades
     };
 
-    console.log("[dataService] Saving user profile to local DB and cloud:", userId);
-
     await db.user_profile.put({ ...sanitized, id: userId });
     
     if (isOnline) {
@@ -1056,8 +1054,6 @@ export const dataService = {
         total_errors: card.total_errors || 0
       };
 
-      console.log(`[dataService] Salvando card ${card.id} no Supabase. Status: ${payload.status}`);
-      
       const { data, error } = await supabase
         .from('flashcards')
         .upsert(payload, { onConflict: 'id' })
@@ -1066,8 +1062,6 @@ export const dataService = {
       if (error) {
         console.error("[dataService] Erro ao salvar no Supabase:", error);
         throw new Error(`Erro ao salvar no nuvem: ${error.message}`);
-      } else {
-        console.log("[dataService] Card salvo com sucesso no Supabase:", data?.[0]?.id);
       }
     } else {
       throw new Error("Você precisa estar online para salvar flashcards.");
@@ -1127,8 +1121,6 @@ export const dataService = {
   async saveNote(note: Note, userId: string, isOnline: boolean) {
     // Optimistic update in local DB
     await db.notes.put(note);
-    console.log("Note saved locally:", note.id);
-
     if (isOnline) {
       try {
         const { error } = await upsertNoteToSupabase({
@@ -1142,8 +1134,6 @@ export const dataService = {
         if (error) {
           console.error("Error syncing note to cloud, adding to queue", error);
           await addToSyncQueue({ table: 'notes', action: 'update', data: note });
-        } else {
-          console.log("Note synced to cloud successfully");
         }
       } catch (err) {
         console.error("Supabase upsert failed:", err);
@@ -1476,10 +1466,6 @@ export const dataService = {
       (item, i) => lastWinIndex.get(getSyncResolutionKey(item, userId)) === i
     );
     if (winners.length === 0) return;
-
-    console.log(
-      `[sync] ${n} entradas na fila → ${winners.length} operações efetivas após dedupe (lotes de ${SYNC_UPSERT_CHUNK})`
-    );
 
     const winnerIdsSucceeded: number[] = [];
 
