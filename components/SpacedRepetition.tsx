@@ -118,6 +118,37 @@ const getIntervalsForCycles = (num: number) => {
   return intervals;
 };
 
+/** Último dia em que um degrau da escada fixa foi concluído (chaves só numéricas em `review_completion_dates`). */
+function getLastFixedRungCompletionDate(t: SpacedTopic): Date | null {
+  const raw = t.review_completion_dates;
+  if (!raw || typeof raw !== 'object') return null;
+  let max: Date | null = null;
+  for (const k of Object.keys(raw)) {
+    if (!/^\d+$/.test(k)) continue;
+    const v = (raw as Record<string, string>)[k];
+    if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) continue;
+    const d = new Date(v + 'T00:00:00');
+    d.setHours(0, 0, 0, 0);
+    if (!max || d.getTime() > max.getTime()) max = d;
+  }
+  return max;
+}
+
+/**
+ * Evita que Hard/Easy puxem o próximo degrau para o mesmo dia da conclusão (parece “Again” na UI).
+ * Próximo degrau fica no mínimo no dia seguinte ao último “OK” na escada fixa.
+ */
+function clampFixedLadderDue(rawTarget: Date, t: SpacedTopic): Date {
+  const last = getLastFixedRungCompletionDate(t);
+  if (!last) return rawTarget;
+  const minNext = new Date(last);
+  minNext.setDate(minNext.getDate() + 1);
+  minNext.setHours(0, 0, 0, 0);
+  const raw = new Date(rawTarget);
+  raw.setHours(0, 0, 0, 0);
+  return raw.getTime() < minNext.getTime() ? minNext : raw;
+}
+
 const normalizeSpacedTopic = (t: SpacedTopic): SpacedTopic => {
   const raw = t.review_completion_dates;
   const dates =
@@ -250,7 +281,7 @@ const getNextReviewDueDate = (t: SpacedTopic): Date | null => {
     const targetDate = new Date(adjustedStart);
     targetDate.setDate(adjustedStart.getDate() + interval + off);
     targetDate.setHours(0, 0, 0, 0);
-    return targetDate;
+    return clampFixedLadderDue(targetDate, t);
   }
   return null;
 };
@@ -308,7 +339,7 @@ function collectUpcomingDueDates(t: SpacedTopic): Date[] {
       snD.setHours(0, 0, 0, 0);
       eff = snD > ladder ? snD : ladder;
     }
-    out.push(eff);
+    out.push(clampFixedLadderDue(eff, t));
   }
   return out;
 }
@@ -616,15 +647,16 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
         const targetDate = new Date(adjustedStart);
         targetDate.setDate(adjustedStart.getDate() + interval + off);
         targetDate.setHours(0, 0, 0, 0);
+        const dueDate = clampFixedLadderDue(targetDate, t);
 
-        if (targetDate <= today) {
+        if (dueDate <= today) {
           tasks.push({
             topicId: t.id,
             subject: t.subject,
             topic: t.topic,
             interval: interval,
-            dueDate: targetDate,
-            status: targetDate.getTime() === today.getTime() ? 'pending' : 'overdue',
+            dueDate,
+            status: dueDate.getTime() === today.getTime() ? 'pending' : 'overdue',
             reviewKind: 'fixed',
           });
         }
@@ -1862,7 +1894,7 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                               ? 'FSRS (biblioteca ts-fsrs): scheduler moderno, melhor previsão de esquecimento que SM-2 clássico. Intervalos em dias (sem steps de minutos), alinhado ao calendário do app.'
                               : newTopicAlgorithm === 'sm2'
                                 ? 'SuperMemo 2 simplificado: o próximo prazo depende da qualidade e do fator de facilidade. FSRS costuma ser mais preciso para retenção a longo prazo.'
-                                : 'Escada clássica 1d → 3d → 7d… Hard antecipa 2 dias e Easy 1 dia os próximos degraus; Good segue o plano; Again repete o degrau no dia seguinte.'}
+                                : 'Escada clássica 1d → 3d → 7d… Hard antecipa 2 dias e Easy 1 dia os próximos degraus; Good segue o plano; o próximo degrau nunca cai no mesmo dia da conclusão (Again continua sendo o único que recoloca o mesmo degrau no dia seguinte).'}
                           </p>
                        </div>
                        <div className="flex justify-between items-center mb-4">
