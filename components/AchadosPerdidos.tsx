@@ -21,6 +21,9 @@ interface LostFoundItem {
   created_at: string;
 }
 
+const LOST_FOUND_COLUMNS =
+  'id, user_id, user_name, title, description, location, image_url, status, contact_info, created_at';
+
 const AchadosPerdidos: React.FC<AchadosPerdidosProps> = ({ userId, userName }) => {
   const [items, setItems] = useState<LostFoundItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,24 +64,12 @@ const AchadosPerdidos: React.FC<AchadosPerdidosProps> = ({ userId, userName }) =
     
     const { data } = await supabase
       .from('sf_lost_found')
-      .select('id, title, contact, created_at')
+      .select(LOST_FOUND_COLUMNS)
       .gte('created_at', sevenDaysAgo.toISOString())
       .order('created_at', { ascending: false });
     
     if (data) {
-      setItems(
-        data.map((row) => ({
-          id: row.id,
-          user_id: '',
-          user_name: '',
-          title: row.title,
-          description: '',
-          location: '',
-          status: 'lost' as const,
-          contact_info: row.contact,
-          created_at: row.created_at,
-        }))
-      );
+      setItems(data as LostFoundItem[]);
     }
     setLoading(false);
   };

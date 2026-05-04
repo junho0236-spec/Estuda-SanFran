@@ -61,13 +61,18 @@ const SocialEvents: React.FC<SocialEventsProps> = ({ userId, userName }) => {
   useEffect(() => {
     const debounced = createTrailingDebounce(() => {
       void fetchData();
-    }, 700);
+    }, 1000);
 
     fetchData();
 
     const eventsChannel = supabase
       .channel('social_events_coalesced')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_events' }, () => debounced.schedule())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_events' }, (payload) => {
+        const row = (payload.new || payload.old) as { event_date?: string } | null;
+        // Skip old events to avoid unnecessary refetch pressure.
+        if (row?.event_date && new Date(row.event_date).getTime() < Date.now()) return;
+        debounced.schedule();
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_event_rsvps' }, () => debounced.schedule())
       .subscribe();
 

@@ -56,7 +56,11 @@ const CaronasRepublicas: React.FC<CaronasRepublicasProps> = ({ userId, userName 
       debounced.cancel();
       supabase.removeChannel(channel);
     };
-  }, [activeTab]); // Refetch when tab changes to keep focus
+  }, [userId]);
+
+  useEffect(() => {
+    void fetchPosts();
+  }, [activeTab]);
 
   const fetchPosts = async () => {
     setLoading(true);

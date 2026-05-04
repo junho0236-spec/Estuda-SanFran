@@ -50,7 +50,7 @@ const ClassificadosPatio: React.FC<ClassificadosPatioProps> = ({ userId, userNam
   useEffect(() => {
     const debounced = createTrailingDebounce(() => {
       void fetchAds();
-    }, 700);
+    }, 1000);
 
     fetchAds();
     fetchSpentCoins();
