@@ -13,6 +13,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../services/supabaseClient';
 import { createTrailingDebounce } from '../utils/realtimeThrottle';
+import { devPerfCount, devPerfEnd, devPerfStart } from '../utils/devPerfLog';
 import ChatSidebar from './chat/ChatSidebar';
 import MessageList from './chat/MessageList';
 import MessageItem from './chat/MessageItem';
@@ -794,6 +795,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
 
   const subscribeToCalls = () => {
     const debouncedHistory = createTrailingDebounce(() => {
+      devPerfCount('Connect:realtime_calls_history_debounced_fetch');
       void fetchCallHistory();
     }, 600);
 
@@ -807,7 +809,10 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
           table: 'chat_calls',
           filter: `caller_id=eq.${userId}`,
         },
-        () => debouncedHistory.schedule()
+        () => {
+          devPerfCount('Connect:realtime_chat_calls_caller');
+          debouncedHistory.schedule();
+        }
       )
       .on(
         'postgres_changes',
@@ -817,7 +822,10 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
           table: 'chat_calls',
           filter: `receiver_id=eq.${userId}`,
         },
-        () => debouncedHistory.schedule()
+        () => {
+          devPerfCount('Connect:realtime_chat_calls_receiver');
+          debouncedHistory.schedule();
+        }
       )
       .subscribe();
     
@@ -962,6 +970,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
 
   const subscribeToAllRooms = () => {
     const debouncedRooms = createTrailingDebounce(() => {
+      devPerfCount('Connect:realtime_rooms_debounced_fetch');
       void fetchRooms();
     }, 550);
 
@@ -971,13 +980,19 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
         event: '*', 
         schema: 'public', 
         table: 'chat_rooms' 
-      }, () => debouncedRooms.schedule())
+      }, () => {
+        devPerfCount('Connect:realtime_chat_rooms');
+        debouncedRooms.schedule();
+      })
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
         table: 'chat_participants',
         filter: `user_id=eq.${userId}`
-      }, () => debouncedRooms.schedule())
+      }, () => {
+        devPerfCount('Connect:realtime_chat_participants_user');
+        debouncedRooms.schedule();
+      })
       .subscribe();
     
     return () => {
@@ -1198,6 +1213,8 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
 
   const fetchRooms = async (options?: { showLoading?: boolean }) => {
     const showLoading = options?.showLoading ?? false;
+    const perfStart = devPerfStart('Connect:fetchRooms');
+    devPerfCount('Connect:fetchRooms_calls');
     if (showLoading) setLoading(true);
     try {
       // Get rooms where user is a participant
@@ -1254,6 +1271,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
       console.error('Error fetching rooms:', error);
       toast.error(`Erro ao carregar conversas: ${error.message || 'Verifique o console'}`);
     } finally {
+      devPerfEnd('Connect:fetchRooms', perfStart);
       if (showLoading) setLoading(false);
     }
   };
@@ -1397,6 +1415,8 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
 
   const fetchMessages = useCallback(
     async (roomId: string, loadMore = false) => {
+      const perfStart = devPerfStart('Connect:fetchMessages');
+      devPerfCount('Connect:fetchMessages_calls', { loadMore });
       if (loadMore) setIsLoadingMore(true);
 
       const cached = useChatStore.getState().messages[roomId] || [];
@@ -1408,6 +1428,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
           setHasMoreMessages(m?.hasMore ?? true);
         }
         setIsLoadingMore(false);
+        devPerfEnd('Connect:fetchMessages', perfStart, { roomId, loadMore, mode: 'cached' });
         return;
       }
 
@@ -1431,6 +1452,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
           setHasMoreMessages(meta?.hasMore ?? true);
         }
         setIsLoadingMore(false);
+        devPerfEnd('Connect:fetchMessages', perfStart, { roomId, loadMore, mode: 'incremental' });
         return;
       }
 
@@ -1449,6 +1471,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
       if (error) {
         logConnectError('messages', 'fetch_page_failed', error, { roomId, loadMore });
         setIsLoadingMore(false);
+        devPerfEnd('Connect:fetchMessages', perfStart, { roomId, loadMore, mode: 'error' });
         return;
       }
 
@@ -1474,6 +1497,12 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
         setHasMoreMessages(hasMore);
       }
       setIsLoadingMore(false);
+      devPerfEnd('Connect:fetchMessages', perfStart, {
+        roomId,
+        loadMore,
+        mode: 'page',
+        fetchedCount: rows.length,
+      });
     },
     [activeRoomId, addMessage, setStoreMessages]
   );
@@ -1547,6 +1576,8 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   };
 
   const fetchPolls = async (roomId: string) => {
+    const perfStart = devPerfStart('Connect:fetchPolls');
+    devPerfCount('Connect:fetchPolls_calls');
     try {
       const { data, error } = await supabase
         .from('chat_polls')
@@ -1568,6 +1599,8 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
       setPolls(pollMap);
     } catch (error: any) {
       console.error('Erro ao buscar enquetes:', error);
+    } finally {
+      devPerfEnd('Connect:fetchPolls', perfStart, { roomId });
     }
   };
 
@@ -1588,6 +1621,8 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
   };
 
   const fetchStories = async () => {
+    const perfStart = devPerfStart('Connect:fetchStories');
+    devPerfCount('Connect:fetchStories_calls');
     try {
       const { data, error } = await supabase
         .from('chat_stories')
@@ -1599,6 +1634,8 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
       setStories(data || []);
     } catch (error: any) {
       console.error('Erro ao buscar stories:', error);
+    } finally {
+      devPerfEnd('Connect:fetchStories', perfStart);
     }
   };
 
@@ -1842,6 +1879,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
         table: 'chat_messages',
         filter: `room_id=eq.${roomId}`
       }, async (payload) => {
+        devPerfCount('Connect:realtime_room_chat_messages_insert');
         const newMsg = payload.new as ChatMessage;
         addMessage(roomId, newMsg);
 
@@ -1885,6 +1923,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
         table: 'chat_messages',
         filter: `room_id=eq.${roomId}`
       }, (payload) => {
+        devPerfCount('Connect:realtime_room_chat_messages_update');
         updateMessage(roomId, payload.new as ChatMessage);
       })
       .on('postgres_changes', {
@@ -1893,6 +1932,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
         table: 'chat_participants',
         filter: `room_id=eq.${roomId}`
       }, (payload) => {
+        devPerfCount('Connect:realtime_room_chat_participants_update');
         setParticipants(prev => {
           const roomParticipants = prev[roomId] || [];
           const updated = roomParticipants.map(p => p.user_id === payload.new.user_id ? payload.new as ChatParticipant : p);
@@ -2541,7 +2581,10 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
           table: 'chat_calls',
           filter: `caller_id=eq.${userId}`,
         },
-        (payload) => void onCallRow(payload as { eventType: string; new: Record<string, unknown> })
+        (payload) => {
+          devPerfCount('Connect:realtime_call_overlay_caller');
+          void onCallRow(payload as { eventType: string; new: Record<string, unknown> });
+        }
       )
       .on(
         'postgres_changes',
@@ -2551,7 +2594,10 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
           table: 'chat_calls',
           filter: `receiver_id=eq.${userId}`,
         },
-        (payload) => void onCallRow(payload as { eventType: string; new: Record<string, unknown> })
+        (payload) => {
+          devPerfCount('Connect:realtime_call_overlay_receiver');
+          void onCallRow(payload as { eventType: string; new: Record<string, unknown> });
+        }
       )
       .subscribe();
 
