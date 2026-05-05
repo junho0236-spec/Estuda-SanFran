@@ -2208,10 +2208,10 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
         ? 'Exatamente 5 strings: alternativas A a E.'
         : 'Exatamente 2 strings: primeira e segunda alternativa (ex.: Certo e Errado), na mesma ordem usada em correct_answer.';
       const correctAnswerSchemaDesc = isMultipla
-        ? 'Índice inteiro da alternativa correta: 0 a 4.'
+        ? 'Índice inteiro da alternativa correta no array options: 0 a 4. O sistema embaralha a ordem das opções ao guardar (gabarito com distribuição uniforme A–E).'
         : 'Índice inteiro da alternativa correta: 0 ou 1 (alinhar com a ordem do array options).';
       const explanationSchemaDesc = isMultipla
-        ? 'Explicação detalhada referindo cada alternativa A–E.'
+        ? 'Explicação detalhada: analisar cada opção pelo conteúdo (não use letras A–E como referência fixa, pois a ordem é reorganizada ao guardar).'
         : 'Explicação detalhada para Certo e para Errado.';
 
       let materialCoveragePlan: MaterialCoveragePlan | null = null;
@@ -2293,6 +2293,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
         
         ${buildAiDistractorQualityBlock(aiConfig.difficulty, aiConfig.modality, statementForThisBatch)}
         ${aiConfig.modality === 'multipla_escolha' ? 'Cada questão deve ter 5 alternativas (A, B, C, D, E).' : 'Cada questão deve ser de Certo ou Errado (duas alternativas: Certo e Errado).'}
+        ${aiConfig.modality === 'multipla_escolha' ? 'Depois de geradas, as alternativas são embaralhadas ao guardar (distribuição uniforme do gabarito entre A–E); nas explicações, referir cada opção pelo texto/conteúdo, não por uma letra fixa.' : ''}
         A explicação deve ser EXTREMAMENTE detalhada, contendo uma análise individual para cada alternativa (ou para o item Certo/Errado), explicando por que a resposta correta está certa e por que as incorretas estão erradas, fundamentando com base no foco jurídico selecionado e no diploma legal mencionado.
         
         IMPORTANTE: Identifique e extraia tags de legislação (ex: "Art. 5, CF", "Código Penal") e jurisprudência (ex: "Súmula 123 STJ", "Informativo 999 STF") associadas a cada questão.

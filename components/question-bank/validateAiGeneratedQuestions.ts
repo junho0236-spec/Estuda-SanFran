@@ -39,6 +39,36 @@ function trimStr(v: unknown): string {
   return String(v).trim();
 }
 
+/** Permutação aleatória uniforme de 0..n-1 (Fisher–Yates). */
+function randomPermutation(n: number): number[] {
+  const a = Array.from({ length: n }, (_, i) => i);
+  for (let i = n - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = a[i];
+    a[i] = a[j]!;
+    a[j] = t!;
+  }
+  return a;
+}
+
+/**
+ * Remove o viés do modelo (quase sempre gabarito na posição 0 / alternativa A).
+ * Reordena as 5 alternativas e recalcula o índice da correta.
+ */
+export function shuffleMcOptionsFromModel(
+  options: string[],
+  correctIndex: number
+): { options: string[]; correct_answer: number } {
+  const n = options.length;
+  if (n !== 5 || correctIndex < 0 || correctIndex >= n) {
+    return { options: [...options], correct_answer: correctIndex };
+  }
+  const perm = randomPermutation(n);
+  const newOptions = perm.map((oldIdx) => options[oldIdx]!);
+  const newCorrect = perm.indexOf(correctIndex);
+  return { options: newOptions, correct_answer: newCorrect };
+}
+
 function normalizeDifficulty(raw: unknown): string {
   const s = trimStr(raw).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const compact = s.replace(/\s+/g, '_');
@@ -117,7 +147,7 @@ export function validateOneAiGeneratedQuestion(
     return { ok: false, message: `${label}: "options" tem de ser uma lista (array) de textos.` };
   }
 
-  const options = (q.options as unknown[]).map((o) => trimStr(o));
+  let options = (q.options as unknown[]).map((o) => trimStr(o));
   if (options.length !== expectedOpts) {
     return {
       ok: false,
@@ -158,6 +188,12 @@ export function validateOneAiGeneratedQuestion(
       ok: false,
       message: `${label}: "correct_answer"=${correctAnswer} está fora do intervalo válido (0 a ${options.length - 1}) para ${options.length} alternativas.`,
     };
+  }
+
+  if (modality === 'multipla_escolha' && options.length === 5) {
+    const sh = shuffleMcOptionsFromModel(options, correctAnswer);
+    options = sh.options;
+    correctAnswer = sh.correct_answer;
   }
 
   const resolvedModality = normalizeQuestionModality(trimStr(q.modality)) ?? modality;
