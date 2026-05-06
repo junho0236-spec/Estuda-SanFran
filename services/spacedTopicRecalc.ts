@@ -1,5 +1,6 @@
 import type { SpacedTopic, SrsAlgorithm } from '../types';
 import { createInitialFsrsCard, fsrsCardToSnapshot } from './spacedFsrs';
+import { filterFixedGapPlanToCycles, stripFixedGapKeys } from './spacedFixedGaps';
 
 function getIntervalsForCycles(num: number) {
   const intervals = [1, 3, 7, 15];
@@ -19,6 +20,7 @@ function addCalendarDays(isoDate: string, deltaDays: number): string {
 
 function normalizeAlgoChoice(a: SrsAlgorithm | undefined | null): SrsAlgorithm {
   if (a === 'sm2' || a === 'fsrs') return a;
+  if (a === 'fixed_gaps') return 'fixed_gaps';
   return 'fixed';
 }
 
@@ -46,12 +48,13 @@ export type SpacedTopicPlanPatch = {
 
 /**
  * Regras (espelhadas no texto da UI):
- * - Trocar algoritmo: reinicia o estado do modo destino (fixo mantém degraus concluídos válidos; SM-2/FSRS zeram fila fixa e reiniciam scheduler).
- * - Só mudar data (fixo): mantém degraus concluídos; zera offset cumulativo e snoozes.
+ * - Trocar algoritmo: reinicia o estado do modo destino (fixo mantém degraus da escada válidos; saltos fixos começa limpo; SM-2/FSRS zeram fila e reiniciam scheduler).
+ * - Só mudar data (fixo / saltos fixos): mantém conclusões; zera offset e snoozes.
  * - Só mudar data (SM-2/FSRS): reinicia scheduler a partir da nova data (primeira revisão = data + 1 dia).
- * - Só mudar ciclos (fixo): remove conclusões/snoozes cujo degrau deixou de existir no plano.
- * - Só mudar ciclos (SM-2/FSRS): só altera meta de “ciclos”; estado do scheduler inalterado.
- * - Modo fixo (qualidade ao concluir degrau): Hard antecipa (−2 no offset cumulativo), Easy antecipa levemente (−1), Good neutro; offset mín. −5.
+ * - Só mudar ciclos (fixo): remove conclusões/snoozes de degraus que sumiram.
+ * - Só mudar ciclos (saltos fixos): remove passos fg acima do novo limite.
+ * - Só mudar ciclos (SM-2/FSRS): só altera meta visual de “ciclos”.
+ * - Fixo / saltos fixos (qualidade): Hard/Easy no 1.º passo ajustam offset (−2 / −1, mín. −5).
  */
 export function applySpacedTopicPlanEdit(prev: SpacedTopic, patch: SpacedTopicPlanPatch): SpacedTopic {
   const nextStudy = patch.study_date ?? prev.study_date;
@@ -85,12 +88,28 @@ export function applySpacedTopicPlanEdit(prev: SpacedTopic, patch: SpacedTopicPl
         srs_cumulative_offset_days: 0,
         review_snoozes: {},
       };
+      t = stripFixedGapKeys(t);
       t = filterFixedPlanToIntervals(t, intervals);
       return t;
     }
-    if (nextAlgo === 'sm2') {
+    if (nextAlgo === 'fixed_gaps') {
       return {
         ...t,
+        srs_ease_factor: 2.5,
+        srs_repetitions: 0,
+        srs_interval_days: null,
+        srs_next_review_at: null,
+        srs_fsrs_card: null,
+        srs_cumulative_offset_days: 0,
+        review_snoozes: {},
+        reviews_completed: [],
+        review_completion_dates: {},
+      };
+    }
+    if (nextAlgo === 'sm2') {
+      const u = stripFixedGapKeys(t);
+      return {
+        ...u,
         reviews_completed: [],
         review_snoozes: {},
         srs_cumulative_offset_days: 0,
@@ -101,8 +120,9 @@ export function applySpacedTopicPlanEdit(prev: SpacedTopic, patch: SpacedTopicPl
         srs_fsrs_card: null,
       };
     }
+    const u = stripFixedGapKeys(t);
     return {
-      ...t,
+      ...u,
       reviews_completed: [],
       review_snoozes: {},
       srs_cumulative_offset_days: 0,
@@ -115,7 +135,7 @@ export function applySpacedTopicPlanEdit(prev: SpacedTopic, patch: SpacedTopicPl
   }
 
   if (studyCh) {
-    if (nextAlgo === 'fixed') {
+    if (nextAlgo === 'fixed' || nextAlgo === 'fixed_gaps') {
       t = {
         ...t,
         srs_cumulative_offset_days: 0,
@@ -143,6 +163,10 @@ export function applySpacedTopicPlanEdit(prev: SpacedTopic, patch: SpacedTopicPl
 
   if (cyclesCh && nextAlgo === 'fixed') {
     t = filterFixedPlanToIntervals(t, intervals);
+  }
+
+  if (cyclesCh && nextAlgo === 'fixed_gaps') {
+    t = filterFixedGapPlanToCycles(t, nextCycles);
   }
 
   return t;

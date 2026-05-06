@@ -1028,8 +1028,8 @@ export interface IracEntry {
   created_at: string;
 }
 
-/** `fixed` = escada Ebbinghaus; `sm2` = SM-2; `fsrs` = FSRS (ts-fsrs, intervalos em dias). */
-export type SrsAlgorithm = 'fixed' | 'sm2' | 'fsrs';
+/** `fixed` = escada Ebbinghaus; `fixed_gaps` = saltos +3/+7/+14… após cada revisão; `sm2` / `fsrs` = adaptativos. */
+export type SrsAlgorithm = 'fixed' | 'fixed_gaps' | 'sm2' | 'fsrs';
 
 /** Destaque de atalhos no tópico de revisão espaçada (flashcards, resumidor, banco de questões). */
 export type SpacedMaterialKind = 'none' | 'flashcards' | 'summarizer' | 'both' | 'question_bank';
@@ -1041,8 +1041,8 @@ export interface SpacedTopic {
   subject: string;
   topic: string;
   study_date: string; // YYYY-MM-DD
-  reviews_completed: number[]; // Array of intervals done [1, 7, 15, 30]
-  /** Data (YYYY-MM-DD) em que cada intervalo foi concluído; chaves são o número do intervalo em string (ex.: "1", "7"). */
+  reviews_completed: number[]; // Ebbinghaus: degraus 1,3,7…; saltos fixos: ids 10000+; SM-2/FSRS: livre
+  /** Data (YYYY-MM-DD) da conclusão; escada numérica ("1","3"); modo saltos fixos (`fg0`,`fg1`…). */
   review_completion_dates?: Record<string, string>;
   cycles: number;
   created_at: string;
@@ -1058,9 +1058,9 @@ export interface SpacedTopic {
   srs_next_review_at?: string | null;
   /** Estado serializado do cartão FSRS (`services/spacedFsrs.ts`). Só para `srs_algorithm === 'fsrs'`. */
   srs_fsrs_card?: unknown;
-  /** Modo fixo: adia a revisão de um degrau (ex.: Again) — chave = intervalo em string, valor = data. */
+  /** Fixo / saltos fixos: Again — chave do degrau ou `fgN`, valor = data mínima. */
   review_snoozes?: Record<string, string>;
-  /** Modo fixo: somado a study_date+degrau; valores negativos antecipam (Hard −2, Easy −1 por clique, mín. −5). */
+  /** Fixo / saltos fixos: no 1.º passo soma a `study_date+delay`; Hard −2 / Easy −1 no offset (mín. −5). */
   srs_cumulative_offset_days?: number | null;
   /** Qual atalho de material enfatizar (ambos continuam disponíveis quando não for `none`). */
   linked_material_kind?: SpacedMaterialKind | null;

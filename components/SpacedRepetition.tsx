@@ -23,6 +23,16 @@ import {
   getFsrsRepsFromSnapshot,
 } from '../services/spacedFsrs';
 import { applySpacedTopicPlanEdit } from '../services/spacedTopicRecalc';
+import {
+  fixedGapBadgeLabel,
+  fixedGapCompletionKey,
+  fixedGapRungId,
+  fixedGapStepFromRungId,
+  getFixedGapFirstPendingStep,
+  getFixedGapStepDelays,
+  getFixedGapStepDueDate,
+  topicWithoutFixedGapStepCompletion,
+} from '../services/spacedFixedGaps';
 
 interface SpacedRepetitionProps {
   userId: string;
@@ -37,7 +47,7 @@ interface ReviewTask {
   interval: number; // degrau fixo em dias ou último intervalo SM-2 / FSRS
   dueDate: Date;
   status: 'pending' | 'done' | 'overdue';
-  reviewKind: 'fixed' | 'sm2' | 'fsrs';
+  reviewKind: 'fixed' | 'fixed_gaps' | 'sm2' | 'fsrs';
 }
 
 type ReviewQuality = 'again' | 'hard' | 'good' | 'easy';
@@ -83,6 +93,12 @@ function sm2Step(
 
 function isAdaptiveSrsAlgorithm(a: unknown): a is 'sm2' | 'fsrs' {
   return a === 'sm2' || a === 'fsrs';
+}
+
+function normalizeSrsAlgorithm(raw: unknown): SrsAlgorithm {
+  if (raw === 'sm2' || raw === 'fsrs') return raw;
+  if (raw === 'fixed_gaps') return 'fixed_gaps';
+  return 'fixed';
 }
 
 function spacedTopicPersistPayload(t: SpacedTopic) {
@@ -149,6 +165,78 @@ function clampFixedLadderDue(rawTarget: Date, t: SpacedTopic): Date {
   return raw.getTime() < minNext.getTime() ? minNext : raw;
 }
 
+/** Para métricas de atraso: estado antes de registrar a conclusão deste degrau. */
+function topicWithoutFixedRungCompletion(t: SpacedTopic, intervalValue: number): SpacedTopic {
+  const key = String(intervalValue);
+  const dates = { ...(t.review_completion_dates || {}) };
+  delete dates[key];
+  return {
+    ...t,
+    reviews_completed: t.reviews_completed.filter(i => i !== intervalValue),
+    review_completion_dates: dates,
+  };
+}
+
+/**
+ * Modo fixo — data-alvo de um degrau antes de snooze/clamp:
+ * se o degrau anterior na escada foi concluído, conta a partir dessa data (como Anki);
+ * senão mantém âncora na data de estudo + intervalo + offset cumulativo.
+ */
+function getFixedRungBaseDueDate(
+  t: SpacedTopic,
+  intervalValue: number,
+  topicIntervals: number[]
+): Date {
+  const idx = topicIntervals.indexOf(intervalValue);
+  const off = t.srs_cumulative_offset_days ?? 0;
+  const adjustedStart = new Date(t.study_date + 'T00:00:00');
+  adjustedStart.setHours(0, 0, 0, 0);
+
+  if (idx <= 0) {
+    const d = new Date(adjustedStart);
+    d.setDate(adjustedStart.getDate() + intervalValue + off);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  const prevIv = topicIntervals[idx - 1];
+  const prevDone = t.reviews_completed.includes(prevIv);
+  const prevDateStr = t.review_completion_dates?.[String(prevIv)];
+  if (prevDone && typeof prevDateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(prevDateStr)) {
+    const anchor = new Date(prevDateStr + 'T00:00:00');
+    anchor.setHours(0, 0, 0, 0);
+    const d = new Date(anchor);
+    d.setDate(anchor.getDate() + (intervalValue - prevIv));
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  const d = new Date(adjustedStart);
+  d.setDate(adjustedStart.getDate() + intervalValue + off);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function applyFixedSnoozeFloor(base: Date, t: SpacedTopic, intervalValue: number): Date {
+  const sn = t.review_snoozes?.[String(intervalValue)];
+  if (typeof sn === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(sn)) {
+    const snD = new Date(sn + 'T00:00:00');
+    snD.setHours(0, 0, 0, 0);
+    return snD.getTime() > base.getTime() ? snD : base;
+  }
+  return base;
+}
+
+function getFixedRungEffectiveDueDate(
+  t: SpacedTopic,
+  intervalValue: number,
+  topicIntervals: number[]
+): Date {
+  const base = getFixedRungBaseDueDate(t, intervalValue, topicIntervals);
+  const lifted = applyFixedSnoozeFloor(base, t, intervalValue);
+  return clampFixedLadderDue(lifted, t);
+}
+
 const normalizeSpacedTopic = (t: SpacedTopic): SpacedTopic => {
   const raw = t.review_completion_dates;
   const dates =
@@ -161,7 +249,7 @@ const normalizeSpacedTopic = (t: SpacedTopic): SpacedTopic => {
       ? (snRaw as Record<string, string>)
       : {};
   const rawAlgo = t.srs_algorithm;
-  const algo: SrsAlgorithm = isAdaptiveSrsAlgorithm(rawAlgo) ? rawAlgo : 'fixed';
+  const algo: SrsAlgorithm = normalizeSrsAlgorithm(rawAlgo);
   let srs_next = t.srs_next_review_at ?? null;
   if (isAdaptiveSrsAlgorithm(algo) && !srs_next && t.study_date) {
     srs_next = addCalendarDays(t.study_date, 1);
@@ -238,6 +326,34 @@ function applyReviewQuality(topic: SpacedTopic, task: ReviewTask, quality: Revie
     });
   }
 
+  if (algo === 'fixed_gaps') {
+    const step = fixedGapStepFromRungId(task.interval);
+    if (step === null) return normalizeSpacedTopic(topic);
+    const key = fixedGapCompletionKey(step);
+    const snoozes = { ...(topic.review_snoozes || {}) };
+
+    if (quality === 'again') {
+      snoozes[key] = addCalendarDays(completionDay, 1);
+      return normalizeSpacedTopic({ ...topic, review_snoozes: snoozes });
+    }
+
+    delete snoozes[key];
+    const newCompleted = [...topic.reviews_completed, fixedGapRungId(step)];
+    const newDates = { ...(topic.review_completion_dates || {}), [key]: completionDay };
+    let offset = topic.srs_cumulative_offset_days ?? 0;
+    if (step === 0) {
+      if (quality === 'hard') offset = Math.max(-5, offset - 2);
+      if (quality === 'easy') offset = Math.max(-5, offset - 1);
+    }
+    return normalizeSpacedTopic({
+      ...topic,
+      reviews_completed: newCompleted,
+      review_completion_dates: newDates,
+      review_snoozes: snoozes,
+      srs_cumulative_offset_days: offset,
+    });
+  }
+
   const intKey = String(task.interval);
   const snoozes = { ...(topic.review_snoozes || {}) };
 
@@ -273,15 +389,15 @@ const getNextReviewDueDate = (t: SpacedTopic): Date | null => {
     d.setHours(0, 0, 0, 0);
     return d;
   }
-  const adjustedStart = new Date(t.study_date + 'T00:00:00');
+  if ((t.srs_algorithm || 'fixed') === 'fixed_gaps') {
+    const step = getFixedGapFirstPendingStep(t);
+    if (step === null) return null;
+    return getFixedGapStepDueDate(t, step);
+  }
   const topicIntervals = getIntervalsForCycles(t.cycles || 4);
-  const off = t.srs_cumulative_offset_days ?? 0;
   for (const interval of topicIntervals) {
     if (t.reviews_completed.includes(interval)) continue;
-    const targetDate = new Date(adjustedStart);
-    targetDate.setDate(adjustedStart.getDate() + interval + off);
-    targetDate.setHours(0, 0, 0, 0);
-    return clampFixedLadderDue(targetDate, t);
+    return getFixedRungEffectiveDueDate(t, interval, topicIntervals);
   }
   return null;
 };
@@ -309,11 +425,15 @@ function topicIsMastered(t: SpacedTopic): boolean {
     return getFsrsRepsFromSnapshot(t.srs_fsrs_card) >= (t.cycles || 4) * 3;
   }
   if (algo === 'sm2') return (t.srs_repetitions ?? 0) >= (t.cycles || 4) * 3;
+  if (algo === 'fixed_gaps') {
+    const c = Math.min(12, Math.max(4, t.cycles || 4));
+    return getFixedGapFirstPendingStep(t) === null && c > 0;
+  }
   const progress = (t.reviews_completed.length / topicIntervals.length) * 100;
   return progress === 100;
 }
 
-/** Datas previstas de cada degrau ainda pendente (fixo: escada + offset + snooze; SM-2/FSRS: próxima única). */
+/** Datas previstas: SM-2/FSRS uma única; saltos fixos só o próximo passo; escada fixa todos os degraus pendentes. */
 function collectUpcomingDueDates(t: SpacedTopic): Date[] {
   if (topicIsMastered(t)) return [];
   const algo = t.srs_algorithm || 'fixed';
@@ -323,23 +443,16 @@ function collectUpcomingDueDates(t: SpacedTopic): Date[] {
     d.setHours(0, 0, 0, 0);
     return [d];
   }
-  const adjustedStart = new Date(t.study_date + 'T00:00:00');
+  if (algo === 'fixed_gaps') {
+    const step = getFixedGapFirstPendingStep(t);
+    if (step === null) return [];
+    return [getFixedGapStepDueDate(t, step)];
+  }
   const intervals = getIntervalsForCycles(t.cycles || 4);
-  const off = t.srs_cumulative_offset_days ?? 0;
   const out: Date[] = [];
   for (const interval of intervals) {
     if (t.reviews_completed.includes(interval)) continue;
-    const ladder = new Date(adjustedStart);
-    ladder.setDate(adjustedStart.getDate() + interval + off);
-    ladder.setHours(0, 0, 0, 0);
-    const sn = t.review_snoozes?.[String(interval)];
-    let eff = ladder;
-    if (sn && /^\d{4}-\d{2}-\d{2}$/.test(sn)) {
-      const snD = new Date(sn + 'T00:00:00');
-      snD.setHours(0, 0, 0, 0);
-      eff = snD > ladder ? snD : ladder;
-    }
-    out.push(clampFixedLadderDue(eff, t));
+    out.push(getFixedRungEffectiveDueDate(t, interval, intervals));
   }
   return out;
 }
@@ -630,9 +743,32 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
         return;
       }
 
-      const adjustedStart = new Date(t.study_date + 'T00:00:00');
+      if (algo === 'fixed_gaps') {
+        const step = getFixedGapFirstPendingStep(t);
+        if (step === null) return;
+        const key = fixedGapCompletionKey(step);
+        const snoozeUntil = t.review_snoozes?.[key];
+        if (snoozeUntil) {
+          const sn = new Date(snoozeUntil + 'T00:00:00');
+          sn.setHours(0, 0, 0, 0);
+          if (sn > today) return;
+        }
+        const dueDate = getFixedGapStepDueDate(t, step);
+        if (dueDate <= today) {
+          tasks.push({
+            topicId: t.id,
+            subject: t.subject,
+            topic: t.topic,
+            interval: fixedGapRungId(step),
+            dueDate,
+            status: dueDate.getTime() === today.getTime() ? 'pending' : 'overdue',
+            reviewKind: 'fixed_gaps',
+          });
+        }
+        return;
+      }
+
       const topicIntervals = getIntervalsForCycles(t.cycles || 4);
-      const off = t.srs_cumulative_offset_days ?? 0;
 
       topicIntervals.forEach(interval => {
         if (t.reviews_completed.includes(interval)) return;
@@ -644,10 +780,7 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
           if (sn > today) return;
         }
 
-        const targetDate = new Date(adjustedStart);
-        targetDate.setDate(adjustedStart.getDate() + interval + off);
-        targetDate.setHours(0, 0, 0, 0);
-        const dueDate = clampFixedLadderDue(targetDate, t);
+        const dueDate = getFixedRungEffectiveDueDate(t, interval, topicIntervals);
 
         if (dueDate <= today) {
           tasks.push({
@@ -841,7 +974,9 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
     setEditPlanStudyDate(selectedTopicForContent.study_date);
     setEditPlanCycles(selectedTopicForContent.cycles || 4);
     const a = selectedTopicForContent.srs_algorithm;
-    setEditPlanAlgorithm(a === 'sm2' || a === 'fsrs' ? a : 'fixed');
+    setEditPlanAlgorithm(
+      a === 'sm2' || a === 'fsrs' ? a : a === 'fixed_gaps' ? 'fixed_gaps' : 'fixed'
+    );
   }, [selectedTopicForContent]);
 
   const requestReminderPermission = async () => {
@@ -1024,7 +1159,9 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
           ? 'Intervalo SM-2 reiniciado; próxima revisão em 1 dia.'
           : alg === 'fsrs'
             ? 'FSRS ajustou estabilidade; a próxima data segue o scheduler (geralmente breve após Again).'
-            : 'Este degrau volta à fila amanhã (modo fixo).';
+            : alg === 'fixed_gaps'
+              ? 'Este passo volta à fila amanhã (saltos fixos).'
+              : 'Este degrau volta à fila amanhã (modo fixo).';
       toast.info('Vamos repetir em breve.', {
         description: againDesc,
       });
@@ -1210,7 +1347,12 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
   const topicPlanDirty = useMemo(() => {
     const cur = selectedTopicForContent;
     if (!cur) return false;
-    const curAlgo = cur.srs_algorithm === 'sm2' || cur.srs_algorithm === 'fsrs' ? cur.srs_algorithm : 'fixed';
+    const curAlgo =
+      cur.srs_algorithm === 'sm2' || cur.srs_algorithm === 'fsrs'
+        ? cur.srs_algorithm
+        : cur.srs_algorithm === 'fixed_gaps'
+          ? 'fixed_gaps'
+          : 'fixed';
     return (
       editPlanStudyDate !== cur.study_date ||
       editPlanCycles !== (cur.cycles || 4) ||
@@ -1425,14 +1567,31 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
     let onTime = 0;
     topics.forEach(topic => {
       if (isAdaptiveSrsAlgorithm(topic.srs_algorithm)) return;
-      const planIntervals = getIntervalsForCycles(topic.cycles || 4);
       const dates = topic.review_completion_dates || {};
+      if (topic.srs_algorithm === 'fixed_gaps') {
+        const cycles = Math.min(12, Math.max(4, topic.cycles || 4));
+        for (const [k, completed] of Object.entries(dates)) {
+          if (!/^fg\d+$/.test(k)) continue;
+          const step = Number(k.slice(2));
+          if (!Number.isFinite(step) || step >= cycles) continue;
+          if (typeof completed !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(completed)) continue;
+          const tBefore = topicWithoutFixedGapStepCompletion(topic, step);
+          const planned = dateToLocalISO(getFixedGapStepDueDate(tBefore, step));
+          if (completed > planned) late += 1;
+          else onTime += 1;
+        }
+        return;
+      }
+      const planIntervals = getIntervalsForCycles(topic.cycles || 4);
       for (const [k, completed] of Object.entries(dates)) {
         if (!/^\d+$/.test(k)) continue;
         const interval = Number(k);
         if (!planIntervals.includes(interval)) continue;
         if (typeof completed !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(completed)) continue;
-        const planned = addCalendarDays(topic.study_date, interval);
+        const tBefore = topicWithoutFixedRungCompletion(topic, interval);
+        const planned = dateToLocalISO(
+          getFixedRungEffectiveDueDate(tBefore, interval, planIntervals)
+        );
         if (completed > planned) late += 1;
         else onTime += 1;
       }
@@ -1886,6 +2045,7 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                             className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-700 outline-none focus:border-sky-500 dark:border-slate-700 dark:bg-black/40 dark:text-slate-200"
                           >
                             <option value="fixed">Intervalos fixos (Ebbinghaus + qualidade)</option>
+                            <option value="fixed_gaps">Saltos fixos (+3 / +7 / +14… após cada revisão)</option>
                             <option value="sm2">Adaptativo SM-2 (Again / Hard / Good / Easy)</option>
                             <option value="fsrs">Adaptativo FSRS (Again / Hard / Good / Easy)</option>
                           </select>
@@ -1894,7 +2054,9 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                               ? 'FSRS (biblioteca ts-fsrs): scheduler moderno, melhor previsão de esquecimento que SM-2 clássico. Intervalos em dias (sem steps de minutos), alinhado ao calendário do app.'
                               : newTopicAlgorithm === 'sm2'
                                 ? 'SuperMemo 2 simplificado: o próximo prazo depende da qualidade e do fator de facilidade. FSRS costuma ser mais preciso para retenção a longo prazo.'
-                                : 'Escada clássica 1d → 3d → 7d… Hard antecipa 2 dias e Easy 1 dia os próximos degraus; Good segue o plano; o próximo degrau nunca cai no mesmo dia da conclusão (Again continua sendo o único que recoloca o mesmo degrau no dia seguinte).'}
+                                : newTopicAlgorithm === 'fixed_gaps'
+                                  ? 'Primeiro passo 1 dia após a data do estudo; cada revisão seguinte agenda o próximo em +3, depois +7, +14… sempre a partir do dia em que você concluiu a anterior. Hard/Easy só antecipam o primeiro passo (via offset). A fila mostra um passo por vez.'
+                                  : 'Escada clássica 1d → 3d → 7d… Hard antecipa 2 dias e Easy 1 dia os próximos degraus; Good segue o plano; o próximo degrau nunca cai no mesmo dia da conclusão (Again continua sendo o único que recoloca o mesmo degrau no dia seguinte).'}
                           </p>
                        </div>
                        <div className="flex justify-between items-center mb-4">
@@ -1929,6 +2091,22 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                            </div>
                            <p className="text-[9px] text-slate-400 mt-3 italic">
                              * Até completar {getIntervalLabel(getIntervalsForCycles(cycles).slice(-1)[0])} nesta escada.
+                           </p>
+                         </>
+                       ) : newTopicAlgorithm === 'fixed_gaps' ? (
+                         <>
+                           <div className="flex justify-between gap-1">
+                             {getFixedGapStepDelays(cycles).map((d, idx) => (
+                               <div key={idx} className="flex flex-col items-center gap-1 flex-1 min-w-0">
+                                 <div className="w-full h-1 bg-orange-200 dark:bg-orange-800 rounded-full" />
+                                 <span className="text-[8px] font-bold text-orange-600 dark:text-orange-400 truncate">
+                                   {idx === 0 ? `${d}d` : `+${d}d`}
+                                 </span>
+                               </div>
+                             ))}
+                           </div>
+                           <p className="text-[9px] text-slate-400 mt-3 italic">
+                             * Cada etiqueta é o espaçamento até o próximo passo após concluir o atual (o primeiro parte da data do estudo).
                            </p>
                          </>
                        ) : (
@@ -2043,7 +2221,8 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                 Qualidade da revisão
               </h2>
               <p id="spaced-quality-desc" className="mt-2 text-sm font-medium text-slate-600 dark:text-slate-400">
-                “{qualityPickTask.topic}” — isso ajusta o próximo intervalo (FSRS / SM-2) ou a escada fixa (Hard/Easy/Again).
+                “{qualityPickTask.topic}” — isso ajusta o próximo intervalo (FSRS / SM-2), a escada Ebbinghaus ou os saltos fixos
+                (Hard/Easy/Again).
               </p>
               <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <button
@@ -2193,7 +2372,14 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                                      ? `FSRS${task.interval > 1 ? ` · ${task.interval}d` : ''}`
                                      : task.reviewKind === 'sm2'
                                        ? `SM-2${task.interval > 1 ? ` · ${task.interval}d` : ''}`
-                                       : getIntervalLabel(task.interval)}
+                                       : task.reviewKind === 'fixed_gaps'
+                                         ? (() => {
+                                             const step = fixedGapStepFromRungId(task.interval);
+                                             const full = topics.find(x => x.id === task.topicId);
+                                             const delays = getFixedGapStepDelays(full?.cycles ?? 4);
+                                             return step !== null ? fixedGapBadgeLabel(step, delays) : '…';
+                                           })()
+                                         : getIntervalLabel(task.interval)}
                                  </span>
                               </div>
                               <div className="min-w-0 flex-1">
@@ -2346,7 +2532,10 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                      const algo = t.srs_algorithm || 'fixed';
                      const isSm2 = algo === 'sm2';
                      const isFsrs = algo === 'fsrs';
+                     const isFixedGaps = algo === 'fixed_gaps';
                      const isAdaptive = isSm2 || isFsrs;
+                     const gapStepsCount = Math.min(12, Math.max(4, t.cycles || 4));
+                     const gapDelays = getFixedGapStepDelays(gapStepsCount);
                      const adaptiveReps = isFsrs
                        ? getFsrsRepsFromSnapshot(t.srs_fsrs_card)
                        : (t.srs_repetitions ?? 0);
@@ -2388,6 +2577,11 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                                   {isFsrs && (
                                     <span className="text-[8px] font-black uppercase text-teal-700 bg-teal-50 dark:bg-teal-900/25 dark:text-teal-200 px-2 py-0.5 rounded-lg border border-teal-100 dark:border-teal-800/40">
                                       FSRS
+                                    </span>
+                                  )}
+                                  {isFixedGaps && (
+                                    <span className="text-[8px] font-black uppercase text-orange-700 bg-orange-50 dark:bg-orange-900/25 dark:text-orange-200 px-2 py-0.5 rounded-lg border border-orange-100 dark:border-orange-800/40">
+                                      Saltos fixos
                                     </span>
                                   )}
                                 </div>
@@ -2470,20 +2664,25 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                            </div>
 
                            <div className="flex items-center gap-1.5 mb-4">
-                              {topicIntervals.map((int, idx) => {
+                              {(isFixedGaps ? gapDelays : topicIntervals).map((intOrDelay, idx) => {
                                 const filled = isAdaptive
                                   ? idx < Math.min(topicIntervals.length, adaptiveReps)
-                                  : t.reviews_completed.includes(int);
+                                  : isFixedGaps
+                                    ? t.reviews_completed.includes(fixedGapRungId(idx))
+                                    : t.reviews_completed.includes(intOrDelay as number);
+                                const ladderInt = isFixedGaps ? idx : (intOrDelay as number);
                                 return (
                                  <div 
-                                   key={int} 
+                                   key={isFixedGaps ? `fg-${idx}` : ladderInt} 
                                    className={`h-2 flex-1 rounded-full transition-all duration-500 ${filled ? 'bg-gradient-to-r from-sky-500 to-blue-600 shadow-sm' : 'bg-slate-100 dark:bg-white/5'}`}
                                    title={
                                      isFsrs
                                        ? `Revisões FSRS: ${adaptiveReps}`
                                        : isSm2
                                          ? `Revisões SM-2: ${t.srs_repetitions ?? 0}`
-                                         : getIntervalLabel(int)
+                                         : isFixedGaps
+                                           ? `Passo ${idx + 1}/${gapStepsCount}: ${idx === 0 ? `${gapDelays[idx]}d após o estudo` : `+${gapDelays[idx]}d após a revisão anterior`}`
+                                           : getIntervalLabel(ladderInt)
                                    }
                                  />
                                 );
@@ -2497,7 +2696,11 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                                    ? 'border-red-100 bg-red-50/80 dark:border-red-900/30 dark:bg-red-950/20'
                                    : 'border-sky-100 bg-sky-50/60 dark:border-sky-900/25 dark:bg-sky-950/15'
                                }`}
-                               title={`Previsão com base na data do estudo + intervalo (${nextDueDate.toLocaleDateString('pt-BR')})`}
+                               title={
+                                 isFixedGaps
+                                   ? `Saltos fixos — próximo passo (${nextDueDate.toLocaleDateString('pt-BR')})`
+                                   : `Previsão: última conclusão na escada + espaçamento, ou data do estudo + 1.º degrau (${nextDueDate.toLocaleDateString('pt-BR')})`
+                               }
                              >
                                <Calendar
                                  className={`mt-0.5 shrink-0 ${nextHint.overdue ? 'text-red-500' : 'text-sky-500'}`}
@@ -2533,7 +2736,15 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                                   Domínio:{' '}
                                   {isAdaptive
                                     ? Math.min(100, Math.round((adaptiveReps / Math.max(1, t.cycles || 4)) * 25))
-                                    : Math.round((t.reviews_completed.length / (t.cycles || 4)) * 100)}
+                                    : isFixedGaps
+                                      ? Math.round(
+                                          (Array.from({ length: gapStepsCount }, (_, i) =>
+                                            t.reviews_completed.includes(fixedGapRungId(i))
+                                          ).filter(Boolean).length /
+                                            gapStepsCount) *
+                                            100
+                                        )
+                                      : Math.round((t.reviews_completed.length / (t.cycles || 4)) * 100)}
                                   %
                                 </span>
                               </div>
@@ -2678,9 +2889,8 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                         Taxa de atraso
                       </p>
                       <p className="mt-1 text-[9px] leading-snug text-slate-400">
-                        Modo escada fixa: conclusão depois de{' '}
-                        <span className="font-bold text-slate-500">estudo + intervalo</span> (sem offset).
-                        SM-2 e FSRS não entram (sem prazo fixo por degrau).
+                        Escada fixa ou saltos fixos: compara com o prazo efetivo (última conclusão / estudo +
+                        offset/snooze). SM-2 e FSRS não entram (sem prazo fixo por degrau).
                       </p>
                       {spacedPlanningStats.lateRatePct == null ? (
                         <p className="mt-4 text-sm font-bold text-slate-400">Sem dados ainda</p>
@@ -2797,17 +3007,17 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                     <ul className="list-inside list-disc space-y-1 text-[9px] font-medium leading-snug text-slate-600 dark:text-slate-400">
                       <li>
                         <span className="font-bold text-slate-700 dark:text-slate-300">Trocar algoritmo:</span> reinicia o estado
-                        do modo escolhido. Fixo mantém só degraus da escada que ainda existem no plano; SM-2/FSRS zeram a fila fixa e
-                        voltam à primeira revisão (estudo + 1 dia).
+                        do modo escolhido. Fixo mantém degraus válidos; saltos fixos começa do zero; SM-2/FSRS zeram a fila e voltam
+                        à primeira revisão (estudo + 1 dia).
                       </li>
                       <li>
-                        <span className="font-bold text-slate-700 dark:text-slate-300">Só mudar data do estudo:</span> no fixo,
-                        mantemos degraus já concluídos e zeramos offset + snoozes. No SM-2/FSRS, o scheduler reinicia a partir da
+                        <span className="font-bold text-slate-700 dark:text-slate-300">Só mudar data do estudo:</span> no fixo e em
+                        saltos fixos, mantemos conclusões e zeramos offset + snoozes. No SM-2/FSRS, o scheduler reinicia a partir da
                         nova data.
                       </li>
                       <li>
-                        <span className="font-bold text-slate-700 dark:text-slate-300">Só mudar ciclos:</span> no fixo, removemos
-                        conclusões/snoozes de degraus que sumiram do plano. Nos adaptativos, só muda a meta visual de “ciclos”.
+                        <span className="font-bold text-slate-700 dark:text-slate-300">Só mudar ciclos:</span> no fixo e em saltos
+                        fixos, removemos passos que passaram do novo limite. Nos adaptativos, só muda a meta visual de “ciclos”.
                       </li>
                     </ul>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -2851,6 +3061,7 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                           className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-700 outline-none dark:border-white/10 dark:bg-black/40 dark:text-slate-200"
                         >
                           <option value="fixed">Intervalos fixos</option>
+                          <option value="fixed_gaps">Saltos fixos</option>
                           <option value="sm2">SM-2</option>
                           <option value="fsrs">FSRS</option>
                         </select>
