@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../services/supabaseClient';
-import { SPACED_TOPICS_LIST_COLUMNS, USER_PERSONA_FOR_APP_PROFILE } from '../utils/supabaseSelectColumns';
+import { SPACED_TOPICS_LIST_COLUMNS } from '../utils/supabaseSelectColumns';
 import { SpacedTopic, UserProfile, SrsAlgorithm, SpacedMaterialKind } from '../types';
 import confetti from 'canvas-confetti';
 import { toast } from 'sonner';
@@ -814,30 +814,18 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
 
   const fetchProfile = useCallback(async () => {
     setProfileLoadError(null);
-    const { data, error } = await supabase
-      .from('user_persona')
-      .select(USER_PERSONA_FOR_APP_PROFILE)
-      .eq('id', userId)
-      .single();
-
-    if (error) {
-      if (error.code === 'PGRST116') {
-        setProfile(null);
-        setProfileLoadError(null);
-        setProfileSettled(true);
-        return;
-      }
+    try {
+      const loaded = await dataService.getUserProfile(userId, isOnline);
+      setProfile((loaded as UserProfile | null) ?? null);
+      setProfileLoadError(null);
+      setProfileSettled(true);
+    } catch (error) {
       const msg = describeSupabaseError(error);
       setProfileLoadError(msg);
       toast.error('Não foi possível carregar o perfil', { description: msg });
       setProfileSettled(true);
-      return;
     }
-
-    setProfile(data as unknown as UserProfile);
-    setProfileLoadError(null);
-    setProfileSettled(true);
-  }, [userId]);
+  }, [userId, isOnline]);
 
   const fetchTopics = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -1184,15 +1172,15 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
 
     let effectiveProfile: UserProfile | null = profile;
     if (!effectiveProfile) {
-      const { data, error } = await supabase
-        .from('user_persona')
-        .select(USER_PERSONA_FOR_APP_PROFILE)
-        .eq('id', userId)
-        .single();
-      if (!error && data) {
-        effectiveProfile = data as unknown as UserProfile;
-        setProfile(effectiveProfile);
-        setProfileLoadError(null);
+      try {
+        const loaded = await dataService.getUserProfile(userId, isOnline);
+        if (loaded) {
+          effectiveProfile = loaded as UserProfile;
+          setProfile(effectiveProfile);
+          setProfileLoadError(null);
+        }
+      } catch (error) {
+        console.warn('[spaced] fallback profile load failed:', error);
       }
     }
 
