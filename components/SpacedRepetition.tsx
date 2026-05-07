@@ -5,7 +5,7 @@ import {
   Repeat, Calendar, CheckCircle2, Circle, Plus, Trash2, 
   BookOpen, AlertCircle, RefreshCw, Flame, Zap, Trophy, 
   Star, Ghost, Sword, X, TrendingUp, Award, Target,
-  ChevronRight, ChevronLeft, Brain, Sparkles, ZapIcon, ShieldCheck, Clock,
+  ChevronRight, ChevronLeft, ChevronDown, ChevronsDown, ChevronsUp, Brain, Sparkles, ZapIcon, ShieldCheck, Clock,
   FileText, Save, RotateCcw, Search, ThumbsDown, Minus, ThumbsUp,
   Bell, BrainCircuit, Settings2
 } from 'lucide-react';
@@ -551,6 +551,19 @@ const formatNextReviewHint = (due: Date) => {
 };
 
 type TopicsSortMode = 'overdueFirst' | 'subject' | 'studyDate';
+type SectionId = 'overdue' | 'today' | 'week' | 'later' | 'mastered';
+
+type TopicSection = {
+  id: SectionId;
+  title: string;
+  hint: string;
+  topics: SpacedTopic[];
+};
+
+type SubjectTopicGroup = {
+  subject: string;
+  topics: SpacedTopic[];
+};
 
 interface LastReviewUndo {
   topicSnapshot: SpacedTopic;
@@ -656,6 +669,52 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
   const [lastReviewUndo, setLastReviewUndo] = useState<LastReviewUndo | null>(null);
   const [topicsSearch, setTopicsSearch] = useState('');
   const [topicsSort, setTopicsSort] = useState<TopicsSortMode>('overdueFirst');
+  const [compactMode, setCompactMode] = useState(() => {
+    try {
+      return localStorage.getItem('spaced-ui-compact') !== '0';
+    } catch {
+      return true;
+    }
+  });
+  const [hideMastered, setHideMastered] = useState(() => {
+    try {
+      return localStorage.getItem('spaced-ui-hide-mastered') !== '0';
+    } catch {
+      return true;
+    }
+  });
+  const [reviewSectionOpen, setReviewSectionOpen] = useState<Record<string, boolean>>({
+    overdue: true,
+    pending: true,
+  });
+  const [topicSectionOpen, setTopicSectionOpen] = useState<Record<string, boolean>>({
+    overdue: true,
+    today: true,
+    week: true,
+    later: false,
+    mastered: false,
+  });
+  const [reviewVisible, setReviewVisible] = useState<Record<string, number>>({
+    overdue: 8,
+    pending: 8,
+  });
+  const [topicVisible, setTopicVisible] = useState<Record<string, number>>({
+    overdue: 6,
+    today: 6,
+    week: 6,
+    later: 6,
+    mastered: 6,
+  });
+  const [subjectGroupOpen, setSubjectGroupOpen] = useState<Record<string, boolean>>(() => {
+    try {
+      const raw = localStorage.getItem('spaced-ui-subject-open');
+      if (!raw) return {};
+      const parsed = JSON.parse(raw) as Record<string, boolean>;
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  });
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const d = new Date();
     return new Date(d.getFullYear(), d.getMonth(), 1);
@@ -887,6 +946,16 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
       /* ignore */
     }
   }, [reminderEnabled, reminderTime, reminderPanelDismissed]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('spaced-ui-compact', compactMode ? '1' : '0');
+      localStorage.setItem('spaced-ui-hide-mastered', hideMastered ? '1' : '0');
+      localStorage.setItem('spaced-ui-subject-open', JSON.stringify(subjectGroupOpen));
+    } catch {
+      /* ignore */
+    }
+  }, [compactMode, hideMastered, subjectGroupOpen]);
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
@@ -1459,6 +1528,86 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
 
     return list;
   }, [topics, topicsSearch, topicsSort, todaysReviews]);
+
+  const groupedReviews = useMemo(() => {
+    const overdue = todaysReviews.filter(t => t.status === 'overdue');
+    const pending = todaysReviews.filter(t => t.status === 'pending');
+    return [
+      { id: 'overdue', title: 'Atrasadas', hint: 'Prioridade máxima', tasks: overdue },
+      { id: 'pending', title: 'Hoje', hint: 'Vencem hoje', tasks: pending },
+    ];
+  }, [todaysReviews]);
+
+  const groupedTopics = useMemo<TopicSection[]>(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const buckets: Record<SectionId, SpacedTopic[]> = {
+      overdue: [],
+      today: [],
+      week: [],
+      later: [],
+      mastered: [],
+    };
+    filteredSortedTopics.forEach(t => {
+      if (topicIsMastered(t)) {
+        buckets.mastered.push(t);
+        return;
+      }
+      const due = getNextReviewDueDate(t);
+      if (!due) {
+        buckets.later.push(t);
+        return;
+      }
+      const d = new Date(due);
+      d.setHours(0, 0, 0, 0);
+      const diff = Math.round((d.getTime() - today.getTime()) / 86400000);
+      if (diff < 0) buckets.overdue.push(t);
+      else if (diff === 0) buckets.today.push(t);
+      else if (diff <= 7) buckets.week.push(t);
+      else buckets.later.push(t);
+    });
+    const sections: TopicSection[] = [
+      { id: 'overdue', title: 'Atrasadas', hint: 'Revisar primeiro', topics: buckets.overdue },
+      { id: 'today', title: 'Hoje', hint: 'Vencimento hoje', topics: buckets.today },
+      { id: 'week', title: 'Próximos 7 dias', hint: 'Curto prazo', topics: buckets.week },
+      { id: 'later', title: 'Depois', hint: 'Planejamento', topics: buckets.later },
+      { id: 'mastered', title: 'Consolidados', hint: 'Ocultáveis', topics: buckets.mastered },
+    ];
+    return hideMastered ? sections.filter(s => s.id !== 'mastered') : sections;
+  }, [filteredSortedTopics, hideMastered]);
+
+  const visibleTopicSections = useMemo(() => {
+    return groupedTopics
+      .map(section => {
+        const open = topicSectionOpen[section.id] ?? true;
+        if (!open) {
+          return {
+            ...section,
+            visibleTopics: [] as SpacedTopic[],
+            subjectGroups: [] as SubjectTopicGroup[],
+          };
+        }
+        const lim = topicVisible[section.id] ?? 6;
+        const visibleTopics = section.topics.slice(0, lim);
+        const map = new Map<string, SpacedTopic[]>();
+        visibleTopics.forEach(topic => {
+          const key = topic.subject?.trim() || 'Sem matéria';
+          if (!map.has(key)) map.set(key, []);
+          map.get(key)!.push(topic);
+        });
+        const subjectGroups = Array.from(map.entries()).map(([subject, topics]) => ({
+          subject,
+          topics,
+        }));
+        return { ...section, visibleTopics, subjectGroups };
+      })
+      .filter(section => section.visibleTopics.length > 0);
+  }, [groupedTopics, topicSectionOpen, topicVisible]);
+
+  const totalVisibleTopics = useMemo(
+    () => visibleTopicSections.reduce((acc, section) => acc + section.visibleTopics.length, 0),
+    [visibleTopicSections]
+  );
 
   const spacedPlanningStats = useMemo(() => {
     const y = calendarMonth.getFullYear();
@@ -2261,10 +2410,44 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
           )
         : null}
 
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 xl:gap-8 xl:h-full min-h-0">
+      <div className="sticky top-2 z-10 mb-4 rounded-2xl border border-slate-200 bg-white/90 p-2 backdrop-blur dark:border-white/10 dark:bg-[#111]/85">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setCompactMode(v => !v)}
+            className={`rounded-xl px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors ${
+              compactMode
+                ? 'bg-sky-600 text-white hover:bg-sky-700'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-200'
+            }`}
+          >
+            {compactMode ? 'Modo compacto' : 'Modo confortável'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setHideMastered(v => !v)}
+            className={`rounded-xl px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors ${
+              hideMastered
+                ? 'bg-violet-600 text-white hover:bg-violet-700'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-200'
+            }`}
+          >
+            {hideMastered ? 'Consolidados ocultos' : 'Consolidados visíveis'}
+          </button>
+          <button
+            type="button"
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="rounded-xl bg-slate-100 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-700 transition-colors hover:bg-slate-200 dark:bg-white/10 dark:text-slate-200"
+          >
+            Voltar ao topo
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 xl:gap-8 min-h-0">
          
          {/* LEFT: REVIEWS FOR TODAY */}
-         <div className="xl:col-span-7 flex flex-col xl:h-full min-h-[400px]">
+         <div className="xl:col-span-7 flex flex-col min-h-[400px] xl:max-h-[72vh]">
             <div className="mb-4 flex flex-wrap items-center gap-3">
                <Calendar className="text-sky-500" size={20} aria-hidden />
                <h3 className="text-base font-black uppercase tracking-tight text-slate-900 dark:text-white sm:text-lg">Revisões de Hoje</h3>
@@ -2333,7 +2516,32 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                   </div>
                ) : (
                   <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 custom-scrollbar">
-                     {todaysReviews.map(task => (
+                     {groupedReviews.map(section => {
+                       const open = reviewSectionOpen[section.id] ?? true;
+                       const lim = reviewVisible[section.id] ?? 8;
+                       const hasMore = section.tasks.length > lim;
+                       const visible = open ? section.tasks.slice(0, lim) : [];
+                       if (section.tasks.length === 0) return null;
+                       return (
+                        <div key={section.id} className="rounded-2xl border border-slate-200/80 bg-white/70 p-2 dark:border-white/10 dark:bg-black/20">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setReviewSectionOpen(prev => ({ ...prev, [section.id]: !open }))
+                            }
+                            aria-expanded={open}
+                            className="mb-2 flex w-full items-center justify-between rounded-xl px-2 py-1.5 text-left hover:bg-slate-100/70 dark:hover:bg-white/10"
+                          >
+                            <div>
+                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">{section.title}</p>
+                              <p className="text-[9px] text-slate-400">{section.hint}</p>
+                            </div>
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-600 dark:bg-white/10 dark:text-slate-300">
+                              {section.tasks.length}
+                            </span>
+                          </button>
+                          <div className="space-y-2">
+                            {visible.map(task => (
                          <div 
                             key={`${task.topicId}-${task.reviewKind}-${task.interval}`} 
                             role="button"
@@ -2350,7 +2558,7 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                                 if (topic) openTopicContent(topic);
                               }
                             }}
-                            className={`group p-3 sm:p-4 rounded-2xl border-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all cursor-pointer ${task.status === 'overdue' ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30' : 'bg-slate-50 dark:bg-white/5 border-slate-100 dark:border-white/5 hover:border-sky-200 dark:hover:border-sky-900'}`}
+                           className={`group ${compactMode ? 'p-2.5 sm:p-3' : 'p-3 sm:p-4'} rounded-2xl border-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all cursor-pointer ${task.status === 'overdue' ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30' : 'bg-slate-50 dark:bg-white/5 border-slate-100 dark:border-white/5 hover:border-sky-200 dark:hover:border-sky-900'}`}
                          >
                            <div className="flex items-start gap-3 sm:gap-4 min-w-0">
                               <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex flex-col items-center justify-center shrink-0 ${task.status === 'overdue' ? 'bg-red-100 text-red-600' : 'bg-sky-100 text-sky-600 dark:bg-sky-900/20 dark:text-sky-400'}`}>
@@ -2378,7 +2586,7 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                                     {task.status === 'overdue' && <span className="text-[8px] sm:text-[9px] font-black uppercase text-red-500 flex items-center gap-1"><AlertCircle size={10} /> Atrasado</span>}
                                  </div>
                                  <h4 className="font-bold text-slate-800 dark:text-slate-200 leading-tight text-sm sm:text-base truncate">{task.topic}</h4>
-                                 {(() => {
+                                {!compactMode && (() => {
                                    const full = topics.find(x => x.id === task.topicId);
                                    if (!full) return null;
                                    const mk = normalizeMaterialKind(full.linked_material_kind);
@@ -2428,10 +2636,10 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                                        </button>
                                      </div>
                                    );
-                                 })()}
+                                })()}
                               </div>
                            </div>
-                           <button 
+                           <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -2444,14 +2652,29 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                               <span className="sm:hidden">Concluir Revisão</span>
                            </button>
                         </div>
-                     ))}
+                            ))}
+                          </div>
+                          {open && hasMore && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setReviewVisible(prev => ({ ...prev, [section.id]: lim + 8 }))
+                              }
+                              className="mt-2 w-full rounded-xl border border-slate-200 bg-white py-1.5 text-[9px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:bg-black/20 dark:text-slate-300"
+                            >
+                              Mostrar mais
+                            </button>
+                          )}
+                        </div>
+                       );
+                     })}
                   </div>
                )}
             </div>
          </div>
 
          {/* RIGHT: ALL TOPICS */}
-         <div className="xl:col-span-5 flex flex-col xl:h-full min-h-[400px]">
+         <div className="xl:col-span-5 flex flex-col min-h-[400px] xl:max-h-[72vh]">
             <div className="flex items-center gap-3 mb-4">
                <BookOpen className="text-slate-400" size={20} />
                <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Tópicos Ativos</h3>
@@ -2489,11 +2712,104 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                     </select>
                     {topics.length > 0 && (
                       <span className="text-[10px] font-bold text-slate-400 sm:text-right">
-                        {filteredSortedTopics.length === topics.length
+                        {totalVisibleTopics === topics.length
                           ? `${topics.length} tópico${topics.length === 1 ? '' : 's'}`
-                          : `${filteredSortedTopics.length} de ${topics.length}`}
+                          : `${totalVisibleTopics} de ${topics.length}`}
                       </span>
                     )}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTopicSectionOpen(prev => {
+                          const next = { ...prev };
+                          groupedTopics.forEach(section => {
+                            next[section.id] = true;
+                          });
+                          return next;
+                        });
+                        setSubjectGroupOpen(prev => {
+                          const next = { ...prev };
+                          groupedTopics.forEach(section => {
+                            section.topics.forEach(topic => {
+                              const key = `${section.id}::${topic.subject?.trim() || 'Sem matéria'}`;
+                              next[key] = true;
+                            });
+                          });
+                          return next;
+                        });
+                      }}
+                      className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-[8px] font-black uppercase tracking-widest text-slate-500 dark:border-white/10 dark:bg-black/20 dark:text-slate-400"
+                    >
+                      <ChevronsDown size={10} aria-hidden />
+                      Expandir tudo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTopicSectionOpen(prev => {
+                          const next = { ...prev };
+                          groupedTopics.forEach(section => {
+                            next[section.id] = false;
+                          });
+                          return next;
+                        });
+                        setSubjectGroupOpen(prev => {
+                          const next = { ...prev };
+                          groupedTopics.forEach(section => {
+                            section.topics.forEach(topic => {
+                              const key = `${section.id}::${topic.subject?.trim() || 'Sem matéria'}`;
+                              next[key] = false;
+                            });
+                          });
+                          return next;
+                        });
+                      }}
+                      className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-[8px] font-black uppercase tracking-widest text-slate-500 dark:border-white/10 dark:bg-black/20 dark:text-slate-400"
+                    >
+                      <ChevronsUp size={10} aria-hidden />
+                      Recolher tudo
+                    </button>
+                    {groupedTopics.map(section => {
+                      const open = topicSectionOpen[section.id] ?? true;
+                      const lim = topicVisible[section.id] ?? 6;
+                      const hasMore = section.topics.length > lim;
+                      return (
+                        <div key={section.id} className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setTopicSectionOpen(prev => ({ ...prev, [section.id]: !open }))
+                            }
+                            aria-expanded={open}
+                            className={`rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-widest ${
+                              open
+                                ? 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-200'
+                                : 'border-slate-200 bg-white text-slate-500 dark:border-white/10 dark:bg-black/20 dark:text-slate-400'
+                            }`}
+                          >
+                            <ChevronDown
+                              size={10}
+                              aria-hidden
+                              className={`transition-transform ${open ? 'rotate-180' : ''}`}
+                            />
+                            {section.title} · {section.topics.length}
+                          </button>
+                          {open && hasMore && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setTopicVisible(prev => ({ ...prev, [section.id]: lim + 6 }))
+                              }
+                              className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[8px] font-black uppercase tracking-widest text-slate-500 dark:border-white/10 dark:bg-black/20 dark:text-slate-400"
+                            >
+                              +6
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                </div>
                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 custom-scrollbar">
@@ -2501,7 +2817,7 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                      <div className="text-center py-20 opacity-40">
                         <p className="text-xs font-black uppercase">Nenhum tópico registrado</p>
                      </div>
-                  ) : filteredSortedTopics.length === 0 ? (
+                  ) : totalVisibleTopics === 0 ? (
                     <div className="flex flex-col items-center gap-3 py-16 text-center">
                       <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-400">
                         Nenhum tópico corresponde à busca
@@ -2515,7 +2831,77 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                       </button>
                     </div>
                   ) : (
-                    filteredSortedTopics.map(t => {
+                    visibleTopicSections.map(section => (
+                      <div key={section.id} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                            {section.title}
+                          </p>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSubjectGroupOpen(prev => {
+                                  const next = { ...prev };
+                                  section.subjectGroups.forEach(g => {
+                                    next[`${section.id}::${g.subject}`] = true;
+                                  });
+                                  return next;
+                                })
+                              }
+                              className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-slate-500 dark:border-white/10 dark:bg-black/20 dark:text-slate-400"
+                            >
+                              <ChevronsDown size={10} aria-hidden />
+                              Abrir matérias
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSubjectGroupOpen(prev => {
+                                  const next = { ...prev };
+                                  section.subjectGroups.forEach(g => {
+                                    next[`${section.id}::${g.subject}`] = false;
+                                  });
+                                  return next;
+                                })
+                              }
+                              className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-slate-500 dark:border-white/10 dark:bg-black/20 dark:text-slate-400"
+                            >
+                              <ChevronsUp size={10} aria-hidden />
+                              Fechar matérias
+                            </button>
+                            <span className="rounded-full bg-slate-200/70 px-2 py-0.5 text-[9px] font-black text-slate-600 dark:bg-white/10 dark:text-slate-300">
+                              {section.visibleTopics.length}
+                            </span>
+                          </div>
+                        </div>
+                        {section.subjectGroups.map(subjectGroup => {
+                          const sgKey = `${section.id}::${subjectGroup.subject}`;
+                          const subjectOpen = subjectGroupOpen[sgKey] ?? true;
+                          return (
+                          <div key={`${section.id}-${subjectGroup.subject}`} className="space-y-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSubjectGroupOpen(prev => ({ ...prev, [sgKey]: !subjectOpen }))
+                              }
+                              aria-expanded={subjectOpen}
+                              className="flex w-full items-center justify-between rounded-lg px-1 py-1 text-left hover:bg-slate-100/80 dark:hover:bg-white/5"
+                            >
+                              <p className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                <ChevronDown
+                                  size={10}
+                                  aria-hidden
+                                  className={`transition-transform ${subjectOpen ? 'rotate-180' : ''}`}
+                                />
+                                {subjectGroup.subject}
+                              </p>
+                              <span className="rounded-full bg-slate-200/70 px-2 py-0.5 text-[8px] font-black text-slate-600 dark:bg-white/10 dark:text-slate-300">
+                                {subjectGroup.topics.length}
+                              </span>
+                            </button>
+                            {subjectOpen &&
+                              subjectGroup.topics.map(t => {
                      const topicIntervals = getIntervalsForCycles(t.cycles || 4);
                      const algo = t.srs_algorithm || 'fixed';
                      const isSm2 = algo === 'sm2';
@@ -2547,7 +2933,7 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                               openTopicContent(t);
                             }
                           }}
-                          className={`bg-white dark:bg-[#1a1a1a] p-5 rounded-3xl shadow-sm border transition-all relative group cursor-pointer ${isUrgent ? 'border-red-200 dark:border-red-900/30 ring-1 ring-red-500/10' : 'border-slate-200 dark:border-white/5'}`}
+                          className={`bg-white dark:bg-[#1a1a1a] ${compactMode ? 'p-3.5' : 'p-5'} rounded-3xl shadow-sm border transition-all relative group cursor-pointer ${isUrgent ? 'border-red-200 dark:border-red-900/30 ring-1 ring-red-500/10' : 'border-slate-200 dark:border-white/5'}`}
                         >
                            <button type="button" onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(t.id); }} className="absolute top-4 right-4 p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all bg-slate-50 dark:bg-black/20 rounded-xl" aria-label={`Remover tópico ${t.topic}`}>
                               <Trash2 size={14} />
@@ -2596,7 +2982,7 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                                 )}
                               </div>
                               <h4 className="text-base font-black text-slate-900 dark:text-white leading-tight pr-8">{t.topic}</h4>
-                              {(() => {
+                              {!compactMode && (() => {
                                 const mk = normalizeMaterialKind(t.linked_material_kind);
                                 const hiFlash = mk === 'flashcards' || mk === 'both';
                                 const hiSum = mk === 'summarizer' || mk === 'both';
@@ -2743,7 +3129,12 @@ const SpacedRepetition: React.FC<SpacedRepetitionProps> = ({ userId, isOnline })
                            </div>
                         </motion.div>
                      );
-                    })
+                    })}
+                          </div>
+                        );
+                        })}
+                      </div>
+                    ))
                   )}
                </div>
             </div>
