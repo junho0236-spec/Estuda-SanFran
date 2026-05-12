@@ -19,8 +19,42 @@ export function buildAiDistractorQualityBlock(
   statementStyle?: StatementBatchKind
 ): string {
   if (modality === 'certo_errado') {
-    return `
-DISCRIMINAÇÃO (Certo/Errado): Evite afirmações cuja falsidade seja óbvia pelo vocabulário. Prefira proposições em que o erro seja sutil (hipótese legal vizinha, exceção confundida com regra, efeito ou competência trocados).`;
+    const baseCE = `
+DISCRIMINAÇÃO (Certo/Errado) — regras gerais:
+- Evite afirmações cuja falsidade seja óbvia pelo vocabulário ("sempre", "nunca", "exclusivamente", "em qualquer hipótese") — o aluno treinado descarta por estilo sem ler o conteúdo.
+- A proposição falsa deve conter um erro sutil: hipótese legal vizinha, exceção confundida com regra, efeito ou competência trocados, prazo de regime semelhante mas inaplicável.
+- ANTI-CARICATURA: PROIBIDO proposições erradas por absurdo factual ou invenção de regra. O item errado deve soar como tese que alguém poderia defender brevemente antes de ser refutado pelo critério fino.
+- Proposições "Certo" e "Errado" devem ter extensão e registro formal semelhantes — não faça a proposição errada nitidamente mais curta, genérica ou extrema que a correta.
+- ANTI-EXTREMISMO LÉXICO: se a proposição for falsa, o erro deve ser de conteúdo (instituto, pressuposto, consequência), não de tom absolutista. Prefira modalizações ("em regra", "salvo exceções", "preponderantemente") e erre pelo recorte técnico.`;
+
+    switch (difficulty) {
+      case 'muito_facil':
+      case 'facil':
+        return `${baseCE}
+Nível pedido (${difficulty}): a proposição pode abordar conceitos mais diretos, mas o erro (quando falsa) não pode ser dedutível só pelo vocabulário — deve exigir conhecimento mínimo do tema.`;
+
+      case 'media':
+        return `${baseCE}
+Nível médio: proposições falsas devem errar por confusão plausível (exceção aplicada como regra, efeito de instituto vizinho, competência trocada). O aluno que não estudou o ponto específico deve hesitar.`;
+
+      case 'dificil':
+        return `${baseCE}
+Nível difícil (estilo banca):
+- Proposições falsas devem errar por nuance fina: regime jurídico vizinho, entendimento jurisprudencial superado apresentado como atual, exceção legal sutil, pressuposto inadequado ao caso.
+- O item deve exigir domínio preciso do dispositivo ou do entendimento consolidado — não basta "saber o tema", é preciso saber o detalhe.
+- Evite proposições que se autodenuncia pelo tom severo ou pela negação grosseira; a falsidade deve resistir a uma leitura rápida.`;
+
+      case 'muito_dificil':
+        return `${baseCE}
+Nível muito difícil (máxima exigência):
+- Proposições falsas devem errar por sutileza doutrinária ou jurisprudencial: linha superada vs. atual, distinção entre teses quase idênticas, aplicação de regime a hipótese vizinha mas inaplicável, leitura sistemática incorreta de dispositivos correlatos.
+- O item deve fazer o candidato bem preparado hesitar — a falsidade só se revela ao confrontar com o critério canônico exato ou com o entendimento consolidado mais recente.
+- Evite que a proposição falsa contenha mais de UM erro; um único ponto técnico fino torna o item mais discriminatório.
+- TESTE DE PLAUSIBILIDADE: a proposição falsa deve poder ser defendida brevemente num debate acadêmico antes de ser refutada pelo fundamento preciso.`;
+
+      default:
+        return baseCE;
+    }
   }
 
   const baseHomogeneity = `
@@ -100,31 +134,50 @@ ${enunciadoLine}
 
 /**
  * Níveis acessíveis: “fácil” é conteúdo mais direto, não gabarito óbvio por estilo ou caricatura.
- * (Só múltipla escolha; vazio para difícil/muito difícil — esses usam `buildAiHighDifficultyStemBlock`.)
+ * Aplica-se a MC e C/E; vazio para difícil/muito difícil (esses usam `buildAiHighDifficultyStemBlock`).
  */
 export function buildAiAccessibleStemBlock(
   difficulty: QuestionBankAiConfig['difficulty'],
   modality: QuestionModality
 ): string {
-  if (modality !== 'multipla_escolha') return '';
   if (difficulty === 'dificil' || difficulty === 'muito_dificil') return '';
+
+  if (modality === 'certo_errado') {
+    return `
+COMANDO DO ENUNCIADO — Certo/Errado (níveis acessíveis — “fácil” não é “óbvio”):
+- O enunciado deve ser uma proposição clara e completa, sem ambiguidade gramatical que permita dupla leitura.
+- “Fácil” significa tema mais direto, NÃO proposição cuja veracidade ou falsidade seja dedutível só pelo tom, vocabulário absolutista ou extensão.
+- Varie a construção das proposições: afirmativas, negativas com ressalva, condicionais — não repita o mesmo esqueleto em todas.
+- Proposições falsas devem exigir conhecimento do tema para serem identificadas, não apenas leitura atenta do estilo.`;
+  }
+
   return `
 COMANDO DO ENUNCIADO (níveis acessíveis — “fácil” não é “óbvio”):
 - Fácil/médio significa discriminações mais diretas e vocabulário adequado ao público, NÃO alternativas disparatadas, nem gabarito dedutível só por tom, polaridade ou por ser a única linha “bem fundamentada”.
 - Varie o comando quando couber (nem todas idênticas a “assinale a correta”); mantenha clareza e paralelismo entre as cinco alternativas em registo formal semelhante.
 - As incorretas podem ser mais claras para quem estuda o tema, mas continuam plausíveis no enunciado — proibido o contraste em que quatro opções são manequins e uma só “fecha” o problema.`;
+}
 
-/** Enunciados de “segunda ordem” para discriminar entre teses todas plausíveis (só MC + difícil/muito difícil). */
+/** Enunciados de "segunda ordem" para discriminar entre teses todas plausíveis (difícil/muito difícil, MC e C/E). */
 export function buildAiHighDifficultyStemBlock(
   difficulty: QuestionBankAiConfig['difficulty'],
   modality: QuestionModality
 ): string {
-  if (modality !== 'multipla_escolha') return '';
   if (difficulty !== 'dificil' && difficulty !== 'muito_dificil') return '';
+
+  if (modality === 'certo_errado') {
+    return `
+COMANDO DO ENUNCIADO — Certo/Errado (alta dificuldade — cumpra em pelo menos METADE das proposições DESTE lote):
+- Prefira proposições de "segunda ordem" que obriguem a discriminar entre teses próximas: não basta saber o conceito genérico, é preciso saber o detalhe normativo, jurisprudencial ou doutrinário específico.
+- Exemplos de formulação exigente: "A aplicação do regime X ao caso Y prescinde do requisito Z" (falso se Z for necessário); "Segundo o entendimento consolidado do STJ, a cláusula W é válida mesmo sem anuência do devedor" (certo ou errado conforme a súmula específica).
+- Em direito material: prefira proposições que exijam distinguir entre hipóteses do mesmo universo normativo (ex.: efeitos do art. 239 vs. 234 CC; mora vs. inadimplemento absoluto; resolução vs. exceção de contrato não cumprido).
+- Nas restantes proposições do lote pode usar formato clássico, desde que a falsidade não seja caricatural.`;
+  }
+
   return `
 COMANDO DO ENUNCIADO (alta dificuldade — cumpra em pelo menos METADE das questões DESTE lote):
-- Prefira formulações de segunda ordem que obriguem a discriminar entre teses todas plausíveis (ex.: "Qual crítica seria menos adequada...", "Qual distinção é mais pertinente face ao cenário...", "Qual argumento não sustenta...", "Assinale a leitura que melhor reconcilia X com Y"), em vez de apenas "Qual característica diferencia..." ou "Assinale a alternativa correta sobre..." como modelo único de comando.
-- Em direito material (obrigações, contratos, responsabilidade): quando possível, evite só "Assinale a alternativa que melhor descreve as faculdades..." com cinco respostas onde quatro são disparates; prefira também formulações do tipo "Qual consequência seria **incabível**...", "Qual requisito **não** se exige nesta hipótese...", "Qual leitura **não** se sustenta no regime legal aplicável...", mantendo as cinco alternativas em registo técnico semelhante.
+- Prefira formulações de segunda ordem que obriguem a discriminar entre teses todas plausíveis (ex.: “Qual crítica seria menos adequada...”, “Qual distinção é mais pertinente face ao cenário...”, “Qual argumento não sustenta...”, “Assinale a leitura que melhor reconcilia X com Y”), em vez de apenas “Qual característica diferencia...” ou “Assinale a alternativa correta sobre...” como modelo único de comando.
+- Em direito material (obrigações, contratos, responsabilidade): quando possível, evite só “Assinale a alternativa que melhor descreve as faculdades...” com cinco respostas onde quatro são disparates; prefira também formulações do tipo “Qual consequência seria **incabível**...”, “Qual requisito **não** se exige nesta hipótese...”, “Qual leitura **não** se sustenta no regime legal aplicável...”, mantendo as cinco alternativas em registo técnico semelhante.
 - Nas restantes questões do lote pode usar comando clássico, desde que as incorretas não sejam caricaturais (vide ANTI-CARICATURA e ANTI-FOTOCOPIA DO DISPOSITIVO nas alternativas).`;
 }
 
