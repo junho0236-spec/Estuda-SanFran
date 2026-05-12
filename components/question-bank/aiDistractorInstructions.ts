@@ -98,6 +98,22 @@ ${enunciadoLine}
   }
 }
 
+/**
+ * Níveis acessíveis: “fácil” é conteúdo mais direto, não gabarito óbvio por estilo ou caricatura.
+ * (Só múltipla escolha; vazio para difícil/muito difícil — esses usam `buildAiHighDifficultyStemBlock`.)
+ */
+export function buildAiAccessibleStemBlock(
+  difficulty: QuestionBankAiConfig['difficulty'],
+  modality: QuestionModality
+): string {
+  if (modality !== 'multipla_escolha') return '';
+  if (difficulty === 'dificil' || difficulty === 'muito_dificil') return '';
+  return `
+COMANDO DO ENUNCIADO (níveis acessíveis — “fácil” não é “óbvio”):
+- Fácil/médio significa discriminações mais diretas e vocabulário adequado ao público, NÃO alternativas disparatadas, nem gabarito dedutível só por tom, polaridade ou por ser a única linha “bem fundamentada”.
+- Varie o comando quando couber (nem todas idênticas a “assinale a correta”); mantenha clareza e paralelismo entre as cinco alternativas em registo formal semelhante.
+- As incorretas podem ser mais claras para quem estuda o tema, mas continuam plausíveis no enunciado — proibido o contraste em que quatro opções são manequins e uma só “fecha” o problema.`;
+
 /** Enunciados de “segunda ordem” para discriminar entre teses todas plausíveis (só MC + difícil/muito difícil). */
 export function buildAiHighDifficultyStemBlock(
   difficulty: QuestionBankAiConfig['difficulty'],
@@ -112,11 +128,12 @@ COMANDO DO ENUNCIADO (alta dificuldade — cumpra em pelo menos METADE das quest
 - Nas restantes questões do lote pode usar comando clássico, desde que as incorretas não sejam caricaturais (vide ANTI-CARICATURA e ANTI-FOTOCOPIA DO DISPOSITIVO nas alternativas).`;
 }
 
+/** Refino pós-geração para alinhar distratores (custo extra de API). Em MC aplica a todos os níveis; passagens múltiplas só em muito_dificil. */
 export function shouldRefineMcDistractors(
   modality: QuestionModality,
-  difficulty: QuestionBankAiConfig['difficulty']
+  _difficulty: QuestionBankAiConfig['difficulty']
 ): boolean {
-  return modality === 'multipla_escolha' && (difficulty === 'dificil' || difficulty === 'muito_dificil');
+  return modality === 'multipla_escolha';
 }
 
 type RefineItem = {
@@ -127,7 +144,7 @@ type RefineItem = {
 };
 
 /**
- * Refino em cadeia das alternativas (só múltipla escolha; dificil = 1 passo; muito_dificil = 3 passos).
+ * Refino em cadeia das alternativas (só múltipla escolha; 1 passo para todos; muito_dificil = +2 passagens extra).
  * muito_dificil: 3 chamadas ao modelo por chunk (lotes de 5), o que aumenta latência e custo.
  * Preserva o índice do gabarito; em falha da API devolve o array original.
  */
@@ -152,10 +169,22 @@ export async function refineMultipleChoiceDistractors(
     payloadIndices.push(i);
   }
 
-  const difficultyLabel =
-    difficulty === 'muito_dificil'
-      ? 'muito difícil (distratores finos, concursos de alto nível)'
-      : 'difícil (banca exigente)';
+  const difficultyLabel = (() => {
+    switch (difficulty) {
+      case 'muito_facil':
+        return 'muito fácil (conteúdo elementar; proibido gabarito por estilo ou única opção “técnica”)';
+      case 'facil':
+        return 'fácil (discriminação acessível; distratores plausíveis, não caricaturais)';
+      case 'media':
+        return 'médio (armadilhas plausíveis; manter homogeneidade e anti-eliminação superficial)';
+      case 'dificil':
+        return 'difícil (banca exigente)';
+      case 'muito_dificil':
+        return 'muito difícil (distratores finos, concursos de alto nível)';
+      default:
+        return 'médio (armadilhas plausíveis; manter homogeneidade e anti-eliminação superficial)';
+    }
+  })();
 
   const refinePasses =
     difficulty === 'muito_dificil'

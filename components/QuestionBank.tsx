@@ -47,6 +47,7 @@ import {
 } from './question-bank/aiQuestionTopics';
 import { dedupeSimilarAiStatements } from './question-bank/similarStatementDetection';
 import {
+  buildAiAccessibleStemBlock,
   buildAiDistractorQualityBlock,
   buildAiHighDifficultyStemBlock,
   refineMultipleChoiceDistractors,
@@ -2275,6 +2276,7 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
         Foco Jurídico: ${aiConfig.legalFocus.join(', ') || 'Geral'}.
         Tipo de Enunciado: ${statementForThisBatch}.
         ${buildAiStatementEnforcementBlock(statementForThisBatch)}
+        ${buildAiAccessibleStemBlock(aiConfig.difficulty, aiConfig.modality)}
         ${buildAiHighDifficultyStemBlock(aiConfig.difficulty, aiConfig.modality)}
         ${aiConfig.statementType === QB_STATEMENT_MIX ? `Regra do pedido (mistura): o aluno pediu ${totalQuestions} questão(ões) no total, repartidas entre enunciado direto e caso prático segundo: total par → metade de cada; total ímpar → a questão extra é sempre enunciado direto. Este lote deve seguir APENAS o tipo indicado acima.` : ''}
         Ano da Questão: OBRIGATORIAMENTE ${new Date().getFullYear()}.
