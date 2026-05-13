@@ -31,7 +31,10 @@ export function QuestionBankQuestionArea({
 }: QuestionBankQuestionAreaProps) {
   return (
     <div key="question-area-container" className="w-full" ref={resultsSectionRef}>
-      <div className="flex-1" style={{ fontSize: `${listFontScalePercent}%` }}>
+      <div
+        className="qb-font-scale flex-1"
+        style={{ fontSize: `${listFontScalePercent}%` }}
+      >
         {showQuestionChrome ? (
           viewMode === 'list' ? (
             <QuestionBankListView {...listViewProps} />

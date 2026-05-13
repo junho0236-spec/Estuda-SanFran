@@ -157,6 +157,32 @@
   font-size: 0.875rem;
   line-height: 1.5;
 }
+
+/*
+ * Question bank letter-size control: the wrapper sets font-size as a % of the root.
+ * Tailwind text-sm / text-xs / .prose-sm use rem, so they ignore that %. Under
+ * .qb-font-scale, use em so gabarito, correção IA e markdown acompanham o enunciado.
+ */
+.qb-font-scale .prose-sm {
+  font-size: 0.875em;
+  line-height: 1.5;
+}
+.qb-font-scale .prose-xs {
+  font-size: 0.75em;
+  line-height: 1.4;
+}
+.qb-font-scale .text-sm {
+  font-size: 0.875em;
+}
+.qb-font-scale .text-xs {
+  font-size: 0.75em;
+}
+.qb-font-scale .text-\[10px\] {
+  font-size: 0.625em;
+}
+.qb-font-scale .text-\[11px\] {
+  font-size: 0.6875em;
+}
 .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="small"]::before,
 .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="small"]::before {
   content: '13px';
