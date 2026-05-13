@@ -15,11 +15,11 @@ export function QuestionAlternativeAnalysisBlocks({
   if (analysis == null || analysis === '') return null;
   if (isAlternativesAnalysisArray(analysis)) {
     return (
-      <ul className="m-0 list-none space-y-2 p-0" aria-labelledby={headingId}>
+      <ul className="m-0 list-none p-0 flex flex-col qb-reading-alt-list" aria-labelledby={headingId}>
         {analysis.map((alt, idx) => (
           <li key={`${alt.alternative}-${idx}`}>
             <div
-              className={`rounded-xl border p-4 ${
+              className={`rounded-xl border qb-reading-surface-md ${
                 alt.status === 'Correta'
                   ? 'border-green-100 bg-green-50 dark:border-green-900/30 dark:bg-green-900/10'
                   : 'border-red-100 bg-red-50 dark:border-red-900/30 dark:bg-red-900/10'
@@ -27,7 +27,7 @@ export function QuestionAlternativeAnalysisBlocks({
               role="group"
               aria-label={`Alternativa ${alt.alternative}, ${alt.status === 'Correta' ? 'correta' : 'incorreta'}. ${alt.explanation}`}
             >
-              <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+              <p className="qb-reading-alt-analysis-lead text-sm font-bold leading-relaxed text-slate-800 dark:text-slate-200">
                 <span className="font-black uppercase">
                   [{alt.alternative}] {alt.status}:
                 </span>{' '}
@@ -41,7 +41,7 @@ export function QuestionAlternativeAnalysisBlocks({
   }
   return (
     <p
-      className="text-sm leading-relaxed text-slate-600 dark:text-slate-400"
+      className="qb-reading-alt-analysis-lead text-sm leading-relaxed text-slate-600 dark:text-slate-400"
       role="region"
       aria-label="Análise das alternativas"
     >

@@ -24,6 +24,7 @@ import { QuestionComments } from '../QuestionComments';
 import { GlossaryText } from '../GlossaryText.tsx';
 import { QB_OPTION_FOCUS } from './questionBankHelpers';
 import { QuestionAiCorrectionPanel } from './QuestionAiCorrectionPanel';
+import { QuestionBankReadingShell } from './QuestionBankReadingShell';
 import type { FollowUpMessage } from './QuestionBankSingleQuestionView';
 
 export type QuestionBankListQuestionCardProps = {
@@ -246,24 +247,26 @@ export function QuestionBankListQuestionCard({
       </div>
 
       <div className="p-6">
-        <div id={`qb-statement-${q.id}`} className="text-slate-800 dark:text-slate-200 leading-relaxed mb-4">
-          <GlossaryText text={q.statement} onTermClick={onTermClick} />
-        </div>
-        {selectedText && (
-          <button
-            onClick={onJuridiquesTranslate}
-            disabled={loadingJuridiquesExplanation}
-            type="button"
-            className="mb-4 flex items-center gap-2 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-bold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loadingJuridiquesExplanation ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
-            ) : (
-              <MessageSquareText size={14} />
-            )}{' '}
-            Traduzir Juridiquês
-          </button>
-        )}
+        <QuestionBankReadingShell>
+          <div id={`qb-statement-${q.id}`} className="text-slate-800 dark:text-slate-200 leading-relaxed mb-4">
+            <GlossaryText text={q.statement} onTermClick={onTermClick} />
+          </div>
+          {selectedText && (
+            <button
+              onClick={onJuridiquesTranslate}
+              disabled={loadingJuridiquesExplanation}
+              type="button"
+              className="mb-4 flex items-center gap-2 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-bold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loadingJuridiquesExplanation ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <MessageSquareText size={14} />
+              )}{' '}
+              Traduzir Juridiquês
+            </button>
+          )}
+        </QuestionBankReadingShell>
 
         <div className="flex items-center gap-3">
           <button
@@ -331,13 +334,14 @@ export function QuestionBankListQuestionCard({
       </div>
 
       {expandedQuestionId === q.id && (
-        <div className="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-4 duration-300">
-          <div
-            className="space-y-3"
-            role="group"
-            aria-label="Alternativas da questão"
-            aria-labelledby={`qb-statement-${q.id}`}
-          >
+        <div className="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-4 duration-300 px-6 pb-2">
+          <QuestionBankReadingShell>
+            <div
+              className="flex flex-col qb-reading-options-stack"
+              role="group"
+              aria-label="Alternativas da questão"
+              aria-labelledby={`qb-statement-${q.id}`}
+            >
             {q.options.map((option, optIdx) => {
               const isSelected = isMockMode ? mockAnswers[q.id] === optIdx : selectedOption === optIdx;
               const isCorrect = q.correct_answer === optIdx;
@@ -429,9 +433,9 @@ export function QuestionBankListQuestionCard({
                 </div>
               );
             })}
-          </div>
+            </div>
 
-          {showExplanation && (
+            {showExplanation && (
             <div className="mt-8 space-y-4 animate-in slide-in-from-bottom-4">
               {loadingAiCommentary[q.id] ? (
                 <div
@@ -463,7 +467,7 @@ export function QuestionBankListQuestionCard({
                           Regenerar explicação
                         </button>
                       </div>
-                      <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
+                      <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 qb-reading-surface-lg">
                         <div className="prose prose-sm dark:prose-invert max-w-none">
                           <Markdown remarkPlugins={[remarkGfm]}>{aiCommentary[q.id] as string}</Markdown>
                         </div>
@@ -479,7 +483,7 @@ export function QuestionBankListQuestionCard({
                       alternativesHeadingId={`qb-alt-h-${q.id}`}
                     />
                   )}
-                  <div className="mt-6 pt-6 border-t border-slate-100 dark:border-white/5 space-y-4">
+                  <div className="mt-6 pt-6 border-t border-slate-100 dark:border-white/5 qb-reading-mentor">
                     <div className="flex items-center gap-2 mb-2">
                       <MessageSquareText size={16} className="text-purple-500" />
                       <span className="text-[10px] font-black text-purple-600 uppercase tracking-widest">
@@ -487,11 +491,11 @@ export function QuestionBankListQuestionCard({
                       </span>
                     </div>
 
-                    <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                    <div className="flex flex-col qb-reading-mentor-chat-stack max-h-60 overflow-y-auto custom-scrollbar pr-2 min-h-0">
                       {(followUpChat[q.id] || []).map((msg, i) => (
-                        <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div key={i} className={`flex min-w-0 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                           <div
-                            className={`max-w-[90%] p-4 rounded-2xl text-xs font-bold shadow-sm ${
+                            className={`qb-reading-mentor-bubble max-w-[min(90%,100%)] rounded-2xl text-xs font-bold shadow-sm ${
                               msg.role === 'user'
                                 ? 'bg-purple-600 text-white rounded-tr-none'
                                 : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-tl-none border border-slate-100 dark:border-white/5'
@@ -505,21 +509,21 @@ export function QuestionBankListQuestionCard({
                       ))}
                       {isFollowUpLoading[q.id] && (
                         <div className="flex justify-start">
-                          <div className="bg-slate-100 dark:bg-white/5 p-3 rounded-2xl rounded-tl-none">
+                          <div className="qb-reading-mentor-loading flex items-center justify-center bg-slate-100 dark:bg-white/5 rounded-2xl rounded-tl-none">
                             <Loader2 size={14} className="animate-spin text-purple-500" />
                           </div>
                         </div>
                       )}
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 min-w-0">
                       <input
                         type="text"
                         value={followUpInput[q.id] || ''}
                         onChange={(e) => setFollowUpInput((prev) => ({ ...prev, [q.id]: e.target.value }))}
                         onKeyDown={(e) => e.key === 'Enter' && onFollowUp(q.id, q.statement)}
                         placeholder="Tire uma dúvida ou peça para aprofundar..."
-                        className="flex-1 p-3 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold outline-none focus:border-purple-500"
+                        className="qb-reading-mentor-input flex-1 min-w-0 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold outline-none focus:border-purple-500 px-3"
                       />
                       <button
                         type="button"
@@ -557,10 +561,11 @@ export function QuestionBankListQuestionCard({
                     }
                     questionTitle={q.statement}
                     showNotification={showNotification}
+                    className="qb-reading-comments"
                   />
                 </>
               ) : (
-                <div className="p-6 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30">
+                <div className="bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30 qb-reading-surface-lg">
                   <h4 className="font-bold text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
                     <BookOpen size={18} /> Explicação Padrão
                   </h4>
@@ -570,7 +575,8 @@ export function QuestionBankListQuestionCard({
                 </div>
               )}
             </div>
-          )}
+            )}
+          </QuestionBankReadingShell>
         </div>
       )}
     </div>

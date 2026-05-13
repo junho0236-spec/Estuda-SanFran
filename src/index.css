@@ -159,30 +159,184 @@
 }
 
 /*
- * Question bank letter-size control: the wrapper sets font-size as a % of the root.
- * Tailwind text-sm / text-xs / .prose-sm use rem, so they ignore that %. Under
- * .qb-font-scale, use em so gabarito, correção IA e markdown acompanham o enunciado.
+ * Question bank — apenas dentro de .qb-reading (QuestionBankReadingShell):
+ * rem → em para acompanhar font-size %; entrelinha mais folgada; paddings/gaps
+ * crescem com --qb-scale (definido no shell). Rótulos fora de .qb-reading mantêm tamanho UI.
  */
-.qb-font-scale .prose-sm {
+.qb-reading {
+  --qb-scale: 1;
+  --qb-stack-gap: calc(0.85rem + 0.45rem * max(0, var(--qb-scale, 1) - 1));
+  --qb-alt-gap: calc(0.65rem + 0.5rem * max(0, var(--qb-scale, 1) - 1));
+}
+
+.qb-reading .prose-sm {
   font-size: 0.875em;
-  line-height: 1.5;
+  line-height: calc(1.72 + 0.1 * max(0, var(--qb-scale, 1) - 1));
 }
-.qb-font-scale .prose-xs {
+.qb-reading .prose-xs {
   font-size: 0.75em;
-  line-height: 1.4;
+  line-height: calc(1.58 + 0.12 * max(0, var(--qb-scale, 1) - 1));
 }
-.qb-font-scale .text-sm {
+.qb-reading .text-sm {
   font-size: 0.875em;
+  line-height: calc(1.58 + 0.22 * max(0, var(--qb-scale, 1) - 1));
 }
-.qb-font-scale .text-xs {
+.qb-reading .text-xs {
   font-size: 0.75em;
+  line-height: calc(1.52 + 0.2 * max(0, var(--qb-scale, 1) - 1));
 }
-.qb-font-scale .text-\[10px\] {
-  font-size: 0.625em;
+
+.qb-reading .qb-reading-options-stack {
+  gap: var(--qb-alt-gap);
 }
-.qb-font-scale .text-\[11px\] {
-  font-size: 0.6875em;
+
+.qb-reading .qb-reading-surface-md {
+  padding: calc(1.15rem + 0.85rem * max(0, var(--qb-scale, 1) - 1));
 }
+.qb-reading .qb-reading-surface-md-wide {
+  padding: calc(1.125rem + 0.6rem * max(0, var(--qb-scale, 1) - 1));
+}
+.qb-reading .qb-reading-surface-lg {
+  padding: calc(1.5rem + 0.7rem * max(0, var(--qb-scale, 1) - 1));
+}
+
+.qb-reading .qb-reading-alt-list {
+  gap: var(--qb-alt-gap);
+}
+
+.qb-reading .qb-correction-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--qb-stack-gap);
+}
+.qb-reading .qb-correction-stack--loose {
+  gap: calc(1.1rem + 0.55rem * max(0, var(--qb-scale, 1) - 1));
+}
+
+.qb-reading .qb-reading-doctrine-grid {
+  gap: calc(0.75rem + 0.45rem * max(0, var(--qb-scale, 1) - 1));
+}
+
+.qb-reading .qb-concepts-dl-gap {
+  gap: calc(0.65rem + 0.35rem * max(0, var(--qb-scale, 1) - 1));
+}
+
+/* Análise das alternativas — evita colisão de descendentes em font-bold ampliado */
+.qb-reading .qb-reading-alt-analysis-lead {
+  line-height: calc(1.65 + 0.18 * max(0, var(--qb-scale, 1) - 1));
+}
+
+/* Mentor IA — ritmo vertical e bolhas */
+.qb-reading .qb-reading-mentor {
+  display: flex;
+  flex-direction: column;
+  gap: calc(1rem + 0.55rem * max(0, var(--qb-scale, 1) - 1));
+}
+.qb-reading .qb-reading-mentor-chat-stack {
+  gap: calc(0.85rem + 0.5rem * max(0, var(--qb-scale, 1) - 1));
+}
+.qb-reading .qb-reading-mentor-bubble {
+  padding: calc(1rem + 0.45rem * max(0, var(--qb-scale, 1) - 1));
+  line-height: calc(1.58 + 0.2 * max(0, var(--qb-scale, 1) - 1));
+}
+.qb-reading .qb-reading-mentor-bubble .prose {
+  line-height: inherit;
+}
+.qb-reading .qb-reading-mentor-bubble .prose p {
+  margin-bottom: 0.65em;
+}
+.qb-reading .qb-reading-mentor-bubble .prose p:last-child {
+  margin-bottom: 0;
+}
+.qb-reading .qb-reading-mentor-input {
+  line-height: calc(1.55 + 0.18 * max(0, var(--qb-scale, 1) - 1));
+  padding-top: calc(0.8rem + 0.25rem * max(0, var(--qb-scale, 1) - 1));
+  padding-bottom: calc(0.8rem + 0.25rem * max(0, var(--qb-scale, 1) - 1));
+  min-height: max(44px, calc(2.85rem + 0.55rem * max(0, var(--qb-scale, 1) - 1)));
+}
+.qb-reading .qb-reading-mentor-loading {
+  padding: calc(0.85rem + 0.35rem * max(0, var(--qb-scale, 1) - 1));
+}
+
+/* Discussão — só com ancestral .qb-reading (lista) ou shell extra (single) */
+.qb-reading .qb-reading-comments {
+  margin-top: calc(2rem + 0.45rem * max(0, var(--qb-scale, 1) - 1));
+  padding-top: calc(2rem + 0.45rem * max(0, var(--qb-scale, 1) - 1));
+}
+.qb-reading .qb-reading-comments .qb-reading-comments-list {
+  gap: calc(1.5rem + 0.35rem * max(0, var(--qb-scale, 1) - 1));
+}
+.qb-reading .qb-reading-comments .qb-reading-comments-empty {
+  line-height: calc(1.65 + 0.2 * max(0, var(--qb-scale, 1) - 1));
+  padding-top: calc(1.75rem + 0.45rem * max(0, var(--qb-scale, 1) - 1));
+  padding-bottom: calc(1.75rem + 0.45rem * max(0, var(--qb-scale, 1) - 1));
+}
+.qb-reading .qb-reading-comments .qb-reading-comments-input {
+  line-height: calc(1.62 + 0.2 * max(0, var(--qb-scale, 1) - 1));
+  padding: calc(1.1rem + 0.35rem * max(0, var(--qb-scale, 1) - 1));
+  min-height: calc(6.25rem + 0.75rem * max(0, var(--qb-scale, 1) - 1));
+}
+.qb-reading .qb-reading-comments .qb-reading-comments-locked-hint {
+  line-height: calc(1.58 + 0.18 * max(0, var(--qb-scale, 1) - 1));
+  max-width: 22rem;
+}
+
+/* Conforto visual — só na zona de resultados do banco (.qb-reading-zone), não no chrome global */
+.qb-reading-zone {
+  --qb-dim: 0;
+  --qb-warm: 0;
+}
+
+.qb-comfort-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.qb-comfort-overlay--warm {
+  z-index: 1;
+  background: rgb(255 190 120 / calc(var(--qb-warm, 0) * 0.34));
+  mix-blend-mode: multiply;
+}
+
+.dark .qb-comfort-overlay--warm {
+  mix-blend-mode: soft-light;
+  background: rgb(255 175 100 / calc(var(--qb-warm, 0) * 0.3));
+}
+
+.qb-comfort-overlay--dim {
+  z-index: 2;
+  background: rgb(0 0 0 / calc(var(--qb-dim, 0) * 0.62));
+}
+
+/* Menos movimento: lista/questão dentro da zona de leitura */
+.qb-reading-zone--reduce-motion .animate-in,
+.qb-reading-zone--reduce-motion .animate-out {
+  animation: none !important;
+}
+
+.qb-reading-zone--reduce-motion .animate-spin {
+  animation: none !important;
+}
+
+.qb-reading-zone--reduce-motion .animate-pulse {
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qb-reading-zone .animate-in,
+  .qb-reading-zone .animate-out {
+    animation: none !important;
+  }
+  .qb-reading-zone .animate-spin {
+    animation: none !important;
+  }
+  .qb-reading-zone .animate-pulse {
+    animation: none !important;
+  }
+}
+
 .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="small"]::before,
 .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="small"]::before {
   content: '13px';

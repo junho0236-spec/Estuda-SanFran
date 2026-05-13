@@ -55,8 +55,8 @@ export function QuestionAiCorrectionPanel({
   alternativesHeadingId,
 }: QuestionAiCorrectionPanelProps) {
   const isSingle = density === 'single';
-  const pad = isSingle ? 'p-6 rounded-[2rem]' : 'p-4 rounded-xl';
-  const padWide = isSingle ? 'p-6 rounded-[2rem]' : 'p-5 rounded-2xl';
+  const pad = isSingle ? 'rounded-[2rem] qb-reading-surface-lg' : 'rounded-xl qb-reading-surface-md';
+  const padWide = isSingle ? 'rounded-[2rem] qb-reading-surface-lg' : 'rounded-2xl qb-reading-surface-md-wide';
   const titleClass = isSingle
     ? 'text-[11px] uppercase tracking-widest mb-3'
     : 'text-[10px] uppercase tracking-widest mb-2';
@@ -67,7 +67,7 @@ export function QuestionAiCorrectionPanel({
 
   return (
     <div
-      className={isSingle ? 'space-y-6' : 'space-y-4'}
+      className={isSingle ? 'qb-correction-stack qb-correction-stack--loose' : 'qb-correction-stack'}
       role="region"
       aria-label="Correção comentada pela inteligência artificial"
     >
@@ -115,7 +115,7 @@ export function QuestionAiCorrectionPanel({
           >
             <BookOpen size={isSingle ? 16 : 14} aria-hidden /> Conceitos-chave
           </h4>
-          <dl className="m-0 space-y-3">
+          <dl className="m-0 flex flex-col qb-concepts-dl-gap">
             {concepts.map((k) => (
               <div key={k.term}>
                 <dt className="text-sm font-black text-violet-900 dark:text-violet-200">{k.term}</dt>
@@ -146,8 +146,8 @@ export function QuestionAiCorrectionPanel({
       <div
         className={
           isSingle
-            ? 'grid grid-cols-1 md:grid-cols-2 gap-4'
-            : 'grid grid-cols-1 gap-3'
+            ? 'grid grid-cols-1 md:grid-cols-2 qb-reading-doctrine-grid'
+            : 'grid grid-cols-1 qb-reading-doctrine-grid'
         }
       >
         <div
@@ -250,7 +250,7 @@ export function QuestionAiCorrectionPanel({
       ) : null}
 
       <div
-        className={`${padWide} bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-200 dark:border-slate-700 space-y-3`}
+        className={`${padWide} bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-200 dark:border-slate-700 flex flex-col qb-reading-alt-list`}
       >
         <h4
           id={alternativesHeadingId}

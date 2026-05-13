@@ -14,15 +14,18 @@ interface QuestionCommentsProps {
   showNotification?: (message: string, type: 'success' | 'error') => void;
   /** Comentários de equipa/docentes (SanFran); alunos usam "student". */
   defaultAuthorKind?: QuestionCommentAuthorKind;
+  /** Ex.: `qb-reading-comments` quando dentro de `.qb-reading` (banco de questões). */
+  className?: string;
 }
 
-export const QuestionComments: React.FC<QuestionCommentsProps> = ({ 
-  questionId, 
-  userId, 
+export const QuestionComments: React.FC<QuestionCommentsProps> = ({
+  questionId,
+  userId,
   isAnswered,
   questionTitle = "uma questão",
   showNotification,
   defaultAuthorKind = 'student',
+  className = '',
 }) => {
   const [comments, setComments] = useState<QuestionComment[]>([]);
   const [newComment, setNewComment] = useState('');
@@ -186,12 +189,14 @@ export const QuestionComments: React.FC<QuestionCommentsProps> = ({
 
   if (!isAnswered) {
     return (
-      <div className="mt-8 p-8 bg-slate-50 dark:bg-white/5 rounded-3xl border-2 border-dashed border-slate-200 dark:border-white/10 text-center">
+      <div
+        className={`mt-8 p-8 bg-slate-50 dark:bg-white/5 rounded-3xl border-2 border-dashed border-slate-200 dark:border-white/10 text-center ${className}`.trim()}
+      >
         <MessageSquare size={32} className="mx-auto mb-4 text-slate-300" />
         <h3 className="text-sm font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest mb-2">
           Área de Discussão Bloqueada
         </h3>
-        <p className="text-xs text-slate-500 max-w-xs mx-auto">
+        <p className="qb-reading-comments-locked-hint text-xs text-slate-500 max-w-xs mx-auto leading-relaxed">
           Responda a questão pela primeira vez para liberar os comentários da comunidade e compartilhar mnemônicos!
         </p>
       </div>
@@ -199,7 +204,7 @@ export const QuestionComments: React.FC<QuestionCommentsProps> = ({
   }
 
   return (
-    <div className="mt-8 pt-8 border-t border-slate-100 dark:border-white/5">
+    <div className={`mt-8 pt-8 border-t border-slate-100 dark:border-white/5 ${className}`.trim()}>
       <div className="flex items-center gap-2 mb-6">
         <MessageSquare size={18} className="text-blue-500" />
         <h3 className="text-sm font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest">
@@ -207,13 +212,13 @@ export const QuestionComments: React.FC<QuestionCommentsProps> = ({
         </h3>
       </div>
 
-      <div className="space-y-6 mb-8">
+      <div className="flex flex-col qb-reading-comments-list mb-8">
         {loading && comments.length === 0 ? (
           <div className="flex justify-center py-4">
             <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
           </div>
         ) : comments.length === 0 ? (
-          <p className="text-center py-8 text-slate-400 text-sm italic">
+          <p className="qb-reading-comments-empty text-center text-slate-400 text-sm italic leading-relaxed">
             Nenhum comentário ainda. Seja o primeiro a compartilhar um mnemônico ou dúvida!
           </p>
         ) : (
@@ -323,7 +328,7 @@ export const QuestionComments: React.FC<QuestionCommentsProps> = ({
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
               placeholder={replyingTo ? "Escreva sua resposta..." : "Escreva seu comentário, mnemônico ou dúvida..."}
-              className="w-full p-4 pr-12 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 dark:border-white/10 rounded-2xl text-sm font-medium outline-none focus:border-blue-500 transition-all resize-none min-h-[100px]"
+              className="qb-reading-comments-input w-full p-4 pr-12 bg-slate-50 dark:bg-black/50 border-2 border-slate-200 dark:border-white/10 rounded-2xl text-sm font-medium outline-none focus:border-blue-500 transition-all resize-none min-h-[100px] leading-relaxed"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
