@@ -154,6 +154,13 @@ export interface QuestionBankFiltersPanelProps {
   onFontDecrease: () => void;
   isDarkMode: boolean;
   onToggleDarkMode: () => void;
+  qbReadingDimPct: number;
+  setQbReadingDimPct: (v: number) => void;
+  qbReadingWarmPct: number;
+  setQbReadingWarmPct: (v: number) => void;
+  qbFewerAnimationsUser: boolean;
+  setQbFewerAnimationsUser: (v: boolean) => void;
+  prefersReducedMotion: boolean;
 }
 
 export const QuestionBankFiltersPanel: React.FC<QuestionBankFiltersPanelProps> = ({
@@ -225,6 +232,13 @@ export const QuestionBankFiltersPanel: React.FC<QuestionBankFiltersPanelProps> =
   onFontDecrease,
   isDarkMode,
   onToggleDarkMode,
+  qbReadingDimPct,
+  setQbReadingDimPct,
+  qbReadingWarmPct,
+  setQbReadingWarmPct,
+  qbFewerAnimationsUser,
+  setQbFewerAnimationsUser,
+  prefersReducedMotion,
 }) => {
   const [saveName, setSaveName] = useState('');
   const [showSavedMenu, setShowSavedMenu] = useState(false);
@@ -669,6 +683,64 @@ export const QuestionBankFiltersPanel: React.FC<QuestionBankFiltersPanelProps> =
           >
             {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
           </button>
+          <div
+            className="flex flex-wrap items-end gap-3 w-full sm:w-auto border-t sm:border-t-0 sm:border-l border-slate-200 dark:border-slate-800 pt-2 sm:pt-0 sm:pl-3 mt-1 sm:mt-0"
+            role="group"
+            aria-label="Conforto visual na zona de leitura"
+          >
+            <label
+              className="flex flex-col gap-1 min-w-[7.5rem] flex-1 sm:flex-initial"
+              title="Escurece só a área de enunciado e resolução (lista ou questão), para reduzir brilho."
+            >
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                Luz baixa{' '}
+                <span className="tabular-nums font-bold text-slate-400">{qbReadingDimPct}%</span>
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={qbReadingDimPct}
+                onChange={(e) => setQbReadingDimPct(Number(e.target.value))}
+                className="w-full h-2 accent-blue-600 cursor-pointer"
+              />
+            </label>
+            <label
+              className="flex flex-col gap-1 min-w-[7.5rem] flex-1 sm:flex-initial"
+              title="Tonalidade âmbar suave sobre a mesma zona; ajuda em sensibilidade à luz fria."
+            >
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                Tom quente{' '}
+                <span className="tabular-nums font-bold text-slate-400">{qbReadingWarmPct}%</span>
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={qbReadingWarmPct}
+                onChange={(e) => setQbReadingWarmPct(Number(e.target.value))}
+                className="w-full h-2 accent-amber-600 cursor-pointer"
+              />
+            </label>
+            <label
+              className="inline-flex items-center gap-2 min-h-[44px] cursor-pointer select-none touch-manipulation"
+              title={
+                prefersReducedMotion
+                  ? 'O sistema já pede menos movimento; pode manter ativo para reforçar na zona de leitura.'
+                  : 'Reduz entradas animadas e pulsação nos carregamentos da zona de leitura.'
+              }
+            >
+              <input
+                type="checkbox"
+                checked={qbFewerAnimationsUser}
+                onChange={(e) => setQbFewerAnimationsUser(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 leading-tight max-w-[9rem]">
+                Menos animações
+              </span>
+            </label>
+          </div>
           <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">
             Por página
             <select

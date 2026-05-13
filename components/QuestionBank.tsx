@@ -189,6 +189,10 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
   const [listPage, setListPage] = useState(1);
   const [listPageSize, setListPageSize] = useState(20);
   const [listFontScalePercent, setListFontScalePercent] = useState(100);
+  const [qbReadingDimPct, setQbReadingDimPct] = useState(0);
+  const [qbReadingWarmPct, setQbReadingWarmPct] = useState(0);
+  const [qbFewerAnimationsUser, setQbFewerAnimationsUser] = useState(false);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const [savedFilterPresets, setSavedFilterPresets] = useState<QuestionBankSavedFilterPreset[]>([]);
   const [qbDarkSynced, setQbDarkSynced] = useState(
     () => typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
@@ -284,6 +288,19 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
         const n = parseInt(fs, 10);
         if (!Number.isNaN(n)) setListFontScalePercent(Math.min(250, Math.max(85, n)));
       }
+      const dim = localStorage.getItem(`qb_dim_pct_${userId}`);
+      if (dim) {
+        const n = parseInt(dim, 10);
+        if (!Number.isNaN(n)) setQbReadingDimPct(Math.min(100, Math.max(0, n)));
+      }
+      const warm = localStorage.getItem(`qb_warm_pct_${userId}`);
+      if (warm) {
+        const n = parseInt(warm, 10);
+        if (!Number.isNaN(n)) setQbReadingWarmPct(Math.min(100, Math.max(0, n)));
+      }
+      const motion = localStorage.getItem(`qb_reduce_motion_${userId}`);
+      if (motion === '1') setQbFewerAnimationsUser(true);
+      else if (motion === '0') setQbFewerAnimationsUser(false);
     } catch {
       /* ignore */
     }
@@ -300,7 +317,30 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
   }, [listFontScalePercent, userId]);
 
   useEffect(() => {
+    if (!userId) return;
+    localStorage.setItem(`qb_dim_pct_${userId}`, String(qbReadingDimPct));
+  }, [qbReadingDimPct, userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    localStorage.setItem(`qb_warm_pct_${userId}`, String(qbReadingWarmPct));
+  }, [qbReadingWarmPct, userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    localStorage.setItem(`qb_reduce_motion_${userId}`, qbFewerAnimationsUser ? '1' : '0');
+  }, [qbFewerAnimationsUser, userId]);
+
+  useEffect(() => {
     setQbDarkSynced(document.documentElement.classList.contains('dark'));
+  }, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setPrefersReducedMotion(mq.matches);
+    const onChange = () => setPrefersReducedMotion(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
   }, []);
 
   enum OperationType {
@@ -3666,6 +3706,13 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
               onFontDecrease={onListFontDecrease}
               isDarkMode={qbDarkSynced}
               onToggleDarkMode={toggleQbDark}
+              qbReadingDimPct={qbReadingDimPct}
+              setQbReadingDimPct={setQbReadingDimPct}
+              qbReadingWarmPct={qbReadingWarmPct}
+              setQbReadingWarmPct={setQbReadingWarmPct}
+              qbFewerAnimationsUser={qbFewerAnimationsUser}
+              setQbFewerAnimationsUser={setQbFewerAnimationsUser}
+              prefersReducedMotion={prefersReducedMotion}
             />
           </QuestionBankStatsGoalsNotebookShell>
 
@@ -3673,6 +3720,9 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
           <QuestionBankQuestionArea
             resultsSectionRef={resultsSectionRef}
             listFontScalePercent={listFontScalePercent}
+            readingDimPct={qbReadingDimPct}
+            readingWarmPct={qbReadingWarmPct}
+            readingReduceHeavyMotion={prefersReducedMotion || qbFewerAnimationsUser}
             showQuestionChrome={
               Boolean(
                 (isMockMode ? mockQuestions.length > 0 : filteredQuestions.length > 0) && currentQuestion
