@@ -112,6 +112,10 @@ const QUESTION_BANK_LIST_COLUMNS_LEGACY_FALLBACK =
 const QUESTION_BANK_FACET_COLUMNS_LEGACY_FALLBACK =
   'topic, subject, exam_board, year, legislation_tags, jurisprudence_tags, institution, exam_name, legal_diploma';
 
+const QUESTION_BANK_LIST_FONT_STEPS = [
+  85, 100, 115, 130, 145, 160, 175, 190, 205, 220, 235, 250,
+] as const;
+
 /** Alinhado ao select do gerador de IA — guia a profundidade pedida ao modelo. */
 const AI_DIFFICULTY_PROMPT_LABEL: Record<QuestionBankAiConfig['difficulty'], string> = {
   muito_facil: 'muito fácil (conceitos elementares, memorização direta)',
@@ -278,7 +282,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({
       const fs = localStorage.getItem(`qb_font_pct_${userId}`);
       if (fs) {
         const n = parseInt(fs, 10);
-        if (!Number.isNaN(n)) setListFontScalePercent(Math.min(130, Math.max(85, n)));
+        if (!Number.isNaN(n)) setListFontScalePercent(Math.min(250, Math.max(85, n)));
       }
     } catch {
       /* ignore */
@@ -3000,19 +3004,20 @@ Retorne em formato JSON array de objetos com: subject, topic, statement, options
     });
   }, []);
 
-  const fontSteps = [85, 100, 115, 130] as const;
   const onListFontIncrease = useCallback(() => {
     setListFontScalePercent((p) => {
-      const i = fontSteps.indexOf(p as (typeof fontSteps)[number]);
+      const steps = QUESTION_BANK_LIST_FONT_STEPS;
+      const i = steps.indexOf(p as (typeof steps)[number]);
       const idx = i === -1 ? 1 : i;
-      return fontSteps[Math.min(fontSteps.length - 1, idx + 1)];
+      return steps[Math.min(steps.length - 1, idx + 1)];
     });
   }, []);
   const onListFontDecrease = useCallback(() => {
     setListFontScalePercent((p) => {
-      const i = fontSteps.indexOf(p as (typeof fontSteps)[number]);
+      const steps = QUESTION_BANK_LIST_FONT_STEPS;
+      const i = steps.indexOf(p as (typeof steps)[number]);
       const idx = i === -1 ? 1 : i;
-      return fontSteps[Math.max(0, idx - 1)];
+      return steps[Math.max(0, idx - 1)];
     });
   }, []);
 

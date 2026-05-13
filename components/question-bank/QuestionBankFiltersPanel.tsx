@@ -649,7 +649,9 @@ export const QuestionBankFiltersPanel: React.FC<QuestionBankFiltersPanelProps> =
             >
               A−
             </button>
-            <span className="text-[10px] text-slate-400 w-8 text-center">{listFontScalePercent}%</span>
+            <span className="text-[10px] text-slate-400 min-w-[2.75rem] text-center tabular-nums">
+              {listFontScalePercent}%
+            </span>
             <button
               type="button"
               onClick={onFontIncrease}
