@@ -253,7 +253,7 @@ async function upsertNoteToSupabase(payload: Record<string, unknown>) {
   for (let i = 0; i < maxStrips; i++) {
     const { error } = await supabase
       .from('notes')
-      .upsert(current, { onConflict: 'user_id' });
+      .upsert(current, { onConflict: 'id' });
     if (!error) {
       notesRemoteColumnKeys = new Set(Object.keys(current));
       return { error: null };
@@ -292,7 +292,7 @@ async function upsertNoteToSupabase(payload: Record<string, unknown>) {
 
   const { error: lastErr } = await supabase
     .from('notes')
-    .upsert(current, { onConflict: 'user_id' });
+    .upsert(current, { onConflict: 'id' });
   if (!lastErr) {
     notesRemoteColumnKeys = new Set(Object.keys(current));
   }
@@ -935,7 +935,24 @@ export const dataService = {
       console.error("[dataService] Error fetching notifications:", error);
       return [];
     }
-    return data || [];
+    const rows = (data || []) as Record<string, unknown>[];
+    return rows.map((n) => {
+      let inferredType = n.type as string | undefined;
+      if (!inferredType) {
+        const msg = String(n.message || '').toLowerCase();
+        if (msg.includes('solicitação de amizade') || msg.includes('pedido de amizade')) {
+          inferredType = 'friend_request';
+        } else if (msg.includes('delegou') || msg.includes('atribuiu')) {
+          inferredType = 'delegated';
+        } else if (msg.includes('completou') || msg.includes('concluiu')) {
+          inferredType = 'completed';
+        }
+      }
+      return {
+        ...n,
+        type: inferredType,
+      } as unknown as Notification;
+    });
   },
 
   async markNotificationAsRead(id: string) {
@@ -946,6 +963,7 @@ export const dataService = {
   },
 
   async markAllNotificationsAsRead(userId: string) {
+    // Try filtering out friend_requests if 'type' column exists
     const { error } = await supabase
       .from('notifications')
       .update({ is_read: true })
@@ -953,18 +971,41 @@ export const dataService = {
       .eq('is_read', false)
       .neq('type', 'friend_request');
     if (error) {
-      console.error("[dataService] Error marking all notifications as read:", error);
+      // If 'type' column does not exist in the database (code 42703), update all without type filter
+      if ((error as { code?: string }).code === '42703') {
+        const { error: fallbackError } = await supabase
+          .from('notifications')
+          .update({ is_read: true })
+          .eq('user_id', userId)
+          .eq('is_read', false);
+        if (fallbackError) {
+          console.error("[dataService] Error marking all notifications as read (fallback):", fallbackError);
+        }
+      } else {
+        console.error("[dataService] Error marking all notifications as read:", error);
+      }
     }
   },
 
   async createNotification(userId: string, message: string, linkTask?: string, type?: string) {
-    const { error } = await supabase.from('notifications').insert({
+    const payload: Record<string, unknown> = {
       user_id: userId,
       message,
       link_task: linkTask,
-      type
-    });
+    };
+    if (type) payload.type = type;
+
+    const { error } = await supabase.from('notifications').insert(payload);
     if (error) {
+      if ((error as { code?: string }).code === '42703' && payload.type) {
+        delete payload.type;
+        const { error: retryError } = await supabase.from('notifications').insert(payload);
+        if (retryError) {
+          console.error("[dataService] Error creating notification (retry without type):", retryError);
+          throw retryError;
+        }
+        return;
+      }
       console.error("[dataService] Error creating notification:", error);
       throw error;
     }

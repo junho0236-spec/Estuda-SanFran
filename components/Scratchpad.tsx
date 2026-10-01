@@ -12,37 +12,87 @@ const Scratchpad: React.FC<ScratchpadProps> = ({ userId, isExtremeFocus }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [content, setContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const storageKey = `sanfran_scratchpad_${userId}`;
 
-  // Carregar nota inicial
+  // Carregar nota inicial: localStorage primeiro (instantâneo), depois nuvem (user_persona)
   useEffect(() => {
+    let isMounted = true;
+    const localContent = localStorage.getItem(storageKey);
+    if (localContent) {
+      setContent(localContent);
+    }
+
     const fetchNote = async () => {
-      const { data, error } = await supabase
-        .from('notes')
-        .select('content')
-        .eq('user_id', userId)
-        .single();
-      
-      if (data) setContent(data.content);
+      try {
+        const { data, error } = await supabase
+          .from('user_persona')
+          .select('persona_data')
+          .eq('id', userId)
+          .maybeSingle();
+
+        if (!error && data?.persona_data?.scratchpad && isMounted) {
+          const remoteContent = data.persona_data.scratchpad as string;
+          // Se não havia dado local ou se o remoto tem conteúdo mais recente
+          if (!localContent || localContent.trim().length === 0) {
+            setContent(remoteContent);
+            localStorage.setItem(storageKey, remoteContent);
+          }
+        }
+      } catch {
+        // Fallback silencioso para armazenamento local
+      }
     };
+
     fetchNote();
-  }, [userId]);
+    return () => {
+      isMounted = false;
+    };
+  }, [userId, storageKey]);
 
   // Debounce para salvar automaticamente
   useEffect(() => {
+    // Salva no localStorage imediatamente
+    if (userId) {
+      localStorage.setItem(storageKey, content);
+    }
+
     const delayDebounceFn = setTimeout(async () => {
-      if (content) {
+      if (content !== undefined && userId) {
         setIsSaving(true);
-        const { error } = await supabase
-          .from('notes')
-          .upsert({ user_id: userId, content, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
-        
-        if (error) console.error("Erro ao salvar nota:", error);
-        setIsSaving(false);
+        try {
+          // Busca persona_data atual para não sobrescrever outras preferências
+          const { data: personaRow } = await supabase
+            .from('user_persona')
+            .select('persona_data')
+            .eq('id', userId)
+            .maybeSingle();
+
+          const prevData = (personaRow?.persona_data as Record<string, unknown>) || {};
+          const { error } = await supabase
+            .from('user_persona')
+            .update({
+              persona_data: {
+                ...prevData,
+                scratchpad: content,
+              },
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', userId);
+
+          if (error) {
+            // Se falhar na nuvem, o dado continua preservado no localStorage
+            console.warn('[Scratchpad] Sincronização em nuvem pendente, preservado localmente:', error.message);
+          }
+        } catch {
+          // Preservado no localStorage
+        } finally {
+          setIsSaving(false);
+        }
       }
     }, 1500);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [content, userId]);
+  }, [content, userId, storageKey]);
 
   return (
     <>

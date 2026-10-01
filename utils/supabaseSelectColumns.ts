@@ -21,7 +21,7 @@ export const SUBJECT_FILES_LIST_COLUMNS =
 export const FRIENDSHIPS_LIST_COLUMNS = 'id, user_id, friend_id, status, created_at, updated_at';
 
 export const NOTIFICATIONS_LIST_COLUMNS =
-  'id, user_id, message, is_read, link_task, type, created_at';
+  'id, user_id, message, is_read, link_task, created_at';
 
 export const NOTES_LIST_COLUMNS =
   'id, subject_id, user_id, title, content, handwriting_data, updated_at, tags, is_starred';
