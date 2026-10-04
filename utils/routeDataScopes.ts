@@ -1,6 +1,12 @@
 import { View } from '../types';
 import type { UserDataSyncScope } from './realtimeThrottle';
 
+/**
+ * Identificador da aba Vocab English. Mantido fora do enum `View` em types.ts
+ * para que o módulo permaneça 100% aditivo (nenhum arquivo base alterado).
+ */
+export const VOCAB_ENGLISH_VIEW = 'vocab_ingles' as unknown as View;
+
 /** Escopos de dados necessários por ecrã (além do `bootstrap` pós-login). */
 export function getDataScopesForView(view: View): UserDataSyncScope[] {
   switch (view) {
@@ -41,6 +47,9 @@ export function getDataScopesForView(view: View): UserDataSyncScope[] {
       return ['study_sessions'];
     case View.SpacedRepetition:
       return ['flashcards'];
+    case VOCAB_ENGLISH_VIEW:
+      // Dados próprios (vocab_*) carregados pelo serviço isolado do módulo.
+      return [];
     default:
       return [];
   }

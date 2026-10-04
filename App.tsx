@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map as MapIcon, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck, BookX, ScrollText, FileText, Repeat, UserX, ListTodo, ListChecks, Handshake, Eye, Key, CalendarCheck, Loader2, BarChart3, Search, Command, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Timer as TimerIcon, BookOpen, CheckSquare, BrainCircuit, Moon, Sun, LogOut, Calendar as CalendarIcon, Clock as ClockIcon, Menu, X, Coffee, Gavel, Play, Pause, Trophy, Library as LibraryIcon, Users, MessageSquare, Calculator as CalculatorIcon, Mic, Building2, CalendarClock, Armchair, Briefcase, Scroll, ClipboardList, GitCommit, Archive, Quote, Scale, Gamepad2, Zap, ShoppingBag, Sword, Bell, Target, Network, Keyboard, FileSignature, Calculator, Megaphone, Dna, Banknote, ClipboardCheck, ScanSearch, Languages, Split, ThumbsUp, Map as MapIcon, Hourglass, Globe, IdCard, Pin, Landmark, LayoutGrid, Radio, GraduationCap, Leaf, Wrench, ShieldCheck, BookX, ScrollText, FileText, Repeat, UserX, ListTodo, ListChecks, Handshake, Eye, Key, CalendarCheck, Loader2, BarChart3, Search, Command, ChevronLeft, ChevronRight, BookA } from 'lucide-react';
 import { View, Subject, Flashcard, Task, Folder, StudySession, Reading, PresenceUser, Duel, StudyMode, Board, Notification, Friendship, UserProfile } from './types';
 import Login from './components/Login';
 import Atmosphere from './components/Atmosphere';
@@ -16,7 +16,7 @@ import {
   createScopedRealtimeDebounce,
   type UserDataSyncScope,
 } from './utils/realtimeThrottle';
-import { getDataScopesForView } from './utils/routeDataScopes';
+import { getDataScopesForView, VOCAB_ENGLISH_VIEW } from './utils/routeDataScopes';
 import {
   FLASHCARD_CLOUD_COLUMNS,
   TASK_CLOUD_COLUMNS,
@@ -171,6 +171,7 @@ const ErrorLog = React.lazy(() => import('./components/ErrorLog'));
 const CodeTracker = React.lazy(() => import('./components/CodeTracker'));
 const IracMethod = React.lazy(() => import('./components/IracMethod')); 
 const SpacedRepetition = React.lazy(() => import('./components/SpacedRepetition'));
+const VocabEnglish = React.lazy(() => import('./components/VocabEnglish'));
 const Connect = React.lazy(() => import('./components/Connect'));
 const Friends = React.lazy(() => import('./components/Friends'));
 const AttendanceCalculator = React.lazy(() => import('./components/AttendanceCalculator'));
@@ -276,6 +277,7 @@ const getPathFromView = (view: View): string => {
   if (view === View.QuestionBank) return '/questoes';
   if (view === View.Anki) return '/flashcards';
   if (view === View.ErrorLog) return '/caderno-erros';
+  if (view === VOCAB_ENGLISH_VIEW) return '/vocab-ingles';
   return `/${view}`;
 };
 
@@ -285,6 +287,7 @@ const getViewFromPath = (pathname: string): View => {
   if (pathname === '/flashcards') return View.Anki;
   if (pathname === '/simulados') return View.QuestionBank;
   if (pathname === '/caderno-erros') return View.ErrorLog;
+  if (pathname === '/vocab-ingles') return VOCAB_ENGLISH_VIEW;
   
   const pathWithoutSlash = pathname.substring(1);
   if (Object.values(View).includes(pathWithoutSlash as View)) {
@@ -1600,6 +1603,7 @@ const App: React.FC = () => {
     { id: View.MinhasListas, icon: ListTodo, label: 'Minhas Listas', color: 'text-violet-600', bg: 'bg-violet-100' },
     { id: View.QuestionBank, icon: ListChecks, label: 'Banco de Questões', color: 'text-amber-700', bg: 'bg-amber-100' },
     { id: View.Anki, icon: BrainCircuit, label: 'FLASHCARDS', color: 'text-slate-900', bg: 'bg-slate-200' },
+    { id: VOCAB_ENGLISH_VIEW, icon: BookA, label: 'Vocab EN', color: 'text-sky-700', bg: 'bg-sky-100' },
     { id: View.Connect, icon: MessageSquare, label: 'CONNECT', color: 'text-blue-600', bg: 'bg-blue-100' },
     { id: View.Friends, icon: Users, label: 'FRIENDS', color: 'text-emerald-600', bg: 'bg-emerald-100' },
     { id: View.Statistics, icon: BarChart3, label: 'Estatísticas', color: 'text-usp-gold', bg: 'bg-usp-gold/10' },
@@ -1627,7 +1631,7 @@ const App: React.FC = () => {
   const isImprovementChild = [View.Specialization, View.TypingChallenge, View.TypingLab, View.DominioJuridico, View.Timeline, View.LeiSeca, View.Library, View.Sumulas, View.OralArgument, View.IntelligentSummarizer, View.StudyBuddy, View.Certificates, View.CaseAnalyzer].includes(currentView);
 
   // Helper to check if current view is a child of SanFran Languages
-  const isLanguagesChild = [View.SanFranIdiomas, View.LegalCinema, View.GeneralLanguages, View.PronunciationLab, View.LyricalVibes, View.TheExchangeStudent, View.VisualFlashcards, View.BilingualNews, View.SlangChallenge, View.LatinGame].includes(currentView);
+  const isLanguagesChild = [View.SanFranIdiomas, View.LegalCinema, View.GeneralLanguages, View.PronunciationLab, View.LyricalVibes, View.TheExchangeStudent, View.VisualFlashcards, View.BilingualNews, View.SlangChallenge, View.LatinGame, VOCAB_ENGLISH_VIEW].includes(currentView);
 
   // Helper to check if current view is a child of SanFran Life
   const isLifeChild = [View.Office, View.Sebo].includes(currentView);
@@ -2279,6 +2283,7 @@ const App: React.FC = () => {
                 <Route path={getPathFromView(View.CodeTracker)} element={<CodeTracker userId={session.user.id} />} />
                 <Route path={getPathFromView(View.IracMethod)} element={<IracMethod userId={session.user.id} />} />
                 <Route path={getPathFromView(View.SpacedRepetition)} element={<SpacedRepetition userId={session.user.id} isOnline={isOnline} />} />
+                <Route path={getPathFromView(VOCAB_ENGLISH_VIEW)} element={<VocabEnglish userId={session.user.id} isOnline={isOnline} />} />
                 <Route path={getPathFromView(View.Connect)} element={<Connect userId={session.user.id} userName={session.user.user_metadata?.full_name || 'Doutor(a)'} onNavigate={setCurrentView} />} />
                 <Route path={getPathFromView(View.Friends)} element={<Friends userId={session.user.id} userName={userProfile?.full_name || session.user.email || 'Usuário'} onNavigate={setCurrentView} />} />
                 <Route path={getPathFromView(View.AttendanceCalculator)} element={<AttendanceCalculator userId={session.user.id} />} />
