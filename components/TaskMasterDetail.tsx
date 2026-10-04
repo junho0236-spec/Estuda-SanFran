@@ -989,7 +989,7 @@ const TaskMasterDetail: React.FC<TaskMasterDetailProps> = ({
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
       const response = await ai.models.generateContent({
-        model: 'gemini-3.1-flash-lite-preview',
+        model: 'gemini-3.1-flash-lite',
         contents: `Você é um assistente de produtividade. Quebre a tarefa "${selectedTask.title}" em exatamente 5 subtarefas lógicas e acionáveis. 
         Retorne apenas os títulos das subtarefas, um por linha, sem números ou marcadores.`
       });

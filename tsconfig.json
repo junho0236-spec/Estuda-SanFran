@@ -21,6 +21,9 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@google/genai": [
+        "./services/genaiCompat.ts"
       ]
     },
     "allowImportingTsExtensions": true,

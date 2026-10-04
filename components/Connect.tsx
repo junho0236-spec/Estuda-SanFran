@@ -2226,7 +2226,7 @@ const Connect: React.FC<ConnectProps> = ({ userId, userName, onNavigate, setTask
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-flash-lite-preview",
+        model: "gemini-3.1-flash-lite",
         contents: `Extraia metadados para este link: ${canonical}. Retorne um JSON com title, description e image (URL https da imagem, ou vazio). Se for um site jurídico brasileiro (STF, Jusbrasil, etc), forneça uma descrição técnica e formal.`,
         config: {
           responseMimeType: "application/json",
