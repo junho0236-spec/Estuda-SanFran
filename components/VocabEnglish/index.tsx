@@ -19,7 +19,6 @@ import type { VocabSentence, VocabWord, VocabWordStatus } from '../../services/v
 import {
   addVocabWord,
   deleteVocabWord,
-  dueVocabSentences,
   isVocabCloudUnavailable,
   listSentencesForWord,
   listVocabSentences,
@@ -78,18 +77,30 @@ const VocabEnglish: React.FC<VocabEnglishProps> = ({ userId, isOnline }) => {
 
   const wordsById = useMemo(() => new Map(words.map((w) => [w.id, w])), [words]);
 
+  const getDueSentences = useCallback((rows: VocabSentence[]) => {
+    const today = localTodayISO();
+    return rows
+      .filter((s) => s.next_review == null || s.next_review <= today)
+      .sort((a, b) => String(a.next_review ?? '').localeCompare(String(b.next_review ?? '')));
+  }, []);
+
   const refresh = useCallback(async () => {
-    const [w, s, d] = await Promise.all([
-      listVocabWords(userId, isOnline),
-      listVocabSentences(userId, isOnline),
-      dueVocabSentences(userId),
-    ]);
-    setWords(w);
-    setSentences(s);
-    setDue(d);
-    setCloudUnavailable(isVocabCloudUnavailable());
-    setLoading(false);
-  }, [userId, isOnline]);
+    try {
+      const [w, s] = await Promise.all([
+        listVocabWords(userId, isOnline),
+        listVocabSentences(userId, isOnline),
+      ]);
+      setWords(w);
+      setSentences(s);
+      setDue(getDueSentences(s));
+      setCloudUnavailable(isVocabCloudUnavailable());
+    } catch (e) {
+      console.error('[vocab] erro ao carregar dados', e);
+      toast.error('Não foi possível carregar o Vocab English.');
+    } finally {
+      setLoading(false);
+    }
+  }, [userId, isOnline, getDueSentences]);
 
   useEffect(() => {
     void refresh();

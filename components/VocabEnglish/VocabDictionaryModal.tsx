@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Volume2, BookMarked, CheckCircle2, CircleDashed } from 'lucide-react';
+import { X, Volume2, BookMarked, CheckCircle2, CircleDashed, Circle } from 'lucide-react';
 import type { VocabWord } from '../../services/vocabService';
 import { playVocabAudio, speakEnglish } from '../../services/vocabService';
 import { wordStabilityDays } from '../../services/vocabFsrs';
@@ -144,6 +144,13 @@ const VocabDictionaryModal: React.FC<VocabDictionaryModalProps> = ({
         </div>
 
         <div className="mt-5 flex gap-2">
+          <button
+            onClick={() => onSetStatus(word, 'unknown')}
+            disabled={word.status === 'unknown'}
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-xs font-black uppercase tracking-widest bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300 disabled:opacity-40 hover:brightness-105 transition-all active:scale-95"
+          >
+            <Circle size={14} /> Desconhecida
+          </button>
           <button
             onClick={() => onSetStatus(word, 'learning')}
             disabled={word.status === 'learning'}
