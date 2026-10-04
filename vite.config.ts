@@ -28,6 +28,9 @@ export default defineConfig(({ mode }) => {
       },
       resolve: {
         alias: {
+          // Toda a IA passa pelo adaptador OpenRouter (compatível com a API
+          // do @google/genai). Chave: GEMINI_API_KEY recebe um valor sk-or-...
+          '@google/genai': path.resolve(__dirname, './services/genaiCompat.ts'),
           '@': path.resolve(__dirname, '.'),
         }
       }
