@@ -64,6 +64,12 @@ interface VocabSyncQueueItem {
   timestamp: string;
 }
 
+export interface VocabSyncFlushSummary {
+  attempted: number;
+  synced: number;
+  pending: number;
+}
+
 interface VocabAudioCacheItem {
   url: string;
   blob: Blob;
@@ -127,17 +133,28 @@ const enqueue = async (item: Omit<VocabSyncQueueItem, 'id' | 'timestamp'>) => {
   await vocabDb.vocab_sync_queue.add({ ...item, timestamp: new Date().toISOString() });
 };
 
+export async function getVocabPendingSyncCount(): Promise<number> {
+  return vocabDb.vocab_sync_queue.count();
+}
+
 /** Re-executa operações pendentes na nuvem. Chamado antes de leituras remotas. */
-export async function flushVocabSyncQueue(isOnline: boolean) {
-  if (!isOnline || vocabCloudUnavailable) return;
+export async function flushVocabSyncQueue(isOnline: boolean): Promise<VocabSyncFlushSummary> {
+  const pendingBefore = await vocabDb.vocab_sync_queue.count();
+  if (!isOnline || vocabCloudUnavailable) {
+    return { attempted: 0, synced: 0, pending: pendingBefore };
+  }
   const items = await vocabDb.vocab_sync_queue.orderBy('id').toArray();
+  let synced = 0;
   for (const item of items) {
     try {
       if (item.action === 'delete') {
         const { error } = await supabase.from(item.table).delete().eq('id', item.data.id);
         if (error) {
           noteCloudError(error);
-          if (isMissingTableError(error)) return;
+          if (isMissingTableError(error)) {
+            const pending = await vocabDb.vocab_sync_queue.count();
+            return { attempted: items.length, synced, pending };
+          }
           continue;
         }
       } else {
@@ -146,16 +163,23 @@ export async function flushVocabSyncQueue(isOnline: boolean) {
           .upsert(item.data, { onConflict: 'id' });
         if (error) {
           noteCloudError(error);
-          if (isMissingTableError(error)) return;
+          if (isMissingTableError(error)) {
+            const pending = await vocabDb.vocab_sync_queue.count();
+            return { attempted: items.length, synced, pending };
+          }
           continue;
         }
       }
       await vocabDb.vocab_sync_queue.delete(item.id!);
+      synced += 1;
     } catch {
       // Sem conexão real — tenta de novo na próxima oportunidade.
-      return;
+      const pending = await vocabDb.vocab_sync_queue.count();
+      return { attempted: items.length, synced, pending };
     }
   }
+  const pending = await vocabDb.vocab_sync_queue.count();
+  return { attempted: items.length, synced, pending };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -286,6 +310,22 @@ export async function listVocabSentences(
 
 export async function listSentencesForWord(wordId: string): Promise<VocabSentence[]> {
   return vocabDb.vocab_sentences.where('word_id').equals(wordId).toArray();
+}
+
+export async function deleteVocabSentence(sentenceId: string, isOnline: boolean): Promise<void> {
+  await vocabDb.vocab_sentences.delete(sentenceId);
+  const data = { id: sentenceId };
+  if (isOnline && !vocabCloudUnavailable) {
+    const { error } = await supabase.from('vocab_sentences').delete().eq('id', sentenceId);
+    if (error) {
+      noteCloudError(error);
+      if (!isMissingTableError(error)) {
+        await enqueue({ table: 'vocab_sentences', action: 'delete', data });
+      }
+    }
+  } else {
+    await enqueue({ table: 'vocab_sentences', action: 'delete', data });
+  }
 }
 
 export function localTodayISO(): string {
@@ -420,8 +460,19 @@ export async function addVocabWord(
 /*  Áudio: Free Dictionary mp3 (com cache) + Web Speech API (TTS)              */
 /* -------------------------------------------------------------------------- */
 
-function pickEnglishVoice(): SpeechSynthesisVoice | undefined {
+export interface SpeakEnglishOptions {
+  accent?: 'us' | 'uk';
+  rate?: number;
+}
+
+function pickEnglishVoice(accent: SpeakEnglishOptions['accent'] = 'us'): SpeechSynthesisVoice | undefined {
   const voices = window.speechSynthesis?.getVoices?.() ?? [];
+  if (accent === 'uk') {
+    return (
+      voices.find((v) => /en-gb|english \(uk\)|british/i.test(`${v.lang} ${v.name}`)) ||
+      voices.find((v) => /en-gb/i.test(v.lang))
+    );
+  }
   return (
     voices.find((v) => /google us english/i.test(v.name)) ||
     voices.find((v) => v.lang === 'en-US') ||
@@ -430,13 +481,14 @@ function pickEnglishVoice(): SpeechSynthesisVoice | undefined {
 }
 
 /** TTS via Web Speech API — cobre palavras e frases sem áudio do dicionário. */
-export function speakEnglish(text: string) {
+export function speakEnglish(text: string, options: SpeakEnglishOptions = {}) {
   if (!window.speechSynthesis) return;
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'en-US';
-  utterance.rate = 0.92;
-  const voice = pickEnglishVoice();
+  const accent = options.accent ?? 'us';
+  utterance.lang = accent === 'uk' ? 'en-GB' : 'en-US';
+  utterance.rate = options.rate ?? 0.92;
+  const voice = pickEnglishVoice(accent);
   if (voice) utterance.voice = voice;
   window.speechSynthesis.speak(utterance);
 }

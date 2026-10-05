@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { X, Volume2, Eye, CheckCircle2, RotateCcw } from 'lucide-react';
+import { X, Volume2, Eye, CheckCircle2, RotateCcw, Pause, RefreshCw, Loader2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { toast } from 'sonner';
@@ -13,6 +13,8 @@ interface VocabStudySessionProps {
   isOnline: boolean;
   sentences: VocabSentence[];
   wordsById: Map<string, VocabWord>;
+  storageKey: string;
+  onReplaceSentence: (sentence: VocabSentence) => Promise<void>;
   onFinish: () => void;
 }
 
@@ -44,7 +46,8 @@ const GRADE_BUTTONS: { quality: ReviewQuality; label: string; className: string 
 ];
 
 /** Renderiza a frase destacando a palavra alvo (qualquer flexão simples). */
-function SentenceWithHighlight({ text, lemma }: { text: string; lemma: string }) {
+function SentenceWithHighlight({ text, lemma, mode }: { text: string; lemma: string; mode: 'normal' | 'cloze' }) {
+  const normalizedLemma = lemma.trim().toLowerCase();
   const parts = useMemo(() => {
     if (!lemma) return [text];
     const escaped = lemma.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -54,12 +57,12 @@ function SentenceWithHighlight({ text, lemma }: { text: string; lemma: string })
   return (
     <p className="text-xl md:text-2xl font-bold text-slate-800 dark:text-slate-100 leading-relaxed text-center">
       {parts.map((p, i) =>
-        p.toLowerCase().startsWith(lemma) ? (
+        p.toLowerCase().startsWith(normalizedLemma) ? (
           <mark
             key={i}
             className="bg-sky-200/70 dark:bg-sky-500/40 text-sky-900 dark:text-sky-100 rounded px-1"
           >
-            {p}
+            {mode === 'cloze' ? '____' : p}
           </mark>
         ) : (
           <span key={i}>{p}</span>
@@ -69,33 +72,80 @@ function SentenceWithHighlight({ text, lemma }: { text: string; lemma: string })
   );
 }
 
+function loadSavedQueue(storageKey: string, sentences: VocabSentence[]): VocabSentence[] {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return sentences;
+    const parsed = JSON.parse(raw) as { queue?: VocabSentence[] };
+    const queue = Array.isArray(parsed?.queue) ? parsed.queue : [];
+    if (queue.length === 0) return sentences;
+    return queue;
+  } catch {
+    return sentences;
+  }
+}
+
 const VocabStudySession: React.FC<VocabStudySessionProps> = ({
   userId,
   isOnline,
   sentences,
   wordsById,
+  storageKey,
+  onReplaceSentence,
   onFinish,
 }) => {
-  const [queue, setQueue] = useState<VocabSentence[]>(sentences);
-  const [total] = useState(sentences.length);
+  const [initialQueue] = useState<VocabSentence[]>(() => loadSavedQueue(storageKey, sentences));
+  const [queue, setQueue] = useState<VocabSentence[]>(initialQueue);
+  const [total] = useState(initialQueue.length);
   const [revealed, setRevealed] = useState(false);
   const [reviewing, setReviewing] = useState(false);
+  const [replacing, setReplacing] = useState(false);
   const [done, setDone] = useState(false);
   const [promotions, setPromotions] = useState<string[]>([]);
+  const [studyMode, setStudyMode] = useState<'normal' | 'cloze'>('normal');
+  const [accent, setAccent] = useState<'us' | 'uk'>('us');
+  const [speechRate, setSpeechRate] = useState(0.92);
+  const [audioLoop, setAudioLoop] = useState(false);
 
   const current = queue[0] ?? null;
   const currentWord = current ? wordsById.get(current.word_id) : undefined;
   const completed = total - queue.length;
+  const initialNew = useMemo(
+    () => initialQueue.filter((s) => s.fsrs_snapshot == null).length,
+    [initialQueue]
+  );
+  const initialReview = useMemo(() => initialQueue.length - initialNew, [initialQueue.length, initialNew]);
+  const queueNew = useMemo(() => queue.filter((s) => s.fsrs_snapshot == null).length, [queue]);
+  const queueReview = queue.length - queueNew;
 
   useEffect(() => {
     return () => window.speechSynthesis?.cancel();
   }, []);
 
   useEffect(() => {
+    localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        queue,
+        promotions,
+      })
+    );
+  }, [storageKey, queue, promotions]);
+
+  useEffect(() => {
+    if (!audioLoop || !current) return;
+    const id = window.setInterval(() => {
+      speakEnglish(current.text_en, { accent, rate: speechRate });
+    }, 3500);
+    return () => window.clearInterval(id);
+  }, [audioLoop, current, accent, speechRate]);
+
+  useEffect(() => {
     if (done) {
       confetti({ particleCount: 90, spread: 70, origin: { y: 0.7 } });
+      localStorage.removeItem(storageKey);
     }
-  }, [done]);
+  }, [done, storageKey]);
 
   const grade = useCallback(
     async (quality: ReviewQuality) => {
@@ -126,6 +176,20 @@ const VocabStudySession: React.FC<VocabStudySessionProps> = ({
     },
     [current, reviewing, userId, isOnline]
   );
+
+  const replaceCurrent = useCallback(async () => {
+    if (!current || replacing) return;
+    setReplacing(true);
+    try {
+      await onReplaceSentence(current);
+      setQueue((prev) => prev.slice(1));
+      setRevealed(false);
+    } catch {
+      toast.error('Não foi possível substituir a frase agora.');
+    } finally {
+      setReplacing(false);
+    }
+  }, [current, replacing, onReplaceSentence]);
 
   useEffect(() => {
     if (queue.length === 0 && !done) setDone(true);
@@ -182,7 +246,20 @@ const VocabStudySession: React.FC<VocabStudySessionProps> = ({
           <p className="mt-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400">
             {completed}/{total} revisadas
           </p>
+          <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-slate-400">
+            novas {queueNew}/{initialNew} · revisão {queueReview}/{initialReview}
+          </p>
         </div>
+        <button
+          onClick={() => {
+            toast.success('Sessão pausada. Você pode continuar depois.');
+            onFinish();
+          }}
+          className="p-2.5 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 transition-colors"
+          aria-label="Pausar sessão"
+        >
+          <Pause size={18} />
+        </button>
         <button
           onClick={onFinish}
           className="p-2.5 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 transition-colors"
@@ -203,7 +280,7 @@ const VocabStudySession: React.FC<VocabStudySessionProps> = ({
         >
           <div className="flex justify-center mb-6">
             <button
-              onClick={() => speakEnglish(current.text_en)}
+              onClick={() => speakEnglish(current.text_en, { accent, rate: speechRate })}
               className="w-12 h-12 rounded-2xl bg-sky-600 hover:bg-sky-500 text-white flex items-center justify-center shadow-lg shadow-sky-600/30 transition-all active:scale-95"
               aria-label="Ouvir frase"
               title="Ouvir frase"
@@ -212,7 +289,42 @@ const VocabStudySession: React.FC<VocabStudySessionProps> = ({
             </button>
           </div>
 
-          <SentenceWithHighlight text={current.text_en} lemma={currentWord?.lemma ?? ''} />
+          <div className="mb-4 flex flex-wrap justify-center gap-2">
+            <button
+              onClick={() => setStudyMode((m) => (m === 'normal' ? 'cloze' : 'normal'))}
+              className="px-3 py-1.5 rounded-full bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 text-[10px] font-black uppercase tracking-widest"
+            >
+              modo: {studyMode === 'normal' ? 'frase' : 'cloze'}
+            </button>
+            <button
+              onClick={() => setAccent((a) => (a === 'us' ? 'uk' : 'us'))}
+              className="px-3 py-1.5 rounded-full bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 text-[10px] font-black uppercase tracking-widest"
+            >
+              accent: {accent.toUpperCase()}
+            </button>
+            <button
+              onClick={() => setSpeechRate((r) => (r === 0.92 ? 0.8 : r === 0.8 ? 1 : 0.92))}
+              className="px-3 py-1.5 rounded-full bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 text-[10px] font-black uppercase tracking-widest"
+            >
+              velocidade: {speechRate.toFixed(2)}x
+            </button>
+            <button
+              onClick={() => setAudioLoop((v) => !v)}
+              className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                audioLoop
+                  ? 'bg-sky-600 text-white'
+                  : 'bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300'
+              }`}
+            >
+              loop {audioLoop ? 'on' : 'off'}
+            </button>
+          </div>
+
+          <SentenceWithHighlight
+            text={current.text_en}
+            lemma={currentWord?.lemma ?? ''}
+            mode={studyMode}
+          />
 
           {revealed ? (
             <div className="mt-6 p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 text-center animate-in fade-in slide-in-from-top-2 duration-300">
@@ -234,6 +346,16 @@ const VocabStudySession: React.FC<VocabStudySessionProps> = ({
               palavra alvo: <span className="text-sky-600 dark:text-sky-400">{currentWord.lemma}</span>
             </p>
           )}
+          <div className="mt-3 flex justify-center">
+            <button
+              onClick={() => void replaceCurrent()}
+              disabled={replacing}
+              className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-violet-600 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-500/10 disabled:opacity-50 flex items-center gap-2"
+            >
+              {replacing ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+              Frase ruim? substituir
+            </button>
+          </div>
         </motion.div>
       </AnimatePresence>
 

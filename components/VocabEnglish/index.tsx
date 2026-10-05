@@ -9,16 +9,23 @@ import {
   Loader2,
   Sparkles,
   CloudOff,
+  CloudUpload,
   ChevronDown,
   ChevronUp,
   Filter,
   Play,
+  RefreshCw,
+  Download,
+  Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { VocabSentence, VocabWord, VocabWordStatus } from '../../services/vocabService';
 import {
   addVocabWord,
+  deleteVocabSentence,
   deleteVocabWord,
+  flushVocabSyncQueue,
+  getVocabPendingSyncCount,
   isVocabCloudUnavailable,
   listSentencesForWord,
   listVocabSentences,
@@ -28,6 +35,7 @@ import {
   suggestEnglishWords,
   localTodayISO,
 } from '../../services/vocabService';
+import { parseFsrsSnapshot } from '../../services/spacedFsrs';
 import {
   generateSentencesForWord,
   getUseSeed,
@@ -53,16 +61,63 @@ const STATUS_STYLE: Record<VocabWordStatus, string> = {
   known: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
 };
 
+const DAILY_LIMIT_STORAGE_KEY = 'sanfran_vocab_daily_limit';
+const WEEK_DAYS = 7;
+
+function parseDailyLimit(): 20 | 40 | 60 {
+  try {
+    const raw = Number(localStorage.getItem(DAILY_LIMIT_STORAGE_KEY) ?? '40');
+    return raw === 20 || raw === 60 ? raw : 40;
+  } catch {
+    return 40;
+  }
+}
+
+function classifyApiError(error: unknown): string {
+  const msg = String((error as { message?: string } | null)?.message ?? '').toLowerCase();
+  if (msg.includes('429') || msg.includes('quota') || msg.includes('rate')) {
+    return 'Limite da API atingido. Tente novamente em alguns minutos.';
+  }
+  if (msg.includes('network') || msg.includes('fetch') || msg.includes('offline')) {
+    return 'Sem conexão no momento. Verifique sua internet e tente novamente.';
+  }
+  return 'Serviço indisponível no momento. Tente novamente mais tarde.';
+}
+
+function dayDiff(todayISO: string, dateISO: string | null): number {
+  if (!dateISO) return 0;
+  const today = new Date(todayISO + 'T00:00:00').getTime();
+  const due = new Date(dateISO + 'T00:00:00').getTime();
+  return Math.floor((today - due) / (1000 * 60 * 60 * 24));
+}
+
+function prioritizeDue(sentences: VocabSentence[], limit: number): VocabSentence[] {
+  const today = localTodayISO();
+  const scored = [...sentences].sort((a, b) => {
+    const aSnap = parseFsrsSnapshot(a.fsrs_snapshot);
+    const bSnap = parseFsrsSnapshot(b.fsrs_snapshot);
+    const aScore =
+      (aSnap?.lapses ?? 0) * 5 + (aSnap?.difficulty ?? 5) * 2 + Math.max(0, dayDiff(today, a.next_review));
+    const bScore =
+      (bSnap?.lapses ?? 0) * 5 + (bSnap?.difficulty ?? 5) * 2 + Math.max(0, dayDiff(today, b.next_review));
+    return bScore - aScore;
+  });
+  return scored.slice(0, limit);
+}
+
 const VocabEnglish: React.FC<VocabEnglishProps> = ({ userId, isOnline }) => {
   const [words, setWords] = useState<VocabWord[]>([]);
   const [sentences, setSentences] = useState<VocabSentence[]>([]);
-  const [due, setDue] = useState<VocabSentence[]>([]);
+  const [dueAll, setDueAll] = useState<VocabSentence[]>([]);
   const [loading, setLoading] = useState(true);
   const [cloudUnavailable, setCloudUnavailable] = useState(false);
+  const [pendingSync, setPendingSync] = useState(0);
+  const [syncing, setSyncing] = useState(false);
 
   const [input, setInput] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
 
   const [filter, setFilter] = useState<'all' | VocabWordStatus | 'due'>('all');
@@ -71,8 +126,10 @@ const VocabEnglish: React.FC<VocabEnglishProps> = ({ userId, isOnline }) => {
   const [dictWord, setDictWord] = useState<VocabWord | null>(null);
   const [studying, setStudying] = useState(false);
   const [useSeed, setUseSeedState] = useState(getUseSeed());
+  const [dailyLimit, setDailyLimit] = useState<20 | 40 | 60>(parseDailyLimit);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
   const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const wordsById = useMemo(() => new Map(words.map((w) => [w.id, w])), [words]);
@@ -92,8 +149,9 @@ const VocabEnglish: React.FC<VocabEnglishProps> = ({ userId, isOnline }) => {
       ]);
       setWords(w);
       setSentences(s);
-      setDue(getDueSentences(s));
+      setDueAll(getDueSentences(s));
       setCloudUnavailable(isVocabCloudUnavailable());
+      setPendingSync(await getVocabPendingSyncCount());
     } catch (e) {
       console.error('[vocab] erro ao carregar dados', e);
       toast.error('Não foi possível carregar o Vocab English.');
@@ -144,14 +202,14 @@ const VocabEnglish: React.FC<VocabEnglishProps> = ({ userId, isOnline }) => {
           }
         } catch (e) {
           console.warn('[vocab] geração de frases falhou', e);
-          toast.error('IA indisponível para gerar frases agora.');
+          toast.error(classifyApiError(e));
         } finally {
           setGeneratingFor(null);
         }
         await refresh();
       } catch (e) {
         console.error('[vocab] erro ao adicionar palavra', e);
-        toast.error('Não foi possível adicionar a palavra.');
+        toast.error(classifyApiError(e));
       } finally {
         setAdding(false);
       }
@@ -173,7 +231,7 @@ const VocabEnglish: React.FC<VocabEnglishProps> = ({ userId, isOnline }) => {
         await refresh();
       } catch (e) {
         console.warn('[vocab] geração de frases falhou', e);
-        toast.error('IA indisponível para gerar frases agora.');
+        toast.error(classifyApiError(e));
       } finally {
         setGeneratingFor(null);
       }
@@ -215,7 +273,37 @@ const VocabEnglish: React.FC<VocabEnglishProps> = ({ userId, isOnline }) => {
     return m;
   }, [sentences]);
 
-  const dueWordIds = useMemo(() => new Set(due.map((s) => s.word_id)), [due]);
+  const dueWordIds = useMemo(() => new Set(dueAll.map((s) => s.word_id)), [dueAll]);
+  const dueQueue = useMemo(() => prioritizeDue(dueAll, dailyLimit), [dueAll, dailyLimit]);
+
+  const metrics = useMemo(() => {
+    const today = localTodayISO();
+    const reviewed = sentences.filter((s) => !!parseFsrsSnapshot(s.fsrs_snapshot));
+    const retained = reviewed.filter((s) => !!s.next_review && s.next_review > today).length;
+    const retention = reviewed.length ? Math.round((retained / reviewed.length) * 100) : 0;
+    const riskWords = words.filter(
+      (w) => w.status !== 'known' && ((w.correct_streak ?? 0) <= 1 || dueWordIds.has(w.id))
+    ).length;
+    const daily = Array.from({ length: WEEK_DAYS }).map((_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (WEEK_DAYS - 1 - i));
+      const day = d.toLocaleDateString('en-CA');
+      const count = sentences.filter((s) => {
+        const snap = parseFsrsSnapshot(s.fsrs_snapshot);
+        const when = snap?.last_review?.slice(0, 10);
+        return when === day;
+      }).length;
+      return { day: day.slice(5), count };
+    });
+    return {
+      reviewedCount: reviewed.length,
+      retention,
+      riskWords,
+      daily,
+      dueTotal: dueAll.length,
+      duePlanned: dueQueue.length,
+    };
+  }, [sentences, words, dueWordIds, dueAll.length, dueQueue.length]);
 
   const filteredWords = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -236,13 +324,136 @@ const VocabEnglish: React.FC<VocabEnglishProps> = ({ userId, isOnline }) => {
     [words]
   );
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(DAILY_LIMIT_STORAGE_KEY, String(dailyLimit));
+    } catch {
+      /* storage indisponível */
+    }
+  }, [dailyLimit]);
+
+  const handleManualSync = useCallback(async () => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      const result = await flushVocabSyncQueue(isOnline);
+      const pending = await getVocabPendingSyncCount();
+      setPendingSync(pending);
+      if (!isOnline) {
+        toast.info('Você está offline. A sincronização será retomada quando voltar a conectar.');
+      } else if (result.synced > 0) {
+        toast.success(`${result.synced} item(ns) sincronizado(s).`);
+      } else if (pending > 0) {
+        toast.info(`${pending} item(ns) ainda pendente(s).`);
+      } else {
+        toast.success('Tudo sincronizado.');
+      }
+      await refresh();
+    } catch (e) {
+      toast.error(classifyApiError(e));
+    } finally {
+      setSyncing(false);
+    }
+  }, [syncing, isOnline, refresh]);
+
+  const handleReplaceSentence = useCallback(
+    async (sentence: VocabSentence) => {
+      const word = wordsById.get(sentence.word_id);
+      if (!word || generatingFor) return;
+      setGeneratingFor(word.id);
+      try {
+        await deleteVocabSentence(sentence.id, isOnline);
+        const created = await generateSentencesForWord(userId, word, words, isOnline, 1, {
+          blockedEnglish: [sentence.text_en],
+        });
+        if (created.length > 0) {
+          toast.success('Frase substituída por uma alternativa nova.');
+        } else {
+          toast.info('Frase removida, mas a IA não retornou substituição válida agora.');
+        }
+        await refresh();
+      } catch (e) {
+        toast.error(classifyApiError(e));
+      } finally {
+        setGeneratingFor(null);
+      }
+    },
+    [wordsById, generatingFor, isOnline, userId, words, refresh]
+  );
+
+  const handleExport = useCallback(() => {
+    const payload = words.map((w) => ({
+      lemma: w.lemma,
+      translation_pt: w.translation_pt,
+      status: w.status,
+      correct_streak: w.correct_streak,
+    }));
+    const csv = [
+      'lemma,translation_pt,status,correct_streak',
+      ...payload.map((p) =>
+        [p.lemma, p.translation_pt ?? '', p.status, String(p.correct_streak ?? 0)]
+          .map((x) => `"${String(x).replace(/"/g, '""')}"`)
+          .join(',')
+      ),
+    ].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `vocab-en-${new Date().toLocaleDateString('en-CA')}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, [words]);
+
+  const handleImportFile = useCallback(
+    async (file: File | null) => {
+      if (!file) return;
+      if (importing) return;
+      setImporting(true);
+      try {
+        const text = await file.text();
+        const lines = text
+          .split(/\r?\n/)
+          .flatMap((line) => line.split(','))
+          .map((x) => x.trim().toLowerCase())
+          .filter(Boolean);
+        const unique = [...new Set(lines)].filter((w) => /^[a-z][a-z'-]{1,40}$/i.test(w));
+        if (unique.length === 0) {
+          toast.info('Nenhuma palavra válida encontrada no arquivo.');
+          return;
+        }
+        let ok = 0;
+        for (const lemma of unique.slice(0, 200)) {
+          try {
+            // reutiliza enriquecimento atual
+            await addVocabWord(userId, lemma, isOnline);
+            ok += 1;
+          } catch {
+            // continua
+          }
+        }
+        await refresh();
+        toast.success(`${ok} palavra(s) importada(s).`);
+      } catch (e) {
+        toast.error(classifyApiError(e));
+      } finally {
+        setImporting(false);
+      }
+    },
+    [importing, userId, isOnline, refresh]
+  );
+
   if (studying) {
     return (
       <VocabStudySession
         userId={userId}
         isOnline={isOnline}
-        sentences={due}
+        sentences={dueQueue}
         wordsById={wordsById}
+        storageKey={`sanfran_vocab_session_${userId}`}
+        onReplaceSentence={handleReplaceSentence}
         onFinish={() => {
           setStudying(false);
           void refresh();
@@ -264,16 +475,53 @@ const VocabEnglish: React.FC<VocabEnglishProps> = ({ userId, isOnline }) => {
         </p>
       </header>
 
-      {cloudUnavailable && (
-        <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20">
-          <CloudOff size={18} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-          <p className="text-xs md:text-sm text-amber-800 dark:text-amber-200 font-medium">
-            Modo local: as tabelas <code>vocab_words</code>/<code>vocab_sentences</code> ainda não
-            existem no Supabase. Seus dados ficam salvos neste dispositivo até que a migration
-            <code> supabase/sql/vocab_english_complete_setup.sql</code> seja executada.
-          </p>
+      <div className="space-y-2">
+        {cloudUnavailable && (
+          <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20">
+            <CloudOff size={18} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <p className="text-xs md:text-sm text-amber-800 dark:text-amber-200 font-medium">
+              Modo local: as tabelas <code>vocab_words</code>/<code>vocab_sentences</code> ainda não
+              existem no Supabase. Seus dados ficam salvos neste dispositivo até que a migration
+              <code> supabase/sql/vocab_english_complete_setup.sql</code> seja executada.
+            </p>
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-2 p-3 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
+            sync pendente: {pendingSync}
+          </span>
+          <button
+            onClick={() => void handleManualSync()}
+            disabled={syncing}
+            className="px-3 py-1.5 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 disabled:opacity-50 flex items-center gap-1.5"
+          >
+            {syncing ? <Loader2 size={12} className="animate-spin" /> : <CloudUpload size={12} />} sincronizar
+          </button>
+          <button
+            onClick={handleExport}
+            className="px-3 py-1.5 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 flex items-center gap-1.5"
+          >
+            <Download size={12} /> exportar csv
+          </button>
+          <button
+            onClick={() => importInputRef.current?.click()}
+            disabled={importing}
+            className="px-3 py-1.5 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 disabled:opacity-50 flex items-center gap-1.5"
+          >
+            {importing ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} importar txt/csv
+          </button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".txt,.csv,text/plain,text/csv"
+            className="hidden"
+            onChange={(e) => {
+              void handleImportFile(e.target.files?.[0] ?? null);
+              e.currentTarget.value = '';
+            }}
+          />
         </div>
-      )}
+      </div>
 
       {/* Add word */}
       <div className="relative">
@@ -334,17 +582,46 @@ const VocabEnglish: React.FC<VocabEnglishProps> = ({ userId, isOnline }) => {
         </div>
         <button
           onClick={() => setStudying(true)}
-          disabled={due.length === 0}
+          disabled={dueQueue.length === 0}
           className="p-4 rounded-2xl bg-sky-600 hover:bg-sky-500 disabled:bg-white dark:disabled:bg-slate-900 disabled:border disabled:border-slate-200 dark:disabled:border-white/10 text-white disabled:text-slate-800 dark:disabled:text-white text-left transition-all active:scale-95 group"
         >
           <p className="text-2xl font-black flex items-center gap-2">
-            {due.length}
+            {dueQueue.length}
             <Play size={16} className="opacity-70 group-disabled:hidden" />
           </p>
-          <p className="text-[10px] font-black uppercase tracking-widest opacity-80 disabled:text-slate-400">
-            Revisões devidas
+          <p className="text-[10px] font-black uppercase tracking-widest opacity-80">
+            Devidas hoje ({dueQueue.length}/{dueAll.length})
           </p>
         </button>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10">
+          <p className="text-2xl font-black text-slate-800 dark:text-white">{metrics.retention}%</p>
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Retenção</p>
+        </div>
+        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10">
+          <p className="text-2xl font-black text-slate-800 dark:text-white">{metrics.reviewedCount}</p>
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Frases revisadas</p>
+        </div>
+        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10">
+          <p className="text-2xl font-black text-rose-600 dark:text-rose-400">{metrics.riskWords}</p>
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Palavras em risco</p>
+        </div>
+        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10">
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Histórico 7 dias</p>
+          <div className="grid grid-cols-7 gap-1 items-end h-10">
+            {metrics.daily.map((d) => (
+              <div key={d.day} className="flex flex-col items-center gap-1">
+                <div
+                  className="w-full rounded bg-sky-500/70"
+                  style={{ height: `${Math.max(4, d.count * 6)}px` }}
+                  title={`${d.day}: ${d.count}`}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Filters + seed toggle */}
@@ -360,9 +637,23 @@ const VocabEnglish: React.FC<VocabEnglishProps> = ({ userId, isOnline }) => {
                 : 'bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/20'
             }`}
           >
-            {f === 'all' ? 'Todas' : f === 'due' ? `Devidas (${due.length})` : STATUS_LABEL[f]}
+            {f === 'all' ? 'Todas' : f === 'due' ? `Devidas (${dueAll.length})` : STATUS_LABEL[f]}
           </button>
         ))}
+        <label className="flex items-center gap-2 px-3 py-2 rounded-full bg-slate-50 dark:bg-white/5">
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
+            meta diária
+          </span>
+          <select
+            value={dailyLimit}
+            onChange={(e) => setDailyLimit(Number(e.target.value) as 20 | 40 | 60)}
+            className="bg-transparent text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-200 outline-none"
+          >
+            <option value={20}>20</option>
+            <option value={40}>40</option>
+            <option value={60}>60</option>
+          </select>
+        </label>
         <div className="flex-1" />
         <input
           value={search}
@@ -481,7 +772,11 @@ const VocabEnglish: React.FC<VocabEnglishProps> = ({ userId, isOnline }) => {
                 </div>
 
                 {isExpanded && (
-                  <WordSentences wordId={word.id} lemma={word.lemma} />
+                  <WordSentences
+                    wordId={word.id}
+                    isReplacing={generatingFor === word.id}
+                    onReplaceSentence={handleReplaceSentence}
+                  />
                 )}
               </div>
             );
@@ -509,7 +804,11 @@ const VocabEnglish: React.FC<VocabEnglishProps> = ({ userId, isOnline }) => {
 };
 
 /** Lista expansível de frases de uma palavra (local, via Dexie). */
-const WordSentences: React.FC<{ wordId: string; lemma: string }> = ({ wordId, lemma }) => {
+const WordSentences: React.FC<{
+  wordId: string;
+  isReplacing: boolean;
+  onReplaceSentence: (sentence: VocabSentence) => Promise<void>;
+}> = ({ wordId, isReplacing, onReplaceSentence }) => {
   const [rows, setRows] = useState<VocabSentence[]>([]);
 
   useEffect(() => {
@@ -540,6 +839,15 @@ const WordSentences: React.FC<{ wordId: string; lemma: string }> = ({ wordId, le
               aria-label="Ouvir frase"
             >
               <Volume2 size={14} />
+            </button>
+            <button
+              onClick={() => void onReplaceSentence(s)}
+              disabled={isReplacing}
+              className="p-1.5 rounded-lg text-violet-500 hover:bg-violet-100 dark:hover:bg-violet-500/10 transition-colors shrink-0 mt-0.5 disabled:opacity-50"
+              aria-label="Frase ruim: substituir"
+              title="Frase ruim: substituir"
+            >
+              {isReplacing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
             </button>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{s.text_en}</p>
