@@ -124,8 +124,19 @@ interface GeneratedSentence {
   pt: string;
 }
 
-function buildPrompt(targetLemma: string, knownList: string[], count: number): string {
+function buildPrompt(
+  targetLemma: string,
+  knownList: string[],
+  count: number,
+  blockedEnglish: string[]
+): string {
   const vocabSample = knownList.slice(0, 600).join(', ');
+  const blockedSample =
+    blockedEnglish.length > 0
+      ? `\n- Never return any of these sentences (or close rephrases): ${blockedEnglish
+          .slice(0, 40)
+          .join(' | ')}`
+      : '';
   return `You are a language-learning sentence generator. Write ${count} short English sentences (8-14 words each) that teach the word "${targetLemma}" in context, in the i+1 style: every other word in each sentence MUST come only from this allowed vocabulary list (plus inflections of it):
 
 ${vocabSample}
@@ -134,7 +145,10 @@ Rules:
 - Each sentence must contain the word "${targetLemma}" (any inflection).
 - Do NOT use any other word outside the allowed list. No proper nouns.
 - Sentences must be natural, varied in meaning, and help infer the word's meaning.
+- Keep wording simple and very common, avoiding unnatural phrasing.
 - For each sentence, also give a natural Brazilian Portuguese translation.
+- Avoid uncommon names, legal citations, or slang.
+${blockedSample}
 - Respond ONLY with a JSON array like [{"en": "...", "pt": "..."}].`;
 }
 
@@ -166,34 +180,42 @@ export async function generateSentencesForWord(
   word: VocabWord,
   allWords: VocabWord[],
   isOnline: boolean,
-  count = 4
+  count = 4,
+  options?: { blockedEnglish?: string[] }
 ): Promise<VocabSentence[]> {
   const knownLemmas = await getKnownLemmas(allWords, getUseSeed());
-  const prompt = buildPrompt(word.lemma, [...knownLemmas], count);
-
-  const response = await ai.models.generateContent({
-    model: GEMINI_MODEL,
-    contents: [{ parts: [{ text: prompt }] }],
-    config: {
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            en: { type: Type.STRING },
-            pt: { type: Type.STRING },
+  const blocked = (options?.blockedEnglish ?? []).map((x) => x.trim().toLowerCase()).filter(Boolean);
+  const runGeneration = async (requestedCount: number): Promise<GeneratedSentence[]> => {
+    const prompt = buildPrompt(word.lemma, [...knownLemmas], requestedCount, blocked);
+    const response = await ai.models.generateContent({
+      model: GEMINI_MODEL,
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              en: { type: Type.STRING },
+              pt: { type: Type.STRING },
+            },
           },
         },
       },
-    },
-  });
-
-  const candidates = extractJsonArray(response.text || '');
+    });
+    return extractJsonArray(response.text || '');
+  };
   const existing = await listVocabSentences(userId, isOnline);
   const existingForWord = new Set(
     existing.filter((s) => s.word_id === word.id).map((s) => s.text_en.toLowerCase())
   );
+  for (const b of blocked) existingForWord.add(b);
+
+  const candidates = [
+    ...(await runGeneration(Math.max(count, 4))),
+    ...(await runGeneration(Math.max(count, 3))),
+  ];
 
   const now = new Date().toISOString();
   const created: VocabSentence[] = [];
