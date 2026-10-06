@@ -129,7 +129,8 @@ function buildPrompt(
   targetLemma: string,
   knownList: string[],
   count: number,
-  blockedEnglish: string[]
+  blockedEnglish: string[],
+  outputShape: 'array' | 'object' = 'array'
 ): string {
   const vocabSample = knownList.slice(0, 600).join(', ');
   const blockedSample =
@@ -150,16 +151,26 @@ Rules:
 - For each sentence, also give a natural Brazilian Portuguese translation.
 - Avoid uncommon names, legal citations, or slang.
 ${blockedSample}
-- Respond ONLY with a JSON array like [{"en": "...", "pt": "..."}].`;
+- ${
+    outputShape === 'object'
+      ? 'Respond ONLY with a JSON object like {"sentences": [{"en": "...", "pt": "..."}]}.'
+      : 'Respond ONLY with a JSON array like [{"en": "...", "pt": "..."}].'
+  }`;
 }
 
 function extractJsonArray(text: string): GeneratedSentence[] {
   const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
   const start = cleaned.indexOf('[');
   const end = cleaned.lastIndexOf(']');
-  if (start === -1 || end === -1) return [];
   try {
-    const parsed = JSON.parse(cleaned.slice(start, end + 1));
+    let parsed: unknown;
+    if (start !== -1 && end !== -1) {
+      parsed = JSON.parse(cleaned.slice(start, end + 1));
+    } else {
+      // Ollama com format:'json' às vezes devolve um único objeto {en, pt}.
+      const single = JSON.parse(cleaned);
+      parsed = single && typeof single === 'object' ? [single] : [];
+    }
     if (!Array.isArray(parsed)) return [];
     return parsed
       .map((x) => ({
@@ -188,8 +199,8 @@ export async function generateSentencesForWord(
 ): Promise<VocabSentence[]> {
   const knownLemmas = await getKnownLemmas(allWords, getUseSeed());
   const blocked = (options?.blockedEnglish ?? []).map((x) => x.trim().toLowerCase()).filter(Boolean);
-  const buildFor = (requestedCount: number) =>
-    buildPrompt(word.lemma, [...knownLemmas], requestedCount, blocked);
+  const buildFor = (requestedCount: number, outputShape: 'array' | 'object' = 'array') =>
+    buildPrompt(word.lemma, [...knownLemmas], requestedCount, blocked, outputShape);
 
   const runGeminiGeneration = async (requestedCount: number): Promise<GeneratedSentence[]> => {
     const prompt = buildFor(requestedCount);
@@ -216,7 +227,9 @@ export async function generateSentencesForWord(
   /** Retorna [] em qualquer falha (rede, timeout, JSON inválido) para cair no Gemini. */
   const runOllamaGeneration = async (requestedCount: number): Promise<GeneratedSentence[]> => {
     try {
-      const text = await ollamaGenerate(buildFor(requestedCount), { jsonMode: true });
+      const text = await ollamaGenerate(buildFor(requestedCount, 'object'), {
+        jsonMode: true,
+      });
       return extractJsonArray(text);
     } catch (e) {
       console.debug('[vocab] Ollama falhou, usando Gemini:', e);
