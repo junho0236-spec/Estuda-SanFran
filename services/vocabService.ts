@@ -1,6 +1,7 @@
 import Dexie, { Table } from 'dexie';
 import { supabase } from './supabaseClient';
 import { geminiService } from './geminiService';
+import { ollamaGenerate, shouldUseOllama } from './ollamaService';
 import {
   VOCAB_WORD_CLOUD_COLUMNS,
   VOCAB_SENTENCE_CLOUD_COLUMNS,
@@ -407,7 +408,24 @@ export async function fetchDictionaryEntry(lemma: string): Promise<DictionaryEnt
   }
 }
 
+const OLLAMA_TRANSLATE_INSTRUCTION =
+  'Translate the following text to Brazilian Portuguese. Output only the translation, no quotes or extra text.';
+
+async function translateWithOllama(text: string): Promise<string> {
+  const trimmed = text.trim();
+  if (!trimmed || !(await shouldUseOllama())) return '';
+  try {
+    const out = await ollamaGenerate(`${OLLAMA_TRANSLATE_INSTRUCTION}\n\n${trimmed}`, { timeoutMs: 30000 });
+    return out.replace(/^["'“”«»]+|["'“”«»]+$/g, '').trim();
+  } catch (e) {
+    console.debug('[vocab] Ollama falhou na tradução, usando Gemini:', e);
+    return '';
+  }
+}
+
 export async function translateToPtBr(text: string): Promise<string> {
+  const local = await translateWithOllama(text);
+  if (local) return local;
   try {
     return await geminiService.translateText(text, 'pt');
   } catch (e) {
