@@ -381,6 +381,20 @@ const VocabEnglish: React.FC<VocabEnglishProps> = ({ userId, isOnline }) => {
     [wordsById, generatingFor, isOnline, userId, words, refresh]
   );
 
+  const handleDeleteSentence = useCallback(
+    async (sentence: VocabSentence) => {
+      try {
+        await deleteVocabSentence(sentence.id, isOnline);
+        await refresh();
+        toast.success('Frase excluída.');
+      } catch (e) {
+        toast.error(classifyApiError(e));
+        throw e;
+      }
+    },
+    [isOnline, refresh]
+  );
+
   const handleExport = useCallback(() => {
     const payload = words.map((w) => ({
       lemma: w.lemma,
@@ -454,6 +468,7 @@ const VocabEnglish: React.FC<VocabEnglishProps> = ({ userId, isOnline }) => {
         wordsById={wordsById}
         storageKey={`sanfran_vocab_session_${userId}`}
         onReplaceSentence={handleReplaceSentence}
+        onDeleteSentence={handleDeleteSentence}
         onFinish={() => {
           setStudying(false);
           void refresh();
@@ -776,6 +791,7 @@ const VocabEnglish: React.FC<VocabEnglishProps> = ({ userId, isOnline }) => {
                     wordId={word.id}
                     isReplacing={generatingFor === word.id}
                     onReplaceSentence={handleReplaceSentence}
+                    onDeleteSentence={handleDeleteSentence}
                   />
                 )}
               </div>
@@ -808,8 +824,23 @@ const WordSentences: React.FC<{
   wordId: string;
   isReplacing: boolean;
   onReplaceSentence: (sentence: VocabSentence) => Promise<void>;
-}> = ({ wordId, isReplacing, onReplaceSentence }) => {
+  onDeleteSentence: (sentence: VocabSentence) => Promise<void>;
+}> = ({ wordId, isReplacing, onReplaceSentence, onDeleteSentence }) => {
   const [rows, setRows] = useState<VocabSentence[]>([]);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const deleteRow = async (sentence: VocabSentence) => {
+    if (deletingId) return;
+    setDeletingId(sentence.id);
+    try {
+      await onDeleteSentence(sentence);
+      setRows((prev) => prev.filter((r) => r.id !== sentence.id));
+    } catch {
+      /* toast já exibido pelo pai */
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   useEffect(() => {
     void listSentencesForWord(wordId).then(setRows);
@@ -864,6 +895,15 @@ const WordSentences: React.FC<{
             >
               {isDue ? 'Devida' : s.next_review}
             </span>
+            <button
+              onClick={() => void deleteRow(s)}
+              disabled={deletingId !== null}
+              className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors shrink-0 disabled:opacity-50"
+              aria-label="Excluir frase"
+              title="Excluir frase"
+            >
+              {deletingId === s.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+            </button>
           </div>
         );
       })}
