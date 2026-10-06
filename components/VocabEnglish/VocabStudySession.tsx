@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { X, Volume2, Eye, CheckCircle2, RotateCcw, Pause, RefreshCw, Loader2 } from 'lucide-react';
+import { X, Volume2, Eye, CheckCircle2, RotateCcw, Pause, RefreshCw, Loader2, Trash2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { toast } from 'sonner';
@@ -15,6 +15,7 @@ interface VocabStudySessionProps {
   wordsById: Map<string, VocabWord>;
   storageKey: string;
   onReplaceSentence: (sentence: VocabSentence) => Promise<void>;
+  onDeleteSentence: (sentence: VocabSentence) => Promise<void>;
   onFinish: () => void;
 }
 
@@ -92,6 +93,7 @@ const VocabStudySession: React.FC<VocabStudySessionProps> = ({
   wordsById,
   storageKey,
   onReplaceSentence,
+  onDeleteSentence,
   onFinish,
 }) => {
   const [initialQueue] = useState<VocabSentence[]>(() => loadSavedQueue(storageKey, sentences));
@@ -100,6 +102,7 @@ const VocabStudySession: React.FC<VocabStudySessionProps> = ({
   const [revealed, setRevealed] = useState(false);
   const [reviewing, setReviewing] = useState(false);
   const [replacing, setReplacing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [done, setDone] = useState(false);
   const [promotions, setPromotions] = useState<string[]>([]);
   const [studyMode, setStudyMode] = useState<'normal' | 'cloze'>('normal');
@@ -190,6 +193,21 @@ const VocabStudySession: React.FC<VocabStudySessionProps> = ({
       setReplacing(false);
     }
   }, [current, replacing, onReplaceSentence]);
+
+  const deleteCurrent = useCallback(async () => {
+    if (!current || deleting || replacing) return;
+    const id = current.id;
+    setDeleting(true);
+    try {
+      await onDeleteSentence(current);
+      setQueue((prev) => prev.filter((s) => s.id !== id));
+      setRevealed(false);
+    } catch {
+      /* toast já exibido pelo pai */
+    } finally {
+      setDeleting(false);
+    }
+  }, [current, deleting, replacing, onDeleteSentence]);
 
   useEffect(() => {
     if (queue.length === 0 && !done) setDone(true);
@@ -346,14 +364,22 @@ const VocabStudySession: React.FC<VocabStudySessionProps> = ({
               palavra alvo: <span className="text-sky-600 dark:text-sky-400">{currentWord.lemma}</span>
             </p>
           )}
-          <div className="mt-3 flex justify-center">
+          <div className="mt-3 flex flex-wrap justify-center gap-2">
             <button
               onClick={() => void replaceCurrent()}
-              disabled={replacing}
+              disabled={replacing || deleting}
               className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-violet-600 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-500/10 disabled:opacity-50 flex items-center gap-2"
             >
               {replacing ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
               Frase ruim? substituir
+            </button>
+            <button
+              onClick={() => void deleteCurrent()}
+              disabled={replacing || deleting}
+              className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-rose-500 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-500/10 disabled:opacity-50 flex items-center gap-2"
+            >
+              {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+              Excluir frase
             </button>
           </div>
         </motion.div>
