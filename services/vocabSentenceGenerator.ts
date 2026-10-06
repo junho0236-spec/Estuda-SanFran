@@ -118,6 +118,21 @@ function validateSentence(
   return { valid, unknownTokens, containsTarget };
 }
 
+/**
+ * Modelos fracos às vezes deixam a palavra alvo em inglês na tradução
+ * ("teve que rebuke"). Ignora cognatos (tradução da palavra contém o lemma).
+ */
+function translationKeepsEnglishTarget(
+  textPt: string,
+  targetLemma: string,
+  targetTranslationPt: string | null
+): boolean {
+  const lemma = targetLemma.toLowerCase();
+  if (lemma.length < 3) return false;
+  if (targetTranslationPt && tokenize(targetTranslationPt).some((t) => t.includes(lemma))) return false;
+  return tokenize(textPt).some((tok) => tok === lemma || naiveLemma(tok) === lemma);
+}
+
 /* ------------------------------ geração ----------------------------------- */
 
 interface GeneratedSentence {
@@ -130,7 +145,8 @@ function buildPrompt(
   knownList: string[],
   count: number,
   blockedEnglish: string[],
-  outputShape: 'array' | 'object' = 'array'
+  outputShape: 'array' | 'object' = 'array',
+  targetMeaningPt?: string | null
 ): string {
   const vocabSample = knownList.slice(0, 600).join(', ');
   const blockedSample =
@@ -139,6 +155,9 @@ function buildPrompt(
           .slice(0, 40)
           .join(' | ')}`
       : '';
+  const meaningRule = targetMeaningPt?.trim()
+    ? `\n- In Brazilian Portuguese, "${targetLemma}" means "${targetMeaningPt.trim()}". In each "pt" translation, translate "${targetLemma}" with this meaning (conjugated/inflected as needed).`
+    : '';
   return `You are a language-learning sentence generator. Write ${count} short English sentences (8-14 words each) that teach the word "${targetLemma}" in context, in the i+1 style: every other word in each sentence MUST come only from this allowed vocabulary list (plus inflections of it):
 
 ${vocabSample}
@@ -148,7 +167,7 @@ Rules:
 - Do NOT use any other word outside the allowed list. No proper nouns.
 - Sentences must be natural, varied in meaning, and help infer the word's meaning.
 - Keep wording simple and very common, avoiding unnatural phrasing.
-- For each sentence, also give a natural Brazilian Portuguese translation.
+- For each sentence, also give a natural Brazilian Portuguese translation. Translate every word; never leave English words in the "pt" field.${meaningRule}
 - Avoid uncommon names, legal citations, or slang.
 ${blockedSample}
 - ${
@@ -200,7 +219,7 @@ export async function generateSentencesForWord(
   const knownLemmas = await getKnownLemmas(allWords, getUseSeed());
   const blocked = (options?.blockedEnglish ?? []).map((x) => x.trim().toLowerCase()).filter(Boolean);
   const buildFor = (requestedCount: number, outputShape: 'array' | 'object' = 'array') =>
-    buildPrompt(word.lemma, [...knownLemmas], requestedCount, blocked, outputShape);
+    buildPrompt(word.lemma, [...knownLemmas], requestedCount, blocked, outputShape, word.translation_pt);
 
   const runGeminiGeneration = async (requestedCount: number): Promise<GeneratedSentence[]> => {
     const prompt = buildFor(requestedCount);
@@ -253,6 +272,10 @@ export async function generateSentencesForWord(
       const check = validateSentence(c.en, word.lemma, knownLemmas);
       if (!check.valid) {
         console.debug('[vocab] frase rejeitada pela validação i+1:', c.en, check.unknownTokens);
+        continue;
+      }
+      if (translationKeepsEnglishTarget(c.pt || '', word.lemma, word.translation_pt)) {
+        console.debug('[vocab] frase rejeitada: tradução manteve a palavra em inglês:', c.pt);
         continue;
       }
       existingForWord.add(key);
