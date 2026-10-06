@@ -7,6 +7,7 @@ import {
   saveVocabSentences,
 } from './vocabService';
 import { VOCAB_SEED_WORDS } from './vocabSeedWords';
+import { ollamaGenerate, shouldUseOllama } from './ollamaService';
 
 /**
  * Gerador de frases i+1 (compreensível + 1 item novo), estilo Migaku.
@@ -171,6 +172,8 @@ function extractJsonArray(text: string): GeneratedSentence[] {
   }
 }
 
+const OLLAMA_GENERATION_ATTEMPTS = 4;
+
 /**
  * Gera, valida e persiste frases i+1 para a palavra alvo.
  * Retorna as frases criadas (pode ser < requested se a validação filtrar).
@@ -185,8 +188,11 @@ export async function generateSentencesForWord(
 ): Promise<VocabSentence[]> {
   const knownLemmas = await getKnownLemmas(allWords, getUseSeed());
   const blocked = (options?.blockedEnglish ?? []).map((x) => x.trim().toLowerCase()).filter(Boolean);
-  const runGeneration = async (requestedCount: number): Promise<GeneratedSentence[]> => {
-    const prompt = buildPrompt(word.lemma, [...knownLemmas], requestedCount, blocked);
+  const buildFor = (requestedCount: number) =>
+    buildPrompt(word.lemma, [...knownLemmas], requestedCount, blocked);
+
+  const runGeminiGeneration = async (requestedCount: number): Promise<GeneratedSentence[]> => {
+    const prompt = buildFor(requestedCount);
     const response = await ai.models.generateContent({
       model: GEMINI_MODEL,
       contents: [{ parts: [{ text: prompt }] }],
@@ -206,39 +212,68 @@ export async function generateSentencesForWord(
     });
     return extractJsonArray(response.text || '');
   };
+
+  /** Retorna [] em qualquer falha (rede, timeout, JSON inválido) para cair no Gemini. */
+  const runOllamaGeneration = async (requestedCount: number): Promise<GeneratedSentence[]> => {
+    try {
+      const text = await ollamaGenerate(buildFor(requestedCount), { jsonMode: true });
+      return extractJsonArray(text);
+    } catch (e) {
+      console.debug('[vocab] Ollama falhou, usando Gemini:', e);
+      return [];
+    }
+  };
+
   const existing = await listVocabSentences(userId, isOnline);
   const existingForWord = new Set(
     existing.filter((s) => s.word_id === word.id).map((s) => s.text_en.toLowerCase())
   );
   for (const b of blocked) existingForWord.add(b);
 
-  const candidates = [
-    ...(await runGeneration(Math.max(count, 4))),
-    ...(await runGeneration(Math.max(count, 3))),
-  ];
-
   const now = new Date().toISOString();
   const created: VocabSentence[] = [];
-  for (const c of candidates) {
-    if (existingForWord.has(c.en.toLowerCase())) continue;
-    const check = validateSentence(c.en, word.lemma, knownLemmas);
-    if (!check.valid) {
-      console.debug('[vocab] frase rejeitada pela validação i+1:', c.en, check.unknownTokens);
-      continue;
+  const acceptCandidates = (candidates: GeneratedSentence[]) => {
+    for (const c of candidates) {
+      if (created.length >= count) break;
+      const key = c.en.toLowerCase();
+      if (existingForWord.has(key)) continue;
+      const check = validateSentence(c.en, word.lemma, knownLemmas);
+      if (!check.valid) {
+        console.debug('[vocab] frase rejeitada pela validação i+1:', c.en, check.unknownTokens);
+        continue;
+      }
+      existingForWord.add(key);
+      created.push({
+        id: crypto.randomUUID(),
+        user_id: userId,
+        word_id: word.id,
+        text_en: c.en,
+        translation_pt: c.pt || null,
+        audio_url: null,
+        fsrs_snapshot: null,
+        next_review: null,
+        created_at: now,
+        updated_at: now,
+      });
     }
-    created.push({
-      id: crypto.randomUUID(),
-      user_id: userId,
-      word_id: word.id,
-      text_en: c.en,
-      translation_pt: c.pt || null,
-      audio_url: null,
-      fsrs_snapshot: null,
-      next_review: null,
-      created_at: now,
-      updated_at: now,
-    });
-    if (created.length >= count) break;
+  };
+
+  // Ollama (local, gratuito, mais fraco): mais tentativas quando a validação
+  // rejeita candidatas. Falha/resultado vazio encerra a fase local.
+  if (await shouldUseOllama()) {
+    for (let attempt = 0; attempt < OLLAMA_GENERATION_ATTEMPTS && created.length < count; attempt++) {
+      const candidates = await runOllamaGeneration(Math.max(count, 4));
+      if (candidates.length === 0) break;
+      acceptCandidates(candidates);
+    }
+  }
+
+  // Fallback Gemini (fluxo original: até 2 chamadas) se o Ollama não gerou nada válido.
+  if (created.length === 0) {
+    for (const requested of [Math.max(count, 4), Math.max(count, 3)]) {
+      if (created.length >= count) break;
+      acceptCandidates(await runGeminiGeneration(requested));
+    }
   }
 
   if (created.length > 0) {
